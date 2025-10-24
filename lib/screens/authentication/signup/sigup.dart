@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:kakiso_reseller_app/screens/authentication/success.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -202,9 +205,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 // 11. Create Account Button
                 ElevatedButton(
-                  onPressed: () {
-                    // Handle Create Account logic
-                  },
+                  onPressed: () => Get.to(() => const AccountCreatedScreen()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE91E63),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),

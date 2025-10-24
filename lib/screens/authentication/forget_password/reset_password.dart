@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart'; // Assuming you are still using GetX for navigation
 

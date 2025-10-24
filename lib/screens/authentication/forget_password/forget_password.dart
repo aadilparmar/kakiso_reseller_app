@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/reset_password.dart';
-import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
-import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
