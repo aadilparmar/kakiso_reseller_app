@@ -4,11 +4,15 @@ import 'package:kakiso_reseller_app/screens/authentication/forget_password/forge
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 import 'dart:async'; // For async operations
 
-// 1. Import http and convert packages
-import 'package:http/http.dart' as http;
+// 1. Import the graphql_flutter package
+import 'package:graphql_flutter/graphql_flutter.dart';
+
+// 2. Import your dashboard page and user model
 // Assuming UserDashboardPage and UserData are in 'example.dart'
 import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
-import 'dart:convert'; // For jsonDecode
+// 3. We no longer need http or dart:convert
+// import 'package:http/http.dart' as http;
+// import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,10 +28,23 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // 3. DEFINE YOUR STORE'S URL
-  // ‼️‼️ THIS IS THE FIX ‼️‼️
-  // Remove "/reseller/login" from the end of the URL.
-  final String _baseUrl = "https://prod-kakiso.smitpatadiya.me";
+  // 4. DEFINE YOUR STORE'S GRAPHQL URL
+  // The endpoint for WPGraphQL is almost always /graphql
+  final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
+
+  // 5. This is the GraphQL client
+  late GraphQLClient _client;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the GraphQL client
+    final HttpLink httpLink = HttpLink(_graphqlUrl);
+    _client = GraphQLClient(
+      link: httpLink,
+      cache: GraphQLCache(), // Use default in-memory cache
+    );
+  }
 
   @override
   void dispose() {
@@ -36,111 +53,100 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // 4. THIS IS THE NEW, REAL API LOGIN FUNCTION
-  /// Logs into the WordPress JWT plugin, gets a token,
-  /// then uses that token to fetch WooCommerce customer data.
+  // 6. THIS IS THE NEW, REAL GRAPHQL LOGIN FUNCTION
+  /// Logs in using the WPGraphQL JWT Authentication plugin.
+  /// This single mutation gets the auth token AND all the user data we need.
   Future<UserData> _apiLogin(String email, String password) async {
-    String? token;
-
-    // --- Step 1: Get Authentication Token ---
-    // This calls the "JWT Authentication for WP REST API" plugin
-    try {
-      final tokenResponse = await http.post(
-        Uri.parse('$_baseUrl/wp-json/jwt-auth/v1/token'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': email, 'password': password}),
-      );
-
-      if (tokenResponse.statusCode == 200) {
-        final tokenData = jsonDecode(tokenResponse.body);
-        token = tokenData['token'];
-      } else {
-        // Handle login failure
-        final errorData = jsonDecode(tokenResponse.body);
-        throw Exception(errorData['message'] ?? 'Invalid email or password.');
-      }
-    } catch (e) {
-      // ‼️ ADDED THIS PRINT to help debug ‼️
-      print('--- LOGIN API ERROR ---');
-      print(e);
-      print('-------------------------');
-      throw Exception('Login failed. Please check your credentials.');
-    }
-
-    if (token == null) {
-      throw Exception('Login failed. Could not get auth token.');
-    }
-
-    // --- Step 2: Fetch Customer Data using the Token ---
-    // This calls the WooCommerce "Customers" endpoint
-    try {
-      final customerResponse = await http.get(
-        // We find the customer by their email
-        Uri.parse('$_baseUrl/wp-json/wc/v3/customers?email=$email'),
-        headers: {
-          'Content-Type': 'application/json',
-          // Use the token for authentication
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (customerResponse.statusCode == 200) {
-        final List<dynamic> customerList = jsonDecode(customerResponse.body);
-        if (customerList.isEmpty) {
-          throw Exception('Customer data not found for this user.');
+    // 7. This is the GraphQL mutation string.
+    // It's like a function definition for the API.
+    const String loginMutation = r'''
+      mutation LoginUser($username: String!, $password: String!) {
+        login(input: { username: $username, password: $password }) {
+          authToken
+          user {
+            databaseId
+            email
+            firstName
+            lastName
+            registeredDate
+            avatar {
+              url
+            }
+          }
         }
-
-        // The API returns a list, we take the first match
-        final customerData = customerList[0];
-
-        // 5. Map the API response to your UserData model
-        return UserData(
-          // Combine first and last name
-          name: '${customerData['first_name']} ${customerData['last_name']}',
-          email: customerData['email'],
-          // Convert the integer ID from API to a String for your model
-          userId: customerData['id'].toString(),
-          // Parse the date string from the API
-          joined: DateTime.parse(customerData['date_created']),
-          profilePicUrl: customerData['avatar_url'],
-        );
-      } else {
-        throw Exception(
-          'Failed to fetch user data. Status: ${customerResponse.statusCode}',
-        );
       }
-    } catch (e) {
-      // ‼️ ADDED THIS PRINT to help debug ‼️
-      print('--- CUSTOMER API ERROR ---');
-      print(e);
-      print('----------------------------');
-      throw Exception('An error occurred while fetching user details.');
+    ''';
+
+    // 8. Set the variables for the mutation
+    final MutationOptions options = MutationOptions(
+      document: gql(loginMutation),
+      variables: <String, dynamic>{'username': email, 'password': password},
+    );
+
+    // 9. Call the API
+    final QueryResult result = await _client.mutate(options);
+
+    // 10. Check for errors
+    if (result.hasException) {
+      print('--- GRAPHQL API ERROR ---');
+      print(result.exception.toString());
+      print('-------------------------');
+      // Throw a user-friendly error
+      // Try to find a more specific error message
+      String errorMessage = 'Login failed. Please check your credentials.';
+      if (result.exception!.graphqlErrors.isNotEmpty) {
+        errorMessage = result.exception!.graphqlErrors[0].message;
+      }
+      throw Exception(errorMessage);
+    }
+
+    // 11. Parse the successful response
+    if (result.data != null && result.data!['login'] != null) {
+      final loginData = result.data!['login'];
+      final userData = loginData['user'];
+
+      // We can also store this token for future authenticated requests
+      // final String authToken = loginData['authToken'];
+      // (For now, we just pass the user data)
+
+      // 12. Map the API response to your UserData model
+      return UserData(
+        name: '${userData['firstName']} ${userData['lastName']}',
+        email: userData['email'],
+        userId: userData['databaseId'].toString(),
+        joined: DateTime.parse(userData['registeredDate']),
+        // ‼️‼️ THIS IS THE FIX ‼️‼️
+        // We use "??" to provide a default empty string if the avatar data is null.
+        profilePicUrl: userData['avatar']?['url'] ?? '',
+      );
+    } else {
+      // This happens if the GraphQL call succeeded but didn't return data
+      throw Exception('Login failed. Received invalid data from server.');
     }
   }
 
-  // 6. This handler function stays the same!
-  // It will now call your new _apiLogin function.
+  // 13. This handler function stays the same!
+  // It doesn't care *how* _apiLogin works, just that it returns a UserData
   Future<void> _handleLogin() async {
     // Start loading
     setState(() => _isLoading = true);
 
     try {
-      final email = _emailController.text.trim(); // Use .trim()
+      final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Call the API
+      // Call the API (now the GraphQL version)
       final userData = await _apiLogin(email, password);
 
       // If successful, stop loading and navigate to dashboard
       if (mounted) {
         setState(() => _isLoading = false);
-        Get.off(() => UserDashboardPage(userData: userData));
+        Get.offAll(() => UserDashboardPage(userData: userData));
       }
     } catch (e) {
       // If API call fails, stop loading and show an error
       if (mounted) {
         setState(() => _isLoading = false);
-        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceFirst("Exception: ", "")),
@@ -158,7 +164,6 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            // Consistent padding around the content
             padding: const EdgeInsets.symmetric(
               horizontal: 24.0,
               vertical: 32.0,
@@ -363,7 +368,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(
                           color: Color(0xFFE91E63),
                           decoration: TextDecoration.underline,
-                          decorationColor: Color(0xFFE91E63), // Fixed color
+                          decorationColor: Color(0xFFE91E63),
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
                         ),

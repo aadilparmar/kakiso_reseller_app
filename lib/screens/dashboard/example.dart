@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'dart:async'; // For Future.delayed
+import 'package:flutter/material.dart'; // For Future.delayed
 
 // A simple model for our user data
 class UserData {

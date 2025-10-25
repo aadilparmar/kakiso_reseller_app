@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get/get_core/src/get_main.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
+import 'package:kakiso_reseller_app/screens/intro/intro.dart';
 
 class AccountCreatedScreen extends StatelessWidget {
   const AccountCreatedScreen({Key? key}) : super(key: key);
@@ -59,7 +59,7 @@ class AccountCreatedScreen extends StatelessWidget {
                 // Make the button wide, but not full-width
                 width: screenWidth * 0.75,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => Get.offAll(() => const KIntroScreen()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(
                       0xFFE91E63,
