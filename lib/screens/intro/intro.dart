@@ -37,15 +37,6 @@ class KIntroScreen extends StatelessWidget {
         title: Row(
           children: [
             // 1. Hamburger Icon (Left)
-            IconButton(
-              icon: const Icon(Icons.menu),
-              color: accentColor,
-              iconSize: 30,
-              onPressed: () {
-                // Action for opening the menu/drawer
-              },
-            ),
-
             // 2. Logo (Center-Left) - Using the Image widget for your logo.
             Padding(
               padding: const EdgeInsets.only(left: 8.0),

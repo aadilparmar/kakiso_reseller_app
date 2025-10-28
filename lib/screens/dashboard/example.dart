@@ -303,6 +303,26 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
+              ), // Spacing below the search bar
+              ClipRRect(
+                child: Image.asset(
+                  'assets/images/posters/h_poster1.png', // Placeholder for the woman's image
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: const Color(
+                        0xFFF7F4F9,
+                      ), // Match container background
+                      child: const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Colors.purple,
+                        ), // Reduced icon size
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
