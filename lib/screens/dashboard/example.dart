@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-// --- IMPORTS ADDED FOR LOGOUT ---
+// --- IMPORTS ADDED FOR LOGOUT & DRAWER ---
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 // You MUST update this import to point to your actual login page file
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+// Import for the icon pack you're using in the AppBar
 // --- END OF IMPORTS ---
 
 // A simple model for our user data
@@ -24,32 +25,31 @@ class UserData {
   });
 }
 
-class UserDashboardPage extends StatefulWidget {
-  // 1. Add userData to the constructor
+// --- RENAMED TO HomePage ---
+class HomePage extends StatefulWidget {
   final UserData userData;
 
-  const UserDashboardPage({
-    super.key,
-    required this.userData, // 2. Make it required
-  });
+  const HomePage({super.key, required this.userData});
 
   @override
-  State<UserDashboardPage> createState() => _UserDashboardPageState();
+  // --- RENAMED STATE ---
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _UserDashboardPageState extends State<UserDashboardPage> {
-  // 3. Remove _isLoading, we get data immediately
-  late UserData _userData; // 4. Make this non-nullable
+// --- RENAMED STATE ---
+class _HomePageState extends State<HomePage> {
+  late UserData _userData;
 
-  // --- ADDED FOR LOGOUT ---
+  // Define the accent color from your image
+  final Color accentColor = const Color(0xFFE91E63);
+  final Color drawerHeaderColor = const Color(0xFF4A317E);
+  final Color drawerIconColor = const Color(0xFFCC0000); // A strong red
+
+  // --- LOGOUT LOGIC (KEPT) ---
   final _storage = const FlutterSecureStorage();
 
   Future<void> _handleLogout() async {
-    // 1. Delete the saved token
     await _storage.delete(key: 'authToken');
-
-    // 2. Navigate back to the LoginPage, removing all previous routes
-    //    (Ensures user can't press "back" to get to the dashboard)
     if (mounted) {
       Get.offAll(() => const LoginPage());
     }
@@ -59,24 +59,35 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   @override
   void initState() {
     super.initState();
-    // 5. Set user data from the widget passed in
     _userData = widget.userData;
-    // 6. Remove the _fetchUserData() call
   }
 
-  // 7. REMOVE the entire _fetchUserData() function
-  // Future<void> _fetchUserData() async { ... } // <-- DELETE THIS
+  // --- NEW: Placeholder for navigation ---
+  void _navigateTo(String pageName) {
+    // Since these pages don't exist yet, we'll just show a snackbar.
+    Get.snackbar(
+      'Navigation',
+      'Navigating to $pageName...',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.black87,
+      colorText: Colors.white,
+    );
+    // When your pages exist, you'll do:
+    // if (pageName == 'My Profile') {
+    //   Get.to(() => const ProfilePage()); // Example
+    // }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Use a light theme for the page
+    // --- KEPT YOUR ORIGINAL THEME ---
     final theme = ThemeData(
       brightness: Brightness.light,
       primarySwatch: Colors.blue,
       scaffoldBackgroundColor: const Color(0xFFF3F4F6), // bg-gray-100
-      fontFamily: 'Inter', // Make sure you've added Inter to your pubspec.yaml
+      fontFamily: 'Inter',
       cardTheme: CardThemeData(
-        elevation: 8.0,
+        elevation: 2.0, // Reduced elevation for a softer look
         margin: const EdgeInsets.all(0),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0), // rounded-2xl
@@ -95,221 +106,234 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       ),
     );
 
-    // We use Theme to apply our custom theme
+    // --- Get user's first name for the welcome message ---
     return Theme(
       data: theme,
       child: Scaffold(
+        // --- THIS IS THE NEW APPBAR from your prompt ---
         appBar: AppBar(
-          title: const Text('MyApp Dashboard'),
-          actions: [
-            // --- LOGOUT BUTTON ADDED HERE ---
-            IconButton(
-              icon: const Icon(Icons.logout, color: Color(0xFFE91E63)),
-              tooltip: 'Log Out',
-              onPressed: _handleLogout, // Calls the logout function
-            ),
-            // --- END OF LOGOUT BUTTON ---
-          ],
-        ),
-        body: SingleChildScrollView(
-          // container mx-auto px-6 py-12
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Makes the AppBar match the style in the image
+          backgroundColor: Colors.white,
+          elevation: 0,
+          // We use 'title' as a full-width container for all elements
+          title: Row(
             children: [
-              // text-3xl font-bold text-gray-800 mb-8
-              const Text(
-                'User Profile',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+              // 1. Hamburger Icon (Left)
+              // We wrap this in a Builder so it can find the Scaffold
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  color: accentColor,
+                  iconSize: 30,
+                  onPressed: () {
+                    // --- THIS IS THE ACTION to open the drawer ---
+                    Scaffold.of(context).openDrawer();
+                  },
                 ),
               ),
-              const SizedBox(height: 32),
 
-              // User Info Card
-              // bg-white max-w-2xl mx-auto rounded-2xl shadow-xl
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 672), // max-w-2xl
-                  child: Card(
-                    child: Column(
-                      children: [
-                        // p-8
-                        Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            children: [
-                              // Profile Picture Section
-                              _buildProfilePic(),
-                              const SizedBox(height: 24),
-
-                              // User Details Section
-                              // space-y-5
-                              _buildInfoRow(
-                                label: 'Full Name',
-                                // 8. Remove conditional logic, just show the data
-                                child: Text(
-                                  _userData.name,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _buildInfoRow(
-                                label: 'Email Address',
-                                // 9. Remove conditional logic
-                                child: Text(
-                                  _userData.email,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _buildInfoRow(
-                                label: 'User ID',
-                                // 10. Remove conditional logic
-                                child: Text(
-                                  _userData.userId,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _buildInfoRow(
-                                label: 'Joined Date',
-                                // 11. Remove conditional logic
-                                child: Text(
-                                  // Simple date formatting
-                                  '${_userData.joined.month}/${_userData.joined.day}/${_userData.joined.year}',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Card Footer for Status
-                        // bg-gray-50 px-8 py-4 border-t
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32.0,
-                            vertical: 16.0,
-                          ),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF9FAFB), // bg-gray-50
-                            borderRadius: BorderRadius.vertical(
-                              bottom: Radius.circular(16.0),
-                            ),
-                            border: Border(
-                              top: BorderSide(
-                                color: Color(0xFFE5E7EB),
-                              ), // border-gray-200
-                            ),
-                          ),
-                          child: _buildApiStatus(),
-                        ),
-                      ],
-                    ),
-                  ),
+              // 2. Logo (Center-Left)
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Image.asset(
+                  'assets/logos/login-logo.png', // Updated asset path
+                  height: 22, // Updated height
+                  fit: BoxFit.contain,
                 ),
+              ),
+
+              // Spacer pushes the remaining items (actions) to the right edge
+              const Spacer(),
+
+              // 3. Bell Icon (Right)
+              IconButton(
+                icon: const Icon(Icons.notifications_none),
+                color: accentColor,
+                iconSize: 30,
+                onPressed: () {
+                  // Action for notifications
+                },
+              ),
+
+              // 4. Settings Icon (Far Right) - This is now your settings/profile icon
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                color: accentColor,
+                iconSize: 30,
+                onPressed: () {
+                  _navigateTo('Settings');
+                },
               ),
             ],
           ),
+          // Set titleSpacing to 0 to remove default padding
+          titleSpacing: 0,
+          // We don't use 'leading' since the menu icon is part of the 'title' row
+          automaticallyImplyLeading: false,
         ),
+        // --- THIS IS THE NEW DRAWER ---
+        drawer: _buildAppDrawer(),
+        // --- END OF NEW DRAWER ---
       ),
     );
   }
 
-  // Helper widget to build the profile picture (with loading state)
-  Widget _buildProfilePic() {
-    // 12. REMOVE the _isLoading check
-    // if (_isLoading) { ... } // <-- DELETE THIS
-
-    // 13. Just return the CircleAvatar directly
-    // --- IMPROVED ---
+  // --- NEW: HELPER WIDGET TO BUILD THE DRAWER ---
+  Widget _buildAppDrawer() {
     // Check if the URL is valid before trying to load it
     final bool hasProfilePic = _userData.profilePicUrl.isNotEmpty;
+    // final String phonePlaceholder = '+91 98840 08362'; // From your screenshot
 
-    return CircleAvatar(
-      radius: 64, // w-32 / 2
-      backgroundColor: const Color(0xFFE0E7FF), // Placeholder bg
-      // Only use NetworkImage if the URL is not empty
-      backgroundImage: hasProfilePic
-          ? NetworkImage(_userData.profilePicUrl)
-          : null,
-      // If there's no image, show a default person icon
-      child: !hasProfilePic
-          ? const Icon(
-              Icons.person,
-              size: 64,
-              color: Color(0xFF4338CA), // text-indigo-700
-            )
-          : null,
+    return Drawer(
+      child: Column(
+        children: [
+          // --- DRAWER HEADER ---
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+            decoration: BoxDecoration(color: drawerHeaderColor),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: const Color(0xFFE0E7FF),
+                  backgroundImage: hasProfilePic
+                      ? NetworkImage(_userData.profilePicUrl)
+                      : null,
+                  child: !hasProfilePic
+                      ? const Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Color(0xFF4338CA),
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _userData.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _userData.email,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Text(
+                //   phonePlaceholder, // Using placeholder from your image
+                //   style: TextStyle(
+                //     color: Colors.white.withOpacity(0.8),
+                //     fontSize: 14,
+                //   ),
+                // ),
+              ],
+            ),
+          ),
+          // --- NAVIGATION ITEMS ---
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerItem(
+                  icon: Icons.business_outlined,
+                  title: 'Company Details',
+                  onTap: () => _navigateTo('Company Details'),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.account_balance_outlined,
+                  title: 'Bank Account',
+                  onTap: () => _navigateTo('Bank Account'),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.location_on_outlined,
+                  title: 'Manage Address',
+                  onTap: () => _navigateTo('Manage Address'),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.people_alt_outlined,
+                  title: 'Manage Users',
+                  onTap: () => _navigateTo('Manage Users'),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.warehouse_outlined,
+                  title: 'Warehouse',
+                  onTap: () => _navigateTo('Warehouse'),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.integration_instructions_outlined,
+                  title: 'Integration',
+                  onTap: () => _navigateTo('Integration'),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.description_outlined,
+                  title: 'Terms & Conditions',
+                  onTap: () => _navigateTo('Terms & Conditions'),
+                ),
+              ],
+            ),
+          ),
+          // --- LOGOUT BUTTON AT BOTTOM ---
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.logout_outlined, color: Colors.white),
+              label: const Text(
+                'Logout',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: _handleLogout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // Helper widget for the info rows (e.g., "Full Name" + data/skeleton)
-  Widget _buildInfoRow({required String label, required Widget child}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // text-sm font-medium text-gray-500
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF6B7280),
-          ),
+  // --- NEW: Helper for individual drawer list items ---
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: drawerIconColor, size: 28),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
         ),
-        const SizedBox(height: 4),
-        // This is where the data or skeleton goes
-        child,
-      ],
+      ),
+      onTap: () {
+        // Close the drawer first
+        Navigator.pop(context);
+        // Then navigate
+        onTap();
+      },
     );
   }
 
-  // Helper widget for the API status footer
-  Widget _buildApiStatus() {
-    // 14. REMOVE the _isLoading check
-    // if (_isLoading) { ... } // <-- DELETE THIS
-
-    // 15. Just return the "Loaded" state directly
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: const BoxDecoration(
-            color: Color(0xFF10B981), // bg-green-500
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
-        // text-sm font-medium text-green-700
-        const Text(
-          'User data loaded successfully!',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF047857), // text-green-700
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 16. REMOVE the _buildSkeleton() helper function
-  // Widget _buildSkeleton({double? width, double height = 20}) { ... } // <-- DELETE THIS
+  // --- NEW HELPER WIDGET for the navigation cards ---
+  // --- REMOVED _buildProfilePic, _buildInfoRow, and _buildApiStatus ---
+  // (They are no longer needed for this layout)
 }

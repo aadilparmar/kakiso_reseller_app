@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       final userData = await _fetchUserData(authToken);
       // Token is valid and we have data, go to Dashboard
-      Get.offAll(() => UserDashboardPage(userData: userData));
+      Get.offAll(() => HomePage(userData: userData));
     } catch (e) {
       // Token is invalid or expired
       print("Token validation failed: $e");

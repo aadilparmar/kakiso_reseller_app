@@ -127,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() => _isLoading = false);
         // Use Get.offAll to clear the navigation stack
-        Get.offAll(() => UserDashboardPage(userData: userData));
+        Get.offAll(() => HomePage(userData: userData));
       }
     } catch (e) {
       // If API call fails, stop loading and show an error
