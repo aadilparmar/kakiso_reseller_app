@@ -176,7 +176,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // 3. Subtitle
                 const Text(
-                  'Login to Your Supplier Panel',
+                  'Login to Your Reseller Panel',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.black54),
                 ),

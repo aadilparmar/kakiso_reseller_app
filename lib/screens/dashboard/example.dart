@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 // --- IMPORTS ADDED FOR LOGOUT & DRAWER ---
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 // You MUST update this import to point to your actual login page file
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 // Import for the icon pack you're using in the AppBar
@@ -56,6 +57,62 @@ class _HomePageState extends State<HomePage> {
   }
   // --- END OF LOGOUT LOGIC ---
 
+  // --- NEW: Function to show logout confirmation dialog ---
+  Future<void> _showLogoutConfirmation() async {
+    // Using Get.dialog as you're already using GetX
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        title: const Text(
+          'Logout',
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Poppins',
+            fontSize: 20,
+          ),
+        ),
+        content: const Text(
+          'Do u want to log out?',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        actions: [
+          // "Cancel" Button
+          TextButton(
+            onPressed: () {
+              Get.back(); // Close the dialog
+            },
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 15,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+          // "Logout" Button
+          TextButton(
+            onPressed: () {
+              Get.back(); // Close the dialog first
+              _handleLogout(); // Then call the actual logout function
+            },
+            child: Text(
+              'Logout',
+              style: TextStyle(
+                color: accentColor, // Use your accent color
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,10 +129,6 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.black87,
       colorText: Colors.white,
     );
-    // When your pages exist, you'll do:
-    // if (pageName == 'My Profile') {
-    //   Get.to(() => const ProfilePage()); // Example
-    // }
   }
 
   @override
@@ -147,7 +200,7 @@ class _HomePageState extends State<HomePage> {
 
               // 3. Bell Icon (Right)
               IconButton(
-                icon: const Icon(Icons.notifications_none),
+                icon: const Icon(Iconsax.notification_bing),
                 color: accentColor,
                 iconSize: 30,
                 onPressed: () {
@@ -157,23 +210,103 @@ class _HomePageState extends State<HomePage> {
 
               // 4. Settings Icon (Far Right) - This is now your settings/profile icon
               IconButton(
-                icon: const Icon(Icons.settings_outlined),
+                icon: const Icon(Iconsax.setting_2),
                 color: accentColor,
                 iconSize: 30,
                 onPressed: () {
                   _navigateTo('Settings');
                 },
               ),
+              SizedBox(width: 8), // Small spacing at the end
             ],
           ),
-          // Set titleSpacing to 0 to remove default padding
           titleSpacing: 0,
-          // We don't use 'leading' since the menu icon is part of the 'title' row
           automaticallyImplyLeading: false,
         ),
         // --- THIS IS THE NEW DRAWER ---
         drawer: _buildAppDrawer(),
-        // --- END OF NEW DRAWER ---
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.only(bottom: 10, right: 16, left: 16),
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(255, 255, 255, 255),
+                ),
+                child: Row(
+                  children: [
+                    // 1. Search Bar (Expanded to take available space)
+                    Expanded(
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search..',
+                            hintStyle: const TextStyle(
+                              color: Colors.blueGrey,
+                              fontFamily: 'Poppins',
+                            ),
+                            border: InputBorder
+                                .none, // Removes the default underline
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14.0,
+                              vertical: 11.0,
+                            ),
+                            suffixIcon: Icon(
+                              Iconsax.search_normal,
+                              color:
+                                  accentColor, // The vibrant pink search icon
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(
+                      width: 12,
+                    ), // Spacing between search bar and button
+                    // 2. Reseller Button
+                    ElevatedButton(
+                      onPressed: () => Get.to(() => const LoginPage()),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor, // Vibrant pink color
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(
+                          110,
+                          50,
+                        ), // Fixed size for height/width
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            12,
+                          ), // Rounded corners
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Reseller',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -184,121 +317,141 @@ class _HomePageState extends State<HomePage> {
     final bool hasProfilePic = _userData.profilePicUrl.isNotEmpty;
     // final String phonePlaceholder = '+91 98840 08362'; // From your screenshot
 
+    //
+    // 💡 1. Make the Drawer transparent and remove its shadow
+    //
     return Drawer(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       child: Column(
         children: [
-          // --- DRAWER HEADER ---
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-            decoration: BoxDecoration(color: drawerHeaderColor),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: const Color(0xFFE0E7FF),
-                  backgroundImage: hasProfilePic
-                      ? NetworkImage(_userData.profilePicUrl)
-                      : null,
-                  child: !hasProfilePic
-                      ? const Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Color(0xFF4338CA),
-                        )
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _userData.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _userData.email,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Text(
-                //   phonePlaceholder, // Using placeholder from your image
-                //   style: TextStyle(
-                //     color: Colors.white.withOpacity(0.8),
-                //     fontSize: 14,
-                //   ),
-                // ),
-              ],
-            ),
-          ),
-          // --- NAVIGATION ITEMS ---
+          SizedBox(height: 85),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _buildDrawerItem(
-                  icon: Icons.business_outlined,
-                  title: 'Company Details',
-                  onTap: () => _navigateTo('Company Details'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.account_balance_outlined,
-                  title: 'Bank Account',
-                  onTap: () => _navigateTo('Bank Account'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.location_on_outlined,
-                  title: 'Manage Address',
-                  onTap: () => _navigateTo('Manage Address'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.people_alt_outlined,
-                  title: 'Manage Users',
-                  onTap: () => _navigateTo('Manage Users'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.warehouse_outlined,
-                  title: 'Warehouse',
-                  onTap: () => _navigateTo('Warehouse'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.integration_instructions_outlined,
-                  title: 'Integration',
-                  onTap: () => _navigateTo('Integration'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.description_outlined,
-                  title: 'Terms & Conditions',
-                  onTap: () => _navigateTo('Terms & Conditions'),
-                ),
-              ],
-            ),
-          ),
-          // --- LOGOUT BUTTON AT BOTTOM ---
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.logout_outlined, color: Colors.white),
-              label: const Text(
-                'Logout',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+            child: ClipRRect(
+              // This adds the standard rounded corners back to your "drawer"
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(16.0),
+                bottomRight: Radius.circular(16.0),
               ),
-              onPressed: _handleLogout,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+              child: Container(
+                // This provides the solid background color (e.g., white)
+                // that the original Drawer had.
+                color: Theme.of(context).canvasColor,
+                child: Column(
+                  //
+                  // 💡 4. This is your ORIGINAL Column content
+                  //
+                  children: [
+                    // --- DRAWER HEADER ---
+                    Container(
+                      width: double.infinity,
+                      //
+                      // 💡 5. Reduced top padding from 60 to 20
+                      // Since we now have the gap *above* the header.
+                      //
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      decoration: BoxDecoration(color: drawerHeaderColor),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundColor: const Color(0xFFE0E7FF),
+                            backgroundImage: hasProfilePic
+                                ? NetworkImage(_userData.profilePicUrl)
+                                : null,
+                            child: !hasProfilePic
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Color(0xFF4338CA),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _userData.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _userData.email,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 14,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Text(
+                          //   phonePlaceholder, // Using placeholder from your image
+                          //   style: TextStyle(
+                          //     color: Colors.white.withOpacity(0.8),
+                          //     fontSize: 14,
+                          //   ),
+                          // ),
+                        ],
+                      ),
+                    ),
+                    // --- NAVIGATION ITEMS ---
+                    Expanded(
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          _buildDrawerItem(
+                            icon: Iconsax.personalcard,
+                            title: 'Business Details',
+                            onTap: () => _navigateTo('Company Details'),
+                          ),
+                          _buildDrawerItem(
+                            icon: Iconsax.wallet_check,
+                            title: 'Orders',
+                            onTap: () => _navigateTo('Manage Address'),
+                          ),
+                          _buildDrawerItem(
+                            icon: Iconsax.book_saved,
+                            title: 'My Catalog',
+                            onTap: () => _navigateTo('Manage Users'),
+                          ),
+                          // ... (your other commented items) ...
+                        ],
+                      ),
+                    ),
+                    // --- LOGOUT BUTTON AT BOTTOM ---
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Iconsax.logout, color: Colors.white),
+                        label: const Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        onPressed: () {
+                          // 1. Close the drawer first
+                          Navigator.pop(context);
+                          // 2. THEN show the confirmation dialog
+                          _showLogoutConfirmation();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentColor,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -322,6 +475,7 @@ class _HomePageState extends State<HomePage> {
           color: Colors.black87,
           fontSize: 16,
           fontWeight: FontWeight.w500,
+          fontFamily: 'Poppins',
         ),
       ),
       onTap: () {

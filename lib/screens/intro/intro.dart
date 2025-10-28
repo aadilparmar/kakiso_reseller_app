@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get/get_core/src/get_main.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/intro/widgets/benifits.dart';
 import 'package:kakiso_reseller_app/screens/intro/widgets/connect.dart';
@@ -60,7 +61,7 @@ class KIntroScreen extends StatelessWidget {
 
             // 3. Bell Icon (Right)
             IconButton(
-              icon: const Icon(Icons.notifications_none),
+              icon: const Icon(Iconsax.notification_bing),
               color: accentColor,
               iconSize: 30,
               onPressed: () {
@@ -70,7 +71,7 @@ class KIntroScreen extends StatelessWidget {
 
             // 4. Settings Icon (Far Right)
             IconButton(
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Iconsax.setting_2),
               color: accentColor,
               iconSize: 30,
               onPressed: () {
@@ -82,68 +83,79 @@ class KIntroScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         // SingleChildScrollView handles the overall vertical scrolling
-        padding: const EdgeInsets.only(left: 16, right: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- Search Bar and Reseller Button ---
-            Row(
-              children: [
-                // 1. Search Bar (Expanded to take available space)
-                Expanded(
-                  child: Container(
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300, width: 1),
-                    ),
-                    child: const TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search..',
-                        hintStyle: TextStyle(color: Colors.blueGrey),
-                        border:
-                            InputBorder.none, // Removes the default underline
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 14.0,
+            Container(
+              padding: const EdgeInsets.only(bottom: 10, right: 16, left: 16),
+              decoration: const BoxDecoration(
+                color: Color.fromARGB(255, 255, 255, 255),
+              ),
+              child: Row(
+                children: [
+                  // 1. Search Bar (Expanded to take available space)
+                  Expanded(
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 1,
                         ),
-                        suffixIcon: Icon(
-                          Icons.search,
-                          color: accentColor, // The vibrant pink search icon
-                          size: 28,
+                      ),
+                      child: const TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search..',
+                          hintStyle: TextStyle(color: Colors.blueGrey),
+                          border:
+                              InputBorder.none, // Removes the default underline
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 14.0,
+                          ),
+                          suffixIcon: Icon(
+                            Iconsax.search_normal,
+                            color: accentColor, // The vibrant pink search icon
+                            size: 28,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(
-                  width: 12,
-                ), // Spacing between search bar and button
-                // 2. Reseller Button
-                ElevatedButton(
-                  onPressed: () => Get.to(() => const LoginPage()),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor, // Vibrant pink color
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(
-                      110,
-                      50,
-                    ), // Fixed size for height/width
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        12,
-                      ), // Rounded corners
+                  const SizedBox(
+                    width: 12,
+                  ), // Spacing between search bar and button
+                  // 2. Reseller Button
+                  ElevatedButton(
+                    onPressed: () => Get.to(() => const LoginPage()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor, // Vibrant pink color
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(
+                        110,
+                        50,
+                      ), // Fixed size for height/width
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          12,
+                        ), // Rounded corners
+                      ),
+                      elevation: 0,
                     ),
-                    elevation: 0,
+                    child: const Text(
+                      'Reseller',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
-                  child: const Text(
-                    'Reseller',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
 
             // --- End Search Bar and Button ---
@@ -151,51 +163,75 @@ class KIntroScreen extends StatelessWidget {
 
             // --- E-Commerce Banner Section ---
             // Note: Using KIntroPageWidget assuming it's imported or defined.
-            KIntroPageWidget(
-              purpleHeaderColor: purpleHeaderColor,
-              accentColor: accentColor,
-              bannerBackgroundColor: const Color.fromARGB(255, 143, 131, 151),
+            Container(
+              padding: const EdgeInsets.only(right: 16, left: 16),
+              child: KIntroPageWidget(
+                purpleHeaderColor: purpleHeaderColor,
+                accentColor: accentColor,
+                bannerBackgroundColor: const Color.fromARGB(255, 143, 131, 151),
+              ),
             ),
 
             // --- End E-Commerce Banner Section ---
             const SizedBox(height: 10),
 
             // --- NEW: Benefits Section with Horizontal Scroll ---
-            const KBenefitsSection(accentColor: accentColor),
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: KBenefitsSection(accentColor: accentColor),
+            ),
             const SizedBox(height: 30),
             // --- NEW: Best Deals Section (Forced to Full Width) --
-            SizedBox(
-              width: double.infinity,
-              child: KBestDealsSection(
-                accentColor: accentColor,
-                purpleHeaderColor: purpleHeaderColor,
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: KBestDealsSection(
+                  accentColor: accentColor,
+                  purpleHeaderColor: purpleHeaderColor,
+                ),
               ),
             ),
 
             const SizedBox(height: 30),
 
-            KConnectStoreBanner(
-              accentColor: accentColor,
-              purpleHeaderColor: purpleHeaderColor,
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: KConnectStoreBanner(
+                accentColor: accentColor,
+                purpleHeaderColor: purpleHeaderColor,
+              ),
             ),
             const SizedBox(height: 30), // Added spacing
             // --- NEW: Discovery Banner Section (Image Right) - INSERTED HERE ---
-            KDiscoveryBanner(
-              accentColor: accentColor,
-              purpleHeaderColor: purpleHeaderColor,
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: KDiscoveryBanner(
+                accentColor: accentColor,
+                purpleHeaderColor: purpleHeaderColor,
+              ),
             ),
             const SizedBox(height: 30),
-            KWhatIsDropshipping(
-              accentColor: accentColor,
-              purpleHeaderColor: purpleHeaderColor,
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: KWhatIsDropshipping(
+                accentColor: accentColor,
+                purpleHeaderColor: purpleHeaderColor,
+              ),
             ),
             const SizedBox(height: 30),
-            KClientTestimonials(
-              accentColor: accentColor,
-              purpleHeaderColor: purpleHeaderColor,
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: KClientTestimonials(
+                accentColor: accentColor,
+                purpleHeaderColor: purpleHeaderColor,
+              ),
             ),
             const SizedBox(height: 30),
-            FinancialInsights(),
+            Container(
+              padding: EdgeInsets.only(right: 16, left: 16),
+              child: FinancialInsights(),
+            ),
             const SizedBox(height: 30),
             KGrow(),
           ],
