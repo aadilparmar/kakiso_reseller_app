@@ -1,4 +1,11 @@
-import 'package:flutter/material.dart'; // For Future.delayed
+import 'package:flutter/material.dart';
+
+// --- IMPORTS ADDED FOR LOGOUT ---
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:get/get.dart';
+// You MUST update this import to point to your actual login page file
+import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+// --- END OF IMPORTS ---
 
 // A simple model for our user data
 class UserData {
@@ -33,6 +40,21 @@ class UserDashboardPage extends StatefulWidget {
 class _UserDashboardPageState extends State<UserDashboardPage> {
   // 3. Remove _isLoading, we get data immediately
   late UserData _userData; // 4. Make this non-nullable
+
+  // --- ADDED FOR LOGOUT ---
+  final _storage = const FlutterSecureStorage();
+
+  Future<void> _handleLogout() async {
+    // 1. Delete the saved token
+    await _storage.delete(key: 'authToken');
+
+    // 2. Navigate back to the LoginPage, removing all previous routes
+    //    (Ensures user can't press "back" to get to the dashboard)
+    if (mounted) {
+      Get.offAll(() => const LoginPage());
+    }
+  }
+  // --- END OF LOGOUT LOGIC ---
 
   @override
   void initState() {
@@ -79,16 +101,14 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('MyApp Dashboard'),
-          actions: const [
-            Padding(
-              padding: EdgeInsets.only(right: 16.0),
-              child: Center(
-                child: Text(
-                  'Test User',
-                  style: TextStyle(color: Color(0xFF374151)), // text-gray-700
-                ),
-              ),
+          actions: [
+            // --- LOGOUT BUTTON ADDED HERE ---
+            IconButton(
+              icon: const Icon(Icons.logout, color: Color(0xFFE91E63)),
+              tooltip: 'Log Out',
+              onPressed: _handleLogout, // Calls the logout function
             ),
+            // --- END OF LOGOUT BUTTON ---
           ],
         ),
         body: SingleChildScrollView(
@@ -217,13 +237,25 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     // if (_isLoading) { ... } // <-- DELETE THIS
 
     // 13. Just return the CircleAvatar directly
+    // --- IMPROVED ---
+    // Check if the URL is valid before trying to load it
+    final bool hasProfilePic = _userData.profilePicUrl.isNotEmpty;
+
     return CircleAvatar(
       radius: 64, // w-32 / 2
       backgroundColor: const Color(0xFFE0E7FF), // Placeholder bg
-      backgroundImage: NetworkImage(_userData.profilePicUrl),
-      onBackgroundImageError: (exception, stackTrace) {
-        // Handle image load error if necessary
-      },
+      // Only use NetworkImage if the URL is not empty
+      backgroundImage: hasProfilePic
+          ? NetworkImage(_userData.profilePicUrl)
+          : null,
+      // If there's no image, show a default person icon
+      child: !hasProfilePic
+          ? const Icon(
+              Icons.person,
+              size: 64,
+              color: Color(0xFF4338CA), // text-indigo-700
+            )
+          : null,
     );
   }
 
