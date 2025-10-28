@@ -148,16 +148,16 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   // 6. Handle "Send OTP" (We'll leave this blank for now)
-  Future<void> _handleSendOtp() async {
-    // This requires a custom backend plugin.
-    // This is where you would call your "Send OTP" API.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("OTP functionality is not yet implemented."),
-        backgroundColor: Colors.blue,
-      ),
-    );
-  }
+  // Future<void> _handleSendOtp() async {
+  //   // This requires a custom backend plugin.
+  //   // This is where you would call your "Send OTP" API.
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(
+  //       content: Text("OTP functionality is not yet implemented."),
+  //       backgroundColor: Colors.blue,
+  //     ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +273,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 //   keyboardType: TextInputType.number,
                 //   enabled: !_isLoading, // <-- Disable when loading
                 // ),
-                const SizedBox(height: 16),
+                // const SizedBox(height: 16),
 
                 // 8. Email ID Field
                 _buildTextField(

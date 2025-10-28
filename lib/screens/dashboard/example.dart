@@ -29,9 +29,9 @@ class UserDashboardPage extends StatefulWidget {
   final UserData userData;
 
   const UserDashboardPage({
-    Key? key,
+    super.key,
     required this.userData, // 2. Make it required
-  }) : super(key: key);
+  });
 
   @override
   State<UserDashboardPage> createState() => _UserDashboardPageState();

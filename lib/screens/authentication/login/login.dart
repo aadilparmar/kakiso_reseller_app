@@ -8,11 +8,10 @@ import 'dart:async'; // For async operations
 import 'package:graphql_flutter/graphql_flutter.dart';
 
 // 2. Import your dashboard page and user model
-// Assuming UserDashboardPage and UserData are in 'example.dart'
 import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
-// 3. We no longer need http or dart:convert
-// import 'package:http/http.dart' as http;
-// import 'dart:convert';
+
+// 3. --- IMPORT THE SECURE STORAGE PACKAGE ---
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,12 +27,11 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // 4. DEFINE YOUR STORE'S GRAPHQL URL
-  // The endpoint for WPGraphQL is almost always /graphql
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
-
-  // 5. This is the GraphQL client
   late GraphQLClient _client;
+
+  // 4. --- INITIALIZE SECURE STORAGE ---
+  final _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
@@ -53,12 +51,8 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // 6. THIS IS THE NEW, REAL GRAPHQL LOGIN FUNCTION
   /// Logs in using the WPGraphQL JWT Authentication plugin.
-  /// This single mutation gets the auth token AND all the user data we need.
   Future<UserData> _apiLogin(String email, String password) async {
-    // 7. This is the GraphQL mutation string.
-    // It's like a function definition for the API.
     const String loginMutation = r'''
       mutation LoginUser($username: String!, $password: String!) {
         login(input: { username: $username, password: $password }) {
@@ -77,22 +71,17 @@ class _LoginPageState extends State<LoginPage> {
       }
     ''';
 
-    // 8. Set the variables for the mutation
     final MutationOptions options = MutationOptions(
       document: gql(loginMutation),
       variables: <String, dynamic>{'username': email, 'password': password},
     );
 
-    // 9. Call the API
     final QueryResult result = await _client.mutate(options);
 
-    // 10. Check for errors
     if (result.hasException) {
       print('--- GRAPHQL API ERROR ---');
       print(result.exception.toString());
       print('-------------------------');
-      // Throw a user-friendly error
-      // Try to find a more specific error message
       String errorMessage = 'Login failed. Please check your credentials.';
       if (result.exception!.graphqlErrors.isNotEmpty) {
         errorMessage = result.exception!.graphqlErrors[0].message;
@@ -100,35 +89,31 @@ class _LoginPageState extends State<LoginPage> {
       throw Exception(errorMessage);
     }
 
-    // 11. Parse the successful response
     if (result.data != null && result.data!['login'] != null) {
       final loginData = result.data!['login'];
       final userData = loginData['user'];
 
-      // We can also store this token for future authenticated requests
-      // final String authToken = loginData['authToken'];
-      // (For now, we just pass the user data)
+      // 5. --- THIS IS THE FIX ---
+      // Get the token from the response
+      final String authToken = loginData['authToken'];
+      // Save the token securely to the device
+      await _storage.write(key: 'authToken', value: authToken);
+      // --- END OF FIX ---
 
-      // 12. Map the API response to your UserData model
+      // Map the API response to your UserData model
       return UserData(
         name: '${userData['firstName']} ${userData['lastName']}',
         email: userData['email'],
         userId: userData['databaseId'].toString(),
         joined: DateTime.parse(userData['registeredDate']),
-        // ‼️‼️ THIS IS THE FIX ‼️‼️
-        // We use "??" to provide a default empty string if the avatar data is null.
         profilePicUrl: userData['avatar']?['url'] ?? '',
       );
     } else {
-      // This happens if the GraphQL call succeeded but didn't return data
       throw Exception('Login failed. Received invalid data from server.');
     }
   }
 
-  // 13. This handler function stays the same!
-  // It doesn't care *how* _apiLogin works, just that it returns a UserData
   Future<void> _handleLogin() async {
-    // Start loading
     setState(() => _isLoading = true);
 
     try {
@@ -141,6 +126,7 @@ class _LoginPageState extends State<LoginPage> {
       // If successful, stop loading and navigate to dashboard
       if (mounted) {
         setState(() => _isLoading = false);
+        // Use Get.offAll to clear the navigation stack
         Get.offAll(() => UserDashboardPage(userData: userData));
       }
     } catch (e) {
