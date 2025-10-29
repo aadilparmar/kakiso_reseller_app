@@ -277,7 +277,7 @@ class _HomePageState extends State<HomePage> {
                     ), // Spacing between search bar and button
                     // 2. Reseller Button
                     ElevatedButton(
-                      onPressed: () => Get.to(() => const LoginPage()),
+                      onPressed: () {},
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentColor, // Vibrant pink color
                         foregroundColor: Colors.white,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/forget_password.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 import 'dart:async'; // For async operations
@@ -127,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() => _isLoading = false);
         // Use Get.offAll to clear the navigation stack
-        Get.offAll(() => HomePage(userData: userData));
+        Get.offAll(() => NavigationMenu(userData: userData));
       }
     } catch (e) {
       // If API call fails, stop loading and show an error

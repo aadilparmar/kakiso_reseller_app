@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro.dart';
 
 // --- Imports Added for Login Check ---
@@ -46,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       final userData = await _fetchUserData(authToken);
       // Token is valid and we have data, go to Dashboard
-      Get.offAll(() => HomePage(userData: userData));
+      Get.offAll(() => NavigationMenu(userData: userData));
     } catch (e) {
       // Token is invalid or expired
       print("Token validation failed: $e");
