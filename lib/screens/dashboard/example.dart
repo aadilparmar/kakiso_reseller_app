@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 // You MUST update this import to point to your actual login page file
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/banner_carousel.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/sliding_category_bar.dart';
 // Import for the icon pack you're using in the AppBar
 // --- END OF IMPORTS ---
 
@@ -48,7 +50,35 @@ class _HomePageState extends State<HomePage> {
 
   // --- LOGOUT LOGIC (KEPT) ---
   final _storage = const FlutterSecureStorage();
-
+  final List<ProductCategory> myCategories = [
+    ProductCategory(
+      imageAssetPath: 'assets/images/icons/jewelry.png', // Or your actual path
+      label: 'Jewels',
+    ),
+    ProductCategory(
+      imageAssetPath: 'assets/images/icons/cookware.png',
+      label: 'Kitchen',
+    ),
+    ProductCategory(
+      imageAssetPath: 'assets/images/icons/headphones.png',
+      label: 'Gadegts',
+    ),
+    ProductCategory(
+      imageAssetPath: 'assets/images/icons/incense.png',
+      label: 'Aroma',
+    ),
+    ProductCategory(
+      imageAssetPath: 'assets/images/icons/kids.png',
+      label: 'Kids',
+    ),
+  ];
+  final List<BannerItem> myBanners = [
+    BannerItem(imagePath: 'assets/images/banners/jewel.jpeg'), // Local
+    BannerItem(imagePath: 'assets/images/banners/kitchen.jpeg'), // Local
+    BannerItem(imagePath: 'assets/images/banners/gadgets.jpeg'), // Local
+    BannerItem(imagePath: 'assets/images/banners/aroma.jpeg'), // Local
+    BannerItem(imagePath: 'assets/images/banners/kids.jpeg'), // Local
+  ];
   Future<void> _handleLogout() async {
     await _storage.delete(key: 'authToken');
     if (mounted) {
@@ -137,7 +167,12 @@ class _HomePageState extends State<HomePage> {
     final theme = ThemeData(
       brightness: Brightness.light,
       primarySwatch: Colors.blue,
-      scaffoldBackgroundColor: const Color(0xFFF3F4F6), // bg-gray-100
+      scaffoldBackgroundColor: const Color.fromARGB(
+        255,
+        255,
+        255,
+        255,
+      ), // bg-gray-100
       fontFamily: 'Inter',
       cardTheme: CardThemeData(
         elevation: 2.0, // Reduced elevation for a softer look
@@ -303,26 +338,18 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
-              ), // Spacing below the search bar
-              ClipRRect(
-                child: Image.asset(
-                  'assets/images/posters/h_poster1.png', // Placeholder for the woman's image
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: const Color(
-                        0xFFF7F4F9,
-                      ), // Match container background
-                      child: const Center(
-                        child: Icon(
-                          Icons.person,
-                          size: 60,
-                          color: Colors.purple,
-                        ), // Reduced icon size
-                      ),
-                    );
-                  },
-                ),
+              ),
+              // Spacing below the search bar
+              SlidingCategoryBar(
+                categories: myCategories,
+                onCategorySelected: (index, label) {},
+              ),
+              BannerCarousel(
+                banners: myBanners,
+                onBannerTap: (index) {
+                  print("Tapped banner $index");
+                  // Handle navigation or other actions
+                },
               ),
             ],
           ),

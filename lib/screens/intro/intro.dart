@@ -138,9 +138,9 @@ class KIntroScreen extends StatelessWidget {
                       elevation: 0,
                     ),
                     child: const Text(
-                      'Reseller',
+                      'Become Reseller',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

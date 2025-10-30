@@ -5,7 +5,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/example.dart'; // Added Ge
 
 // --- Define colors here to be accessible by the Theme ---
 const Color _activeIconColor = Color(0xFFE91E63);
-final Color _inactiveColor = const Color.fromARGB(255, 9, 9, 9);
+final Color _inactiveColor = const Color.fromARGB(255, 0, 0, 0);
 // Very dark grey
 
 class NavigationController extends GetxController {
@@ -107,8 +107,8 @@ class NavigationMenu extends StatelessWidget {
               ),
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.truck,
-                  Iconsax.truck_fast,
+                  Iconsax.building_4,
+                  Iconsax.buildings,
                   2,
                   controller.selectedIndex.value,
                 ),
