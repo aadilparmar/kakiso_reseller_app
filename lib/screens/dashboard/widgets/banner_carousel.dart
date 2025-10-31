@@ -171,7 +171,6 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   widget.onBannerTap?.call(realIndex);
                 },
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12.0),
                   child: _buildImage(banner.imagePath, banner.isNetworkImage),
                 ),
               );
@@ -203,7 +202,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
       height: 8.0,
       width: isActive ? 24.0 : 8.0,
       decoration: BoxDecoration(
-        color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+        color: isActive
+            ? Colors.pinkAccent
+            : Colors.pinkAccent.withOpacity(0.5),
         borderRadius: BorderRadius.circular(4.0),
         boxShadow: [
           BoxShadow(
