@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 // --- IMPORTS ADDED FOR LOGOUT & DRAWER ---
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
+
 import 'package:iconsax/iconsax.dart';
 // You MUST update this import to point to your actual login page file
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/banner_carousel.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/sliding_category_bar.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/vertical_product_card.dart';
 // Import for the icon pack you're using in the AppBar
 // --- END OF IMPORTS ---
 
@@ -347,10 +351,13 @@ class _HomePageState extends State<HomePage> {
               BannerCarousel(
                 banners: myBanners,
                 onBannerTap: (index) {
-                  print("Tapped banner $index");
                   // Handle navigation or other actions
                 },
               ),
+              TopRankingSection(),
+              SizedBox(height: 16), // Spacing between sections
+              NewArrivalSection(),
+              TrendingProducts(),
             ],
           ),
         ),
