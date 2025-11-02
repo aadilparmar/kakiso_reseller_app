@@ -8,6 +8,7 @@ import 'package:iconsax/iconsax.dart';
 // You MUST update this import to point to your actual login page file
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/banner_carousel.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product_card.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/sliding_category_bar.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
@@ -76,6 +77,37 @@ class _HomePageState extends State<HomePage> {
       label: 'Kids',
     ),
   ];
+  final List<Map<String, dynamic>> products = const [
+    {
+      "image": 'assets/images/products/prod_13.png', // Your asset path
+      "title": "Elephant Charm Bracelet ",
+      "company": "AGOR",
+      "price": "₹1199",
+      "discount": 20,
+    },
+    {
+      "image": "assets/images/products/prod_12.jpg", // Your asset path
+      "title": "Primo Strainer ",
+      "company": "Elephant",
+      "price": "₹75",
+      "discount": 10,
+    },
+    {
+      "image": "assets/images/products/prod_11.jpg", // Your asset path
+      "title": "Divorama Insence Sticks",
+      "company": "Divorama",
+      "price": "₹89",
+      "discount": 3,
+    },
+    {
+      "image": "assets/images/products/prod_4.png", // Your asset path
+      "title": "Minimalist Desk Lamp",
+      "company": "Nexa Mart",
+      "price": "₹899",
+      "discount": 5,
+    },
+  ];
+
   final List<BannerItem> myBanners = [
     BannerItem(imagePath: 'assets/images/banners/jewel.jpeg'), // Local
     BannerItem(imagePath: 'assets/images/banners/kitchen.jpeg'), // Local
@@ -348,12 +380,46 @@ class _HomePageState extends State<HomePage> {
                 categories: myCategories,
                 onCategorySelected: (index, label) {},
               ),
-              BannerCarousel(
-                banners: myBanners,
-                onBannerTap: (index) {
-                  // Handle navigation or other actions
-                },
+              SizedBox(height: 16), // Spacing between sections
+              // In your HomePage's build method
+              SizedBox(
+                height: 180, // Card height is 160 + 20 for padding
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+
+                    // 2. HERE IS HOW YOU "CALL" YOUR WIDGET
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12.0),
+                      child: HorizontalProductCard(
+                        // Pass the asset path from your data to the widget
+                        imageUrl: product["image"],
+
+                        // Pass all the other required data
+                        title: product["title"],
+                        companyName: product["company"],
+                        price: product["price"],
+                        discountPercentage: product["discount"],
+                        onAddToCartPressed: () {
+                          // This is what happens when the button is pressed
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Added ${product["title"]} to cart!',
+                              ),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
               ),
+              SizedBox(height: 16), // Spacing between sections
               TopRankingSection(),
               SizedBox(height: 16), // Spacing between sections
               NewArrivalSection(),

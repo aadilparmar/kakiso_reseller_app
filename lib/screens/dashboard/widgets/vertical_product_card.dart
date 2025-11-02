@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 
 // --- NewArrivalImageCard (Square Image Only) ---
 class NewArrivalImageCard extends StatelessWidget {
@@ -122,14 +123,30 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'New Arrival',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontFamily: 'Poppins',
-                ),
+              Row(
+                children: const [
+                  Text(
+                    'New',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Arrival',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.pinkAccent,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Iconsax.bag_happy, color: Colors.orange, size: 24),
+                ],
               ),
               GestureDetector(
                 onTap: () {},

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 
 // --- TrendingImageCard (Square Image Only) ---
 class TrendingImageCard extends StatelessWidget {
@@ -116,14 +117,30 @@ class _TrendingProductsState extends State<TrendingProducts> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Trending On KaKiSo',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontFamily: 'Poppins',
-                ),
+              Row(
+                children: const [
+                  Text(
+                    'Trending on',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'KakiSo',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.pinkAccent,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Iconsax.trend_up, color: Colors.green, size: 24),
+                ],
               ),
               GestureDetector(
                 onTap: () {},

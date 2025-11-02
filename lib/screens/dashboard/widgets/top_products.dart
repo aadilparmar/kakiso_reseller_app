@@ -278,10 +278,10 @@ class TopRankingSection extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: 8),
-                  Icon(Iconsax.bag_happy, color: Colors.orange, size: 24),
+                  Icon(Iconsax.magic_star, color: Colors.orange, size: 24),
                 ],
               ),
-              const SizedBox(width: 4), // Spacing
+              const SizedBox(width: 10), // Spacing
               // --- Tabs Row (wrapped to prevent overflow) ---
               Expanded(
                 child: SingleChildScrollView(
