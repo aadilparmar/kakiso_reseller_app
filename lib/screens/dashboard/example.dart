@@ -52,7 +52,7 @@ class _HomePageState extends State<HomePage> {
   final Color accentColor = const Color(0xFFE91E63);
   final Color drawerHeaderColor = const Color(0xFF4A317E);
   final Color drawerIconColor = const Color(0xFFCC0000); // A strong red
-
+  String _selectedTitle = 'BusinessDetails';
   // --- LOGOUT LOGIC (KEPT) ---
   final _storage = const FlutterSecureStorage();
   final List<ProductCategory> myCategories = [
@@ -297,7 +297,9 @@ class _HomePageState extends State<HomePage> {
         // --- THIS IS THE NEW DRAWER ---
         drawer: _buildAppDrawer(),
         body: SingleChildScrollView(
+          key: const PageStorageKey('dashboard_scroll'),
           child: Column(
+            key: const ValueKey('dashboard_column'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
@@ -437,9 +439,21 @@ class _HomePageState extends State<HomePage> {
     final bool hasProfilePic = _userData.profilePicUrl.isNotEmpty;
     // final String phonePlaceholder = '+91 98840 08362'; // From your screenshot
 
-    //
-    // 💡 1. Make the Drawer transparent and remove its shadow
-    //
+    // --- ✨ NEW: Define which items are in which category ---
+    // This helps the ExpansionTile know if it should be open
+    const List<String> homeCategoryIds = ['Kitchen', 'Bath'];
+    const List<String> beautyCategoryIds = ['AyurvedicProducts'];
+    const List<String> clothingCategoryIds = ['Womens', 'Mens'];
+
+    // --- ✨ NEW: Check if a category is "active" ---
+    final bool isHomeCategoryActive = homeCategoryIds.contains(_selectedTitle);
+    final bool isBeautyCategoryActive = beautyCategoryIds.contains(
+      _selectedTitle,
+    );
+    final bool isClothingCategoryActive = clothingCategoryIds.contains(
+      _selectedTitle,
+    );
+
     return Drawer(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -448,27 +462,17 @@ class _HomePageState extends State<HomePage> {
           SizedBox(height: 85),
           Expanded(
             child: ClipRRect(
-              // This adds the standard rounded corners back to your "drawer"
               borderRadius: const BorderRadius.only(
                 topRight: Radius.circular(16.0),
                 bottomRight: Radius.circular(16.0),
               ),
               child: Container(
-                // This provides the solid background color (e.g., white)
-                // that the original Drawer had.
                 color: Theme.of(context).canvasColor,
                 child: Column(
-                  //
-                  // 💡 4. This is your ORIGINAL Column content
-                  //
                   children: [
                     // --- DRAWER HEADER ---
                     Container(
                       width: double.infinity,
-                      //
-                      // 💡 5. Reduced top padding from 60 to 20
-                      // Since we now have the gap *above* the header.
-                      //
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                       decoration: BoxDecoration(color: drawerHeaderColor),
                       child: Column(
@@ -492,7 +496,7 @@ class _HomePageState extends State<HomePage> {
                           Text(
                             _userData.name,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Color.fromARGB(255, 234, 207, 247),
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Poppins',
@@ -502,43 +506,205 @@ class _HomePageState extends State<HomePage> {
                           Text(
                             _userData.email,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
+                              color: const Color.fromARGB(
+                                255,
+                                255,
+                                255,
+                                255,
+                              ).withOpacity(0.8),
                               fontSize: 14,
                               fontFamily: 'Poppins',
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          // Text(
-                          //   phonePlaceholder, // Using placeholder from your image
-                          //   style: TextStyle(
-                          //     color: Colors.white.withOpacity(0.8),
-                          //     fontSize: 14,
-                          //   ),
-                          // ),
                         ],
                       ),
                     ),
                     // --- NAVIGATION ITEMS ---
                     Expanded(
                       child: ListView(
-                        padding: EdgeInsets.zero,
+                        // Add padding for the new selected backgrounds
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
                         children: [
+                          const SizedBox(height: 8), // Top spacing
                           _buildDrawerItem(
                             icon: Iconsax.personalcard,
                             title: 'Business Details',
+                            uniqueId: 'BusinessDetails', // Must be unique
                             onTap: () => _navigateTo('Company Details'),
                           ),
                           _buildDrawerItem(
                             icon: Iconsax.wallet_check,
                             title: 'Orders',
+                            uniqueId: 'Orders',
                             onTap: () => _navigateTo('Manage Address'),
                           ),
                           _buildDrawerItem(
                             icon: Iconsax.book_saved,
                             title: 'My Catalog',
+                            uniqueId: 'MyCatalog',
                             onTap: () => _navigateTo('Manage Users'),
                           ),
-                          // ... (your other commented items) ...
+
+                          // --- ✨ NEW: Subtle Divider ---
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Divider(height: 1, color: Colors.black12),
+                          ),
+
+                          // --- 🎨 UPDATED: CATEGORIES DROPDOWN ---
+                          Theme(
+                            // Remove the default divider line
+                            data: Theme.of(
+                              context,
+                            ).copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              // --- ✨ NEW: Smart expansion ---
+                              initiallyExpanded:
+                                  isHomeCategoryActive ||
+                                  isBeautyCategoryActive ||
+                                  isClothingCategoryActive,
+                              leading: Icon(
+                                Iconsax.category,
+                                color: drawerIconColor,
+                                size: 28,
+                              ),
+                              title: Text(
+                                'Categories',
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                              collapsedIconColor: drawerIconColor,
+                              iconColor: drawerIconColor,
+                              // Faint background when open
+                              backgroundColor: const Color.fromARGB(
+                                73,
+                                223,
+                                164,
+                                238,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              collapsedShape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              children: [
+                                // --- NESTED TILE 1 ---
+                                Theme(
+                                  data: Theme.of(
+                                    context,
+                                  ).copyWith(dividerColor: Colors.transparent),
+                                  child: ExpansionTile(
+                                    initiallyExpanded: isHomeCategoryActive,
+                                    // Indent the tile
+                                    tilePadding: const EdgeInsets.only(
+                                      left: 36.0,
+                                      right: 32.0,
+                                    ),
+                                    title: const Text(
+                                      'Home , Kitchen , Bath',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 15,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                    collapsedIconColor: drawerIconColor,
+                                    iconColor: drawerIconColor,
+                                    children: [
+                                      _buildSubDrawerItem(
+                                        title: 'Kitchen',
+                                        uniqueId: 'Kitchen',
+                                        indentation: 52.0, // More indent
+                                        onTap: () => _navigateTo('Kitchen'),
+                                      ),
+                                      _buildSubDrawerItem(
+                                        title: 'Bath',
+                                        uniqueId: 'Bath',
+                                        indentation: 52.0,
+                                        onTap: () => _navigateTo('Bath'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // --- NESTED TILE 2 ---
+                                Theme(
+                                  data: Theme.of(
+                                    context,
+                                  ).copyWith(dividerColor: Colors.transparent),
+                                  child: ExpansionTile(
+                                    initiallyExpanded: isBeautyCategoryActive,
+                                    tilePadding: const EdgeInsets.only(
+                                      left: 36.0,
+                                      right: 32.0,
+                                    ),
+                                    title: const Text(
+                                      'Beauty, Health, Personal Care',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 15,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                    collapsedIconColor: drawerIconColor,
+                                    iconColor: drawerIconColor,
+                                    children: [
+                                      _buildSubDrawerItem(
+                                        title: 'Ayurvedic Products',
+                                        uniqueId: 'AyurvedicProducts',
+                                        indentation: 52.0,
+                                        onTap: () =>
+                                            _navigateTo('Ayurvedic Products'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // --- NESTED TILE 3 ---
+                                Theme(
+                                  data: Theme.of(
+                                    context,
+                                  ).copyWith(dividerColor: Colors.transparent),
+                                  child: ExpansionTile(
+                                    initiallyExpanded: isClothingCategoryActive,
+                                    tilePadding: const EdgeInsets.only(
+                                      left: 36.0,
+                                      right: 32.0,
+                                    ),
+                                    title: const Text(
+                                      'Clothing , Fashion & Accessories',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 15,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                    collapsedIconColor: drawerIconColor,
+                                    iconColor: drawerIconColor,
+                                    children: [
+                                      _buildSubDrawerItem(
+                                        title: 'Womens',
+                                        uniqueId: 'Womens',
+                                        indentation: 52.0,
+                                        onTap: () => _navigateTo('Womens'),
+                                      ),
+                                      _buildSubDrawerItem(
+                                        title: 'Mens',
+                                        uniqueId: 'Mens',
+                                        indentation: 52.0,
+                                        onTap: () => _navigateTo('Mens'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -557,9 +723,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         onPressed: () {
-                          // 1. Close the drawer first
                           Navigator.pop(context);
-                          // 2. THEN show the confirmation dialog
                           _showLogoutConfirmation();
                         },
                         style: ElevatedButton.styleFrom(
@@ -582,27 +746,84 @@ class _HomePageState extends State<HomePage> {
   }
 
   // --- NEW: Helper for individual drawer list items ---
+  // (This is your existing helper, no changes needed)
   Widget _buildDrawerItem({
     required IconData icon,
     required String title,
+    required String uniqueId, // Use a unique ID or the title itself
     required VoidCallback onTap,
   }) {
+    final bool isSelected = (_selectedTitle == uniqueId);
+
     return ListTile(
-      leading: Icon(icon, color: drawerIconColor, size: 28),
+      leading: Icon(
+        icon,
+        color: isSelected ? Color(0xFF4338CA) : drawerIconColor, // Active color
+        size: 28,
+      ),
       title: Text(
         title,
-        style: const TextStyle(
-          color: Colors.black87,
+        style: TextStyle(
+          color: isSelected
+              ? Color(0xFF4338CA)
+              : Colors.black87, // Active color
           fontSize: 16,
-          fontWeight: FontWeight.w500,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           fontFamily: 'Poppins',
         ),
       ),
+      // --- ✨ NEW: Selected styling ---
+      selected: isSelected,
+      selectedTileColor: Color(
+        0xFFE0E7FF,
+      ).withOpacity(0.6), // Subtle background
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20.0),
+
       onTap: () {
-        // Close the drawer first
         Navigator.pop(context);
-        // Then navigate
-        onTap();
+        setState(() {
+          _selectedTitle = uniqueId; // Update the state
+        });
+        onTap(); // Then navigate
+      },
+    );
+  }
+
+  // --- ✨ NEW: Helper for sub-category items ---
+  Widget _buildSubDrawerItem({
+    required String title,
+    required String uniqueId,
+    required double indentation,
+    required VoidCallback onTap,
+  }) {
+    final bool isSelected = (_selectedTitle == uniqueId);
+
+    return ListTile(
+      // Indent the sub-item
+      contentPadding: EdgeInsets.only(left: indentation, right: 16.0),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected
+              ? Color(0xFF4338CA)
+              : Colors.black54, // Lighter text
+          fontSize: 15,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          fontFamily: 'Poppins',
+        ),
+      ),
+      // --- ✨ NEW: Selected styling ---
+      selected: isSelected,
+      selectedTileColor: Color(0xFFE0E7FF).withOpacity(0.6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+
+      onTap: () {
+        Navigator.pop(context);
+        setState(() {
+          _selectedTitle = uniqueId; // Update the state
+        });
+        onTap(); // Then navigate
       },
     );
   }
