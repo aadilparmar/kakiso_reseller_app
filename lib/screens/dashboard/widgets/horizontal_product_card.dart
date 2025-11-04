@@ -51,7 +51,7 @@ class HorizontalProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12.0),
         // NEW: Purple border
         border: Border.all(
-          color: const Color.fromARGB(255, 197, 18, 158), // Deep purple color
+          color: const Color.fromARGB(67, 197, 18, 158), // Deep purple color
           width: 1.0, // Thicker border for visibility
         ),
       ),

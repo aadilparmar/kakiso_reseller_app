@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/example.dart'; // Added GetX
+import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart'; // Added GetX
 
 // --- Define colors here to be accessible by the Theme ---
 const Color _activeIconColor = Color(0xFFE91E63);
@@ -30,12 +31,7 @@ class NavigationController extends GetxController {
         style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
       ),
     ),
-    const Center(
-      child: Text(
-        'Inventory Page',
-        style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
-      ),
-    ),
+    InventoryPage(),
     const Center(
       child: Text(
         'Profile Page',
@@ -116,12 +112,12 @@ class NavigationMenu extends StatelessWidget {
               ),
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.clipboard_export,
-                  Iconsax.clipboard_tick,
+                  Iconsax.shopping_cart,
+                  Iconsax.shopping_cart5,
                   3,
                   controller.selectedIndex.value,
                 ),
-                label: 'Inventory',
+                label: 'My Cart',
               ),
               NavigationDestination(
                 icon: _buildIcon(

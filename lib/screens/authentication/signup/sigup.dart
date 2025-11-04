@@ -69,7 +69,7 @@ class _RegisterPageState extends State<RegisterPage> {
             email: $email, 
             password: $password, 
             firstName: $firstName, 
-            lastName: $lastName
+            lastName: $lastName,
           }
         ) {
           user {

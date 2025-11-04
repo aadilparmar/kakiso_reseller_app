@@ -827,8 +827,4 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
-
-  // --- NEW HELPER WIDGET for the navigation cards ---
-  // --- REMOVED _buildProfilePic, _buildInfoRow, and _buildApiStatus ---
-  // (They are no longer needed for this layout)
 }
