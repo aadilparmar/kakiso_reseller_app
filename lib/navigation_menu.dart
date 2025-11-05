@@ -21,7 +21,7 @@ class NavigationController extends GetxController {
     HomePage(userData: userData),
     const Center(
       child: Text(
-        'Order Again Page',
+        'Categories',
         style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
       ),
     ),
@@ -94,12 +94,12 @@ class NavigationMenu extends StatelessWidget {
               ),
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.bag,
-                  Iconsax.bag_happy,
+                  Iconsax.category,
+                  Iconsax.category_25,
                   1,
                   controller.selectedIndex.value,
                 ),
-                label: 'Orders',
+                label: 'Categories',
               ),
               NavigationDestination(
                 icon: _buildIcon(

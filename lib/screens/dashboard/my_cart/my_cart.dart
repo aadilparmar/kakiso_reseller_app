@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart'; // optional: for number formatting (add to pubspec if you want)
 
-// A simple data model for the items in the inventory/cart.
 class CartItem {
   final String id;
   final String imageUrl;
@@ -27,32 +28,32 @@ class InventoryPage extends StatefulWidget {
 }
 
 class _InventoryPageState extends State<InventoryPage> {
-  // Mock list of items. In a real app, this would come from a state manager or API.
+  final Color accentColor = const Color(0xFFE91E63);
+
   final List<CartItem> _items = [
     CartItem(
       id: '1',
-      // Using placeholders as in the design
       imageUrl: 'assets/images/products/prod_13.png',
-      name: 'Floyd Miles', // Using names from design
-      description: 'Lorem ipsum dolor sit amet....',
+      name: 'Elephant Charm Bracelet ',
+      description: 'Comfortable cotton tee · Classic fit',
       price: 200.00,
-      quantity: 46, // Using quantity from design
+      quantity: 2,
     ),
     CartItem(
       id: '2',
-      imageUrl: 'https://placehold.co/100x100/F0F0F0/000000?text=Product',
-      name: 'Guy Hawkins',
-      description: 'Lorem ipsum dolor sit amet....',
-      price: 200.00,
-      quantity: 46,
+      imageUrl: 'assets/images/products/prod_12.jpg',
+      name: 'Primo Strainer',
+      description: 'Everyday sneakers · Lightweight',
+      price: 75.00,
+      quantity: 2,
     ),
     CartItem(
       id: '3',
-      imageUrl: 'https://placehold.co/100x100/F0FFF0/4CAF50?text=Product',
-      name: 'Marvin McKinney',
-      description: 'Lorem ipsum dolor sit amet....',
-      price: 200.00,
-      quantity: 46,
+      imageUrl: 'assets/images/products/prod_11.jpg',
+      name: 'Divorama Insence Sticks',
+      description: 'Slim-fit jeans · Stretch denim',
+      price: 89.99,
+      quantity: 2,
     ),
   ];
 
@@ -68,7 +69,7 @@ class _InventoryPageState extends State<InventoryPage> {
   void _decrementQuantity(String id) {
     setState(() {
       final item = _items.firstWhere((item) => item.id == id);
-      if (item.quantity > 1) {
+      if (item.quantity > 0) {
         item.quantity--;
       }
     });
@@ -80,90 +81,167 @@ class _InventoryPageState extends State<InventoryPage> {
     });
   }
 
+  // double get _totalPrice {
+  //   return _items.fold(0.0, (sum, i) => sum + (i.price * 1));
+  // }
+
+  String _formatPrice(double price) {
+    // If you prefer intl formatting, add intl package and use NumberFormat.currency
+    // return NumberFormat.currency(locale: 'en_IN', symbol: '₹').format(price);
+    return '₹${price.toStringAsFixed(2)}';
+  }
+
+  Widget _smartImage(String url) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.asset(
+        url,
+        width: 96,
+        height: 96,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          width: 96,
+          height: 96,
+          color: Colors.grey.shade100,
+          child: const Icon(Icons.broken_image, color: Colors.grey),
+        ),
+      ),
+    );
+  }
+
   // --- UI Build Methods ---
 
   @override
   Widget build(BuildContext context) {
-    // This is the main accent color from your screenshot
-    const Color accentColor = Color(0xFFE91E63);
-
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
+        // Makes the AppBar match the style in the image
         backgroundColor: Colors.white,
         elevation: 0,
-        // The design implies a white background with no back button,
-        // but typically you'd want one:
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
+        // We use 'title' as a full-width container for all elements
+        title: Row(
+          children: [
+            // 1. Hamburger Icon (Left)
+            // We wrap this in a Builder so it can find the Scaffold
+            Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu),
+                color: accentColor,
+                iconSize: 30,
+                onPressed: () {
+                  // --- THIS IS THE ACTION to open the drawer ---
+                  Scaffold.of(context).openDrawer();
+                },
+              ),
+            ),
+
+            // 2. Logo (Center-Left)
+            Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: Image.asset(
+                'assets/logos/login-logo.png', // Updated asset path
+                height: 22, // Updated height
+                fit: BoxFit.contain,
+              ),
+            ),
+
+            // Spacer pushes the remaining items (actions) to the right edge
+            const Spacer(),
+
+            // 3. Bell Icon (Right)
+            IconButton(
+              icon: const Icon(Iconsax.notification_bing),
+              color: accentColor,
+              iconSize: 30,
+              onPressed: () {
+                // Action for notifications
+              },
+            ),
+
+            // 4. Settings Icon (Far Right) - This is now your settings/profile icon
+            IconButton(
+              icon: const Icon(Iconsax.setting_2),
+              color: accentColor,
+              iconSize: 30,
+              onPressed: () {},
+            ),
+            SizedBox(width: 8), // Small spacing at the end
+          ],
         ),
-        title: const Text(
-          'Inventory',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
+        titleSpacing: 0,
+        automaticallyImplyLeading: false,
       ),
       body: Column(
         children: [
-          _buildSearchAndFilter(accentColor),
+          _buildSearchAndFilter(),
           Expanded(
-            child: ListView.builder(
-              itemCount: _items.length,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              itemBuilder: (context, index) {
-                final item = _items[index];
-                return _buildInventoryItemCard(item, accentColor);
-              },
-            ),
+            child: _items.isEmpty
+                ? Center(
+                    child: Text(
+                      'No items in inventory',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: _items.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return _buildInventoryItemCard(item);
+                    },
+                  ),
           ),
         ],
       ),
-      // Use bottomNavigationBar for the persistent "Purchase" button
-      bottomNavigationBar: _buildPurchaseButton(accentColor),
+      bottomNavigationBar: _buildPurchaseBar(),
     );
   }
 
-  Widget _buildSearchAndFilter(Color accentColor) {
+  Widget _buildSearchAndFilter() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          // Search Bar
           Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search..',
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding: const EdgeInsets.symmetric(vertical: 12.0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide.none,
+            child: Material(
+              elevation: 0,
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search products...',
+                  prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          // Filter Button
-          OutlinedButton.icon(
-            onPressed: () {
-              // TODO: Implement filter logic
-            },
-            icon: Icon(Icons.filter_list, color: accentColor, size: 20),
-            label: Text('Filter', style: TextStyle(color: accentColor)),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.grey[300]!),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
+          Material(
+            color: Colors.white,
+            elevation: 0,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () {},
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14.0,
+                  vertical: 12.0,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.filter_list, color: accentColor, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Filter', style: TextStyle(color: accentColor)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -172,187 +250,302 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _buildInventoryItemCard(CartItem item, Color accentColor) {
-    return Card(
-      elevation: 4,
-      shadowColor: Colors.grey.withOpacity(0.15),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
-      margin: const EdgeInsets.only(bottom: 16.0),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Item Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12.0),
-              child: Image.asset(
-                item.imageUrl,
-                width: 90,
-                height: 100,
-                fit: BoxFit.cover,
-                // Fallback for image loading error
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 90,
-                  height: 90,
-                  color: Colors.grey[200],
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    color: Colors.grey,
-                  ),
+  Widget _buildInventoryItemCard(CartItem item) {
+    final bool lowStock = item.quantity <= 5;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // optional: open detail
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(colors: [Colors.white, Colors.white]),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _smartImage(item.imageUrl),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Delete button (compact)
+                        Material(
+                          color: Colors.grey.shade100,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: InkWell(
+                            onTap: () => _removeItem(item.id),
+                            borderRadius: BorderRadius.circular(8),
+                            child: const Padding(
+                              padding: EdgeInsets.all(6.0),
+                              child: Icon(
+                                Iconsax.trash,
+                                size: 18,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    // Quantity & Price row
+                    Row(
+                      children: [
+                        // Qty label + controls
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Qty',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _quantityControl(item),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Stock indicator
+                        // if (lowStock)
+                        //   Expanded(
+                        //     child: Container(
+                        //       padding: const EdgeInsets.symmetric(
+                        //         horizontal: 8,
+                        //         vertical: 6,
+                        //       ),
+                        //       decoration: BoxDecoration(
+                        //         color: Colors.orange.shade50,
+                        //         borderRadius: BorderRadius.circular(10),
+                        //       ),
+                        //       child: Row(
+                        //         children: [
+                        //           Icon(
+                        //             Icons.warning_amber_rounded,
+                        //             size: 14,
+                        //             color: Colors.orange.shade800,
+                        //           ),
+                        //           const SizedBox(width: 6),
+                        //           Text(
+                        //             'Low stock',
+                        //             style: TextStyle(
+                        //               fontSize: 12,
+                        //               color: Colors.orange.shade800,
+                        //             ),
+                        //           ),
+                        //         ],
+                        //       ),
+                        //     ),
+                        //   ),
+                        const Spacer(),
+                        // Price badge
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              _formatPrice(item.price),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: accentColor,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            // Text(
+                            //   'Available: ${item.quantity}',
+                            //   style: TextStyle(
+                            //     fontSize: 12,
+                            //     color: Colors.grey.shade600,
+                            //   ),
+                            // ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Item Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        // <-- FIX 1: WRAPPED Text IN Expanded
-                        child: Text(
-                          item.name,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1, // Added to ensure it doesn't wrap
-                          overflow: TextOverflow
-                              .ellipsis, // Added to handle long names
-                        ),
-                      ),
-                      // Delete Icon
-                      IconButton(
-                        icon: Icon(Icons.delete_outline, color: accentColor),
-                        onPressed: () => _removeItem(item.id),
-                        constraints:
-                            const BoxConstraints(), // Removes extra padding
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.description,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
-                  // Quantity and Price Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Quantity Selector
-                      _buildQuantitySelector(item, accentColor),
-                      // Price
-                      Text(
-                        'Price:\n₹${item.price.toStringAsFixed(2)}',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: accentColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildQuantitySelector(CartItem item, Color accentColor) {
+  Widget _quantityControl(CartItem item) {
     return Row(
       children: [
-        const Text('Qty:', style: TextStyle(fontSize: 14, color: Colors.grey)),
-        const SizedBox(width: 8),
-        // Decrement Button
-        _buildQuantityButton(
+        // Decrement
+        _circleIconButton(
           icon: Icons.remove,
-          color: accentColor,
           onPressed: () => _decrementQuantity(item.id),
+          semanticLabel: 'Decrease quantity',
         ),
-        // Quantity Text
-        Padding(
-          // <-- FIX 2: REPLACED SizedBox(width: 40) WITH Padding
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12.0,
-          ), // Added horizontal padding
+        const SizedBox(width: 8),
+        // Animated quantity number
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          transitionBuilder: (child, anim) =>
+              ScaleTransition(scale: anim, child: child),
           child: Text(
-            item.quantity.toString(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            '${item.quantity}',
+            key: ValueKey<int>(item.quantity),
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
-        // Increment Button
-        _buildQuantityButton(
+        const SizedBox(width: 8),
+        // Increment
+        _circleIconButton(
           icon: Icons.add,
-          color: accentColor,
           onPressed: () => _incrementQuantity(item.id),
+          semanticLabel: 'Increase quantity',
         ),
       ],
     );
   }
 
-  // Helper widget for the + and - buttons
-  Widget _buildQuantityButton({
+  Widget _circleIconButton({
     required IconData icon,
-    required Color color,
     required VoidCallback onPressed,
+    String? semanticLabel,
   }) {
-    return Container(
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white, size: 16),
-        onPressed: onPressed,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(),
+    return Material(
+      color: accentColor,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Icon(
+            icon,
+            size: 16,
+            color: Colors.white,
+            semanticLabel: semanticLabel,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildPurchaseButton(Color accentColor) {
+  Widget _buildPurchaseBar() {
+    final double total = _items.fold(0.0, (sum, item) => sum + item.price);
     return Container(
-      color: Colors.white, // So it blends with the background
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(
-        horizontal: 24.0,
-        vertical: 16.0,
-      ).copyWith(bottom: 24.0), // Extra padding for home bar
-      child: ElevatedButton(
-        onPressed: () {
-          // TODO: Implement purchase logic
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accentColor,
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14.0),
+        horizontal: 16,
+        vertical: 12,
+      ).copyWith(bottom: 24),
+      child: Row(
+        children: [
+          // Total
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatPrice(total),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
-          elevation: 5,
-          shadowColor: accentColor.withOpacity(0.4),
-        ),
-        child: const Text(
-          'Purchase Now',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 0,
+            child: ElevatedButton(
+              onPressed: () {
+                // handle purchase
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 6,
+                shadowColor: accentColor.withOpacity(0.5),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Iconsax.bag, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'Purchase',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
