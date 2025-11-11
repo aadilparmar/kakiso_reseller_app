@@ -59,16 +59,6 @@ class KIntroScreen extends StatelessWidget {
                 // Action for notifications
               },
             ),
-
-            // 4. Settings Icon (Far Right)
-            IconButton(
-              icon: const Icon(Iconsax.setting_2),
-              color: accentColor,
-              iconSize: 30,
-              onPressed: () {
-                // Action for settings
-              },
-            ),
           ],
         ),
       ),

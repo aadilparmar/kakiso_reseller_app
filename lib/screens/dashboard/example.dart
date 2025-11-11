@@ -7,31 +7,18 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 // You MUST update this import to point to your actual login page file
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/banner_carousel.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product_card.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/sliding_category_bar.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/vertical_product_card.dart';
+import 'package:kakiso_reseller_app/models/user.dart';
 // Import for the icon pack you're using in the AppBar
 // --- END OF IMPORTS ---
 
 // A simple model for our user data
-class UserData {
-  final String name;
-  final String email;
-  final String userId;
-  final DateTime joined;
-  final String profilePicUrl;
-
-  UserData({
-    required this.name,
-    required this.email,
-    required this.userId,
-    required this.joined,
-    required this.profilePicUrl,
-  });
-}
 
 // --- RENAMED TO HomePage ---
 class HomePage extends StatefulWidget {
@@ -281,14 +268,19 @@ class _HomePageState extends State<HomePage> {
 
               // 4. Settings Icon (Far Right) - This is now your settings/profile icon
               IconButton(
-                icon: const Icon(Iconsax.setting_2),
+                icon: const Icon(Iconsax.shopping_cart),
                 color: accentColor,
                 iconSize: 30,
-                onPressed: () {
-                  _navigateTo('Settings');
-                },
+                onPressed: () => Get.to(() => const InventoryPage()),
               ),
-              SizedBox(width: 8), // Small spacing at the end
+              SizedBox(width: 4), // Small spacing at the end
+              IconButton(
+                icon: const Icon(Iconsax.profile_circle),
+                color: accentColor,
+                iconSize: 30,
+                onPressed: () {},
+              ),
+              SizedBox(width: 8),
             ],
           ),
           titleSpacing: 0,
@@ -297,9 +289,7 @@ class _HomePageState extends State<HomePage> {
         // --- THIS IS THE NEW DRAWER ---
         drawer: _buildAppDrawer(),
         body: SingleChildScrollView(
-          key: const PageStorageKey('dashboard_scroll'),
           child: Column(
-            key: const ValueKey('dashboard_column'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
@@ -349,31 +339,6 @@ class _HomePageState extends State<HomePage> {
                       width: 12,
                     ), // Spacing between search bar and button
                     // 2. Reseller Button
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: accentColor, // Vibrant pink color
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(
-                          110,
-                          50,
-                        ), // Fixed size for height/width
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            12,
-                          ), // Rounded corners
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Reseller',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),

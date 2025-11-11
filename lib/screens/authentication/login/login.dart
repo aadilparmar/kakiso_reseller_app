@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/forget_password.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
@@ -7,9 +8,6 @@ import 'dart:async'; // For async operations
 
 // 1. Import the graphql_flutter package
 import 'package:graphql_flutter/graphql_flutter.dart';
-
-// 2. Import your dashboard page and user model
-import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
 
 // 3. --- IMPORT THE SECURE STORAGE PACKAGE ---
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -94,14 +92,10 @@ class _LoginPageState extends State<LoginPage> {
       final loginData = result.data!['login'];
       final userData = loginData['user'];
 
-      // 5. --- THIS IS THE FIX ---
-      // Get the token from the response
       final String authToken = loginData['authToken'];
-      // Save the token securely to the device
-      await _storage.write(key: 'authToken', value: authToken);
-      // --- END OF FIX ---
 
-      // Map the API response to your UserData model
+      await _storage.write(key: 'authToken', value: authToken);
+
       return UserData(
         name: '${userData['firstName']} ${userData['lastName']}',
         email: userData['email'],

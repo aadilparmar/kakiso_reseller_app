@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart'; // Added GetX
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // Added GetX
 
 // --- Define colors here to be accessible by the Theme ---
 const Color _activeIconColor = Color(0xFFE91E63);
@@ -19,22 +22,12 @@ class NavigationController extends GetxController {
   // List of screens to display
   List<Widget> get screens => [
     HomePage(userData: userData),
+    CategoriesSection(),
+    ToolsSection(),
+    CatalogueSection(),
     const Center(
       child: Text(
-        'Categories',
-        style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
-      ),
-    ),
-    const Center(
-      child: Text(
-        'Ware House Page',
-        style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
-      ),
-    ),
-    InventoryPage(),
-    const Center(
-      child: Text(
-        'Profile Page',
+        'Profile',
         style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
       ),
     ),
@@ -103,21 +96,21 @@ class NavigationMenu extends StatelessWidget {
               ),
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.building_4,
-                  Iconsax.buildings,
+                  Iconsax.designtools,
+                  Iconsax.designtools5,
                   2,
                   controller.selectedIndex.value,
                 ),
-                label: 'Ware House',
+                label: 'Tools',
               ),
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.shopping_cart,
-                  Iconsax.shopping_cart5,
+                  Iconsax.book_saved,
+                  Iconsax.book,
                   3,
                   controller.selectedIndex.value,
                 ),
-                label: 'My Cart',
+                label: 'Catalogue',
               ),
               NavigationDestination(
                 icon: _buildIcon(
