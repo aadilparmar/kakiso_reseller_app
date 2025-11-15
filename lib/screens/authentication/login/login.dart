@@ -4,13 +4,15 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/forget_password.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
-import 'dart:async'; // For async operations
+import 'dart:async';
 
-// 1. Import the graphql_flutter package
+// GraphQL
 import 'package:graphql_flutter/graphql_flutter.dart';
 
-// 3. --- IMPORT THE SECURE STORAGE PACKAGE ---
+// Secure storage
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+// Google Sign-In
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,18 +31,19 @@ class _LoginPageState extends State<LoginPage> {
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
   late GraphQLClient _client;
 
-  // 4. --- INITIALIZE SECURE STORAGE ---
+  // Secure storage
   final _storage = const FlutterSecureStorage();
+
+  // GoogleSignIn instance
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: <String>['email', 'profile'],
+  );
 
   @override
   void initState() {
     super.initState();
-    // Initialize the GraphQL client
     final HttpLink httpLink = HttpLink(_graphqlUrl);
-    _client = GraphQLClient(
-      link: httpLink,
-      cache: GraphQLCache(), // Use default in-memory cache
-    );
+    _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
   }
 
   @override
@@ -115,22 +118,79 @@ class _LoginPageState extends State<LoginPage> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Call the API (now the GraphQL version)
       final userData = await _apiLogin(email, password);
 
-      // If successful, stop loading and navigate to dashboard
       if (mounted) {
         setState(() => _isLoading = false);
-        // Use Get.offAll to clear the navigation stack
         Get.offAll(() => NavigationMenu(userData: userData));
       }
     } catch (e) {
-      // If API call fails, stop loading and show an error
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceFirst("Exception: ", "")),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Google Sign-In flow
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+
+      if (account == null) {
+        // user aborted the sign-in
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+
+      // ID token: can be sent to your backend to verify/exchange for a server-side token
+      final String? idToken = auth.idToken;
+      final String? accessToken = auth.accessToken;
+
+      // Persist token locally for now so other parts of app can use it.
+      if (idToken != null) {
+        await _storage.write(key: 'authToken', value: idToken);
+      } else if (accessToken != null) {
+        await _storage.write(key: 'authToken', value: accessToken);
+      }
+
+      // TODO: If your backend supports exchanging Google idToken for your app's auth token,
+      // send `idToken` to your backend here and receive a server auth token.
+      // Example:
+      // final serverToken = await exchangeTokenWithYourBackend(idToken);
+
+      // Build a UserData instance from Google profile
+      final userData = UserData(
+        name: account.displayName ?? account.email.split('@').first,
+        email: account.email,
+        userId: account.id,
+        joined: DateTime.now(),
+        profilePicUrl: account.photoUrl ?? '',
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Get.offAll(() => NavigationMenu(userData: userData));
+      }
+    } catch (e) {
+      // On error, ensure user is signed out of google client to allow retry
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google sign-in failed: ${e.toString()}'),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -153,11 +213,8 @@ class _LoginPageState extends State<LoginPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. Logo
                 Image.asset('assets/logos/login-logo.png', height: 80),
                 const SizedBox(height: 60),
-
-                // 2. Log In Title
                 const Text(
                   'Log In',
                   textAlign: TextAlign.center,
@@ -168,16 +225,12 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // 3. Subtitle
                 const Text(
                   'Login to Your Reseller Panel',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.black54),
                 ),
                 const SizedBox(height: 32),
-
-                // 4. Email/Mobile Field
                 TextFormField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -209,8 +262,6 @@ class _LoginPageState extends State<LoginPage> {
                   enabled: !_isLoading,
                 ),
                 const SizedBox(height: 20),
-
-                // 5. Password Field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
@@ -255,8 +306,6 @@ class _LoginPageState extends State<LoginPage> {
                   enabled: !_isLoading,
                 ),
                 const SizedBox(height: 16),
-
-                // 6. Forgot Password
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -274,8 +323,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // 7. Log in Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
@@ -306,26 +353,26 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                 ),
                 const SizedBox(height: 24),
-
-                // 8. Sign in with Google Button
                 OutlinedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          // Handle Google sign-in logic
-                        },
+                  onPressed: _isLoading ? null : _handleGoogleSignIn,
                   icon: Image.network(
                     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
                     height: 22.0,
                   ),
-                  label: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
+                  label: _isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Sign in with Google',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     side: BorderSide(color: Colors.grey[300]!, width: 1.5),
@@ -335,8 +382,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-
-                // 9. Sign Up Section
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
