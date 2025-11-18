@@ -1,4 +1,8 @@
 // Static Data
+import 'dart:ui';
+
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/sliding_category_bar.dart';
+
 final List<Map<String, String>> leftCategoriesData = [
   {'image': 'https://i.imgur.com/4Z7b2zI.png', 'label': 'Popular'},
   {'image': 'https://i.imgur.com/5zXg2y2.png', 'label': 'Kurti, Saree & L...'},
@@ -39,4 +43,62 @@ final List<String> allFiltersData = [
   'Under ₹999',
   'Best Seller',
   'Handmade',
+];
+const Color accentColor = Color(0xFFE91E63);
+const Color drawerHeaderColor = Color(0xFF4A317E);
+const Color drawerIconColor = Color(0xFFCC0000);
+
+// --- Static Data ---
+final List<ProductCategory> homeCategories = [
+  ProductCategory(
+    imageAssetPath: 'assets/images/icons/jewelry.png',
+    label: 'Jewels',
+  ),
+  ProductCategory(
+    imageAssetPath: 'assets/images/icons/cookware.png',
+    label: 'Kitchen',
+  ),
+  ProductCategory(
+    imageAssetPath: 'assets/images/icons/headphones.png',
+    label: 'Gadegts',
+  ),
+  ProductCategory(
+    imageAssetPath: 'assets/images/icons/incense.png',
+    label: 'Aroma',
+  ),
+  ProductCategory(
+    imageAssetPath: 'assets/images/icons/kids.png',
+    label: 'Kids',
+  ),
+];
+
+final List<Map<String, dynamic>> homeProducts = [
+  {
+    "image": 'assets/images/products/prod_13.png',
+    "title": "Elephant Charm Bracelet ",
+    "company": "AGOR",
+    "price": "₹1199",
+    "discount": 20,
+  },
+  {
+    "image": "assets/images/products/prod_12.jpg",
+    "title": "Primo Strainer ",
+    "company": "Elephant",
+    "price": "₹75",
+    "discount": 10,
+  },
+  {
+    "image": "assets/images/products/prod_11.jpg",
+    "title": "Divorama Insence Sticks",
+    "company": "Divorama",
+    "price": "₹89",
+    "discount": 3,
+  },
+  {
+    "image": "assets/images/products/prod_4.png",
+    "title": "Minimalist Desk Lamp",
+    "company": "Nexa Mart",
+    "price": "₹899",
+    "discount": 5,
+  },
 ];

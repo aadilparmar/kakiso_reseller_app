@@ -4,7 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/example.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // Added GetX
 
 // --- Define colors here to be accessible by the Theme ---

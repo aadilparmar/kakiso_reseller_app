@@ -6,12 +6,10 @@ import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // Internal Imports
-import 'package:kakiso_reseller_app/utils/constants.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
 
 import 'widgets/search_and_filter_bar.dart';
 import 'widgets/filter_chips_list.dart';
-import 'widgets/featured_section.dart';
 import 'widgets/category_grid.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
@@ -174,10 +172,11 @@ class _CategoriesPageState extends State<CategoriesSection> {
                           activeFilters: activeFilters,
                           onSelected: (label, isSelected) {
                             setState(() {
-                              if (isSelected)
+                              if (isSelected) {
                                 activeFilters.add(label);
-                              else
+                              } else {
                                 activeFilters.remove(label);
+                              }
                             });
                           },
                         ),
@@ -212,10 +211,11 @@ class _CategoriesPageState extends State<CategoriesSection> {
                             favorites: favorites,
                             onFavoriteToggle: (id) {
                               setState(() {
-                                if (favorites.contains(id))
+                                if (favorites.contains(id)) {
                                   favorites.remove(id);
-                                else
+                                } else {
                                   favorites.add(id);
+                                }
                               });
                             },
                             items: [],

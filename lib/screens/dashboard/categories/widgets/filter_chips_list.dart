@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
+
+// 1. Add "hide accentColor" to this line:
+
+// 2. Keep this line as is (this provides the correct color):
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class FilterChipsList extends StatelessWidget {

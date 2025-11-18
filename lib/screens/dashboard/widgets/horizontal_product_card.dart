@@ -1,45 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-/// A reusable horizontal product card widget with added features:
-/// - A purple border around the card.
-/// - An optional discount tab.
-/// - A company/brand name with a verified badge.
 class HorizontalProductCard extends StatelessWidget {
-  /// The URL for the product image.
   final String imageUrl;
 
-  /// The title or name of the product.
   final String title;
 
-  /// The price of the product, formatted as a string (e.g., "$19.99").
   final String price;
 
-  /// The name of the company or brand.
-  final String companyName; // NEW: Added companyName property
+  final String companyName;
 
-  /// The discount percentage (e.g., 20). If null or 0, no badge is shown.
-  final int? discountPercentage; // NEW: Added discountPercentage property
+  final int? discountPercentage;
 
-  /// Callback function triggered when the "Add to Cart" button is pressed.
   final VoidCallback onAddToCartPressed;
 
-  /// Creates a horizontal product card.
-  ///
-  /// All parameters are required, except for discountPercentage.
   const HorizontalProductCard({
     super.key,
     required this.imageUrl,
     required this.title,
     required this.price,
-    required this.companyName, // Required
-    this.discountPercentage, // Optional
+    required this.companyName,
+    this.discountPercentage,
     required this.onAddToCartPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Determine if a discount badge should be shown
     final bool showDiscount =
         discountPercentage != null && discountPercentage! > 0;
 
@@ -62,18 +48,19 @@ class HorizontalProductCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(12.0), // Was 10.0, now 12.0
+                  left: Radius.circular(12.0),
                 ),
-
-                child: Image.asset(
-                  // Changed to Image.asset
+                child: Image.network(
                   imageUrl,
-                  height: 180, // FIX: Image takes full height of the card
-                  width: 140, // Fixed width for the image
+                  height: 180,
+                  width: 140,
                   fit: BoxFit.cover,
+
+                  // --- THE FIX IS HERE ---
                   errorBuilder: (context, error, stackTrace) {
+                    // You MUST return a widget here
                     return Container(
-                      height: 160, // FIX: Placeholder takes full height
+                      height: 180,
                       width: 140,
                       color: Colors.grey[200],
                       child: Icon(
@@ -83,14 +70,14 @@ class HorizontalProductCard extends StatelessWidget {
                       ),
                     );
                   },
-                  // NOTE: loadingBuilder is not available on Image.asset
+                  // -----------------------
                 ),
               ),
               // NEW: Discount Tab
               if (showDiscount)
                 Positioned(
-                  top: 0, // Positioned at the very top
-                  left: 0, // Positioned at the very left
+                  top: 0,
+                  left: 0,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8.0,
