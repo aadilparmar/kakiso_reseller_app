@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // --- INTERNAL IMPORTS ---
@@ -34,7 +35,7 @@ class _HomePageState extends State<HomePage> {
   late UserData _userData;
   String _selectedTitle = 'BusinessDetails';
   final _storage = const FlutterSecureStorage();
-
+  final CartController cartController = Get.put(CartController());
   // --- STATE FOR API DATA ---
   List<ProductModel> _products = [];
   bool _isLoadingProducts = true;
@@ -242,6 +243,10 @@ class _HomePageState extends State<HomePage> {
                             price: '₹${product.price}',
                             discountPercentage: product.discountPercentage,
                             onAddToCartPressed: () {
+                              // 1. Add the item to your Cart Controller
+                              cartController.addToCart(product);
+
+                              // 2. Show the visual feedback (SnackBar)
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
