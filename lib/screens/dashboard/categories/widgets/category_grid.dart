@@ -1,27 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:kakiso_reseller_app/models/categories.dart';
 
 class CategoryGrid extends StatelessWidget {
-  final List<Map<String, String>> items;
-  final Set<String> favorites;
-  final Function(String id) onFavoriteToggle;
+  final List<CategoryModel> categories; // Change Type
+  final Set<int> favorites; // Change to ID (int)
+  final Function(int id) onFavoriteToggle;
 
   const CategoryGrid({
     super.key,
-    required this.items,
+    required this.categories,
     required this.favorites,
     required this.onFavoriteToggle,
+    required List items,
   });
 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    // Calculate cross axis count based on width
     int crossAxisCount = screenWidth > 1100
         ? 5
         : (screenWidth > 800 ? 4 : (screenWidth > 600 ? 3 : 2));
 
+    if (categories.isEmpty) {
+      return const Center(child: Text("No categories found."));
+    }
+
     return GridView.builder(
-      itemCount: items.length,
+      itemCount: categories.length,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         mainAxisExtent: 150,
@@ -29,15 +34,14 @@ class CategoryGrid extends StatelessWidget {
         mainAxisSpacing: 14,
       ),
       itemBuilder: (ctx, idx) {
-        final cat = items[idx];
-        final id = cat['label']!;
-        final isFav = favorites.contains(id);
+        final cat = categories[idx];
+        final isFav = favorites.contains(cat.id);
 
         return GestureDetector(
           onTap: () => ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('Open ${cat['label']}'))),
-          onLongPress: () => onFavoriteToggle(id),
+          ).showSnackBar(SnackBar(content: Text('Open ${cat.name}'))),
+          onLongPress: () => onFavoriteToggle(cat.id),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             decoration: BoxDecoration(
@@ -66,13 +70,21 @@ class CategoryGrid extends StatelessWidget {
                         color: Colors.grey.shade100,
                         shape: BoxShape.circle,
                       ),
-                      child: Image.network(cat['image']!, fit: BoxFit.contain),
+                      child: Image.network(
+                        cat.imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                            ),
+                      ),
                     ),
                     Positioned(
                       right: 2,
                       top: 0,
                       child: GestureDetector(
-                        onTap: () => onFavoriteToggle(id),
+                        onTap: () => onFavoriteToggle(cat.id),
                         child: CircleAvatar(
                           radius: 14,
                           backgroundColor: isFav
@@ -90,7 +102,7 @@ class CategoryGrid extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  cat['label']!,
+                  cat.name,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 13,
@@ -101,7 +113,7 @@ class CategoryGrid extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Explore',
+                  '${cat.count} items',
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
               ],

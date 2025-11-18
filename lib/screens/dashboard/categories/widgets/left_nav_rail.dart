@@ -1,32 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart' hide accentColor;
+import 'package:kakiso_reseller_app/models/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 
 class LeftNavigationRail extends StatelessWidget {
+  final List<CategoryModel> categories;
   final int selectedIndex;
-  final Function(int index, String label) onCategorySelected;
+  // UPDATE: Add 'int id' to the callback function
+  final Function(int index, String label, int id) onCategorySelected;
 
   const LeftNavigationRail({
     super.key,
+    required this.categories,
     required this.selectedIndex,
     required this.onCategorySelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Only show Parent Categories
+    final parentCategories = categories.where((c) => c.parent == 0).toList();
+
     return Container(
       width: 96,
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: ListView.builder(
-        itemCount: leftCategoriesData.length,
+        itemCount: parentCategories.length,
         itemBuilder: (ctx, idx) {
-          final item = leftCategoriesData[idx];
+          final item = parentCategories[idx];
           final bool isSelected = idx == selectedIndex;
 
           return GestureDetector(
-            onTap: () => onCategorySelected(idx, item['label']!),
+            // UPDATE: Pass the item.id here
+            onTap: () => onCategorySelected(idx, item.name, item.id),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.symmetric(vertical: 8),
@@ -42,42 +48,17 @@ class LeftNavigationRail extends StatelessWidget {
                   : null,
               child: Column(
                 children: [
-                  Stack(
-                    alignment: Alignment.topRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: isSelected
-                            ? accentColor
-                            : Colors.grey.shade100,
-                        backgroundImage: NetworkImage(item['image']!),
-                      ),
-                      if (idx ==
-                          0) // Highlight purely for the first item example
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Color.fromARGB(255, 148, 45, 251),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(color: Colors.black26, blurRadius: 4),
-                              ],
-                            ),
-                            child: const Icon(
-                              Iconsax.home_trend_up,
-                              size: 12,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: isSelected
+                        ? accentColor
+                        : Colors.grey.shade100,
+                    backgroundImage: NetworkImage(item.imageUrl),
+                    onBackgroundImageError: (_, __) => const Icon(Icons.error),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    item['label']!,
+                    item.name,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
