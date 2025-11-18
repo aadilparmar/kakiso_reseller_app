@@ -1,9 +1,9 @@
 // trending_products_dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 
 class TrendingProductsDashboardPage extends StatelessWidget {
-  const TrendingProductsDashboardPage({Key? key}) : super(key: key);
+  const TrendingProductsDashboardPage({super.key});
 
   final List<Map<String, dynamic>> sample = const [
     {'title': 'Product A', 'sales': 120},

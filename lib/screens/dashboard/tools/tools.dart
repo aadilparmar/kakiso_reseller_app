@@ -8,7 +8,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/ai_caption_g
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/auto_inventory_sync.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/auto_video_generator.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/broadcast_marketing_tools.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_whatsapp.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_wp_share/one_click_whatsapp.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/price_margin_tool.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/reseller_catalog_builder.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_products_dashboard.dart';

@@ -1,6 +1,6 @@
 // auto_inventory_sync.dart
 import 'package:flutter/material.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 
 class AutoInventorySyncPage extends StatefulWidget {
   const AutoInventorySyncPage({super.key});

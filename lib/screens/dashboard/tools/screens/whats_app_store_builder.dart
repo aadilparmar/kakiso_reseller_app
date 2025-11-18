@@ -1,9 +1,9 @@
 // whatsapp_store_builder.dart
 import 'package:flutter/material.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 
 class WhatsappStoreBuilderPage extends StatefulWidget {
-  const WhatsappStoreBuilderPage({Key? key}) : super(key: key);
+  const WhatsappStoreBuilderPage({super.key});
 
   @override
   State<WhatsappStoreBuilderPage> createState() =>

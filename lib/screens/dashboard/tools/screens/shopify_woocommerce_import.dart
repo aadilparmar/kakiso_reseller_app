@@ -1,6 +1,6 @@
 // shopify_woocommerce_import.dart
 import 'package:flutter/material.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 
 class ShopifyWooImportPage extends StatefulWidget {
   const ShopifyWooImportPage({super.key});

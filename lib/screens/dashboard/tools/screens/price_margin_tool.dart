@@ -1,6 +1,6 @@
 // price_margin_tool.dart
 import 'package:flutter/material.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 
 class PriceMarginToolPage extends StatefulWidget {
   const PriceMarginToolPage({super.key});
