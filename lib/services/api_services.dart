@@ -209,4 +209,34 @@ class ApiService {
       throw Exception('Error fetching brands: $e');
     }
   }
+
+  static Future<List<ProductModel>> searchProducts(String query) async {
+    // WooCommerce uses the 'search' parameter for text queries
+    final Uri url = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products?search=$query&status=publish&per_page=20',
+    );
+
+    String basicAuth =
+        'Basic ' + base64Encode(utf8.encode('$consumerKey:$consumerSecret'));
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          "Authorization": basicAuth,
+          "Content-Type": "application/json",
+          "User-Agent": "KakisoResellerApp/1.0",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => ProductModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Search Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error searching products: $e');
+    }
+  }
 }

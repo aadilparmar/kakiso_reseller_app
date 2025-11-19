@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/story_section.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/curated_collections.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/flash_sale_banner.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/recommended_section.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
 
 // --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
@@ -20,9 +17,16 @@ import 'widgets/search_header.dart';
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+// 1. IMPORT THE SEARCH SCREEN HERE
+
+// --- DASHBOARD SECTIONS IMPORTS ---
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/story_section.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/curated_collections.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/flash_sale_banner.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/recommended_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart'; // Assuming TrendingSection is here or renamed
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/vertical_product_card.dart'; // NewArrivalSection
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/vertical_product_card.dart';
 
 class HomePage extends StatefulWidget {
   final UserData userData;
@@ -39,8 +43,6 @@ class _HomePageState extends State<HomePage> {
 
   // Initialize Controller
   final CartController cartController = Get.put(CartController());
-
-  // State for API Data
 
   @override
   void initState() {
@@ -127,7 +129,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- CUSTOM SNACKBAR FUNCTION (Added here for access) ---
+  // --- CUSTOM SNACKBAR FUNCTION ---
   void showCustomCartSnackbar(ProductModel product) {
     Get.snackbar(
       '',
@@ -226,6 +228,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+
       // --- APP BAR ---
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -330,63 +333,29 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SearchHeader(),
-            // SlidingCategoryBar(
-            //   categories: homeCategories,
-            //   onCategorySelected: (index, label) {},
-            // ),
+            // --- 2. FIXED SEARCH HEADER ---
+            SearchHeader(
+              readOnly: true, // Prevents typing here
+              onTap: () {
+                // Navigates to Search Screen
+                Get.to(
+                  () => const ProductSearchScreen(),
+                  transition: Transition.fadeIn,
+                );
+              },
+            ),
+
+            // --- CONTENT SECTIONS ---
             const StorySection(),
             const SizedBox(height: 16),
-            // --- HORIZONTAL PRODUCTS LIST ---
-            // SizedBox(
-            //   height: 180,
-            //   child: _isLoadingProducts
-            //       ? const Center(
-            //           child: CircularProgressIndicator(color: accentColor),
-            //         )
-            //       : _products.isEmpty
-            //       ? const Center(child: Text("No products found"))
-            //       : ListView.builder(
-            //           scrollDirection: Axis.horizontal,
-            //           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            //           itemCount: _products.length,
-            //           itemBuilder: (context, index) {
-            //             final product = _products[index];
-            //             // ... inside the ListView.builder loop ...
-
-            //             return Padding(
-            //               padding: const EdgeInsets.only(right: 12.0),
-            //               child: HorizontalProductCard(
-            //                 imageUrl: product.image,
-            //                 title: product.name,
-            //                 companyName: "Kakiso",
-
-            //                 // 1. Current Selling Price
-            //                 price: '₹${product.price}',
-
-            //                 // 2. Original MRP (Regular Price)
-            //                 // We format it with the currency symbol if it exists
-            //                 originalPrice: product.regularPrice.isNotEmpty
-            //                     ? '₹${product.regularPrice}'
-            //                     : '',
-
-            //                 discountPercentage: product.discountPercentage,
-
-            //                 onAddToCartPressed: () {},
-            //               ),
-            //             );
-            //           },
-            //         ),
-            // ),
             const RecommendedSection(),
-            // const SizedBox(height: 16),
-            // const BrandsSection(),
             const SizedBox(height: 16),
+            // const BrandsSection(),
             const TopRankingSection(),
             const FlashSaleBanner(),
             const SizedBox(height: 16),
             const NewArrivalSection(),
-            const TrendingProducts(), // Renamed to match your file
+            const TrendingProducts(),
             const SizedBox(height: 16),
             const CuratedCollections(),
             const SizedBox(height: 16),

@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-// IMPORT CONSTANTS HERE
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class SearchHeader extends StatelessWidget {
-  const SearchHeader({super.key});
+  // 1. Make function nullable (?)
+  final ValueChanged<String>? onSearchChanged;
+  final VoidCallback? onTap;
+  final bool readOnly;
+  final bool autoFocus;
+
+  const SearchHeader({
+    super.key,
+    // 2. Remove 'required' keyword
+    this.onSearchChanged,
+    this.onTap,
+    this.readOnly = false, // Default to writable
+    this.autoFocus = false, // Default to no focus
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +34,12 @@ class SearchHeader extends StatelessWidget {
                 border: Border.all(color: Colors.grey.shade300, width: 1),
               ),
               child: TextField(
+                autofocus: autoFocus,
+                readOnly: readOnly, // Important logic
+                onTap: onTap, // Important logic
+                onChanged: onSearchChanged,
                 decoration: InputDecoration(
-                  hintText: 'Search..',
+                  hintText: 'Search products...',
                   hintStyle: const TextStyle(
                     color: Colors.blueGrey,
                     fontFamily: 'Poppins',
@@ -35,7 +51,7 @@ class SearchHeader extends StatelessWidget {
                   ),
                   suffixIcon: const Icon(
                     Iconsax.search_normal,
-                    color: accentColor, // Now valid
+                    color: accentColor,
                     size: 28,
                   ),
                 ),
