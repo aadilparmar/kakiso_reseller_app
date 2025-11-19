@@ -1,54 +1,221 @@
+import 'dart:ui'; // For ImageFilter
 import 'package:flutter/material.dart';
+import 'package:get/get.dart'; // Import GetX
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart'; // Import Controller
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart'; // Import Cart Page
 
-// --- NewArrivalImageCard ---
-class NewArrivalImageCard extends StatelessWidget {
-  final String imageUrl;
-  final double cardSize;
+// --- 1. THE "WORLD CLASS" CARD (Updated with Action) ---
+class EditorialProductCard extends StatelessWidget {
+  final ProductModel product;
+  final double width;
+  final double height;
+  final VoidCallback onAddToCart; // <--- NEW CALLBACK
 
-  const NewArrivalImageCard({
+  const EditorialProductCard({
     super.key,
-    required this.imageUrl,
-    this.cardSize = 130.0,
+    required this.product,
+    required this.onAddToCart, // <--- REQUIRED
+    this.width = 180.0,
+    this.height = 280.0,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: cardSize,
-      height: cardSize,
+      width: width,
+      height: height,
+      margin: const EdgeInsets.only(right: 16, bottom: 10),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
         color: Colors.white,
-        borderRadius: BorderRadius.circular(2),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: Icon(Icons.broken_image, color: Colors.grey[400]),
-            );
-          },
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            // --- A. BACKGROUND IMAGE ---
+            Positioned.fill(
+              child: Image.network(
+                product.image,
+                fit: BoxFit.cover,
+                errorBuilder: (ctx, err, stack) => Container(
+                  color: Colors.grey[100],
+                  child: const Icon(
+                    Icons.image_not_supported,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+
+            // --- B. GRADIENT OVERLAY ---
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 140,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.6),
+                      Colors.black.withOpacity(0.9),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // --- C. "NEW DROP" BADGE ---
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C853),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00C853).withOpacity(0.4),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  "NEW DROP",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Poppins',
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+
+            // --- E. CONTENT ---
+            Positioned(
+              bottom: 12,
+              left: 12,
+              right: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "KAKISO EXCLUSIVE",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins',
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Price Tag & Add Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Price Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                            child: Text(
+                              "₹${product.price}",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // --- ACTIVE ADD BUTTON ---
+                      GestureDetector(
+                        onTap: onAddToCart, // Calls the function when tapped
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Iconsax.add,
+                            size: 20,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// --- NewArrivalSection Widget ---
+// --- 2. MAIN SECTION WIDGET ---
 class NewArrivalSection extends StatefulWidget {
   const NewArrivalSection({super.key});
 
@@ -57,7 +224,9 @@ class NewArrivalSection extends StatefulWidget {
 }
 
 class _NewArrivalSectionState extends State<NewArrivalSection> {
-  final ScrollController _scrollController = ScrollController();
+  final CartController cartController = Get.put(
+    CartController(),
+  ); // Inject Controller
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
@@ -82,137 +251,156 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
     }
   }
 
-  String _stripHtml(String htmlString) {
-    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
-    return htmlString.replaceAll(exp, '').trim();
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
+  // --- HELPER: Show Premium Popup ---
+  void _showPremiumPopup(ProductModel product) {
+    Get.snackbar(
+      '',
+      '',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
+      padding: const EdgeInsets.all(16),
+      borderRadius: 24,
+      backgroundColor: Colors.white.withOpacity(0.95),
+      barBlur: 20,
+      colorText: Colors.black,
+      boxShadows: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      titleText: Row(
+        children: [
+          Container(
+            width: 45,
+            height: 45,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              image: DecorationImage(
+                image: NetworkImage(product.image),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Added to Cart",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: Color(0xFF4A317E),
+                  ),
+                ),
+                Text(
+                  product.name,
+                  style: const TextStyle(fontSize: 12, fontFamily: 'Poppins'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      messageText: const SizedBox(height: 0),
+      mainButton: TextButton(
+        onPressed: () => Get.to(() => const InventoryPage()),
+        child: const Row(
+          children: [
+            Text(
+              "View",
+              style: TextStyle(
+                color: Color(0xFF4A317E),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Icon(Iconsax.arrow_right_3, size: 16, color: Color(0xFF4A317E)),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final double cardWidth = 130.0;
-    final double horizontalItemSpacing = 16.0;
-    final double textHeight = 80.0;
-    final double totalItemHeight = cardWidth + 10 + textHeight;
+    const double sectionHeight = 320.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Text(
-                    'New',
+                children: [
+                  Container(
+                    width: 4,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEB2A7E),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Fresh Drops',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                       color: Colors.black,
                       fontFamily: 'Poppins',
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Arrival',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.pinkAccent,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Iconsax.bag_happy, color: Colors.orange, size: 24),
+                  const SizedBox(width: 6),
+                  const Text('🔥', style: TextStyle(fontSize: 20)),
                 ],
               ),
-              GestureDetector(
-                onTap: () {},
-                child: const Text(
-                  'See all',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.pinkAccent,
-                    fontFamily: 'Poppins',
-                    decoration: TextDecoration.underline,
-                  ),
+              const Text(
+                'View All',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFEB2A7E),
+                  fontFamily: 'Poppins',
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+
+        // List
         SizedBox(
-          height: totalItemHeight,
+          height: sectionHeight,
           child: _isLoading
               ? const Center(
-                  child: CircularProgressIndicator(color: Colors.pinkAccent),
+                  child: CircularProgressIndicator(color: Color(0xFFEB2A7E)),
                 )
               : _products.isEmpty
-              ? const Center(child: Text("No new arrivals found."))
+              ? const Center(child: Text("No fresh drops yet."))
               : ListView.builder(
-                  controller: _scrollController,
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: const EdgeInsets.only(left: 16),
                   itemCount: _products.length,
                   itemBuilder: (context, index) {
                     final product = _products[index];
-                    final desc = _stripHtml(
-                      product.shortDescription.isEmpty
-                          ? product.name
-                          : product.shortDescription,
-                    );
-                    return Container(
-                      margin: EdgeInsets.only(
-                        right: (index == _products.length - 1)
-                            ? 0
-                            : horizontalItemSpacing,
-                      ),
-                      width: cardWidth,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          NewArrivalImageCard(
-                            imageUrl: product.image,
-                            cardSize: cardWidth,
-                          ),
-                          const SizedBox(height: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                  fontFamily: 'Poppins',
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                desc,
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontFamily: 'Poppins',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    return EditorialProductCard(
+                      product: product,
+                      width: 200,
+                      height: 300,
+                      // --- CONNECT ACTION HERE ---
+                      onAddToCart: () {
+                        cartController.addToCart(product);
+                        _showPremiumPopup(product);
+                      },
                     );
                   },
                 ),

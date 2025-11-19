@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/story_section.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/curated_collections.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/flash_sale_banner.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/recommended_section.dart';
 
 // --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
@@ -17,8 +20,6 @@ import 'widgets/search_header.dart';
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product_card.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/sliding_category_bar.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart'; // Assuming TrendingSection is here or renamed
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/vertical_product_card.dart'; // NewArrivalSection
@@ -40,8 +41,6 @@ class _HomePageState extends State<HomePage> {
   final CartController cartController = Get.put(CartController());
 
   // State for API Data
-  List<ProductModel> _products = [];
-  bool _isLoadingProducts = true;
 
   @override
   void initState() {
@@ -52,18 +51,12 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     try {
-      final products = await ApiService.fetchProducts();
       if (mounted) {
-        setState(() {
-          _products = products;
-          _isLoadingProducts = false;
-        });
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoadingProducts = false;
-        });
+        setState(() {});
         print("Error loading products: $e");
       }
     }
@@ -338,53 +331,65 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SearchHeader(),
-            SlidingCategoryBar(
-              categories: homeCategories,
-              onCategorySelected: (index, label) {},
-            ),
+            // SlidingCategoryBar(
+            //   categories: homeCategories,
+            //   onCategorySelected: (index, label) {},
+            // ),
+            const StorySection(),
             const SizedBox(height: 16),
-
             // --- HORIZONTAL PRODUCTS LIST ---
-            SizedBox(
-              height: 180,
-              child: _isLoadingProducts
-                  ? const Center(
-                      child: CircularProgressIndicator(color: accentColor),
-                    )
-                  : _products.isEmpty
-                  ? const Center(child: Text("No products found"))
-                  : ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      itemCount: _products.length,
-                      itemBuilder: (context, index) {
-                        final product = _products[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 12.0),
-                          child: HorizontalProductCard(
-                            imageUrl: product.image,
-                            title: product.name,
-                            companyName: "Kakiso",
-                            price: '₹${product.price}',
-                            discountPercentage: product.discountPercentage,
-                            onAddToCartPressed: () {
-                              // 1. Add to Cart Controller
-                              cartController.addToCart(product);
-                              // 2. Show Premium Popup
-                              showCustomCartSnackbar(product);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-            ),
+            // SizedBox(
+            //   height: 180,
+            //   child: _isLoadingProducts
+            //       ? const Center(
+            //           child: CircularProgressIndicator(color: accentColor),
+            //         )
+            //       : _products.isEmpty
+            //       ? const Center(child: Text("No products found"))
+            //       : ListView.builder(
+            //           scrollDirection: Axis.horizontal,
+            //           padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            //           itemCount: _products.length,
+            //           itemBuilder: (context, index) {
+            //             final product = _products[index];
+            //             // ... inside the ListView.builder loop ...
 
+            //             return Padding(
+            //               padding: const EdgeInsets.only(right: 12.0),
+            //               child: HorizontalProductCard(
+            //                 imageUrl: product.image,
+            //                 title: product.name,
+            //                 companyName: "Kakiso",
+
+            //                 // 1. Current Selling Price
+            //                 price: '₹${product.price}',
+
+            //                 // 2. Original MRP (Regular Price)
+            //                 // We format it with the currency symbol if it exists
+            //                 originalPrice: product.regularPrice.isNotEmpty
+            //                     ? '₹${product.regularPrice}'
+            //                     : '',
+
+            //                 discountPercentage: product.discountPercentage,
+
+            //                 onAddToCartPressed: () {},
+            //               ),
+            //             );
+            //           },
+            //         ),
+            // ),
+            const RecommendedSection(),
+            // const SizedBox(height: 16),
+            // const BrandsSection(),
             const SizedBox(height: 16),
             const TopRankingSection(),
+            const FlashSaleBanner(),
             const SizedBox(height: 16),
             const NewArrivalSection(),
-            const TrendingSection(), // Renamed to match your file
-            const SizedBox(height: 40),
+            const TrendingProducts(), // Renamed to match your file
+            const SizedBox(height: 16),
+            const CuratedCollections(),
+            const SizedBox(height: 16),
           ],
         ),
       ),

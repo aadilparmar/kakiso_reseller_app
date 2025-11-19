@@ -1,6 +1,7 @@
 // lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:kakiso_reseller_app/models/brand.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
 import 'package:kakiso_reseller_app/models/product.dart'; // <--- 1. IMPORT THE PRODUCT MODEL
 
@@ -146,6 +147,66 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Error fetching newest products: $e');
+    }
+  }
+
+  static Future<List<ProductModel>> fetchTrendingProducts() async {
+    // We use 'orderby=popularity' to define "Trending"
+    final Uri url = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products?per_page=10&status=publish&orderby=popularity',
+    );
+
+    String basicAuth =
+        'Basic ' + base64Encode(utf8.encode('$consumerKey:$consumerSecret'));
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          "Authorization": basicAuth,
+          "Content-Type": "application/json",
+          "User-Agent": "KakisoResellerApp/1.0",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => ProductModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Trending Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching trending products: $e');
+    }
+  }
+
+  static Future<List<BrandModel>> fetchBrands() async {
+    // NOTE: If you have a specific "Brands" plugin, change 'categories' to 'brands'
+    final Uri url = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products/categories?per_page=10&orderby=count&order=desc&hide_empty=true',
+    );
+
+    String basicAuth =
+        'Basic ' + base64Encode(utf8.encode('$consumerKey:$consumerSecret'));
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          "Authorization": basicAuth,
+          "Content-Type": "application/json",
+          "User-Agent": "KakisoResellerApp/1.0",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => BrandModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Brands Error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching brands: $e');
     }
   }
 }

@@ -1,76 +1,199 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:kakiso_reseller_app/services/api_services.dart'; // Import Model
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
-// --- NewArrivalImageCard (Updated for Network Image) ---
-class NewArrivalImageCard extends StatelessWidget {
-  final String imageUrl; // Changed to URL
-  final double cardSize;
+// --- 1. THE TRENDING CARD (HYPE STYLE) ---
+class TrendingCard extends StatelessWidget {
+  final ProductModel product;
+  final int index;
 
-  const NewArrivalImageCard({
-    super.key,
-    required this.imageUrl,
-    this.cardSize = 130.0,
-  });
+  const TrendingCard({super.key, required this.product, required this.index});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: cardSize,
-      height: cardSize,
+      width: 160,
+      margin: const EdgeInsets.only(
+        right: 16,
+        bottom: 12,
+        top: 4,
+      ), // Room for shadow
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(2),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+            color: const Color(
+              0xFF4A317E,
+            ).withOpacity(0.1), // Brand purple shadow
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          // Changed to Image.network
-          imageUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: Icon(Icons.broken_image, color: Colors.grey[400]),
-            );
-          },
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- IMAGE & BADGE ---
+          Stack(
+            children: [
+              // Image Container
+              Container(
+                height: 160,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                  color: Colors.grey[50],
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                  child: Image.network(
+                    product.image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) =>
+                        const Icon(Icons.image, color: Colors.grey),
+                  ),
+                ),
+              ),
+
+              // Rank Watermark (01, 02...)
+              Positioned(
+                top: 8,
+                left: 10,
+                child: Text(
+                  "${index + 1}".padLeft(2, '0'),
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white.withOpacity(
+                      0.8,
+                    ), // Semi-transparent on image
+                    fontFamily: 'Poppins',
+                    shadows: [
+                      Shadow(
+                        blurRadius: 4,
+                        color: Colors.black26,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // "Hot" Flame Icon
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Iconsax.flag,
+                    color: Colors.orange,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // --- DETAILS ---
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                    fontFamily: 'Poppins',
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                // Price & Action
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "₹${product.price}",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF4A317E), // Brand Color
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    // Mini Add Button
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// --- NewArrivalSection (Main Container) ---
-class TrendingSection extends StatefulWidget {
-  const TrendingSection({super.key});
+// --- 2. MAIN SECTION ---
+class TrendingProducts extends StatefulWidget {
+  const TrendingProducts({super.key});
 
   @override
-  State<TrendingSection> createState() => _NewArrivalSectionState();
+  State<TrendingProducts> createState() => _TrendingProductsState();
 }
 
-class _NewArrivalSectionState extends State<TrendingSection> {
-  final ScrollController _scrollController = ScrollController();
+class _TrendingProductsState extends State<TrendingProducts> {
+  late final ScrollController _scrollController;
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchNewestProducts();
+    _scrollController = ScrollController();
+    _fetchTrendingProducts();
   }
 
-  Future<void> _fetchNewestProducts() async {
+  Future<void> _fetchTrendingProducts() async {
     try {
-      final products = await ApiService.fetchNewestProducts();
+      final products = await ApiService.fetchTrendingProducts();
       if (mounted) {
         setState(() {
           _products = products;
@@ -79,14 +202,8 @@ class _NewArrivalSectionState extends State<TrendingSection> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      print("Error fetching newest products: $e");
+      print("Error fetching trending products: $e");
     }
-  }
-
-  // Helper to strip HTML from description
-  String _stripHtml(String htmlString) {
-    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
-    return htmlString.replaceAll(exp, '').trim();
   }
 
   @override
@@ -97,133 +214,86 @@ class _NewArrivalSectionState extends State<TrendingSection> {
 
   @override
   Widget build(BuildContext context) {
-    final double cardWidth = 130.0;
-    final double horizontalItemSpacing = 16.0;
-    final double textHeight = 80.0;
-    final double totalItemHeight = cardWidth + 10 + textHeight;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- Header ---
+        // --- HEADER ---
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                children: const [
-                  Text(
-                    'Trending',
+                children: [
+                  const Text(
+                    'Trending on',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: Colors.black,
                       fontFamily: 'Poppins',
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Now',
+                  const SizedBox(width: 6),
+                  const Text(
+                    'KakiSo',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.pinkAccent,
+                      fontWeight: FontWeight.w800, // Extra bold for emphasis
+                      color: Color(0xFFEB2A7E), // Brand Pink
                       fontFamily: 'Poppins',
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Iconsax.trend_up, color: Colors.green, size: 24),
+                  const SizedBox(width: 8),
+                  // Animated-looking Icon container
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Iconsax.trend_up,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  ),
                 ],
               ),
-              GestureDetector(
-                onTap: () {},
-                child: const Text(
-                  'See all',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.pinkAccent,
-                    fontFamily: 'Poppins',
-                    decoration: TextDecoration.underline,
-                  ),
+              // Styled "View All"
+              Text(
+                'View All',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[500],
+                  fontFamily: 'Poppins',
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
 
-        // --- Horizontal Product List (API Data) ---
+        // --- HORIZONTAL LIST ---
         SizedBox(
-          height: totalItemHeight,
+          height: 270, // Height tailored for the new card
           child: _isLoading
               ? const Center(
-                  child: CircularProgressIndicator(color: Colors.pinkAccent),
+                  child: CircularProgressIndicator(color: Color(0xFFEB2A7E)),
                 )
               : _products.isEmpty
-              ? const Center(child: Text("No new arrivals found."))
+              ? const Center(child: Text("No trending items."))
               : ListView.builder(
                   controller: _scrollController,
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: const EdgeInsets.only(left: 16), // Left padding
                   itemCount: _products.length,
                   itemBuilder: (context, index) {
                     final product = _products[index];
-                    final desc = _stripHtml(
-                      product.shortDescription.isEmpty
-                          ? product.name
-                          : product.shortDescription,
-                    );
-
-                    return Container(
-                      margin: EdgeInsets.only(
-                        right: (index == _products.length - 1)
-                            ? 0
-                            : horizontalItemSpacing,
-                      ),
-                      width: cardWidth,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          NewArrivalImageCard(
-                            imageUrl: product.image,
-                            cardSize: cardWidth,
-                          ),
-                          const SizedBox(height: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                  fontFamily: 'Poppins',
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                desc,
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontFamily: 'Poppins',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
+                    return TrendingCard(product: product, index: index);
                   },
                 ),
         ),
-        const SizedBox(height: 16),
       ],
     );
   }

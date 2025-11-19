@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-
-import 'package:kakiso_reseller_app/controllers/cart_controller.dart'; // For ImageFilter
 
 class HorizontalProductCard extends StatelessWidget {
   final String imageUrl;
   final String title;
-  final String price;
+  final String price; // Current Selling Price
+  final String originalPrice; // NEW: Original MRP
   final String companyName;
   final int? discountPercentage;
   final VoidCallback onAddToCartPressed;
@@ -17,6 +15,7 @@ class HorizontalProductCard extends StatelessWidget {
     required this.imageUrl,
     required this.title,
     required this.price,
+    required this.originalPrice, // NEW
     required this.companyName,
     this.discountPercentage,
     required this.onAddToCartPressed,
@@ -24,24 +23,18 @@ class HorizontalProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Show discount if percentage is > 0 AND original price exists
     final bool showDiscount =
-        discountPercentage != null && discountPercentage! > 0;
-    Get.put(CartController());
+        (discountPercentage != null && discountPercentage! > 0);
+
     return Container(
-      // Slightly wider for better breathing room
       width: 340,
       height: 150,
-      margin: const EdgeInsets.only(
-        bottom: 12,
-        top: 8,
-        right: 4,
-        left: 4,
-      ), // Breathing room for shadow
+      margin: const EdgeInsets.only(bottom: 12, top: 8, right: 4, left: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          // Soft, multi-layered shadow for depth
           BoxShadow(
             color: const Color(0xFF4A317E).withOpacity(0.06),
             blurRadius: 20,
@@ -59,17 +52,14 @@ class HorizontalProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // --- 1. BACKGROUND DECORATION (Subtle Gradient) ---
+            // --- BACKGROUND ---
             Positioned.fill(
               child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white,
-                      const Color(0xFFF9FAFB), // Very subtle grey-blue tint
-                    ],
+                    colors: [Colors.white, Color(0xFFF9FAFB)],
                   ),
                 ),
               ),
@@ -77,11 +67,11 @@ class HorizontalProductCard extends StatelessWidget {
 
             Row(
               children: [
-                // --- 2. IMAGE SECTION (Left) ---
+                // --- IMAGE SECTION ---
                 Container(
                   width: 130,
                   height: double.infinity,
-                  margin: const EdgeInsets.all(8), // Padding inside the card
+                  margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
@@ -97,7 +87,6 @@ class HorizontalProductCard extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // The Image
                         Image.network(
                           imageUrl,
                           fit: BoxFit.cover,
@@ -106,7 +95,6 @@ class HorizontalProductCard extends StatelessWidget {
                             child: const Icon(Icons.image, color: Colors.grey),
                           ),
                         ),
-                        // Subtle gradient overlay on image bottom for depth
                         Positioned(
                           bottom: 0,
                           left: 0,
@@ -130,7 +118,7 @@ class HorizontalProductCard extends StatelessWidget {
                   ),
                 ),
 
-                // --- 3. CONTENT SECTION (Right) ---
+                // --- CONTENT SECTION ---
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 16, 16, 16),
@@ -138,11 +126,10 @@ class HorizontalProductCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Top: Brand & Discount
+                        // Brand & Discount
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Brand Tag
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -174,28 +161,26 @@ class HorizontalProductCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-
-                            // Discount (Text only to save space, cleaner look)
                             if (showDiscount)
                               Text(
                                 '${discountPercentage!}% OFF',
                                 style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFFFF4C5E), // Alert color
+                                  color: Color(0xFFFF4C5E),
                                   fontFamily: 'Poppins',
                                 ),
                               ),
                           ],
                         ),
 
-                        // Middle: Title
+                        // Title
                         Text(
                           title,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF111827), // Near Black
+                            color: Color(0xFF111827),
                             height: 1.3,
                             fontFamily: 'Poppins',
                           ),
@@ -203,7 +188,7 @@ class HorizontalProductCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
 
-                        // Bottom: Price & Button
+                        // Price & Action
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -211,10 +196,13 @@ class HorizontalProductCard extends StatelessWidget {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (showDiscount)
-                                  const Text(
-                                    '₹1,499', // Dummy original price
-                                    style: TextStyle(
+                                // --- REAL TIME MRP ---
+                                if (showDiscount &&
+                                    originalPrice.isNotEmpty &&
+                                    originalPrice != price)
+                                  Text(
+                                    originalPrice, // The real MRP from API
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       decoration: TextDecoration.lineThrough,
                                       color: Color(0xFF9CA3AF),
@@ -222,18 +210,21 @@ class HorizontalProductCard extends StatelessWidget {
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
+
+                                // Selling Price
                                 Text(
                                   price,
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF4A317E), // Brand Primary
+                                    color: Color(0xFF4A317E),
                                     fontFamily: 'Poppins',
                                     height: 1.0,
                                   ),
                                 ),
                               ],
                             ),
+
                             GestureDetector(
                               onTap: onAddToCartPressed,
                               child: Container(
@@ -251,8 +242,7 @@ class HorizontalProductCard extends StatelessWidget {
                                   ],
                                 ),
                                 child: const Icon(
-                                  Iconsax
-                                      .shopping_cart, // Bag icon feels more "premium retail"
+                                  Iconsax.shopping_cart,
                                   color: Colors.white,
                                   size: 20,
                                 ),

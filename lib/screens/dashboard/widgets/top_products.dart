@@ -1,116 +1,153 @@
+// For ImageFilter
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
-// --- 1. ProductCard Widget ---
-class ProductCard extends StatelessWidget {
-  final String imageUrl;
-  final String title;
-  final String description;
-  final String rank;
+// --- 1. THE CHAMPION CARD (#1 RANK) ---
+class ChampionProductCard extends StatelessWidget {
+  final ProductModel product;
 
-  const ProductCard({
-    super.key,
-    required this.imageUrl,
-    required this.title,
-    required this.description,
-    required this.rank,
-  });
+  const ChampionProductCard({super.key, required this.product});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 200,
-      margin: const EdgeInsets.all(8.0),
+      width: 220,
+      margin: const EdgeInsets.fromLTRB(16, 8, 12, 16),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        // Gold-tinted shadow for the winner
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+            color: const Color(0xFFFFD700).withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(10),
-                ),
-                child: Image.network(
-                  imageUrl,
-                  height: 190,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 190,
-                      width: double.infinity,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.broken_image, color: Colors.grey[400]),
-                    );
-                  },
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Text(
-                    'TOP $rank',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          // Image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Image.network(
+              product.image,
+              height: double.infinity,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (ctx, err, stack) =>
+                  Container(color: Colors.grey[100]),
+            ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
+
+          // Gradient Overlay (Bottom)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 120,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(24),
+                ),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                ),
+              ),
+            ),
+          ),
+
+          // Content (Text)
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
+                  "BEST SELLER",
+                  style: TextStyle(
+                    color: const Color(0xFFFFD700), // Gold
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
                     fontFamily: 'Poppins',
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                    height: 1.2,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  description,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
+                  "₹${product.price}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                     fontFamily: 'Poppins',
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
+            ),
+          ),
+
+          // THE CROWN BADGE (#1)
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFFFFD700),
+                    Color(0xFFFDB931),
+                  ], // Gold Gradient
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: const [
+                  Icon(
+                    Iconsax.crown5,
+                    size: 16,
+                    color: Colors.white,
+                  ), // Filled Crown
+                  SizedBox(width: 4),
+                  Text(
+                    "#1",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -119,116 +156,117 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-// --- 2. SmallProductCard Widget ---
-class SmallProductCard extends StatelessWidget {
-  final String imageUrl;
-  final String title;
-  final String description;
-  final String rank;
-  final Color rankColor;
+// --- 2. THE CHALLENGER CARD (#2 - #5) ---
+class StandardRankCard extends StatelessWidget {
+  final ProductModel product;
+  final int rank;
 
-  const SmallProductCard({
+  const StandardRankCard({
     super.key,
-    required this.imageUrl,
-    required this.title,
-    required this.description,
+    required this.product,
     required this.rank,
-    required this.rankColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Determine Medal Color
+    Color badgeColor;
+    if (rank == 2)
+      badgeColor = const Color(0xFFC0C0C0); // Silver
+    else if (rank == 3)
+      badgeColor = const Color(0xFFCD7F32); // Bronze
+    else
+      badgeColor = const Color(0xFF4A317E); // Brand Color for 4 & 5
+
     return Container(
-      width: 150,
-      margin: const EdgeInsets.only(right: 8.0),
+      width: 160,
+      margin: const EdgeInsets.only(bottom: 10, right: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
+          // Image Section
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(10),
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(16),
                 ),
                 child: Image.network(
-                  imageUrl,
-                  height: 85,
-                  width: double.infinity,
+                  product.image,
+                  height: 90,
+                  width: 80,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 85,
-                      width: double.infinity,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.broken_image, color: Colors.grey[400]),
-                    );
-                  },
+                  errorBuilder: (ctx, err, stack) =>
+                      Container(width: 80, height: 90, color: Colors.grey[100]),
                 ),
               ),
+              // Rank Badge (Small circle)
               Positioned(
-                top: 8,
-                left: 8,
+                top: 4,
+                left: 4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
-                    color: rankColor,
-                    borderRadius: BorderRadius.circular(5),
+                    color: badgeColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
-                  child: Text(
-                    'TOP $rank',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
+                  child: Center(
+                    child: Text(
+                      "$rank",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    fontFamily: 'Poppins',
+
+          // Text Section
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF111827),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 10,
-                    fontFamily: 'Poppins',
+                  const SizedBox(height: 4),
+                  Text(
+                    "₹${product.price}",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -237,7 +275,7 @@ class SmallProductCard extends StatelessWidget {
   }
 }
 
-// --- 3. TopRankingSection Widget (UPDATED WITH TABS) ---
+// --- 3. MAIN SECTION ---
 class TopRankingSection extends StatefulWidget {
   const TopRankingSection({super.key});
 
@@ -248,18 +286,14 @@ class TopRankingSection extends StatefulWidget {
 class _TopRankingSectionState extends State<TopRankingSection> {
   List<ProductModel> _products = [];
   bool _isLoading = true;
-
-  // Tracks the selected tab: 'Top', 'Hot', or 'Popular'
   String _selectedTab = 'Top';
 
   @override
   void initState() {
     super.initState();
-    // Initial fetch for "Top"
     _fetchProductsForTab('Top');
   }
 
-  // Fetch data based on the selected tab
   Future<void> _fetchProductsForTab(String tabName) async {
     setState(() {
       _isLoading = true;
@@ -268,19 +302,11 @@ class _TopRankingSectionState extends State<TopRankingSection> {
 
     try {
       List<ProductModel> products;
-
-      // Map tabs to WooCommerce "orderby" parameters
       if (tabName == 'Top') {
-        // Top = Best Sellers (popularity)
-        products =
-            await ApiService.fetchTopSellingProducts(); // Assuming this fetches by 'popularity'
+        products = await ApiService.fetchTopSellingProducts();
       } else if (tabName == 'Hot') {
-        // Hot = Newest Items (date) - You might need to add a fetchNewestProducts() to ApiService
-        // For now, let's reuse fetchProducts which defaults to date usually
         products = await ApiService.fetchProducts();
       } else {
-        // Popular = Top Rated (rating) - You might need to add fetchTopRated()
-        // For demo, we'll just reuse fetchTopSellingProducts but imagine it's different
         products = await ApiService.fetchTopSellingProducts();
       }
 
@@ -296,15 +322,8 @@ class _TopRankingSectionState extends State<TopRankingSection> {
     }
   }
 
-  ProductModel? getProduct(int index) {
-    if (index < _products.length) return _products[index];
-    return null;
-  }
-
-  String _stripHtml(String htmlString) {
-    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
-    return htmlString.replaceAll(exp, '').trim();
-  }
+  ProductModel? getProduct(int index) =>
+      (index < _products.length) ? _products[index] : null;
 
   @override
   Widget build(BuildContext context) {
@@ -312,147 +331,100 @@ class _TopRankingSectionState extends State<TopRankingSection> {
     final p2 = getProduct(1);
     final p3 = getProduct(2);
     final p4 = getProduct(3);
-    final p5 = getProduct(4);
+    getProduct(4);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- Header ---
+        // --- HEADER & TABS ---
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Title
-              Row(
+              // Title Group
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Iconsax.cup, color: Colors.orange, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   Text(
-                    'Top',
+                    "Leaderboard",
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 12,
+                      color: Colors.grey,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black,
                       fontFamily: 'Poppins',
                     ),
                   ),
-                  SizedBox(width: 8),
                   Text(
-                    'Ranking',
+                    "Top Ranking",
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.pinkAccent,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                       fontFamily: 'Poppins',
+                      height: 1.1,
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Iconsax.magic_star, color: Colors.orange, size: 24),
                 ],
               ),
-              const SizedBox(width: 10),
+
+              const Spacer(),
 
               // Tabs
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildTabButton('Top'),
-                      _buildTabButton('Hot'),
-                      _buildTabButton('Popular'),
-                    ],
-                  ),
+              Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [_buildTabButton('Top'), _buildTabButton('Hot')],
                 ),
               ),
             ],
           ),
         ),
 
-        // --- Content ---
+        // --- CONTENT AREA ---
+        const SizedBox(height: 8),
+
         SizedBox(
-          height: 300,
+          height: 310, // Height of the section
           child: _isLoading
               ? const Center(
-                  child: CircularProgressIndicator(color: Colors.pinkAccent),
+                  child: CircularProgressIndicator(color: Color(0xFF4A317E)),
                 )
               : _products.isEmpty
-              ? const Center(child: Text("No products found."))
+              ? const Center(child: Text("No rankings yet."))
               : ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 8.0),
+                  padding: const EdgeInsets.only(right: 16), // End padding
                   children: [
-                    // 1. Top 1 Product (Large Card)
-                    if (p1 != null)
-                      ProductCard(
-                        imageUrl: p1.image,
-                        title: p1.name,
-                        description: _stripHtml(
-                          p1.shortDescription.isEmpty
-                              ? p1.name
-                              : p1.shortDescription,
-                        ),
-                        rank: '1',
-                      ),
+                    // 1. THE CHAMPION CARD (#1)
+                    if (p1 != null) ChampionProductCard(product: p1),
 
-                    // 2. Grid of Smaller Cards (Top 2-5)
+                    // 2. THE CHALLENGERS GRID (#2-5)
                     if (p2 != null)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0, right: 8.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Row 1: Rank 2 & 3
-                            Row(
-                              children: [
-                                SmallProductCard(
-                                  imageUrl: p2.image,
-                                  title: p2.name,
-                                  description: _stripHtml(p2.shortDescription),
-                                  rank: '2',
-                                  rankColor: Colors.pinkAccent,
-                                ),
-                                if (p3 != null)
-                                  SmallProductCard(
-                                    imageUrl: p3.image,
-                                    title: p3.name,
-                                    description: _stripHtml(
-                                      p3.shortDescription,
-                                    ),
-                                    rank: '3',
-                                    rankColor: Colors.blueAccent,
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Row 2: Rank 4 & 5
-                            if (p4 != null)
-                              Row(
-                                children: [
-                                  SmallProductCard(
-                                    imageUrl: p4.image,
-                                    title: p4.name,
-                                    description: _stripHtml(
-                                      p4.shortDescription,
-                                    ),
-                                    rank: '4',
-                                    rankColor: Colors.green,
-                                  ),
-                                  if (p5 != null)
-                                    SmallProductCard(
-                                      imageUrl: p5.image,
-                                      title: p5.name,
-                                      description: _stripHtml(
-                                        p5.shortDescription,
-                                      ),
-                                      rank: '5',
-                                      rankColor: Colors.purpleAccent,
-                                    ),
-                                ],
-                              ),
-                          ],
-                        ),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Rank 2
+                          StandardRankCard(product: p2, rank: 2),
+                          // Rank 3
+                          if (p3 != null)
+                            StandardRankCard(product: p3, rank: 3),
+                          // Rank 4 (if exists, just to fill space, or we can scroll)
+                          if (p4 != null)
+                            StandardRankCard(product: p4, rank: 4),
+                        ],
                       ),
                   ],
                 ),
@@ -461,28 +433,33 @@ class _TopRankingSectionState extends State<TopRankingSection> {
     );
   }
 
-  // Helper to build clickable tabs
-  Widget _buildTabButton(String tabName) {
-    final bool isSelected = _selectedTab == tabName;
-
+  Widget _buildTabButton(String text) {
+    final isSelected = _selectedTab == text;
     return GestureDetector(
-      onTap: () => _fetchProductsForTab(tabName),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      onTap: () => _fetchProductsForTab(text),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        margin: const EdgeInsets.all(4),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? Colors.pinkAccent.shade100 : Colors.transparent,
-          borderRadius: BorderRadius.circular(20), // More rounded look for tabs
-          border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.grey.shade300,
-            width: 1,
-          ),
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
-          tabName,
+          text,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey.shade700,
-            fontWeight: FontWeight.w500,
+            color: isSelected ? Colors.black : Colors.grey,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             fontSize: 12,
             fontFamily: 'Poppins',
           ),
