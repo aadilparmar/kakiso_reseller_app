@@ -1,10 +1,12 @@
+import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
-// IMPORT CONSTANTS HERE
+import 'package:kakiso_reseller_app/models/categories.dart'; // Import your Category Model
+import 'package:kakiso_reseller_app/services/api_services.dart'; // Import API Service
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-class HomeDrawer extends StatelessWidget {
+class HomeDrawer extends StatefulWidget {
   final UserData userData;
   final String selectedTitle;
   final Function(String title) onNavigate;
@@ -19,214 +21,217 @@ class HomeDrawer extends StatelessWidget {
   });
 
   @override
+  State<HomeDrawer> createState() => _HomeDrawerState();
+}
+
+class _HomeDrawerState extends State<HomeDrawer> {
+  // State variables for categories
+  List<CategoryModel> _categories = [];
+  bool _isLoadingCategories = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDrawerCategories();
+  }
+
+  Future<void> _fetchDrawerCategories() async {
+    try {
+      final cats = await ApiService.fetchCategories();
+      if (mounted) {
+        setState(() {
+          _categories = cats;
+          _isLoadingCategories = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCategories = false;
+          // Optionally handle error, e.g., print(e);
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final bool hasProfilePic = userData.profilePicUrl.isNotEmpty;
-
-    // Category grouping for auto-expansion
-    const List<String> homeCategoryIds = ['Kitchen', 'Bath'];
-    const List<String> beautyCategoryIds = ['AyurvedicProducts'];
-    const List<String> clothingCategoryIds = ['Womens', 'Mens'];
-
-    final bool isHomeCategoryActive = homeCategoryIds.contains(selectedTitle);
-    final bool isBeautyCategoryActive = beautyCategoryIds.contains(
-      selectedTitle,
-    );
-    final bool isClothingCategoryActive = clothingCategoryIds.contains(
-      selectedTitle,
-    );
+    final bool hasProfilePic = widget.userData.profilePicUrl.isNotEmpty;
 
     return Drawer(
       backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: Column(
+      elevation: 10,
+      width: 320,
+      child: Stack(
         children: [
-          const SizedBox(height: 85),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(16.0),
-                bottomRight: Radius.circular(16.0),
+          // 1. Glassmorphism Background
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.90),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+                border: Border(
+                  right: BorderSide(
+                    color: Colors.white.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withOpacity(0.1),
+                    blurRadius: 30,
+                    spreadRadius: 0,
+                    offset: const Offset(5, 0),
+                  ),
+                ],
               ),
-              child: Container(
-                color: Colors.white,
-                child: Column(
-                  children: [
-                    // --- HEADER ---
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      color: drawerHeaderColor, // Now valid
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 40,
-                            backgroundColor: const Color(0xFFE0E7FF),
-                            backgroundImage: hasProfilePic
-                                ? NetworkImage(userData.profilePicUrl)
-                                : null,
-                            child: !hasProfilePic
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 40,
-                                    color: Color(0xFF4338CA),
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            userData.name,
-                            style: const TextStyle(
-                              color: Color.fromARGB(255, 234, 207, 247),
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            userData.email,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 14,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ],
+            ),
+          ),
+
+          // 2. Content
+          Column(
+            children: [
+              // --- HEADER ---
+              _buildUserHeader(hasProfilePic),
+
+              // --- SCROLLABLE MENU ---
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle("General"),
+                      _buildDrawerItem(
+                        context,
+                        Iconsax.personalcard,
+                        'Business Details',
+                        'BusinessDetails',
                       ),
-                    ),
-
-                    // --- MENU ITEMS ---
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                        children: [
-                          const SizedBox(height: 8),
-                          _buildDrawerItem(
-                            context,
-                            Iconsax.personalcard,
-                            'Business Details',
-                            'BusinessDetails',
-                          ),
-                          _buildDrawerItem(
-                            context,
-                            Iconsax.wallet_check,
-                            'Orders',
-                            'Orders',
-                          ),
-                          _buildDrawerItem(
-                            context,
-                            Iconsax.book_saved,
-                            'My Catalog',
-                            'MyCatalog',
-                          ),
-
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Divider(height: 1, color: Colors.black12),
-                          ),
-
-                          // Categories Expansion Tile
-                          Theme(
-                            data: Theme.of(
-                              context,
-                            ).copyWith(dividerColor: Colors.transparent),
-                            child: ExpansionTile(
-                              initiallyExpanded:
-                                  isHomeCategoryActive ||
-                                  isBeautyCategoryActive ||
-                                  isClothingCategoryActive,
-                              leading: const Icon(
-                                Iconsax.category,
-                                color: drawerIconColor,
-                                size: 28,
-                              ), // Now valid
-                              title: const Text(
-                                'Categories',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                              collapsedIconColor: drawerIconColor, // Now valid
-                              iconColor: drawerIconColor, // Now valid
-                              backgroundColor: const Color.fromARGB(
-                                73,
-                                223,
-                                164,
-                                238,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              collapsedShape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              children: [
-                                _buildNestedGroup(
-                                  context,
-                                  'Home , Kitchen , Bath',
-                                  isHomeCategoryActive,
-                                  [
-                                    {'title': 'Kitchen', 'id': 'Kitchen'},
-                                    {'title': 'Bath', 'id': 'Bath'},
-                                  ],
-                                ),
-                                _buildNestedGroup(
-                                  context,
-                                  'Beauty, Health',
-                                  isBeautyCategoryActive,
-                                  [
-                                    {
-                                      'title': 'Ayurvedic Products',
-                                      'id': 'AyurvedicProducts',
-                                    },
-                                  ],
-                                ),
-                                _buildNestedGroup(
-                                  context,
-                                  'Clothing & Fashion',
-                                  isClothingCategoryActive,
-                                  [
-                                    {'title': 'Womens', 'id': 'Womens'},
-                                    {'title': 'Mens', 'id': 'Mens'},
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      _buildDrawerItem(
+                        context,
+                        Iconsax.wallet_check,
+                        'Orders',
+                        'Orders',
                       ),
-                    ),
-
-                    // --- LOGOUT ---
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Iconsax.logout, color: Colors.white),
-                        label: const Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                        onPressed: onLogoutPressed,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentColor, // Now valid
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+                      _buildDrawerItem(
+                        context,
+                        Iconsax.book_saved,
+                        'My Catalog',
+                        'MyCatalog',
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 20),
+                      _buildSectionTitle("Shop"),
+
+                      // Dynamic Categories Section
+                      _isLoadingCategories
+                          ? const Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Center(
+                                child: SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : _buildCategoryExpansion(context),
+                    ],
+                  ),
                 ),
               ),
+
+              // --- FOOTER ---
+              _buildLogoutButton(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET HELPERS ---
+
+  Widget _buildUserHeader(bool hasProfilePic) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accentColor.withOpacity(0.05), Colors.white],
+        ),
+        borderRadius: const BorderRadius.only(topRight: Radius.circular(30)),
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: accentColor.withOpacity(0.5), width: 2),
+            ),
+            child: CircleAvatar(
+              radius: 28,
+              backgroundColor: const Color(0xFFF3F4F6),
+              backgroundImage: hasProfilePic
+                  ? NetworkImage(widget.userData.profilePicUrl)
+                  : null,
+              child: !hasProfilePic
+                  ? const Icon(Icons.person, size: 30, color: Colors.grey)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.userData.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Poppins',
+                    color: Colors.black87,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    widget.userData.email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -234,33 +239,18 @@ class HomeDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildNestedGroup(
-    BuildContext context,
-    String title,
-    bool expanded,
-    List<Map<String, String>> items,
-  ) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        initiallyExpanded: expanded,
-        tilePadding: const EdgeInsets.only(left: 36.0, right: 32.0),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.black54,
-            fontSize: 15,
-            fontFamily: 'Poppins',
-          ),
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, bottom: 12, top: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey.shade400,
+          letterSpacing: 1.2,
+          fontFamily: 'Poppins',
         ),
-        collapsedIconColor: drawerIconColor, // Now valid
-        iconColor: drawerIconColor, // Now valid
-        children: items
-            .map(
-              (item) =>
-                  _buildSubDrawerItem(context, item['title']!, item['id']!),
-            )
-            .toList(),
       ),
     );
   }
@@ -271,30 +261,161 @@ class HomeDrawer extends StatelessWidget {
     String title,
     String uniqueId,
   ) {
-    final bool isSelected = (selectedTitle == uniqueId);
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? const Color(0xFF4338CA) : drawerIconColor,
-        size: 28,
-      ), // Now valid
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? const Color(0xFF4338CA) : Colors.black87,
-          fontSize: 16,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          fontFamily: 'Poppins',
+    final bool isSelected = (widget.selectedTitle == uniqueId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: isSelected ? accentColor : Colors.transparent,
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onNavigate(uniqueId);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 22,
+                  color: isSelected ? Colors.white : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontFamily: 'Poppins',
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? Colors.white : Colors.grey.shade800,
+                  ),
+                ),
+                if (isSelected) ...[
+                  const Spacer(),
+                  const Icon(
+                    Iconsax.arrow_right_3,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
-      selected: isSelected,
-      selectedTileColor: const Color(0xFFE0E7FF).withOpacity(0.6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20.0),
-      onTap: () {
-        Navigator.pop(context);
-        onNavigate(uniqueId);
-      },
+    );
+  }
+
+  // --- DYNAMIC CATEGORY LOGIC ---
+
+  Widget _buildCategoryExpansion(BuildContext context) {
+    // 1. Filter for Top-Level Categories (Parent ID == 0)
+    final parentCategories = _categories
+        .where((c) => c.parent == 0)
+        .take(5)
+        .toList();
+    // Note: taking 5 to avoid cluttering drawer, remove .take(5) if you want all
+
+    // 2. Check if any category is currently active to auto-expand
+    // This logic assumes 'selectedTitle' might match a category ID or Name
+    bool isAnyCategoryActive = false;
+    // You can add logic here if you want the main "Categories" tile to be open by default
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: ExpansionTile(
+          initiallyExpanded: isAnyCategoryActive,
+          backgroundColor: Colors.grey.shade50,
+          collapsedBackgroundColor: Colors.transparent,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Iconsax.category, color: Colors.purple, size: 20),
+          ),
+          title: const Text(
+            'Categories',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          children: parentCategories.map((parent) {
+            // Find children for this parent
+            final children = _categories
+                .where((c) => c.parent == parent.id)
+                .toList();
+
+            if (children.isNotEmpty) {
+              // If it has sub-categories, render a nested group
+              return _buildNestedGroup(context, parent, children);
+            } else {
+              // If no sub-categories, render a direct item
+              return _buildSubDrawerItem(
+                context,
+                parent.name,
+                parent.id.toString(),
+              );
+            }
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNestedGroup(
+    BuildContext context,
+    CategoryModel parent,
+    List<CategoryModel> children,
+  ) {
+    // Check if expanded
+    // bool isExpanded = children.any((c) => c.name == widget.selectedTitle);
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        // initiallyExpanded: isExpanded,
+        tilePadding: const EdgeInsets.only(left: 20, right: 20),
+        title: Text(
+          parent.name,
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        iconColor: accentColor,
+        collapsedIconColor: Colors.grey.shade400,
+        children: children
+            .map(
+              (child) =>
+                  _buildSubDrawerItem(context, child.name, child.id.toString()),
+            )
+            .toList(),
+      ),
     );
   }
 
@@ -303,25 +424,82 @@ class HomeDrawer extends StatelessWidget {
     String title,
     String uniqueId,
   ) {
-    final bool isSelected = (selectedTitle == uniqueId);
-    return ListTile(
-      contentPadding: const EdgeInsets.only(left: 52.0, right: 16.0),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? const Color(0xFF4338CA) : Colors.black54,
-          fontSize: 15,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          fontFamily: 'Poppins',
+    final bool isSelected = (widget.selectedTitle == uniqueId);
+
+    return Container(
+      margin: const EdgeInsets.only(left: 20, right: 10, bottom: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? accentColor.withOpacity(0.08) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: isSelected
+            ? Border.all(color: accentColor.withOpacity(0.2))
+            : Border.all(color: Colors.transparent),
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        visualDensity: VisualDensity.compact,
+        leading: Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isSelected ? accentColor : Colors.grey.shade300,
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? accentColor : Colors.grey.shade700,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        onTap: () {
+          Navigator.pop(context);
+          widget.onNavigate(uniqueId); // Pass ID or Name depending on logic
+        },
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        borderRadius: const BorderRadius.only(bottomRight: Radius.circular(30)),
+      ),
+      child: InkWell(
+        onTap: widget.onLogoutPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Iconsax.logout, size: 20, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text(
+                'Log Out',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.redAccent,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      selected: isSelected,
-      selectedTileColor: const Color(0xFFE0E7FF).withOpacity(0.6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      onTap: () {
-        Navigator.pop(context);
-        onNavigate(uniqueId);
-      },
     );
   }
 }

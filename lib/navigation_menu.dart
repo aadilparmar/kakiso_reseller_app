@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/models/user.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // Added GetX
 
-// --- Define colors here to be accessible by the Theme ---
+// --- MODEL IMPORT ---
+import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+
+// --- SCREEN IMPORTS --- // Ensure this file exists and is named correctly
+import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // Ensure this exists
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart'; // Ensure this exists
+// import 'package:kakiso_reseller_app/screens/dashboard/profile/profile.dart'; // Uncomment when you have a profile screen
+
+// --- CONSTANTS ---
 const Color _activeIconColor = Color(0xFFE91E63);
 final Color _inactiveColor = const Color.fromARGB(255, 0, 0, 0);
-// Very dark grey
 
 class NavigationController extends GetxController {
-  // Holds the currently selected index
   final UserData userData;
+
+  // Constructor requires UserData
   NavigationController({required this.userData});
 
   final Rx<int> selectedIndex = 0.obs;
@@ -22,61 +27,58 @@ class NavigationController extends GetxController {
   // List of screens to display
   List<Widget> get screens => [
     HomePage(userData: userData),
-    CategoriesSection(),
-    ToolsSection(),
-    CatalogueSection(),
+    CategoriesSection(
+      userData: userData,
+    ), // Ensure CategoriesSection accepts userData
+    ToolsSection(
+      userData: userData,
+    ), // Assuming ToolsSection doesn't need userData yet
+    CatalogueSection(
+      userData: userData,
+    ), // Assuming CatalogueSection doesn't need userData yet
     const Center(
       child: Text(
         'Profile',
-        style: TextStyle(fontSize: 24, color: Color.fromARGB(255, 0, 0, 0)),
+        style: TextStyle(fontSize: 24, color: Colors.black),
       ),
     ),
   ];
 }
 
-// --- NEW: Main screen widget using GetX ---
 class NavigationMenu extends StatelessWidget {
   final UserData userData;
+
   const NavigationMenu({super.key, required this.userData});
 
   @override
   Widget build(BuildContext context) {
-    // Initialize the controller
+    // Initialize the controller with the passed userData
+    // usage of 'tag' is optional but good practice if you have multiple controllers
     final controller = Get.put(NavigationController(userData: userData));
 
     return Scaffold(
-      // Body now observes the controller's state
+      // Body observes the controller's state
       body: Obx(() => controller.screens[controller.selectedIndex.value]),
-      // We use Obx to rebuild the NavigationBar when the index changes
+
       bottomNavigationBar: ClipRRect(
-        // 1. Add this wrapper widget
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24.0), // 2. Set your desired radius
-          topRight: Radius.circular(24.0), // 3. Set your desired radius
+          topLeft: Radius.circular(24.0),
+          topRight: Radius.circular(24.0),
         ),
         child: Obx(
           () => NavigationBar(
-            // --- Styling to match the image ---
-            height: 70, // Gives room for the custom icon
+            height: 70,
             backgroundColor: const Color.fromARGB(123, 233, 138, 245),
             elevation: 0,
-            // Hide the default indicator
             indicatorColor: Colors.transparent,
-            // --- GetX State Management ---
             selectedIndex: controller.selectedIndex.value,
             onDestinationSelected: (index) =>
                 controller.selectedIndex.value = index,
-
-            // --- FIX 2: ADDED TO MAKE LABELS SMALLER ---
             labelTextStyle: MaterialStateProperty.all(
               const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
             ),
-            // ---------------------------------------------
-
-            // --- Custom Destinations ---
             destinations: [
               NavigationDestination(
-                // Use the helper to build the custom icon
                 icon: _buildIcon(
                   Iconsax.house,
                   Iconsax.house_25,
@@ -115,9 +117,8 @@ class NavigationMenu extends StatelessWidget {
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.profile_circle,
-                  Iconsax
-                      .user_octagon, // Note: You might want a different active icon here
-                  4, // <-- FIX 1: CHANGED FROM 3 TO 4
+                  Iconsax.user_octagon,
+                  4,
                   controller.selectedIndex.value,
                 ),
                 label: 'Profile',
@@ -129,7 +130,7 @@ class NavigationMenu extends StatelessWidget {
     );
   }
 
-  /// A helper widget to build the custom icon with the "pill" indicator
+  /// Helper widget to build the custom icon with the "pill" indicator
   Widget _buildIcon(
     IconData inactiveIcon,
     IconData activeIcon,
@@ -139,23 +140,19 @@ class NavigationMenu extends StatelessWidget {
     bool isActive = index == currentIndex;
 
     return Column(
-      mainAxisSize: MainAxisSize.min, // To keep the column tight
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // 1. The "Dot" Indicator
         AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
-          // Animate height and width to 0 when inactive
           height: isActive ? 6 : 0,
           width: isActive ? 6 : 0,
           margin: const EdgeInsets.only(bottom: 4),
-          decoration: BoxDecoration(
-            // Use the active icon color for the dot
+          decoration: const BoxDecoration(
             color: _activeIconColor,
-            shape: BoxShape.circle, // Make it a circle
+            shape: BoxShape.circle,
           ),
         ),
-        // 2. The Icon
         Icon(
           isActive ? activeIcon : inactiveIcon,
           color: isActive ? _activeIconColor : _inactiveColor,

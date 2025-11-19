@@ -1,9 +1,18 @@
-// lib/screens/tools/tools_section.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
+// --- MODEL IMPORTS ---
 import 'package:kakiso_reseller_app/models/tools.dart';
+import 'package:kakiso_reseller_app/models/user.dart'; // 1. Import UserData model
+import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
+
+// --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+
+// --- TOOLS SUB-SCREENS ---
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/ai_caption_generator.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/auto_inventory_sync.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/auto_video_generator.dart';
@@ -15,10 +24,16 @@ import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_pro
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/whats_app_store_builder.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/widgets/tools_card.dart';
 
+// --- DRAWER IMPORT ---
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart'; // Make sure path is correct
+
 const Color accentColor = Color(0xFFEB2A7E);
 
 class ToolsSection extends StatefulWidget {
-  const ToolsSection({Key? key}) : super(key: key);
+  // 2. Require UserData in constructor
+  final UserData userData;
+
+  const ToolsSection({super.key, required this.userData});
 
   @override
   State<ToolsSection> createState() => _ToolsSectionState();
@@ -29,6 +44,7 @@ class _ToolsSectionState extends State<ToolsSection> {
   late List<Tool> tools;
   String query = '';
   bool isGrid = true;
+  final _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
@@ -38,7 +54,7 @@ class _ToolsSectionState extends State<ToolsSection> {
         id: 'whatsapp_share',
         title: 'One-click WhatsApp sharing',
         subtitle: 'Share product quickly on WhatsApp',
-        iconData: Iconsax.send_1, // Iconsax paper-plane / send
+        iconData: Iconsax.send_1,
         enabled: true,
         pageBuilder: (_) => const OneClickWhatsAppPage(),
       ),
@@ -82,14 +98,6 @@ class _ToolsSectionState extends State<ToolsSection> {
         enabled: true,
         pageBuilder: (_) => const ResellerCatalogBuilderPage(),
       ),
-      // Tool(
-      //   id: 'shop_import',
-      //   title: 'Shopify / WooCommerce import',
-      //   subtitle: 'Import products from stores',
-      //   iconData: Iconsax.import_1,
-      //   enabled: true,
-      //   pageBuilder: (_) => const ShopifyWooImportPage(),
-      // ),
       Tool(
         id: 'ai_caption',
         title: 'AI caption generator',
@@ -134,10 +142,79 @@ class _ToolsSectionState extends State<ToolsSection> {
     });
   }
 
+  // --- DRAWER LOGIC ---
+  Future<void> _showLogoutConfirmation() async {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        title: const Text(
+          'Logout',
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Poppins',
+            fontSize: 20,
+          ),
+        ),
+        content: const Text(
+          'Do you want to log out?',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await _storage.delete(key: 'authToken');
+              Get.offAll(() => const LoginPage());
+            },
+            child: const Text(
+              'Logout',
+              style: TextStyle(
+                color: accentColor,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleDrawerNavigation(String pageId) {
+    Navigator.pop(context); // Close drawer
+    // Navigate based on ID
+    if (pageId == 'Home' || pageId == 'BusinessDetails') {
+      Get.off(() => HomePage(userData: widget.userData));
+    }
+    // Add other cases if needed
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: _buildDrawer(),
+      // 3. ASSIGN THE DRAWER
+      drawer: HomeDrawer(
+        userData: widget.userData,
+        selectedTitle:
+            'Tools', // You can create a unique ID for this screen if you want it highlighted
+        onNavigate: _handleDrawerNavigation,
+        onLogoutPressed: () {
+          Navigator.pop(context);
+          _showLogoutConfirmation();
+        },
+      ),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -145,6 +222,7 @@ class _ToolsSectionState extends State<ToolsSection> {
         automaticallyImplyLeading: false,
         title: Row(
           children: [
+            // 4. DRAWER TRIGGER
             Builder(
               builder: (ctx) => IconButton(
                 icon: const Icon(Icons.menu),
@@ -162,9 +240,7 @@ class _ToolsSectionState extends State<ToolsSection> {
               color: accentColor,
             ),
             IconButton(
-              onPressed: () => Get.to(
-                () => const InventoryPage(),
-              ), // inventory page already in your project
+              onPressed: () => Get.to(() => const InventoryPage()),
               icon: const Icon(Iconsax.shopping_cart),
               color: accentColor,
             ),
@@ -229,7 +305,7 @@ class _ToolsSectionState extends State<ToolsSection> {
                     ),
                     child: IconButton(
                       onPressed: () => setState(() => isGrid = !isGrid),
-                      icon: Icon(isGrid ? Icons.grid_view : Icons.view_list),
+                      icon: Icon(isGrid ? Iconsax.grid_1 : Iconsax.menu_1),
                       color: accentColor,
                     ),
                   ),
@@ -340,39 +416,6 @@ class _ToolsSectionState extends State<ToolsSection> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildDrawer() {
-    return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: [
-            ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person)),
-              title: const Text('Aadil Parmar'),
-              subtitle: const Text('Reseller'),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('Dashboard'),
-              onTap: () => Get.back(),
-            ),
-            ListTile(
-              leading: const Icon(Icons.shopping_bag),
-              title: const Text('My Cart'),
-              onTap: () => Get.toNamed('/cart'),
-            ),
-            const Spacer(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {},
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
