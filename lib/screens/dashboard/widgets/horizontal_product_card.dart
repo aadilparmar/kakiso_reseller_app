@@ -252,7 +252,7 @@ class HorizontalProductCard extends StatelessWidget {
                                 ),
                                 child: const Icon(
                                   Iconsax
-                                      .shopping_bag, // Bag icon feels more "premium retail"
+                                      .shopping_cart, // Bag icon feels more "premium retail"
                                   color: Colors.white,
                                   size: 20,
                                 ),
