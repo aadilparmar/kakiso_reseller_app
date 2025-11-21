@@ -8,14 +8,12 @@ version: 1.0.0+1
 environment:
   sdk: ^3.8.1
 
-
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
   smooth_page_indicator: ^1.2.1
   google_sign_in: ^6.0.0
-
   iconsax: ^0.0.8
   get: ^4.6.5
   get_storage: ^2.1.1
@@ -27,13 +25,17 @@ dependencies:
   graphql_flutter: ^5.2.1
   flutter_secure_storage: ^9.2.4
 
+  # --- NEW PACKAGES FOR DOWNLOAD & SHARE ---
+  path_provider: ^2.1.2   # To access file system
+  share_plus: ^10.0.0     # To share text and files
+  gal: ^2.3.0             # To save images to Gallery
+  # -----------------------------------------
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
-
-
 
 flutter:
   uses-material-design: true

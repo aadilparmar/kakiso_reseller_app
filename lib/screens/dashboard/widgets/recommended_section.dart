@@ -3,9 +3,12 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product_card.dart'; // Import your card
+import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product_card.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+
+// --- IMPORT PRODUCT DETAILS PAGE ---
 
 class RecommendedSection extends StatefulWidget {
   const RecommendedSection({super.key});
@@ -244,6 +247,14 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                         onAddToCartPressed: () {
                           cartController.addToCart(product);
                           _showPremiumPopup(product);
+                        },
+                        // --- 3. ADD NAVIGATION LOGIC HERE ---
+                        onPressed: () {
+                          Get.to(
+                            () => ProductDetailsPage(product: product),
+                            transition: Transition.fadeIn,
+                            duration: const Duration(milliseconds: 300),
+                          );
                         },
                       ),
                     );

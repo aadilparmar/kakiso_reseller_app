@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 
 // --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
@@ -26,7 +27,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/widgets/flash_sale_banner.
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/recommended_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/widgets/vertical_product_card.dart';
 
 class HomePage extends StatefulWidget {
   final UserData userData;

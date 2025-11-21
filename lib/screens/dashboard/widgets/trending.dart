@@ -1,33 +1,110 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 
-// --- 1. THE TRENDING CARD (HYPE STYLE) ---
 class TrendingCard extends StatelessWidget {
   final ProductModel product;
   final int index;
-
   const TrendingCard({super.key, required this.product, required this.index});
+  void _showPremiumPopup(ProductModel product) {
+    Get.snackbar(
+      '',
+      '',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      borderRadius: 24,
+      backgroundColor: Colors.white.withOpacity(0.95),
+      barBlur: 20,
+      colorText: Colors.black,
+      duration: const Duration(seconds: 3),
+      boxShadows: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      titleText: Row(
+        children: [
+          Container(
+            width: 45,
+            height: 45,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+              image: DecorationImage(
+                image: NetworkImage(product.image),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Added to Cart",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: Color(0xFF4A317E),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'Poppins',
+                    color: Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      messageText: const SizedBox(height: 0), // Hiding default message
+      mainButton: TextButton(
+        onPressed: () => Get.to(() => const InventoryPage()),
+        child: const Row(
+          children: [
+            Text(
+              "View",
+              style: TextStyle(
+                color: Color(0xFF4A317E),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(width: 4),
+            Icon(Iconsax.arrow_right_3, size: 16, color: Color(0xFF4A317E)),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final CartController cartController = Get.put(CartController());
     return Container(
       width: 160,
-      margin: const EdgeInsets.only(
-        right: 16,
-        bottom: 12,
-        top: 4,
-      ), // Room for shadow
+      margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(
-              0xFF4A317E,
-            ).withOpacity(0.1), // Brand purple shadow
+            color: const Color(0xFF4A317E).withOpacity(0.1),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -36,10 +113,8 @@ class TrendingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- IMAGE & BADGE ---
           Stack(
             children: [
-              // Image Container
               Container(
                 height: 160,
                 width: double.infinity,
@@ -61,8 +136,6 @@ class TrendingCard extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Rank Watermark (01, 02...)
               Positioned(
                 top: 8,
                 left: 10,
@@ -71,9 +144,7 @@ class TrendingCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 40,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white.withOpacity(
-                      0.8,
-                    ), // Semi-transparent on image
+                    color: Colors.white.withOpacity(0.8),
                     fontFamily: 'Poppins',
                     shadows: [
                       Shadow(
@@ -85,8 +156,6 @@ class TrendingCard extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // "Hot" Flame Icon
               Positioned(
                 top: 8,
                 right: 8,
@@ -146,20 +215,32 @@ class TrendingCard extends StatelessWidget {
                         fontFamily: 'Poppins',
                       ),
                     ),
-                    // Mini Add Button
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
+
+                    // --- ADD BUTTON TRIGGERING POPUP ---
+                    Material(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 18,
+                        onTap: () {
+                          // 1. Add Logic
+                          cartController.addToCart(product);
+                          // 2. Show Custom Premium Popup
+                          _showPremiumPopup(product);
+                        },
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
                       ),
                     ),
+                    // -----------------------------------
                   ],
                 ),
               ],
@@ -171,7 +252,7 @@ class TrendingCard extends StatelessWidget {
   }
 }
 
-// --- 2. MAIN SECTION ---
+// --- 2. MAIN SECTION (Maintains state and list) ---
 class TrendingProducts extends StatefulWidget {
   const TrendingProducts({super.key});
 
@@ -239,13 +320,12 @@ class _TrendingProductsState extends State<TrendingProducts> {
                     'KakiSo',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w800, // Extra bold for emphasis
-                      color: Color(0xFFEB2A7E), // Brand Pink
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFEB2A7E),
                       fontFamily: 'Poppins',
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Animated-looking Icon container
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -260,7 +340,6 @@ class _TrendingProductsState extends State<TrendingProducts> {
                   ),
                 ],
               ),
-              // Styled "View All"
               Text(
                 'View All',
                 style: TextStyle(
@@ -276,7 +355,7 @@ class _TrendingProductsState extends State<TrendingProducts> {
 
         // --- HORIZONTAL LIST ---
         SizedBox(
-          height: 270, // Height tailored for the new card
+          height: 270,
           child: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(color: Color(0xFFEB2A7E)),
@@ -286,7 +365,7 @@ class _TrendingProductsState extends State<TrendingProducts> {
               : ListView.builder(
                   controller: _scrollController,
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 16), // Left padding
+                  padding: const EdgeInsets.only(left: 16),
                   itemCount: _products.length,
                   itemBuilder: (context, index) {
                     final product = _products[index];

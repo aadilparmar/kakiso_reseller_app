@@ -219,7 +219,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner> {
           ),
 
           // --- 3. DISCOUNT BUBBLE ---
-          if (_flashProduct!.discountPercentage > 0)
+          if (_flashProduct!.discountPercentage! > 0)
             Positioned(
               right: 130,
               top: 0,
