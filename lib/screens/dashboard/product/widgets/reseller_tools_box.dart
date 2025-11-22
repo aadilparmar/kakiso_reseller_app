@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // Import GetX for Obx
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
@@ -21,7 +21,7 @@ class ResellerToolsBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDF4FF), // Light Pink
+        color: const Color(0xFFFDF4FF),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: accentColor.withOpacity(0.1)),
       ),
@@ -45,7 +45,7 @@ class ResellerToolsBox extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              // 1. COPY BUTTON
+              // 1. COPY
               Expanded(
                 child: _buildToolButton(
                   icon: Iconsax.copy,
@@ -57,27 +57,28 @@ class ResellerToolsBox extends StatelessWidget {
               ),
               const SizedBox(width: 12),
 
-              // 2. DOWNLOAD BUTTON (With Loading State)
+              // 2. DOWNLOAD
               Expanded(
                 child: Obx(
                   () => _buildToolButton(
                     icon: Iconsax.gallery_export,
                     label: "Download",
-                    isLoading: controller.isDownloading.value, // Check loading
+                    isLoading: controller.isDownloading.value,
                     onTap: () => controller.downloadImages(product),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
 
-              // 3. SHARE BUTTON (With Loading State)
+              // 3. SHARE (Updated)
               Expanded(
                 child: Obx(
                   () => _buildToolButton(
                     icon: Iconsax.share,
                     label: "Share",
-                    isLoading: controller.isSharing.value, // Check loading
-                    onTap: () => controller.shareProduct(product),
+                    isLoading: controller.isSharing.value,
+                    // --- UPDATED: Pass context to show dialog ---
+                    onTap: () => controller.promptAndShare(context, product),
                   ),
                 ),
               ),
@@ -92,10 +93,10 @@ class ResellerToolsBox extends StatelessWidget {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    bool isLoading = false, // Added param
+    bool isLoading = false,
   }) {
     return InkWell(
-      onTap: isLoading ? null : onTap, // Disable tap if loading
+      onTap: isLoading ? null : onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -112,7 +113,6 @@ class ResellerToolsBox extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Show Spinner if loading, otherwise Icon
             isLoading
                 ? const SizedBox(
                     width: 22,

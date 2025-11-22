@@ -79,15 +79,9 @@ class EditorialProductCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Price Pill
-                        Container(
-                          // ... (Price Styling) ...
-                          child: Text("₹${product.price}"),
-                        ),
-
-                        // ADD BUTTON (Must handle its own tap to avoid conflict)
+                        Container(child: Text("₹${product.price}")),
                         GestureDetector(
-                          onTap: onAddToCart, // <--- Independent tap
+                          onTap: onAddToCart,
                           child: Container(
                             width: 32,
                             height: 32,

@@ -1,21 +1,22 @@
-import 'dart:io'; // Required for File operations
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http; // For downloading images
-import 'package:path_provider/path_provider.dart'; // For storing temp files
-import 'package:share_plus/share_plus.dart'; // For sharing
-import 'package:gal/gal.dart'; // For saving to Gallery
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/utils/constants.dart'; // For accentColor
 
 class ProductDetailsController extends GetxController {
   final RxInt currentImageIndex = 0.obs;
   final RxInt quantity = 1.obs;
   final RxBool isDescriptionExpanded = false.obs;
 
-  // Loading states for the buttons
+  // Loading states
   final RxBool isDownloading = false.obs;
   final RxBool isSharing = false.obs;
 
@@ -30,7 +31,6 @@ class ProductDetailsController extends GetxController {
     currentImageIndex.value = 0;
     selectedAttributes.clear();
 
-    // Pre-select first options
     for (var attr in product.attributes) {
       if (attr.options.isNotEmpty) {
         selectedAttributes[attr.name] = attr.options[0];
@@ -46,11 +46,9 @@ class ProductDetailsController extends GetxController {
   // --- ADD TO CART ---
   void addToCart(ProductModel product) {
     HapticFeedback.mediumImpact();
-
     for (int i = 0; i < quantity.value; i++) {
       cartController.addToCart(product);
     }
-
     Get.snackbar(
       "Success",
       "Added ${quantity.value} item(s) to cart",
@@ -64,32 +62,96 @@ class ProductDetailsController extends GetxController {
     );
   }
 
+  // --- NEW: SHOW PRICE DIALOG ---
+  void promptAndShare(BuildContext context, ProductModel product) {
+    final TextEditingController priceController = TextEditingController();
+    // Pre-fill with existing price (stripping currency symbols if any)
+    priceController.text = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "Set Selling Price",
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Original Price: ₹${product.price}",
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: priceController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                prefixText: "₹ ",
+                labelText: "Your Price",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: accentColor, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () {
+              Get.back(); // Close dialog
+              // Call share with the NEW price
+              shareProduct(product, customPrice: priceController.text);
+            },
+            child: const Text(
+              "Share Now",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- DOWNLOAD IMAGES ---
   Future<void> downloadImages(ProductModel product) async {
+    if (isDownloading.value) return;
+
     try {
       isDownloading.value = true;
 
-      // 1. Check Access
       bool hasAccess = await Gal.hasAccess();
       if (!hasAccess) {
-        await Gal.requestAccess();
+        hasAccess = await Gal.requestAccess();
+        if (!hasAccess) throw Exception("Gallery permission denied");
       }
 
-      // 2. Prepare Path
       final String imageUrl = product.image;
-      // Create a unique filename
       final String fileName =
           'kakiso_${product.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final Directory tempDir = await getTemporaryDirectory();
       final String path = '${tempDir.path}/$fileName';
 
-      // 3. Download Image
       final response = await http.get(Uri.parse(imageUrl));
+
       if (response.statusCode == 200) {
         final File file = File(path);
         await file.writeAsBytes(response.bodyBytes);
-
-        // 4. Save to Gallery (Album: Kakiso Resell)
         await Gal.putImage(path, album: 'Kakiso Resell');
 
         Get.snackbar(
@@ -107,55 +169,55 @@ class ProductDetailsController extends GetxController {
     } catch (e) {
       Get.snackbar(
         "Error",
-        "Could not save image. Check permissions.",
+        "Could not save image: $e",
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
-        borderRadius: 12,
       );
-      debugPrint("Download Error: $e");
     } finally {
       isDownloading.value = false;
     }
   }
 
-  // --- SHARE PRODUCT ---
-  Future<void> shareProduct(ProductModel product) async {
+  // --- SHARE PRODUCT (Updated with Custom Price) ---
+  Future<void> shareProduct(ProductModel product, {String? customPrice}) async {
+    if (isSharing.value) return;
+
     try {
       isSharing.value = true;
 
-      // 1. Create Share Text
+      // Use custom price if provided, else original
+      final String displayPrice = customPrice ?? product.price;
+
+      String desc = product.description;
+      if (desc.length > 20000) desc = "${desc.substring(0, 20000)}...";
+
+      // Custom Share Text
       final String shareText =
           "✨ *${product.name}* ✨\n\n"
-          "💰 Price: ₹${product.price}\n"
-          "${product.description.length > 100 ? product.description.substring(0, 100) + '...' : product.description}\n\n"
-          "🛍️ Shop now on Kakiso!";
+          "💰 Price: ₹$displayPrice\n\n" // <--- Uses the custom price
+          "$desc\n\n"
+          "🛍️ DM me to order!";
 
-      // 2. Download Image to Temp Storage
       final Directory tempDir = await getTemporaryDirectory();
-      final String path = '${tempDir.path}/share_${product.id}.jpg';
+      final String fileName = 'share_${product.id}.jpg';
+      final String filePath = '${tempDir.path}/$fileName';
+
       final response = await http.get(Uri.parse(product.image));
 
       if (response.statusCode == 200) {
-        final File file = File(path);
+        final File file = File(filePath);
         await file.writeAsBytes(response.bodyBytes);
 
-        // 3. Share Image + Text using Share Plus
-        await Share.shareXFiles([XFile(path)], text: shareText);
+        await Share.shareXFiles([XFile(filePath)], text: shareText);
       } else {
-        // Fallback: Share text only if image fails
         await Share.share(shareText);
       }
     } catch (e) {
       Get.snackbar(
         "Error",
-        "Could not open share dialog",
+        "Could not share: $e",
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
-        borderRadius: 12,
       );
     } finally {
       isSharing.value = false;
@@ -167,17 +229,12 @@ class ProductDetailsController extends GetxController {
     Get.snackbar(
       "Success",
       "Copied to clipboard",
-      snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.black87,
       colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-      borderRadius: 12,
-      duration: const Duration(seconds: 2),
     );
   }
 
   // --- HELPERS ---
-
   bool isColorAttribute(String name) {
     final n = name.toLowerCase();
     return n.contains('color') || n.contains('colour');
