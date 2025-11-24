@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
-import 'package:kakiso_reseller_app/services/api_services.dart'; // Verify your file name (api_service.dart vs api_services.dart)
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
+// --- IMPORT CATEGORY DETAILS PAGE ---
 class CuratedCollections extends StatefulWidget {
   const CuratedCollections({super.key});
 
@@ -24,7 +24,6 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
 
   Future<void> _fetchData() async {
     try {
-      // We use categories to populate the collections
       final data = await ApiService.fetchCategories();
       // We need at least 3 categories for the mosaic
       if (data.length >= 3 && mounted) {
@@ -121,8 +120,15 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
   }) {
     return GestureDetector(
       onTap: () {
-        // Navigate to category page (Using InventoryPage as placeholder)
-        Get.to(() => const InventoryPage());
+        // --- NAVIGATION LOGIC ---
+        Get.to(
+          () => CategoryDetailsPage(
+            categoryId: category.id,
+            categoryName: category.name,
+          ),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 300),
+        );
       },
       child: Container(
         height: height,
@@ -223,7 +229,8 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
                             ),
                             SizedBox(width: 4),
                             Icon(
-                              Iconsax.arrow_right_3,
+                              Icons
+                                  .arrow_forward, // Using Standard Icon for Safety
                               color: Colors.white70,
                               size: 14,
                             ),

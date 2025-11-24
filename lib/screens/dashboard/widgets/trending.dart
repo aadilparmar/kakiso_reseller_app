@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+
+// --- IMPORT YOUR CART PAGE & PRODUCT DETAILS PAGE ---
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class TrendingCard extends StatelessWidget {
   final ProductModel product;
   final int index;
   const TrendingCard({super.key, required this.product, required this.index});
+
   void _showPremiumPopup(ProductModel product) {
     Get.snackbar(
       '',
@@ -73,7 +77,7 @@ class TrendingCard extends StatelessWidget {
           ),
         ],
       ),
-      messageText: const SizedBox(height: 0), // Hiding default message
+      messageText: const SizedBox(height: 0),
       mainButton: TextButton(
         onPressed: () => Get.to(() => const InventoryPage()),
         child: const Row(
@@ -96,163 +100,172 @@ class TrendingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final CartController cartController = Get.put(CartController());
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4A317E).withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              Container(
-                height: 160,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  color: Colors.grey[50],
-                ),
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  child: Image.network(
-                    product.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (ctx, err, stack) =>
-                        const Icon(Icons.image, color: Colors.grey),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                left: 10,
-                child: Text(
-                  "${index + 1}".padLeft(2, '0'),
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white.withOpacity(0.8),
-                    fontFamily: 'Poppins',
-                    shadows: [
-                      Shadow(
-                        blurRadius: 4,
-                        color: Colors.black26,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Iconsax.flag,
-                    color: Colors.orange,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
 
-          // --- DETAILS ---
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // --- 1. WRAP WITH GESTURE DETECTOR ---
+    return GestureDetector(
+      onTap: () {
+        // Navigate to Product Details
+        Get.to(
+          () => ProductDetailsPage(product: product),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 300),
+        );
+      },
+      child: Container(
+        width: 160,
+        margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4A317E).withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
               children: [
-                // Title
-                Text(
-                  product.name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Poppins',
-                    height: 1.2,
+                Container(
+                  height: 160,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                    color: Colors.grey[50],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                    child: Image.network(
+                      product.image,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) =>
+                          const Icon(Icons.image, color: Colors.grey),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
-
-                // Price & Action
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "₹${product.price}",
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF4A317E), // Brand Color
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-
-                    // --- ADD BUTTON TRIGGERING POPUP ---
-                    Material(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(8),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          // 1. Add Logic
-                          cartController.addToCart(product);
-                          // 2. Show Custom Premium Popup
-                          _showPremiumPopup(product);
-                        },
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 18,
-                          ),
+                Positioned(
+                  top: 8,
+                  left: 10,
+                  child: Text(
+                    "${index + 1}".padLeft(2, '0'),
+                    style: TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white.withOpacity(0.8),
+                      fontFamily: 'Poppins',
+                      shadows: const [
+                        Shadow(
+                          blurRadius: 4,
+                          color: Colors.black26,
+                          offset: Offset(0, 2),
                         ),
-                      ),
+                      ],
                     ),
-                    // -----------------------------------
-                  ],
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Iconsax.flag,
+                      color: Colors.orange,
+                      size: 18,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+
+            // --- DETAILS ---
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F2937),
+                      fontFamily: 'Poppins',
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Price & Action
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "₹${product.price}",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF4A317E), // Brand Color
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+
+                      // --- ADD BUTTON (Separate Gesture to avoid conflict) ---
+                      Material(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            // Cart Logic
+                            cartController.addToCart(product);
+                            _showPremiumPopup(product);
+                          },
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// --- 2. MAIN SECTION (Maintains state and list) ---
+// --- 2. MAIN SECTION (Unchanged) ---
 class TrendingProducts extends StatefulWidget {
   const TrendingProducts({super.key});
 
@@ -283,7 +296,7 @@ class _TrendingProductsState extends State<TrendingProducts> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      print("Error fetching trending products: $e");
+      debugPrint("Error fetching trending products: $e");
     }
   }
 

@@ -1,11 +1,14 @@
 import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
+import 'package:get/get.dart'; // Required for Navigation
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
-import 'package:kakiso_reseller_app/models/categories.dart'; // Import your Category Model
-import 'package:kakiso_reseller_app/services/api_services.dart'; // Import API Service
+import 'package:kakiso_reseller_app/models/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
+// --- IMPORT CATEGORY DETAILS PAGE ---
 class HomeDrawer extends StatefulWidget {
   final UserData userData;
   final String selectedTitle;
@@ -25,7 +28,6 @@ class HomeDrawer extends StatefulWidget {
 }
 
 class _HomeDrawerState extends State<HomeDrawer> {
-  // State variables for categories
   List<CategoryModel> _categories = [];
   bool _isLoadingCategories = true;
 
@@ -48,7 +50,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
       if (mounted) {
         setState(() {
           _isLoadingCategories = false;
-          // Optionally handle error, e.g., print(e);
         });
       }
     }
@@ -255,6 +256,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
+  // Standard Drawer Item (No Children)
   Widget _buildDrawerItem(
     BuildContext context,
     IconData icon,
@@ -324,24 +326,17 @@ class _HomeDrawerState extends State<HomeDrawer> {
   // --- DYNAMIC CATEGORY LOGIC ---
 
   Widget _buildCategoryExpansion(BuildContext context) {
-    // 1. Filter for Top-Level Categories (Parent ID == 0)
+    // Filter Top-Level
     final parentCategories = _categories
         .where((c) => c.parent == 0)
-        .take(5)
+        .take(5) // Optional: Limit to 5
         .toList();
-    // Note: taking 5 to avoid cluttering drawer, remove .take(5) if you want all
-
-    // 2. Check if any category is currently active to auto-expand
-    // This logic assumes 'selectedTitle' might match a category ID or Name
-    bool isAnyCategoryActive = false;
-    // You can add logic here if you want the main "Categories" tile to be open by default
 
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: ExpansionTile(
-          initiallyExpanded: isAnyCategoryActive,
           backgroundColor: Colors.grey.shade50,
           collapsedBackgroundColor: Colors.transparent,
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -363,16 +358,14 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
           children: parentCategories.map((parent) {
-            // Find children for this parent
+            // Find children
             final children = _categories
                 .where((c) => c.parent == parent.id)
                 .toList();
 
             if (children.isNotEmpty) {
-              // If it has sub-categories, render a nested group
               return _buildNestedGroup(context, parent, children);
             } else {
-              // If no sub-categories, render a direct item
               return _buildSubDrawerItem(
                 context,
                 parent.name,
@@ -390,13 +383,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
     CategoryModel parent,
     List<CategoryModel> children,
   ) {
-    // Check if expanded
-    // bool isExpanded = children.any((c) => c.name == widget.selectedTitle);
-
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
-        // initiallyExpanded: isExpanded,
         tilePadding: const EdgeInsets.only(left: 20, right: 20),
         title: Text(
           parent.name,
@@ -419,6 +408,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
+  // --- THE IMPORTANT FIX FOR NAVIGATION ---
   Widget _buildSubDrawerItem(
     BuildContext context,
     String title,
@@ -457,8 +447,25 @@ class _HomeDrawerState extends State<HomeDrawer> {
           ),
         ),
         onTap: () {
-          Navigator.pop(context);
-          widget.onNavigate(uniqueId); // Pass ID or Name depending on logic
+          Navigator.pop(context); // Close Drawer
+
+          // --- CHECK IF THIS IS A CATEGORY ID ---
+          int? categoryId = int.tryParse(uniqueId);
+
+          if (categoryId != null) {
+            // It's a Category -> Go to Details Page
+            Get.to(
+              () => CategoryDetailsPage(
+                categoryId: categoryId,
+                categoryName: title,
+              ),
+              transition: Transition.rightToLeft,
+              duration: const Duration(milliseconds: 300),
+            );
+          } else {
+            // It's a Menu Item (e.g. "Orders") -> Switch Tab
+            widget.onNavigate(uniqueId);
+          }
         },
       ),
     );

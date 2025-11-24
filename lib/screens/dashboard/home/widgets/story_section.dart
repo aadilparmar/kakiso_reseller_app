@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+
+// --- IMPORT CATEGORY DETAILS PAGE ---
 
 class StorySection extends StatefulWidget {
   const StorySection({super.key});
@@ -15,7 +17,6 @@ class StorySection extends StatefulWidget {
 
 class _StorySectionState extends State<StorySection> {
   List<CategoryModel> _stories = [];
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -29,11 +30,10 @@ class _StorySectionState extends State<StorySection> {
       if (mounted) {
         setState(() {
           _stories = categories;
-          _isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) ;
     }
   }
 
@@ -183,9 +183,17 @@ class _StorySectionState extends State<StorySection> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
+                            // --- NAVIGATION LOGIC ---
                             onPressed: () {
-                              Get.back();
-                              Get.to(() => const InventoryPage());
+                              Get.back(); // Close dialog
+                              Get.to(
+                                () => CategoryDetailsPage(
+                                  categoryId: story.id,
+                                  categoryName: story.name,
+                                ),
+                                transition: Transition.fadeIn,
+                                duration: const Duration(milliseconds: 300),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF4A317E),
@@ -233,39 +241,26 @@ class _StorySectionState extends State<StorySection> {
 
   @override
   Widget build(BuildContext context) {
-    // Placeholder while loading
-    if (_isLoading) {
-      return const SizedBox(height: 100);
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- 👑 THE WORLD CLASS HEADER ---
+        // --- HEADER ---
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            8,
-          ), // Adjusted top padding
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  // Decorative Purple Pill
                   Container(
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8134AF), // Story Purple
+                      color: const Color(0xFF8134AF),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // "Exclusive"
                   const Text(
                     'Exclusive',
                     style: TextStyle(
@@ -277,21 +272,17 @@ class _StorySectionState extends State<StorySection> {
                     ),
                   ),
                   const SizedBox(width: 6),
-
-                  // "Stories" (Colored)
                   const Text(
                     'Stories',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF8134AF), // Gradient Purple
+                      color: Color(0xFF8134AF),
                       fontFamily: 'Poppins',
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Premium Icon
                   const Icon(
                     Iconsax.lovely,
                     color: Color(0xFFFF4C5E),
@@ -299,8 +290,7 @@ class _StorySectionState extends State<StorySection> {
                   ),
                 ],
               ),
-
-              // "Watch All" Pill Button
+              // Watch All (Can link to Category Grid)
               GestureDetector(
                 onTap: () {},
                 child: Container(
@@ -414,14 +404,10 @@ class _StorySectionState extends State<StorySection> {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.grey.shade300, width: 2),
                 ),
-                child: CircleAvatar(
+                child: const CircleAvatar(
                   radius: 33,
                   backgroundColor: Colors.black,
-                  child: const Icon(
-                    Iconsax.video5,
-                    color: Colors.white,
-                    size: 28,
-                  ),
+                  child: Icon(Iconsax.video5, color: Colors.white, size: 28),
                 ),
               ),
               Positioned(

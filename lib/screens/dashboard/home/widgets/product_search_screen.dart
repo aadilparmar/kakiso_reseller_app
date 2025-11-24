@@ -4,10 +4,11 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/search_header.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
-// Import the header we just updated
-// Import your Product Detail page
+
+// --- IMPORT PRODUCT DETAILS PAGE ---
 
 class ProductSearchScreen extends StatefulWidget {
   const ProductSearchScreen({super.key});
@@ -146,11 +147,14 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
       itemBuilder: (context, index) {
         final product = _searchResults[index];
 
-        // You can use a ListTile or your custom Card widget here
         return GestureDetector(
           onTap: () {
-            // Navigate to Product Detail Page
-            // Get.to(() => ProductDetailScreen(product: product));
+            // --- NAVIGATION LOGIC ADDED HERE ---
+            Get.to(
+              () => ProductDetailsPage(product: product),
+              transition: Transition.fadeIn,
+              duration: const Duration(milliseconds: 300),
+            );
           },
           child: Container(
             decoration: BoxDecoration(
@@ -181,11 +185,12 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
                       width: 80,
                       height: 80,
                       color: Colors.grey[200],
-                      child: const Icon(Icons.error),
+                      child: const Icon(Icons.error, color: Colors.grey),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
+
                 // Details
                 Expanded(
                   child: Column(
@@ -214,6 +219,8 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
                     ],
                   ),
                 ),
+
+                // Arrow Icon
                 const Icon(Iconsax.arrow_right_3, color: Colors.grey),
                 const SizedBox(width: 12),
               ],
