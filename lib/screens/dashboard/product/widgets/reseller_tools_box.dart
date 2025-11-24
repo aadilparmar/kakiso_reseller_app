@@ -64,7 +64,8 @@ class ResellerToolsBox extends StatelessWidget {
                     icon: Iconsax.gallery_export,
                     label: "Download",
                     isLoading: controller.isDownloading.value,
-                    onTap: () => controller.downloadImages(product),
+                    // --- CALL THE NEW FUNCTION ---
+                    onTap: () => controller.promptDownload(context, product),
                   ),
                 ),
               ),

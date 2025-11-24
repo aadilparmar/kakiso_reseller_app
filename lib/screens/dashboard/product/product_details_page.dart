@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/widgets/price_calculator.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/widgets/similar_product_section.dart';
 
 // --- WIDGET IMPORTS ---
 import 'widgets/image_slider.dart';
@@ -90,7 +92,17 @@ class ProductDetailsPage extends StatelessWidget {
                           controller: controller,
                         ),
 
-                        const SizedBox(height: 120), // Space for bottom bar
+                        const SizedBox(height: 20),
+                        // PriceComparisonSection(product: product),
+                        // const SizedBox(height: 20),
+                        PricingCalculator(
+                          productCost: double.tryParse(product.price) ?? 0.0,
+                        ),
+                        const SizedBox(height: 30),
+                        SimilarProductsSection(
+                          categoryId: "0",
+                        ), // Space for bottom bar
+                        const SizedBox(height: 120),
                       ],
                     ),
                   ),
