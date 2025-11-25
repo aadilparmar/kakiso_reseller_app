@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/all_product_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product_card.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
@@ -190,7 +191,15 @@ class _RecommendedSectionState extends State<RecommendedSection> {
 
               // "View All" Button
               GestureDetector(
-                onTap: () {},
+                onTap: () {
+                  Get.to(
+                    () => const AllProductsScreen(
+                      title: "Recommended",
+                      initialOrderBy: 'popularity', // or 'rating'
+                      initialOrder: 'desc',
+                    ),
+                  );
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,

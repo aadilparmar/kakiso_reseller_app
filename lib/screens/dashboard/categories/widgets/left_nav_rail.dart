@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // For accentColor
 
 class LeftNavigationRail extends StatelessWidget {
   final List<CategoryModel> categories;
   final int selectedIndex;
-  // UPDATE: Add 'int id' to the callback function
   final Function(int index, String label, int id) onCategorySelected;
 
   const LeftNavigationRail({
@@ -17,21 +16,21 @@ class LeftNavigationRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only show Parent Categories
-    final parentCategories = categories.where((c) => c.parent == 0).toList();
+    // --- CHANGE: Use the full list directly, do not filter by parent ---
+    final allCategories = categories;
 
     return Container(
       width: 96,
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: ListView.builder(
-        itemCount: parentCategories.length,
+        itemCount: allCategories.length,
         itemBuilder: (ctx, idx) {
-          final item = parentCategories[idx];
+          final item = allCategories[idx];
           final bool isSelected = idx == selectedIndex;
 
           return GestureDetector(
-            // UPDATE: Pass the item.id here
+            // Pass the item.id correctly
             onTap: () => onCategorySelected(idx, item.name, item.id),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -48,6 +47,7 @@ class LeftNavigationRail extends StatelessWidget {
                   : null,
               child: Column(
                 children: [
+                  // Category Image
                   CircleAvatar(
                     radius: 22,
                     backgroundColor: isSelected
@@ -57,11 +57,16 @@ class LeftNavigationRail extends StatelessWidget {
                     onBackgroundImageError: (_, __) => const Icon(Icons.error),
                   ),
                   const SizedBox(height: 6),
+                  // Category Name
                   Text(
                     item.name,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
+                      // Make font bold if selected for better visibility
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.normal,
                       color: isSelected
                           ? const Color.fromARGB(255, 132, 42, 235)
                           : Colors.black87,

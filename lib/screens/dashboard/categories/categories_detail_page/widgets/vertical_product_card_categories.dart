@@ -4,8 +4,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
-
-// --- NAVIGATION ---
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class VerticalProductCard extends StatelessWidget {
@@ -15,6 +13,7 @@ class VerticalProductCard extends StatelessWidget {
 
   // --- REUSABLE PREMIUM POPUP ---
   void _showAddedToCartPopup() {
+    // ... (Keep your existing popup code here) ...
     Get.snackbar(
       '',
       '',
@@ -119,13 +118,14 @@ class VerticalProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- 1. IMAGE & BADGES SECTION ---
+            // FIX 1: Changed flex from 6 to 55 (roughly 55%) to balance space
             Expanded(
-              flex: 6, // Gives image slightly more height than text
+              flex: 55,
               child: Stack(
                 children: [
                   // Main Image
                   Hero(
-                    tag: 'product_${product.id}', // Smooth transition tag
+                    tag: 'product_${product.id}',
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: const BorderRadius.vertical(
@@ -140,7 +140,7 @@ class VerticalProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Discount Badge (Top Left)
+                  // Discount Badge
                   if (product.discountPercentage != null &&
                       product.discountPercentage! > 0)
                     Positioned(
@@ -152,7 +152,7 @@ class VerticalProductCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEB2A7E), // Reseller Pink
+                          color: const Color(0xFFEB2A7E),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -167,7 +167,7 @@ class VerticalProductCard extends StatelessWidget {
                       ),
                     ),
 
-                  // Wishlist Button (Top Right)
+                  // Wishlist Button
                   Positioned(
                     top: 6,
                     right: 6,
@@ -189,13 +189,15 @@ class VerticalProductCard extends StatelessWidget {
             ),
 
             // --- 2. INFO SECTION ---
+            // FIX 1: Changed flex from 4 to 45 (roughly 45%) to give text more room
             Expanded(
-              flex: 4,
+              flex: 45,
               child: Padding(
-                padding: const EdgeInsets.all(10.0),
+                // FIX 2: Reduced padding from 10.0 to 8.0 to save 4px vertical space
+                padding: const EdgeInsets.all(8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // FIX 3: Removed MainAxisAlignment.spaceBetween (see Spacer below)
                   children: [
                     // Title & Rating
                     Column(
@@ -209,7 +211,7 @@ class VerticalProductCard extends StatelessWidget {
                             fontFamily: 'Poppins',
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF1F2937), // Dark Slate
+                            color: Color(0xFF1F2937),
                             height: 1.2,
                           ),
                         ),
@@ -225,7 +227,7 @@ class VerticalProductCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              "4.5", // Placeholder or product.rating
+                              "4.5",
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -244,6 +246,9 @@ class VerticalProductCard extends StatelessWidget {
                       ],
                     ),
 
+                    // FIX 3: Use Spacer to push price down ONLY if there is space
+                    const Spacer(),
+
                     // Price & Add Button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -252,7 +257,6 @@ class VerticalProductCard extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Regular Price Strikethrough
                             if (product.regularPrice.isNotEmpty &&
                                 product.regularPrice != product.price)
                               Text(
@@ -269,13 +273,12 @@ class VerticalProductCard extends StatelessWidget {
                                 fontFamily: 'Poppins',
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF4A317E), // Brand Color
+                                color: Color(0xFF4A317E),
                               ),
                             ),
                           ],
                         ),
 
-                        // Quick Add Button
                         InkWell(
                           onTap: () {
                             cartController.addToCart(product);

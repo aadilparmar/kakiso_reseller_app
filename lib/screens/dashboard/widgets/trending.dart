@@ -3,10 +3,11 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/all_product_screen.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 
-// --- IMPORT YOUR CART PAGE & PRODUCT DETAILS PAGE ---
+// --- IMPORT NAVIGATION PAGES ---
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class TrendingCard extends StatelessWidget {
@@ -101,7 +102,6 @@ class TrendingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final CartController cartController = Get.put(CartController());
 
-    // --- 1. WRAP WITH GESTURE DETECTOR ---
     return GestureDetector(
       onTap: () {
         // Navigate to Product Details
@@ -230,7 +230,7 @@ class TrendingCard extends StatelessWidget {
                         ),
                       ),
 
-                      // --- ADD BUTTON (Separate Gesture to avoid conflict) ---
+                      // --- ADD BUTTON ---
                       Material(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(8),
@@ -265,7 +265,7 @@ class TrendingCard extends StatelessWidget {
   }
 }
 
-// --- 2. MAIN SECTION (Unchanged) ---
+// --- 2. MAIN SECTION ---
 class TrendingProducts extends StatefulWidget {
   const TrendingProducts({super.key});
 
@@ -353,13 +353,26 @@ class _TrendingProductsState extends State<TrendingProducts> {
                   ),
                 ],
               ),
-              Text(
-                'View All',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[500],
-                  fontFamily: 'Poppins',
+              // --- VIEW ALL BUTTON ---
+              GestureDetector(
+                onTap: () {
+                  // Navigate to AllProductsScreen using the Trending API function
+                  Get.to(
+                    () => const AllProductsScreen(
+                      title: "Trending Now",
+                      initialOrderBy: 'popularity',
+                      initialOrder: 'desc',
+                    ),
+                  );
+                },
+                child: Text(
+                  'View All',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[500],
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
             ],

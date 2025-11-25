@@ -1,4 +1,3 @@
-// lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:kakiso_reseller_app/models/brand.dart';
@@ -46,11 +45,26 @@ class ApiService {
     }
   }
 
-  // --- 2. FETCH ALL PRODUCTS ---
-  static Future<List<ProductModel>> fetchProducts() async {
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?per_page=20&status=publish',
-    );
+  // --- 2. FETCH PRODUCTS (Universal: Supports Pagination, Sort, Filter) ---
+  static Future<List<ProductModel>> fetchProducts({
+    int page = 1,
+    int perPage = 20,
+    String orderBy = 'date', // date, price, popularity, rating
+    String order = 'desc', // asc, desc
+    double? minPrice,
+    double? maxPrice,
+  }) async {
+    // Build Query Parameters
+    String queryParams = 'status=publish&per_page=$perPage&page=$page';
+
+    // Add Sorting
+    queryParams += '&orderby=$orderBy&order=$order';
+
+    // Add Filtering
+    if (minPrice != null) queryParams += '&min_price=${minPrice.toInt()}';
+    if (maxPrice != null) queryParams += '&max_price=${maxPrice.toInt()}';
+
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/products?$queryParams');
 
     try {
       final response = await http.get(
@@ -76,8 +90,8 @@ class ApiService {
   // --- 3. FETCH PRODUCTS BY CATEGORY (With Sort & Filter) ---
   static Future<List<ProductModel>> fetchProductsByCategory(
     int categoryId, {
-    String orderBy = 'popularity', // date, price, popularity, rating
-    String order = 'desc', // asc, desc
+    String orderBy = 'popularity',
+    String order = 'desc',
     double? minPrice,
     double? maxPrice,
   }) async {
@@ -194,7 +208,7 @@ class ApiService {
     return fetchTopSellingProducts();
   }
 
-  // --- 8. FETCH BRANDS (Using Categories) ---
+  // --- 8. FETCH BRANDS ---
   static Future<List<BrandModel>> fetchBrands() async {
     final Uri url = Uri.parse(
       '$baseUrl/wp-json/wc/v3/products/categories?per_page=10&orderby=count&order=desc&hide_empty=true',

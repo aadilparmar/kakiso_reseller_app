@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/widgets/all_product_screen.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // --- SCREENS ---
@@ -162,13 +163,25 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
                   const Text('🔥', style: TextStyle(fontSize: 20)),
                 ],
               ),
-              const Text(
-                'View All',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFEB2A7E),
-                  fontFamily: 'Poppins',
+              GestureDetector(
+                onTap: () {
+                  // --- NAVIGATION LOGIC ---
+                  Get.to(
+                    () => const AllProductsScreen(
+                      title: "Fresh Drops",
+                      initialOrderBy: 'date',
+                      initialOrder: 'desc',
+                    ),
+                  );
+                },
+                child: const Text(
+                  'View All',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFEB2A7E),
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
             ],
