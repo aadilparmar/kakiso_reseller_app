@@ -24,8 +24,9 @@ class ProductModel {
     required this.attributes,
   });
 
+  /// Used for API / stored JSON -> ProductModel
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // Helper to parse images
+    // Images
     List<String> gallery = [];
     if (json['images'] != null) {
       gallery = (json['images'] as List)
@@ -33,7 +34,7 @@ class ProductModel {
           .toList();
     }
 
-    // Helper to parse attributes (Size, Color, etc)
+    // Attributes
     List<ProductAttribute> attrs = [];
     if (json['attributes'] != null) {
       attrs = (json['attributes'] as List)
@@ -41,7 +42,7 @@ class ProductModel {
           .toList();
     }
 
-    // Calculate discount
+    // Discount
     double priceVal = double.tryParse(json['price'].toString()) ?? 0;
     double regPriceVal = double.tryParse(json['regular_price'].toString()) ?? 0;
     int discount = 0;
@@ -49,7 +50,7 @@ class ProductModel {
       discount = (((regPriceVal - priceVal) / regPriceVal) * 100).round();
     }
 
-    // Clean HTML from description (Simple Regex strip)
+    // Clean HTML from description
     String rawDesc = json['description'] ?? '';
     String cleanDesc = rawDesc.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
 
@@ -67,6 +68,23 @@ class ProductModel {
       discountPercentage: discount,
       attributes: attrs,
     );
+  }
+
+  /// Used for saving locally (catalogues, cache, etc.)
+  /// This matches the structure expected by fromJson above.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'price': price,
+      'regular_price': regularPrice,
+      'description': description,
+      'short_description': shortDescription,
+      'images': images.map((src) => {'src': src}).toList(),
+      'attributes': attributes.map((a) => a.toJson()).toList(),
+      // extra field not used by fromJson but safe to keep
+      'discount_percentage': discountPercentage,
+    };
   }
 }
 
@@ -87,5 +105,9 @@ class ProductAttribute {
       name: json['name'],
       options: List<String>.from(json['options']),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'name': name, 'options': options};
   }
 }
