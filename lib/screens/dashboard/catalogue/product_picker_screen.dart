@@ -39,10 +39,11 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
     super.dispose();
   }
 
+  /// ✅ NEW: Uses paginated API helper so we truly load *all* products
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final products = await ApiService.fetchProducts(
+      final products = await ApiService.fetchAllProductsPaginated(
         orderBy: 'date',
         order: 'desc',
       );
@@ -132,9 +133,7 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final catalogue = catalogueController.getById(
-        widget.catalogueId,
-      ); // reactive
+      final catalogue = catalogueController.getById(widget.catalogueId);
 
       if (catalogue == null) {
         return Scaffold(

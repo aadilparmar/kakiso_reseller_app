@@ -13,6 +13,9 @@ import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
+// ⭐ IMPORT PDF SERVICE (adjust path if your file name differs)
+import 'package:kakiso_reseller_app/services/pdf_services.dart';
+
 enum _CatalogueSort { newest, oldest, nameAZ, nameZA, mostProducts }
 
 class CatalogueSection extends StatefulWidget {
@@ -38,6 +41,9 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   _CatalogueSort _currentSort = _CatalogueSort.newest;
 
   final TextEditingController _searchController = TextEditingController();
+
+  // PDF loading state
+  bool _isGeneratingPdf = false;
 
   // --- LOGOUT DIALOG ---
   Future<void> _showLogoutConfirmation() async {
@@ -167,8 +173,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
   // --- SORTING + FILTER HELPERS ---
   List<CatalogueModel> _buildFilteredSortedList() {
-    final List<CatalogueModel> base = catalogueController.myCatalogues
-        .toList(); // copy
+    final List<CatalogueModel> base = catalogueController.myCatalogues.toList();
 
     // Filter by search
     final query = _searchQuery.trim().toLowerCase();
@@ -309,24 +314,24 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             onSelected: (value) {
               setState(() => _currentSort = value);
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
+            itemBuilder: (context) => const [
+              PopupMenuItem(
                 value: _CatalogueSort.newest,
                 child: Text("Newest first"),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CatalogueSort.oldest,
                 child: Text("Oldest first"),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CatalogueSort.nameAZ,
                 child: Text("Name A–Z"),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CatalogueSort.nameZA,
                 child: Text("Name Z–A"),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CatalogueSort.mostProducts,
                 child: Text("Most products"),
               ),
@@ -372,6 +377,160 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     return "$d/$m/$y";
   }
 
+  // --- PDF: Ask for name & margin, then generate catalogue PDF ---
+  void _openPdfMarginDialog(CatalogueModel cat) {
+    if (cat.products.isEmpty) {
+      Get.snackbar(
+        "Empty catalogue",
+        "Add products before generating a PDF.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final TextEditingController nameCtrl = TextEditingController(
+      text: widget.userData.name.isNotEmpty ? widget.userData.name : cat.name,
+    );
+    final TextEditingController marginCtrl = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "Download Catalogue PDF",
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "We’ll create a sharable PDF with updated prices.",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: "Business / Shop Name",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: marginCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Flat Margin (₹)",
+                hintText: "Example: 100",
+                prefixText: "₹ ",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              final name = nameCtrl.text.trim().isEmpty
+                  ? "Reseller"
+                  : nameCtrl.text.trim();
+              final double margin =
+                  double.tryParse(marginCtrl.text.trim()) ?? 0;
+
+              Get.back();
+              _generateCataloguePdf(cat, name, margin);
+            },
+            child: const Text(
+              "Generate",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateCataloguePdf(
+    CatalogueModel cat,
+    String businessName,
+    double extraMargin,
+  ) async {
+    if (_isGeneratingPdf) return;
+
+    setState(() => _isGeneratingPdf = true);
+
+    // Optional small overlay
+    Get.showOverlay(
+      asyncFunction: () async {
+        try {
+          await PdfService.createAndShareCatalog(
+            categoryName: cat.name,
+            products: cat.products.toList(), // RxList -> List
+            businessName: businessName,
+            extraMargin: extraMargin,
+          );
+
+          Get.snackbar(
+            "Success",
+            "Catalogue PDF generated.",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+        } catch (e) {
+          Get.snackbar(
+            "PDF Error",
+            "Failed to create PDF: $e",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        } finally {
+          if (mounted) {
+            setState(() => _isGeneratingPdf = false);
+          }
+        }
+      },
+      loadingWidget: Center(
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              SizedBox(height: 12),
+              Text(
+                "Generating PDF...",
+                style: TextStyle(fontFamily: 'Poppins', color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showCatalogueActionsSheet(CatalogueModel cat) {
     Get.bottomSheet(
       SafeArea(
@@ -394,6 +553,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                   ),
                 ),
               ),
+              // --- SHARE SUMMARY ---
               ListTile(
                 leading: const Icon(
                   Iconsax.share,
@@ -419,6 +579,31 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                   Share.share(text);
                 },
               ),
+              // --- DOWNLOAD PDF CATALOGUE ---
+              ListTile(
+                leading: const Icon(
+                  Iconsax.document_download,
+                  size: 20,
+                  color: accentColor,
+                ),
+                title: const Text(
+                  "Download PDF catalogue",
+                  style: TextStyle(fontFamily: 'Poppins'),
+                ),
+                subtitle: Text(
+                  "Generate PDF with custom margin",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                onTap: () {
+                  Get.back();
+                  _openPdfMarginDialog(cat);
+                },
+              ),
+              // --- DELETE CATALOGUE ---
               ListTile(
                 leading: const Icon(Iconsax.trash, size: 20, color: Colors.red),
                 title: const Text(

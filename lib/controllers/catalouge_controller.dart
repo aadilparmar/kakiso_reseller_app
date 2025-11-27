@@ -93,7 +93,6 @@ class CatalogueController extends GetxController {
 
     if (!alreadyExists) {
       cat.products.add(product);
-      Get.snackbar("Added", "Added to ${cat.name}");
       _saveToStorage();
     } else {
       Get.snackbar("Info", "Product already in ${cat.name}");
