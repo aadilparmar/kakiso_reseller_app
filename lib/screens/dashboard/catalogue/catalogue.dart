@@ -3,20 +3,17 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
-// --- INTERNAL IMPORTS ---
-import 'package:kakiso_reseller_app/models/user.dart'; // Required for Drawer
+import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
+import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart'; // For accentColor
-
-// --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
-
-// --- DRAWER IMPORT ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
+import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class CatalogueSection extends StatefulWidget {
-  final UserData userData; // 1. Require UserData
+  final UserData userData;
 
   const CatalogueSection({super.key, required this.userData});
 
@@ -27,7 +24,12 @@ class CatalogueSection extends StatefulWidget {
 class _CatalogueSectionState extends State<CatalogueSection> {
   final _storage = const FlutterSecureStorage();
 
-  // --- DRAWER LOGIC ---
+  // Put controller here so it’s available to all catalogue screens
+  final CatalogueController catalogueController = Get.put(
+    CatalogueController(),
+    permanent: true,
+  );
+
   Future<void> _showLogoutConfirmation() async {
     Get.dialog(
       AlertDialog(
@@ -78,33 +80,93 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   }
 
   void _handleDrawerNavigation(String pageId) {
-    Navigator.pop(context); // Close drawer
-
-    // Navigate if not on Catalogue page
-    if (pageId != 'MyCatalog') {
-      if (pageId == 'Home' || pageId == 'BusinessDetails') {
-        Get.off(() => HomePage(userData: widget.userData));
-      }
-      // Add other navigation logic here
+    Navigator.pop(context);
+    if (pageId == 'Home' || pageId == 'BusinessDetails') {
+      Get.off(() => HomePage(userData: widget.userData));
     }
+    // you can add other nav targets here
+  }
+
+  void _openCreateCatalogueDialog() {
+    final TextEditingController nameCtrl = TextEditingController();
+    final TextEditingController descCtrl = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "Create Catalogue",
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: "Catalogue Name",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              decoration: InputDecoration(
+                labelText: "Description (optional)",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              final desc = descCtrl.text.trim();
+              if (name.isEmpty) {
+                Get.snackbar("Error", "Please enter a name");
+                return;
+              }
+              catalogueController.createCatalogue(
+                name,
+                desc.isEmpty ? "Custom catalogue" : desc,
+              );
+              Get.back();
+            },
+            child: const Text("Create", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
-      // 2. ADD THE DRAWER
       drawer: HomeDrawer(
         userData: widget.userData,
-        selectedTitle: 'MyCatalog', // Highlight Catalogue in drawer
+        selectedTitle: 'MyCatalog',
         onNavigate: _handleDrawerNavigation,
         onLogoutPressed: () {
           Navigator.pop(context);
           _showLogoutConfirmation();
         },
       ),
-
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -112,20 +174,14 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         automaticallyImplyLeading: false,
         title: Row(
           children: [
-            // 3. DRAWER TRIGGER
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Icons.menu),
                 color: accentColor,
                 iconSize: 30,
-                onPressed: () {
-                  // Opens the drawer defined above
-                  Scaffold.of(context).openDrawer();
-                },
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
-
-            // Logo
             Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: Image.asset(
@@ -134,19 +190,13 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 fit: BoxFit.contain,
               ),
             ),
-
             const Spacer(),
-
-            // Actions
             IconButton(
               icon: const Icon(Iconsax.notification_bing),
               color: accentColor,
               iconSize: 30,
-              onPressed: () {
-                // Action for notifications
-              },
+              onPressed: () {},
             ),
-
             IconButton(
               icon: const Icon(Iconsax.shopping_cart),
               color: accentColor,
@@ -164,68 +214,135 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           ],
         ),
       ),
-
-      // Body content
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Search Bar Container
-            Container(
-              padding: const EdgeInsets.only(bottom: 10, right: 16, left: 16),
-              decoration: const BoxDecoration(
-                color: Color.fromARGB(255, 255, 255, 255),
-              ),
-              child: Row(
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: accentColor,
+        onPressed: _openCreateCatalogueDialog,
+        icon: const Icon(Iconsax.folder_add, color: Colors.white),
+        label: const Text(
+          "New Catalogue",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      body: Obx(() {
+        if (catalogueController.myCatalogues.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 1,
-                        ),
-                      ),
-                      child: const TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Search..',
-                          hintStyle: TextStyle(
-                            color: Colors.blueGrey,
-                            fontFamily: 'Poppins',
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 14.0,
-                            vertical: 11.0,
-                          ),
-                          suffixIcon: Icon(
-                            Iconsax.search_normal,
-                            color: accentColor,
-                            size: 28,
-                          ),
-                        ),
-                      ),
+                  Icon(
+                    Iconsax.folder_open,
+                    size: 64,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "No catalogues yet",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // Add your Reseller/Filter Button here if needed
+                  const SizedBox(height: 8),
+                  Text(
+                    "Create a catalogue and start adding products for your customers.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: _openCreateCatalogueDialog,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Iconsax.add, color: Colors.white),
+                    label: const Text(
+                      "Create Catalogue",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ],
               ),
             ),
+          );
+        }
 
-            // Add the rest of your catalogue content here
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text("Catalogue Content Goes Here"),
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: catalogueController.myCatalogues.length,
+          itemBuilder: (context, index) {
+            final cat = catalogueController.myCatalogues[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-          ],
-        ),
-      ),
+              child: ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                leading: const Icon(Iconsax.folder, color: accentColor),
+                title: Text(
+                  cat.name,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  "${cat.products.length} products • ${cat.description}",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Iconsax.trash, size: 18),
+                  onPressed: () {
+                    Get.dialog(
+                      AlertDialog(
+                        title: const Text("Delete Catalogue"),
+                        content: Text("Delete \"${cat.name}\"?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Get.back(),
+                            child: const Text("Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              catalogueController.deleteCatalogue(cat.id);
+                              Get.back();
+                            },
+                            child: const Text(
+                              "Delete",
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                onTap: () {
+                  Get.to(() => CatalogueDetailsPage(catalogueId: cat.id));
+                },
+              ),
+            );
+          },
+        );
+      }),
     );
   }
 }

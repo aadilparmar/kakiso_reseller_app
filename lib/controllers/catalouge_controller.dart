@@ -5,7 +5,7 @@ class CatalogueModel {
   final String id;
   final String name;
   final String description;
-  final RxList<ProductModel> products; // Observable list for updates
+  final RxList<ProductModel> products;
   final DateTime createdAt;
 
   CatalogueModel({
@@ -14,19 +14,12 @@ class CatalogueModel {
     required this.description,
     List<ProductModel>? products,
     DateTime? createdAt,
-  }) : products = (products ?? []).obs,
+  }) : products = (products ?? <ProductModel>[]).obs,
        createdAt = createdAt ?? DateTime.now();
 }
 
 class CatalogueController extends GetxController {
   final RxList<CatalogueModel> myCatalogues = <CatalogueModel>[].obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    // Add a dummy catalog for demonstration
-    createCatalogue("My Best Sarees", "Handpicked silk sarees");
-  }
 
   void createCatalogue(String name, String description) {
     final newCat = CatalogueModel(
@@ -35,7 +28,7 @@ class CatalogueController extends GetxController {
       description: description,
     );
     myCatalogues.add(newCat);
-    // Sort newest first
+    // newest first
     myCatalogues.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
@@ -43,16 +36,29 @@ class CatalogueController extends GetxController {
     myCatalogues.removeWhere((c) => c.id == id);
   }
 
-  void addProductToCatalogue(String catalogId, ProductModel product) {
-    final index = myCatalogues.indexWhere((c) => c.id == catalogId);
-    if (index != -1) {
-      // Check if product already exists
-      if (!myCatalogues[index].products.any((p) => p.id == product.id)) {
-        myCatalogues[index].products.add(product);
-        Get.snackbar("Success", "Added to ${myCatalogues[index].name}");
-      } else {
-        Get.snackbar("Info", "Product already in this catalog");
-      }
+  CatalogueModel? getById(String id) {
+    try {
+      return myCatalogues.firstWhere((c) => c.id == id);
+    } catch (_) {
+      return null;
     }
+  }
+
+  void addProductToCatalogue(String catalogId, ProductModel product) {
+    final cat = getById(catalogId);
+    if (cat == null) return;
+
+    if (!cat.products.any((p) => p.id == product.id)) {
+      cat.products.add(product);
+      Get.snackbar("Added", "Added to ${cat.name}");
+    } else {
+      Get.snackbar("Info", "Product already in ${cat.name}");
+    }
+  }
+
+  void removeProductFromCatalogue(String catalogId, String productId) {
+    final cat = getById(catalogId);
+    if (cat == null) return;
+    cat.products.removeWhere((p) => p.id == productId);
   }
 }
