@@ -1,26 +1,43 @@
+// lib/controllers/catalouge_controller.dart
+
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:kakiso_reseller_app/models/product.dart';
 
+/// Model for a single catalogue.
 class CatalogueModel {
   final String id;
-  final String name;
-  final String description;
-  final RxList<ProductModel> products; // observable
-  final DateTime createdAt;
+  String name;
+  String description;
+  DateTime createdAt;
+  List<ProductModel> products;
 
   CatalogueModel({
     required this.id,
     required this.name,
     required this.description,
-    List<ProductModel>? products,
-    DateTime? createdAt,
-  }) : products = (products ?? <ProductModel>[]).obs,
-       createdAt = createdAt ?? DateTime.now();
+    required this.createdAt,
+    required this.products,
+  });
 
-  // ---- SERIALIZATION HELPERS ----
+  /// JSON serialization – used for local persistence.
+  factory CatalogueModel.fromJson(Map<String, dynamic> json) {
+    return CatalogueModel(
+      id: json['id'] as String,
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      products: (json['products'] as List<dynamic>? ?? [])
+          .map((p) => ProductModel.fromJson(p as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -28,28 +45,20 @@ class CatalogueModel {
       'name': name,
       'description': description,
       'createdAt': createdAt.toIso8601String(),
-      // Convert each ProductModel to json
       'products': products.map((p) => p.toJson()).toList(),
     };
-  }
-
-  factory CatalogueModel.fromJson(Map<String, dynamic> json) {
-    return CatalogueModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String? ?? '',
-      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-      products: (json['products'] as List<dynamic>? ?? [])
-          .map((p) => ProductModel.fromJson(p as Map<String, dynamic>))
-          .toList(),
-    );
   }
 }
 
 class CatalogueController extends GetxController {
-  static const String _storageKey = 'my_catalogues_v1';
-
+  /// All catalogues for this device / user.
   final RxList<CatalogueModel> myCatalogues = <CatalogueModel>[].obs;
+
+  static const _prefsKey = 'kakiso_catalogues_v1';
+
+  // ---------------------------------------------------------------------------
+  // LIFECYCLE
+  // ---------------------------------------------------------------------------
 
   @override
   void onInit() {
@@ -57,23 +66,9 @@ class CatalogueController extends GetxController {
     _loadFromStorage();
   }
 
-  // ---- PUBLIC API ----
-
-  void createCatalogue(String name, String description) {
-    final newCat = CatalogueModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      description: description,
-    );
-    myCatalogues.add(newCat);
-    myCatalogues.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    _saveToStorage();
-  }
-
-  void deleteCatalogue(String id) {
-    myCatalogues.removeWhere((c) => c.id == id);
-    _saveToStorage();
-  }
+  // ---------------------------------------------------------------------------
+  // PUBLIC API – used by your UI
+  // ---------------------------------------------------------------------------
 
   CatalogueModel? getById(String id) {
     try {
@@ -83,62 +78,121 @@ class CatalogueController extends GetxController {
     }
   }
 
-  void addProductToCatalogue(String catalogId, ProductModel product) {
-    final cat = getById(catalogId);
-    if (cat == null) return;
+  /// Create a new empty catalogue
+  void createCatalogue(String name, String description) {
+    final id = _generateId();
+    final catalogue = CatalogueModel(
+      id: id,
+      name: name,
+      description: description,
+      createdAt: DateTime.now(),
+      products: [],
+    );
 
-    final alreadyExists = cat.products.any(
-      (p) => p.id == product.id,
-    ); // assuming ProductModel has id
-
-    if (!alreadyExists) {
-      cat.products.add(product);
-      _saveToStorage();
-    } else {
-      Get.snackbar("Info", "Product already in ${cat.name}");
-    }
-  }
-
-  void removeProductFromCatalogue(String catalogId, String productId) {
-    final cat = getById(catalogId);
-    if (cat == null) return;
-    cat.products.removeWhere((p) => p.id == productId);
+    myCatalogues.add(catalogue);
+    myCatalogues.refresh();
     _saveToStorage();
   }
 
-  // ---- PERSISTENCE ----
-
-  Future<void> _saveToStorage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      // Convert entire list to json string
-      final List<Map<String, dynamic>> raw = myCatalogues
-          .map((c) => c.toJson())
-          .toList();
-      final jsonStr = jsonEncode(raw);
-      await prefs.setString(_storageKey, jsonStr);
-    } catch (e) {
-      // optional: log error
-      // debugPrint("Error saving catalogues: $e");
-    }
+  /// Delete an entire catalogue
+  void deleteCatalogue(String id) {
+    myCatalogues.removeWhere((c) => c.id == id);
+    myCatalogues.refresh();
+    _saveToStorage();
   }
+
+  /// Add a product to a specific catalogue (if not already present)
+  void addProductToCatalogue(String catalogueId, ProductModel product) {
+    final index = myCatalogues.indexWhere((c) => c.id == catalogueId);
+    if (index == -1) return;
+
+    final cat = myCatalogues[index];
+
+    final alreadyExists = cat.products.any(
+      (p) => p.id.toString() == product.id.toString(),
+    );
+    if (alreadyExists) {
+      // You already handled snackbar in UI if you want; so just return
+      return;
+    }
+
+    cat.products.add(product);
+    myCatalogues[index] = CatalogueModel(
+      id: cat.id,
+      name: cat.name,
+      description: cat.description,
+      createdAt: cat.createdAt,
+      products: List<ProductModel>.from(cat.products),
+    );
+
+    myCatalogues.refresh();
+    _saveToStorage();
+  }
+
+  /// Remove a product from a catalogue by productId
+  void removeProductFromCatalogue(String catalogueId, String productId) {
+    final index = myCatalogues.indexWhere((c) => c.id == catalogueId);
+    if (index == -1) return;
+
+    final cat = myCatalogues[index];
+
+    cat.products.removeWhere((p) => p.id.toString() == productId.toString());
+
+    myCatalogues[index] = CatalogueModel(
+      id: cat.id,
+      name: cat.name,
+      description: cat.description,
+      createdAt: cat.createdAt,
+      products: List<ProductModel>.from(cat.products),
+    );
+
+    myCatalogues.refresh();
+    _saveToStorage();
+  }
+
+  // ---------------------------------------------------------------------------
+  // PERSISTENCE
+  // ---------------------------------------------------------------------------
 
   Future<void> _loadFromStorage() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_storageKey);
-      if (jsonStr == null || jsonStr.isEmpty) return;
+      final jsonString = prefs.getString(_prefsKey);
+      if (jsonString == null || jsonString.isEmpty) return;
 
-      final List<dynamic> decoded = jsonDecode(jsonStr);
-      final List<CatalogueModel> loaded = decoded
-          .map((c) => CatalogueModel.fromJson(c as Map<String, dynamic>))
+      final List<dynamic> decoded = jsonDecode(jsonString) as List<dynamic>;
+      final loaded = decoded
+          .map((e) => CatalogueModel.fromJson(e as Map<String, dynamic>))
           .toList();
 
       myCatalogues.assignAll(loaded);
-      myCatalogues.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      myCatalogues.refresh();
     } catch (e) {
-      // optional: log error and ignore
-      // debugPrint("Error loading catalogues: $e");
+      // If anything goes wrong, don't crash – just start fresh
+      // (You can add debugPrint here if you want)
     }
+  }
+
+  Future<void> _saveToStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<Map<String, dynamic>> list = myCatalogues
+          .map((c) => c.toJson())
+          .toList();
+      final jsonString = jsonEncode(list);
+      await prefs.setString(_prefsKey, jsonString);
+    } catch (e) {
+      // ignore for now or log
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // HELPERS
+  // ---------------------------------------------------------------------------
+
+  String _generateId() {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final rand = Random().nextInt(999999);
+    return 'cat_${ts}_$rand';
   }
 }

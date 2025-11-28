@@ -1,8 +1,15 @@
+// lib/screens/dashboard/catalogue/catalouge_section.dart
+
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ Clipboard
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http; // ✅ for downloading images
+import 'package:path_provider/path_provider.dart'; // ✅ for temp dir
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
@@ -12,11 +19,15 @@ import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
-
-// ⭐ IMPORT PDF SERVICE (adjust path if your file name differs)
 import 'package:kakiso_reseller_app/services/pdf_services.dart';
+import 'package:kakiso_reseller_app/services/collage_service.dart'; // ✅ collage
 
-enum _CatalogueSort { newest, oldest, nameAZ, nameZA, mostProducts }
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue_sort.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_header.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_sort_bar.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_empty_state.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_empty_state.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_card.dart';
 
 class CatalogueSection extends StatefulWidget {
   final UserData userData;
@@ -30,19 +41,16 @@ class CatalogueSection extends StatefulWidget {
 class _CatalogueSectionState extends State<CatalogueSection> {
   final _storage = const FlutterSecureStorage();
 
-  // Global controller – persists + handles storage
   final CatalogueController catalogueController = Get.put(
     CatalogueController(),
     permanent: true,
   );
 
-  // --- LOCAL UI STATE ---
   String _searchQuery = '';
-  _CatalogueSort _currentSort = _CatalogueSort.newest;
+  CatalogueSort _currentSort = CatalogueSort.newest;
 
   final TextEditingController _searchController = TextEditingController();
 
-  // PDF loading state
   bool _isGeneratingPdf = false;
 
   // --- LOGOUT DIALOG ---
@@ -100,7 +108,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     if (pageId == 'Home' || pageId == 'BusinessDetails') {
       Get.off(() => HomePage(userData: widget.userData));
     }
-    // add other nav targets if needed
   }
 
   // --- CREATE CATALOGUE DIALOG ---
@@ -175,7 +182,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   List<CatalogueModel> _buildFilteredSortedList() {
     final List<CatalogueModel> base = catalogueController.myCatalogues.toList();
 
-    // Filter by search
     final query = _searchQuery.trim().toLowerCase();
     List<CatalogueModel> filtered = base;
     if (query.isNotEmpty) {
@@ -184,18 +190,17 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           .toList();
     }
 
-    // Sort
     filtered.sort((a, b) {
       switch (_currentSort) {
-        case _CatalogueSort.newest:
+        case CatalogueSort.newest:
           return b.createdAt.compareTo(a.createdAt);
-        case _CatalogueSort.oldest:
+        case CatalogueSort.oldest:
           return a.createdAt.compareTo(b.createdAt);
-        case _CatalogueSort.nameAZ:
+        case CatalogueSort.nameAZ:
           return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        case _CatalogueSort.nameZA:
+        case CatalogueSort.nameZA:
           return b.name.toLowerCase().compareTo(a.name.toLowerCase());
-        case _CatalogueSort.mostProducts:
+        case CatalogueSort.mostProducts:
           return b.products.length.compareTo(a.products.length);
       }
     });
@@ -203,181 +208,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     return filtered;
   }
 
-  String _sortLabel(_CatalogueSort sort) {
-    switch (sort) {
-      case _CatalogueSort.newest:
-        return "Newest";
-      case _CatalogueSort.oldest:
-        return "Oldest";
-      case _CatalogueSort.nameAZ:
-        return "A–Z";
-      case _CatalogueSort.nameZA:
-        return "Z–A";
-      case _CatalogueSort.mostProducts:
-        return "Most products";
-    }
-  }
-
-  // --- UI HELPERS ---
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            "My Catalogue",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          Obx(() {
-            final totalCats = catalogueController.myCatalogues.length;
-            final totalProducts = catalogueController.myCatalogues.fold<int>(
-              0,
-              (sum, cat) => sum + cat.products.length,
-            );
-            return Text(
-              "$totalCats cat • $totalProducts items",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: Colors.grey.shade600,
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchAndSortBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      color: Colors.white,
-      child: Row(
-        children: [
-          // Search
-          Expanded(
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 10),
-                  const Icon(
-                    Iconsax.search_normal_1,
-                    size: 18,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) {
-                        setState(() => _searchQuery = value);
-                      },
-                      decoration: const InputDecoration(
-                        hintText: "Search catalogues...",
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 18),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Sort dropdown
-          PopupMenuButton<_CatalogueSort>(
-            tooltip: "Sort",
-            onSelected: (value) {
-              setState(() => _currentSort = value);
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: _CatalogueSort.newest,
-                child: Text("Newest first"),
-              ),
-              PopupMenuItem(
-                value: _CatalogueSort.oldest,
-                child: Text("Oldest first"),
-              ),
-              PopupMenuItem(
-                value: _CatalogueSort.nameAZ,
-                child: Text("Name A–Z"),
-              ),
-              PopupMenuItem(
-                value: _CatalogueSort.nameZA,
-                child: Text("Name Z–A"),
-              ),
-              PopupMenuItem(
-                value: _CatalogueSort.mostProducts,
-                child: Text("Most products"),
-              ),
-            ],
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Iconsax.sort, size: 18, color: Colors.black87),
-                  const SizedBox(width: 6),
-                  Text(
-                    _sortLabel(_currentSort),
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Nice little date view without extra packages
-  String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final y = date.year.toString();
-    return "$d/$m/$y";
-  }
-
-  // --- PDF: Ask for name & margin, then generate catalogue PDF ---
+  // --- PDF DIALOG ---
   void _openPdfMarginDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
@@ -404,7 +235,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "We’ll create a sharable PDF with updated prices.",
+              "We’ll create a sharable PDF with your reseller margin in % added to each product price.",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
@@ -427,9 +258,9 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               controller: marginCtrl,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: "Flat Margin (₹)",
-                hintText: "Example: 100",
-                prefixText: "₹ ",
+                labelText: "Margin (%)",
+                hintText: "Example: 20",
+                suffixText: "%",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -451,11 +282,13 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               final name = nameCtrl.text.trim().isEmpty
                   ? "Reseller"
                   : nameCtrl.text.trim();
-              final double margin =
+
+              // 🔹 Margin is now PERCENT
+              final double marginPercent =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
 
               Get.back();
-              _generateCataloguePdf(cat, name, margin);
+              _generateCataloguePdf(cat, name, marginPercent);
             },
             child: const Text(
               "Generate",
@@ -476,13 +309,12 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
     setState(() => _isGeneratingPdf = true);
 
-    // Optional small overlay
     Get.showOverlay(
       asyncFunction: () async {
         try {
           await PdfService.createAndShareCatalog(
             categoryName: cat.name,
-            products: cat.products.toList(), // RxList -> List
+            products: cat.products.toList(),
             businessName: businessName,
             extraMargin: extraMargin,
           );
@@ -512,18 +344,287 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.7),
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-              SizedBox(height: 12),
-              Text(
-                "Generating PDF...",
-                style: TextStyle(fontFamily: 'Poppins', color: Colors.white),
+              CircularProgressIndicator(
+                color: Color.fromARGB(255, 185, 28, 224),
+                strokeWidth: 2,
               ),
+              SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- HELPER: Download product images to XFile list ---
+  Future<List<XFile>> _downloadProductImages(
+    CatalogueModel cat, {
+    int maxImages = 10,
+  }) async {
+    final List<XFile> files = [];
+    final productsWithImage = cat.products
+        .where((p) => p.image.isNotEmpty)
+        .take(maxImages)
+        .toList();
+
+    if (productsWithImage.isEmpty) return files;
+
+    final tempDir = await getTemporaryDirectory();
+
+    for (int i = 0; i < productsWithImage.length; i++) {
+      final p = productsWithImage[i];
+      try {
+        final uri = Uri.parse(p.image);
+        final resp = await http.get(uri);
+        if (resp.statusCode == 200) {
+          final file = File('${tempDir.path}/cat_${cat.id}_img_$i.jpg');
+          await file.writeAsBytes(resp.bodyBytes, flush: true);
+          files.add(XFile(file.path));
+        }
+      } catch (_) {
+        // skip failed image
+      }
+    }
+
+    return files;
+  }
+
+  // --- WHATSAPP: ASK MARGIN % THEN SHARE ---
+  void _openWhatsappMarginDialog(CatalogueModel cat) {
+    if (cat.products.isEmpty) {
+      Get.snackbar(
+        "Empty catalogue",
+        "Add products before sharing.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final TextEditingController marginCtrl = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "WhatsApp Catalogue",
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Enter your reselling margin in percentage.\nWe'll add it on top of every product price.",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: marginCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Margin (%)",
+                hintText: "Example: 20",
+                suffixText: "%",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              final double marginPercent =
+                  double.tryParse(marginCtrl.text.trim()) ?? 0;
+              Get.back();
+              _shareCatalogueOnWhatsApp(cat, marginPercent);
+            },
+            child: const Text("Share", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WHATSAPP CATALOGUE:
+  // 1) Copy TEXT (with margin) to clipboard
+  // 2) Share IMAGES as files (no links)
+  Future<void> _shareCatalogueOnWhatsApp(
+    CatalogueModel cat,
+    double marginPercent,
+  ) async {
+    if (cat.products.isEmpty) {
+      Get.snackbar(
+        "Empty catalogue",
+        "Add products before sharing.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    // 1) Build text (NO image links)
+    final buffer = StringBuffer();
+
+    buffer.writeln("📦 *${cat.name}*");
+    if (cat.description.isNotEmpty) {
+      buffer.writeln(cat.description);
+    }
+    buffer.writeln(
+      "Total items: ${cat.products.length} • Margin: ${marginPercent.toStringAsFixed(0)}%",
+    );
+    buffer.writeln("");
+    buffer.writeln("🛍 *Catalogue Items*:");
+    buffer.writeln("");
+
+    for (int i = 0; i < cat.products.length; i++) {
+      final p = cat.products[i];
+
+      final double basePrice = double.tryParse(p.price) ?? 0;
+      final double finalPrice = basePrice * (1 + marginPercent / 100);
+
+      buffer.writeln("${i + 1}. *${p.name}*");
+      buffer.writeln("   Price: ₹${finalPrice.toStringAsFixed(0)}");
+
+      if (p.shortDescription.isNotEmpty) {
+        buffer.writeln("   ${p.shortDescription}");
+      }
+
+      buffer.writeln("");
+    }
+
+    buffer.writeln("– ${cat.name}");
+
+    final text = buffer.toString();
+
+    // ✅ Copy text to clipboard
+    await Clipboard.setData(ClipboardData(text: text));
+
+    // 2) Download product images & share
+    Get.showOverlay(
+      asyncFunction: () async {
+        try {
+          final xFiles = await _downloadProductImages(cat);
+
+          if (xFiles.isEmpty) {
+            // No images, fallback to just text
+            Get.snackbar(
+              "Copied text",
+              "Catalogue text copied. No images found to share.",
+              snackPosition: SnackPosition.BOTTOM,
+            );
+            await Share.share(text);
+            return;
+          }
+
+          // Share only images; user will paste text manually in WhatsApp
+          await Share.shareXFiles(
+            xFiles,
+            text: "", // no text, because we already copied it for manual paste
+          );
+
+          Get.snackbar(
+            "Ready on WhatsApp",
+            "Images shared. Text is copied — just paste it in WhatsApp.",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+        } catch (e) {
+          Get.snackbar(
+            "Share Error",
+            "Failed to share images: $e",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      },
+      loadingWidget: Center(
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                color: Color.fromARGB(255, 185, 28, 224),
+                strokeWidth: 2,
+              ),
+              SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- 📸 SHARE COLLAGE (IMAGES ONLY) ---
+  Future<void> _shareCatalogueCollage(CatalogueModel cat) async {
+    if (cat.products.isEmpty) {
+      Get.snackbar(
+        "Empty catalogue",
+        "Add products before sharing collage.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    Get.showOverlay(
+      asyncFunction: () async {
+        try {
+          final file = await CollageService.createCatalogueCollage(
+            products: cat.products.toList(),
+          );
+
+          await Share.shareXFiles([
+            XFile(file.path),
+          ], text: "${cat.name} – Product Collage");
+        } catch (e) {
+          Get.snackbar(
+            "Collage Error",
+            "Failed to create collage: $e",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      },
+      loadingWidget: Center(
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                color: Color.fromARGB(255, 185, 28, 224),
+                strokeWidth: 2,
+              ),
+              SizedBox(height: 12),
             ],
           ),
         ),
@@ -553,19 +654,16 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                   ),
                 ),
               ),
-              // --- SHARE SUMMARY ---
+
+              // WHATSAPP CATALOGUE (TEXT + separate IMAGES)
               ListTile(
-                leading: const Icon(
-                  Iconsax.share,
-                  size: 20,
-                  color: accentColor,
-                ),
+                leading: const Icon(Iconsax.sms, size: 20, color: accentColor),
                 title: const Text(
-                  "Share summary",
+                  "Share on WhatsApp",
                   style: TextStyle(fontFamily: 'Poppins'),
                 ),
                 subtitle: Text(
-                  "Share name + number of products",
+                  "Copies text, shares product images",
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 11,
@@ -574,12 +672,36 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 ),
                 onTap: () {
                   Get.back();
-                  final text =
-                      "Catalogue: ${cat.name}\nProducts: ${cat.products.length}\nCreated: ${_formatDate(cat.createdAt)}";
-                  Share.share(text);
+                  _openWhatsappMarginDialog(cat);
                 },
               ),
-              // --- DOWNLOAD PDF CATALOGUE ---
+
+              // SHARE COLLAGE
+              ListTile(
+                leading: const Icon(
+                  Iconsax.gallery,
+                  size: 20,
+                  color: accentColor,
+                ),
+                title: const Text(
+                  "Share Collage",
+                  style: TextStyle(fontFamily: 'Poppins'),
+                ),
+                subtitle: Text(
+                  "Create 3×3 photo grid",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                onTap: () {
+                  Get.back();
+                  _shareCatalogueCollage(cat);
+                },
+              ),
+
+              // PDF
               ListTile(
                 leading: const Icon(
                   Iconsax.document_download,
@@ -603,7 +725,8 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                   _openPdfMarginDialog(cat);
                 },
               ),
-              // --- DELETE CATALOGUE ---
+
+              // DELETE
               ListTile(
                 leading: const Icon(Iconsax.trash, size: 20, color: Colors.red),
                 title: const Text(
@@ -646,156 +769,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCatalogueCard(CatalogueModel cat) {
-    final productCount = cat.products.length;
-    final created = _formatDate(cat.createdAt);
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () {
-        Get.to(() => CatalogueDetailsPage(catalogueId: cat.id));
-      },
-      onLongPress: () => _showCatalogueActionsSheet(cat),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Icon + gradient circle
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFEB2A7E), Color(0xFF4A317E)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: const Icon(
-                Iconsax.folder_2,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Text + chips
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    cat.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (cat.description.isNotEmpty)
-                    Text(
-                      cat.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Iconsax.box,
-                              size: 12,
-                              color: Color(0xFF4A317E),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "$productCount item${productCount == 1 ? '' : 's'}",
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontFamily: 'Poppins',
-                                color: Color(0xFF4A317E),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Iconsax.calendar_1,
-                              size: 12,
-                              color: Colors.black54,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              created,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontFamily: 'Poppins',
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Iconsax.more, size: 18),
-              onPressed: () => _showCatalogueActionsSheet(cat),
-            ),
-          ],
         ),
       ),
     );
@@ -874,102 +847,45 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       ),
       body: Column(
         children: [
-          _buildHeader(),
-          _buildSearchAndSortBar(),
+          // Header with totals
+          Obx(() {
+            final totalCats = catalogueController.myCatalogues.length;
+            final totalProducts = catalogueController.myCatalogues.fold<int>(
+              0,
+              (sum, cat) => sum + cat.products.length,
+            );
+            return CatalogueHeader(
+              totalCatalogues: totalCats,
+              totalProducts: totalProducts,
+            );
+          }),
+
+          // Search & sort
+          CatalogueSearchAndSortBar(
+            searchController: _searchController,
+            searchQuery: _searchQuery,
+            onSearchChanged: (value) {
+              setState(() => _searchQuery = value);
+            },
+            currentSort: _currentSort,
+            onSortChanged: (value) {
+              setState(() => _currentSort = value);
+            },
+          ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
           Expanded(
             child: Obx(() {
               final items = _buildFilteredSortedList();
 
               if (catalogueController.myCatalogues.isEmpty) {
-                // Real empty state (no catalogues at all)
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Iconsax.folder_open,
-                          size: 64,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "No catalogues yet",
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Create a catalogue and start adding products for your customers.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          onPressed: _openCreateCatalogueDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: accentColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          icon: const Icon(Iconsax.add, color: Colors.white),
-                          label: const Text(
-                            "Create Catalogue",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                return CatalogueEmptyState(
+                  onCreatePressed: _openCreateCatalogueDialog,
                 );
               }
 
               if (items.isEmpty) {
-                // Search / sort yielded nothing
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Iconsax.search_normal_1,
-                          size: 52,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "No matching catalogues",
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Try a different name or clear the search.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                return const CatalogueSearchEmptyState();
               }
 
               return ListView.builder(
@@ -977,7 +893,14 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final cat = items[index];
-                  return _buildCatalogueCard(cat);
+                  return CatalogueCard(
+                    cat: cat,
+                    onTap: () {
+                      Get.to(() => CatalogueDetailsPage(catalogueId: cat.id));
+                    },
+                    onMorePressed: () => _showCatalogueActionsSheet(cat),
+                    onLongPress: () => _showCatalogueActionsSheet(cat),
+                  );
                 },
               );
             }),

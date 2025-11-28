@@ -244,7 +244,8 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
                                 onTap: () {
                                   controller.removeProductFromCatalogue(
                                     widget.catalogueId,
-                                    product.id.toString(), // ✅ FIXED
+                                    product.id
+                                        .toString(), // ✅ int, matches controller
                                   );
                                 },
                                 child: Container(
