@@ -4,13 +4,14 @@ import 'package:iconsax/iconsax.dart';
 
 // --- MODEL IMPORT ---
 import 'package:kakiso_reseller_app/models/user.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
 
-// --- SCREEN IMPORTS --- // Ensure this file exists and is named correctly
+// --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // Ensure this exists
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart'; // Ensure this exists
-// import 'package:kakiso_reseller_app/screens/dashboard/profile/profile.dart'; // Uncomment when you have a profile screen
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
+// Import the new Wishlist Screen
 
 // --- CONSTANTS ---
 const Color _activeIconColor = Color(0xFFE91E63);
@@ -19,29 +20,17 @@ final Color _inactiveColor = const Color.fromARGB(255, 0, 0, 0);
 class NavigationController extends GetxController {
   final UserData userData;
 
-  // Constructor requires UserData
   NavigationController({required this.userData});
 
   final Rx<int> selectedIndex = 0.obs;
 
-  // List of screens to display
   List<Widget> get screens => [
     HomePage(userData: userData),
-    CategoriesSection(
-      userData: userData,
-    ), // Ensure CategoriesSection accepts userData
-    ToolsSection(
-      userData: userData,
-    ), // Assuming ToolsSection doesn't need userData yet
-    CatalogueSection(
-      userData: userData,
-    ), // Assuming CatalogueSection doesn't need userData yet
-    const Center(
-      child: Text(
-        'Profile',
-        style: TextStyle(fontSize: 24, color: Colors.black),
-      ),
-    ),
+    CategoriesSection(userData: userData),
+    ToolsSection(userData: userData),
+    CatalogueSection(userData: userData),
+    // Replaced the Text widget with the new Screen
+    const WishlistScreen(),
   ];
 }
 
@@ -52,12 +41,9 @@ class NavigationMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize the controller with the passed userData
-    // usage of 'tag' is optional but good practice if you have multiple controllers
     final controller = Get.put(NavigationController(userData: userData));
 
     return Scaffold(
-      // Body observes the controller's state
       body: Obx(() => controller.screens[controller.selectedIndex.value]),
 
       bottomNavigationBar: ClipRRect(
@@ -114,14 +100,15 @@ class NavigationMenu extends StatelessWidget {
                 ),
                 label: 'Catalogue',
               ),
+              // Updated Label to Wishlist and Icon to Heart
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.profile_circle,
-                  Iconsax.user_octagon,
+                  Iconsax.heart,
+                  Iconsax.heart5,
                   4,
                   controller.selectedIndex.value,
                 ),
-                label: 'Profile',
+                label: 'Wishlist',
               ),
             ],
           ),
@@ -130,7 +117,6 @@ class NavigationMenu extends StatelessWidget {
     );
   }
 
-  /// Helper widget to build the custom icon with the "pill" indicator
   Widget _buildIcon(
     IconData inactiveIcon,
     IconData activeIcon,
@@ -138,7 +124,6 @@ class NavigationMenu extends StatelessWidget {
     int currentIndex,
   ) {
     bool isActive = index == currentIndex;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [

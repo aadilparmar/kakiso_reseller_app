@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
@@ -28,7 +29,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   String _selectedSortLabel = 'Popular'; // For Display
   String _orderBy = 'popularity'; // For API
   String _order = 'desc'; // For API
-
+  final catalogueController = Get.put(CatalogueController(), permanent: true);
   // Price Filter Range (Default 0 to 10,000)
   RangeValues _currentPriceRange = const RangeValues(0, 10000);
   final double _maxFilterLimit = 20000;
@@ -384,7 +385,24 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                         ),
                     itemBuilder: (context, index) {
                       final product = _products[index];
-                      return VerticalProductCard(product: product);
+                      return VerticalProductCard(
+                        product: product,
+                        availableCatalogues:
+                            catalogueController.catalogueNames, // List<String>
+                        onCatalogueSelected: (product, catalogueName, isNew) {
+                          if (isNew) {
+                            catalogueController.createCatalogueAndAddProduct(
+                              catalogueName,
+                              product,
+                            );
+                          } else {
+                            catalogueController.addProductToExistingCatalogue(
+                              catalogueName,
+                              product,
+                            );
+                          }
+                        },
+                      );
                     },
                   ),
           ),

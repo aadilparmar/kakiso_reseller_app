@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 
 // --- MODELS & SERVICES ---
 import 'package:kakiso_reseller_app/models/categories.dart';
@@ -55,6 +56,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
   final double _maxFilterLimit = 20000;
 
   final _storage = const FlutterSecureStorage();
+  final catalogueController = Get.put(CatalogueController(), permanent: true);
 
   @override
   void initState() {
@@ -342,13 +344,11 @@ class _CategoriesPageState extends State<CategoriesSection> {
       selected: isSelected,
       onSelected: (selected) {
         if (selected) {
-          // update the temporary sort/order using the provided callback
           setModalState(() {
             onTap(apiSort, apiOrder);
           });
         }
       },
-      // Better implementation for ChoiceChip in StatefulBuilder:
       labelStyle: TextStyle(
         color: isSelected ? Colors.white : Colors.black87,
         fontSize: 12,
@@ -362,8 +362,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
       ),
     );
   }
-
-  // Corrected Chip Builder for the Sheet
 
   // --- PDF LOGIC ---
   void _promptCreatePdf() {
@@ -601,12 +599,12 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         // --- SEARCH & FILTER BAR ---
                         SearchAndFilterBar(
                           controller: _searchController,
-                          onChanged: _onSearchChanged, // Connect Search Logic
+                          onChanged: _onSearchChanged,
                           onClear: () {
                             _searchController.clear();
                             _onSearchChanged();
                           },
-                          onFilter: _openFilterSheet, // Connect Filter Sheet
+                          onFilter: _openFilterSheet,
                         ),
                         const SizedBox(height: 12),
 
@@ -673,8 +671,28 @@ class _CategoriesPageState extends State<CategoriesSection> {
                                         crossAxisSpacing: 12,
                                       ),
                                   itemBuilder: (context, index) {
+                                    final product = _displayedProducts[index];
+
                                     return VerticalProductCard(
-                                      product: _displayedProducts[index],
+                                      product: product,
+                                      availableCatalogues:
+                                          catalogueController.catalogueNames,
+                                      onCatalogueSelected:
+                                          (p, catalogueName, isNew) {
+                                            if (isNew) {
+                                              catalogueController
+                                                  .createCatalogueAndAddProduct(
+                                                    catalogueName,
+                                                    p,
+                                                  );
+                                            } else {
+                                              catalogueController
+                                                  .addProductToExistingCatalogue(
+                                                    catalogueName,
+                                                    p,
+                                                  );
+                                            }
+                                          },
                                     );
                                   },
                                 ),

@@ -123,7 +123,7 @@ class _StorySectionState extends State<StorySection> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              "EXCLUSIVE COLLECTION",
+                              "FEATURED",
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 10,
@@ -183,9 +183,8 @@ class _StorySectionState extends State<StorySection> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            // --- NAVIGATION LOGIC ---
                             onPressed: () {
-                              Get.back(); // Close dialog
+                              Get.back();
                               Get.to(
                                 () => CategoryDetailsPage(
                                   categoryId: story.id,
@@ -209,7 +208,7 @@ class _StorySectionState extends State<StorySection> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: const [
                                 Text(
-                                  "Explore Collection",
+                                  "Explore Category",
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
@@ -248,87 +247,50 @@ class _StorySectionState extends State<StorySection> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8134AF),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Exclusive',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                      fontFamily: 'Poppins',
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Stories',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF8134AF),
-                      fontFamily: 'Poppins',
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Iconsax.lovely,
-                    color: Color(0xFFFF4C5E),
-                    size: 22,
-                  ),
-                ],
+            children: const [
+              // Purple Accent Bar
+              SizedBox(
+                width: 4,
+                height: 24,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(color: Color(0xFF8134AF)),
+                ),
               ),
-              // Watch All (Can link to Category Grid)
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8134AF).withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Watch All',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF8134AF),
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
+              SizedBox(width: 8),
+
+              Text(
+                'Featured',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              SizedBox(width: 6),
+              Text(
+                'Categories',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8134AF),
+                  fontFamily: 'Poppins',
                 ),
               ),
             ],
           ),
         ),
 
-        // --- HORIZONTAL LIST ---
+        // --- HORIZONTAL LIST WITHOUT "LIVE" BUBBLE ---
         Container(
           height: 115,
           margin: const EdgeInsets.only(top: 8),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.only(left: 16),
-            itemCount: _stories.length + 1,
+            itemCount: _stories.length, // ❗ Removed "+1" for live bubble
             itemBuilder: (context, index) {
-              if (index == 0) return _buildLiveBubble();
+              final story = _stories[index];
 
-              final story = _stories[index - 1];
               return GestureDetector(
                 onTap: () => _openStoryPreview(story),
                 child: Container(
@@ -345,8 +307,6 @@ class _StorySectionState extends State<StorySection> {
                               Color(0xFFDD2A7B),
                               Color(0xFF8134AF),
                             ],
-                            begin: Alignment.bottomLeft,
-                            end: Alignment.topRight,
                           ),
                         ),
                         child: Container(
@@ -359,8 +319,6 @@ class _StorySectionState extends State<StorySection> {
                             radius: 32,
                             backgroundColor: Colors.grey[100],
                             backgroundImage: NetworkImage(story.imageUrl),
-                            onBackgroundImageError: (_, __) =>
-                                const Icon(Icons.error),
                           ),
                         ),
                       ),
@@ -372,7 +330,6 @@ class _StorySectionState extends State<StorySection> {
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
                             fontFamily: 'Poppins',
                           ),
                           maxLines: 1,
@@ -388,64 +345,6 @@ class _StorySectionState extends State<StorySection> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildLiveBubble() {
-    return Container(
-      margin: const EdgeInsets.only(right: 16),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey.shade300, width: 2),
-                ),
-                child: const CircleAvatar(
-                  radius: 33,
-                  backgroundColor: Colors.black,
-                  child: Icon(Iconsax.video5, color: Colors.white, size: 28),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: const Text(
-                    "LIVE",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "Kakiso Live",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Poppins',
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/controllers/wishlist_controller.dart';
 import 'fullscreen_image_viewer.dart';
 
 class ProductImageSlider extends StatefulWidget {
@@ -20,8 +22,8 @@ class ProductImageSlider extends StatefulWidget {
 }
 
 class _ProductImageSliderState extends State<ProductImageSlider> {
-  // Controller to control the main big image
   late PageController _pageController;
+  final wishlistController = Get.put(WishlistController());
 
   @override
   void initState() {
@@ -42,26 +44,37 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
         : [widget.product.image];
 
     return SliverAppBar(
-      expandedHeight: 550, // Taller aspect ratio
+      expandedHeight: 550,
       backgroundColor: Colors.white,
       elevation: 0,
       pinned: true,
       stretch: true,
+
       leading: _buildGlassButton(
         icon: Icons.arrow_back,
         onTap: () => Get.back(),
       ),
+
       actions: [
-        _buildGlassButton(
-          icon: Iconsax.heart,
-          onTap: () {}, // Wishlist Logic
-        ),
-        const SizedBox(width: 16),
+        // ❤️ WISHLIST ICON WITH TOGGLE
+        Obx(() {
+          final isLiked = wishlistController.isWhishlisted(widget.product.id);
+
+          return _buildGlassButton(
+            icon: isLiked ? Iconsax.heart5 : Iconsax.heart,
+            onTap: () {
+              wishlistController.toggleWishlist(widget.product);
+            },
+          );
+        }),
+
+        const SizedBox(width: 12),
       ],
+
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
-            // --- 1. MAIN IMAGE SLIDER ---
+            // MAIN SLIDER
             Positioned.fill(
               child: PageView.builder(
                 controller: _pageController,
@@ -102,12 +115,12 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
               ),
             ),
 
-            // --- 2. GRADIENT SHADOW (Bottom) ---
+            // GRADIENT SHADOW
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
-              height: 120, // Increased height to accommodate thumbnails
+              height: 120,
               child: IgnorePointer(
                 child: Container(
                   decoration: BoxDecoration(
@@ -124,18 +137,17 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
               ),
             ),
 
-            // --- 3. THUMBNAIL STRIP ---
+            // THUMBNAILS
             if (imageList.length > 1)
               Positioned(
                 bottom: 24,
                 left: 0,
                 right: 0,
                 child: SizedBox(
-                  height: 60, // Height of the thumbnail strip
+                  height: 60,
                   child: Center(
-                    // Center the list horizontally
                     child: ListView.separated(
-                      shrinkWrap: true, // Only take necessary width
+                      shrinkWrap: true,
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -149,9 +161,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
 
                           return GestureDetector(
                             onTap: () {
-                              // Update Controller
                               widget.controller.currentImageIndex.value = index;
-                              // Animate Main Slider
                               _pageController.animateToPage(
                                 index,
                                 duration: const Duration(milliseconds: 300),
@@ -187,9 +197,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                                   fit: BoxFit.cover,
                                   color: isSelected
                                       ? null
-                                      : Colors.black.withOpacity(
-                                          0.3,
-                                        ), // Dim inactive
+                                      : Colors.black.withOpacity(0.3),
                                   colorBlendMode: BlendMode.darken,
                                 ),
                               ),
@@ -207,6 +215,9 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // GLASS BUTTON WIDGET
+  // ---------------------------------------------------------------------------
   Widget _buildGlassButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -229,7 +240,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
             ),
           ],
         ),
-        child: Icon(icon, color: Colors.black, size: 20),
+        child: Icon(icon, color: Colors.black, size: 22),
       ),
     );
   }

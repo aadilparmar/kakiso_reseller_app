@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
+// CONTROLLERS
+import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
+
+// MODELS
 import 'package:kakiso_reseller_app/models/product.dart';
+
+// WIDGETS
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
-// import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart'; // Use this if the above is wrong
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+
+// SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class AllProductsScreen extends StatefulWidget {
   final String title;
@@ -38,6 +46,12 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   RangeValues _currentPriceRange = const RangeValues(0, 20000);
   final double _maxFilterLimit = 20000;
 
+  // Catalogue controller
+  final CatalogueController catalogueController = Get.put(
+    CatalogueController(),
+    permanent: true,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -50,14 +64,15 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   }
 
   void _determineLabel() {
-    if (_orderBy == 'date')
+    if (_orderBy == 'date') {
       _selectedSortLabel = 'Newest';
-    else if (_orderBy == 'popularity')
+    } else if (_orderBy == 'popularity') {
       _selectedSortLabel = 'Popular';
-    else if (_orderBy == 'price' && _order == 'asc')
+    } else if (_orderBy == 'price' && _order == 'asc') {
       _selectedSortLabel = 'Price: Low to High';
-    else if (_orderBy == 'price' && _order == 'desc')
+    } else if (_orderBy == 'price' && _order == 'desc') {
       _selectedSortLabel = 'Price: High to Low';
+    }
   }
 
   Future<void> _loadData() async {
@@ -395,7 +410,25 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                           crossAxisSpacing: 16,
                         ),
                     itemBuilder: (context, index) {
-                      return VerticalProductCard(product: _products[index]);
+                      final product = _products[index];
+
+                      return VerticalProductCard(
+                        product: product,
+                        availableCatalogues: catalogueController.catalogueNames,
+                        onCatalogueSelected: (p, catalogueName, isNew) {
+                          if (isNew) {
+                            catalogueController.createCatalogueAndAddProduct(
+                              catalogueName,
+                              p,
+                            );
+                          } else {
+                            catalogueController.addProductToExistingCatalogue(
+                              catalogueName,
+                              p,
+                            );
+                          }
+                        },
+                      );
                     },
                   ),
           ),

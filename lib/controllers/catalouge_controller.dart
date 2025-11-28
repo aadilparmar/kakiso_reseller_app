@@ -78,6 +78,11 @@ class CatalogueController extends GetxController {
     }
   }
 
+  /// Handy getter for just the catalogue names (used in bottom sheets / dropdowns).
+  List<String> get catalogueNames => myCatalogues
+      .map((c) => (c.name.isEmpty ? 'Untitled Catalogue' : c.name))
+      .toList();
+
   /// Create a new empty catalogue
   void createCatalogue(String name, String description) {
     final id = _generateId();
@@ -87,6 +92,28 @@ class CatalogueController extends GetxController {
       description: description,
       createdAt: DateTime.now(),
       products: [],
+    );
+
+    myCatalogues.add(catalogue);
+    myCatalogues.refresh();
+    _saveToStorage();
+  }
+
+  /// Create a new catalogue *and* add the given product to it.
+  ///
+  /// Used when user taps "Create New Catalogue" from product card.
+  void createCatalogueAndAddProduct(
+    String name,
+    ProductModel product, {
+    String description = '',
+  }) {
+    final id = _generateId();
+    final catalogue = CatalogueModel(
+      id: id,
+      name: name,
+      description: description,
+      createdAt: DateTime.now(),
+      products: [product],
     );
 
     myCatalogues.add(catalogue);
@@ -112,7 +139,7 @@ class CatalogueController extends GetxController {
       (p) => p.id.toString() == product.id.toString(),
     );
     if (alreadyExists) {
-      // You already handled snackbar in UI if you want; so just return
+      // Optional: Show a snackbar in UI if you like
       return;
     }
 
@@ -127,6 +154,30 @@ class CatalogueController extends GetxController {
 
     myCatalogues.refresh();
     _saveToStorage();
+  }
+
+  /// Convenience: Add product to an *existing* catalogue by its name.
+  ///
+  /// This is useful when your UI is only dealing with catalogue names.
+  void addProductToExistingCatalogueByName(
+    String catalogueName,
+    ProductModel product,
+  ) {
+    try {
+      final cat = myCatalogues.firstWhere((c) => c.name == catalogueName);
+      addProductToCatalogue(cat.id, product);
+    } catch (_) {
+      // No catalogue with that name – do nothing (or you could create one).
+    }
+  }
+
+  /// Backwards-compatible wrapper so you can call:
+  ///   addProductToExistingCatalogue(catalogueName, product)
+  void addProductToExistingCatalogue(
+    String catalogueName,
+    ProductModel product,
+  ) {
+    addProductToExistingCatalogueByName(catalogueName, product);
   }
 
   /// Remove a product from a catalogue by productId
@@ -169,7 +220,6 @@ class CatalogueController extends GetxController {
       myCatalogues.refresh();
     } catch (e) {
       // If anything goes wrong, don't crash – just start fresh
-      // (You can add debugPrint here if you want)
     }
   }
 
