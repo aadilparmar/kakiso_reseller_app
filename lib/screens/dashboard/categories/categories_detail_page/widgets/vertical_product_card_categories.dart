@@ -8,6 +8,8 @@ import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_pa
 class VerticalProductCard extends StatelessWidget {
   final ProductModel product;
   final List<String> availableCatalogues;
+
+  /// Called when user selects an existing catalogue or creates a new one.
   final void Function(
     ProductModel product,
     String catalogueName,
@@ -15,18 +17,25 @@ class VerticalProductCard extends StatelessWidget {
   )
   onCatalogueSelected;
 
+  /// NEW: whether this product is selected in bulk mode.
+  final bool isSelected;
+
+  /// NEW: toggles selection when user taps the checkbox.
+  final VoidCallback? onSelectionToggle;
+
   const VerticalProductCard({
     super.key,
     required this.product,
     required this.availableCatalogues,
     required this.onCatalogueSelected,
+    required this.isSelected,
+    this.onSelectionToggle,
   });
 
   // --- DESIGN TOKENS ---
   static const Color kPrimaryColor = Color(0xFF4A317E);
   static const Color kAccentColor = Color(0xFFEB2A7E);
   static const Color kBlack = Color(0xFF1F2937);
-  // Using a very subtle grey for borders creates a "clean" look
   static final Color kBorderColor = Colors.grey.shade200;
   static const double kRadius = 16.0;
 
@@ -94,27 +103,29 @@ class VerticalProductCard extends StatelessWidget {
         );
       },
       child: Container(
-        // The outer container mimics a physical card with soft shadows
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(kRadius),
-          border: Border.all(color: kBorderColor, width: 1),
+          border: Border.all(
+            color: isSelected ? kPrimaryColor : kBorderColor,
+            width: isSelected ? 1.3 : 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4A317E).withOpacity(0.06),
+              color: (isSelected ? kPrimaryColor : const Color(0xFF4A317E))
+                  .withOpacity(isSelected ? 0.12 : 0.06),
               blurRadius: 20,
               offset: const Offset(0, 8),
               spreadRadius: -4,
             ),
           ],
         ),
-        // Clip behavior ensures the inner children (like images) respect the rounded corners
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ===========================
-            // 1. IMAGE SECTION (Expanded)
+            // 1. IMAGE SECTION
             // ===========================
             Expanded(
               child: Stack(
@@ -152,7 +163,7 @@ class VerticalProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Modern Glassmorphic Badge
+                  // Discount Badge
                   if (product.discountPercentage != null &&
                       product.discountPercentage! > 0)
                     Positioned(
@@ -185,12 +196,60 @@ class VerticalProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                  // Selection Checkbox (top-right)
+                  if (onSelectionToggle != null)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () {
+                          // prevent navigation, only toggle selection
+                          onSelectionToggle?.call();
+                        },
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? kPrimaryColor
+                                : Colors.white.withOpacity(0.95),
+                            border: Border.all(
+                              color: isSelected
+                                  ? kPrimaryColor
+                                  : Colors.grey.shade300,
+                              width: 1.3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.grey.shade400,
+                                ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
 
             // ===========================
-            // 2. HEADING SECTION
+            // 2. HEADING
             // ===========================
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -212,20 +271,17 @@ class VerticalProductCard extends StatelessWidget {
             ),
 
             // ===========================
-            // 3. PRICE SECTION (Subtle Background)
+            // 3. PRICE
             // ===========================
             Container(
               height: 44,
               decoration: BoxDecoration(
-                color: Colors
-                    .grey
-                    .shade50, // Slight tint to separate visuals from data
+                color: Colors.grey.shade50,
                 border: Border(top: BorderSide(color: kBorderColor)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Regular Price (Crossed out)
                   if (product.regularPrice.isNotEmpty &&
                       product.regularPrice != product.price)
                     Padding(
@@ -240,8 +296,6 @@ class VerticalProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                  // Selling Price
                   Text(
                     "₹${product.price}",
                     style: const TextStyle(
@@ -256,7 +310,7 @@ class VerticalProductCard extends StatelessWidget {
             ),
 
             // ===========================
-            // 4. BUTTONS SECTION (High Contrast)
+            // 4. BUTTONS (ICON-ONLY)
             // ===========================
             Container(
               height: 45,
@@ -265,42 +319,27 @@ class VerticalProductCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  // --- Add to Cart (Left - DARK) ---
+                  // Add to Cart (dark)
                   Expanded(
                     child: Material(
-                      color: kBlack, // Strong action color
+                      color: kBlack,
                       child: InkWell(
                         onTap: () {
                           cartController.addToCart(product);
                           _showAddedToCartPopup();
                         },
                         child: const Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Iconsax.bag_2,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                "ADD",
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
+                          child: Icon(
+                            Iconsax.bag_2,
+                            size: 18,
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // --- Catalog (Right - LIGHT) ---
+                  // Add to Catalogue / Share (light)
                   Expanded(
                     child: Material(
                       color: Colors.white,
@@ -313,25 +352,10 @@ class VerticalProductCard extends StatelessWidget {
                             ),
                           ),
                           child: const Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Iconsax.book_1,
-                                  size: 16,
-                                  color: kPrimaryColor,
-                                ),
-                                SizedBox(width: 6),
-                                Text(
-                                  "SHARE", // 'Share' or 'Catalog' usually performs better
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w500,
-                                    color: kPrimaryColor,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
+                            child: Icon(
+                              Iconsax.book_1,
+                              size: 18,
+                              color: kPrimaryColor,
                             ),
                           ),
                         ),

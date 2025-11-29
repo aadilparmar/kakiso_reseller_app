@@ -42,6 +42,9 @@ class _CategoriesPageState extends State<CategoriesSection> {
   // This list holds the products after local search filtering
   List<ProductModel> _displayedProducts = [];
 
+  // For selection
+  final Set<int> _selectedProductIds = {};
+
   String? errorMessage;
 
   int selectedIndex = 0;
@@ -97,6 +100,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
       isProductsLoading = true;
       _categoryProducts = [];
       _displayedProducts = [];
+      _selectedProductIds.clear(); // reset selection when category changes
     });
 
     try {
@@ -133,14 +137,51 @@ class _CategoriesPageState extends State<CategoriesSection> {
   void _onSearchChanged() {
     final query = _searchController.text.toLowerCase();
     if (query.isEmpty) {
-      setState(() => _displayedProducts = _categoryProducts);
+      setState(() {
+        _displayedProducts = _categoryProducts;
+        // Optional: clear selection when search changes
+        _selectedProductIds.removeWhere(
+          (id) => !_displayedProducts.any((p) => p.id == id),
+        );
+      });
     } else {
       setState(() {
         _displayedProducts = _categoryProducts.where((p) {
           return p.name.toLowerCase().contains(query);
         }).toList();
+        _selectedProductIds.removeWhere(
+          (id) => !_displayedProducts.any((p) => p.id == id),
+        );
       });
     }
+  }
+
+  // --- SELECT ALL / UNSELECT ALL ---
+  bool get _isAllSelected {
+    if (_displayedProducts.isEmpty) return false;
+    return _displayedProducts.every((p) => _selectedProductIds.contains(p.id));
+  }
+
+  void _toggleSelectAll(bool? value) {
+    setState(() {
+      if (value == true) {
+        // Select all visible products
+        for (final p in _displayedProducts) {
+          _selectedProductIds.add(p.id);
+        }
+      } else {
+        // Unselect all visible products
+        for (final p in _displayedProducts) {
+          _selectedProductIds.remove(p.id);
+        }
+      }
+    });
+  }
+
+  void _unselectAll() {
+    setState(() {
+      _selectedProductIds.clear();
+    });
   }
 
   // 4. Filter Bottom Sheet
@@ -303,6 +344,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         _currentPriceRange = tempRange;
                         _orderBy = tempOrderBy;
                         _order = tempOrder;
+                        _selectedProductIds.clear();
                       });
                       Get.back(); // Close sheet
                       _loadProductsForCategory(
@@ -360,6 +402,247 @@ class _CategoriesPageState extends State<CategoriesSection> {
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: isSelected ? accentColor : Colors.transparent),
       ),
+    );
+  }
+
+  // --- BATCH: ADD SELECTED TO CATALOGUE ---
+  void _onAddSelectedToCatalogue() {
+    if (_selectedProductIds.isEmpty) {
+      Get.snackbar(
+        'No products selected',
+        'Please select at least one product.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final selectedProducts = _displayedProducts
+        .where((p) => _selectedProductIds.contains(p.id))
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final availableCatalogues = catalogueController.catalogueNames;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Text(
+                'Add ${selectedProducts.length} products to catalogue',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (availableCatalogues.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade100),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Iconsax.folder_open,
+                        size: 30,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        "No catalogues found",
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ...availableCatalogues.map(
+                  (name) => Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade100),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Iconsax.book,
+                          color: accentColor,
+                          size: 18,
+                        ),
+                      ),
+                      title: Text(
+                        name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Iconsax.arrow_right_3,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                      onTap: () {
+                        // Add all selected products to this catalogue
+                        for (final p in selectedProducts) {
+                          catalogueController.addProductToExistingCatalogue(
+                            name,
+                            p,
+                          );
+                        }
+                        Navigator.pop(ctx);
+                        Get.snackbar(
+                          'Added to catalogue',
+                          '${selectedProducts.length} products added to "$name".',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showCreateNewCatalogueDialogForSelected(selectedProducts);
+                  },
+                  icon: const Icon(Iconsax.add_circle, size: 20),
+                  label: const Text('Create New Catalogue'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCreateNewCatalogueDialogForSelected(
+    List<ProductModel> selectedProducts,
+  ) {
+    final TextEditingController nameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'New Catalogue',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          content: TextField(
+            controller: nameController,
+            autofocus: true,
+            style: const TextStyle(fontFamily: 'Poppins'),
+            decoration: InputDecoration(
+              labelText: 'Catalogue Name',
+              hintText: 'e.g. Diwali Offers',
+              filled: true,
+              fillColor: const Color.fromARGB(185, 250, 250, 250),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: accentColor),
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty) {
+                  // Create catalogue with first product, then add rest
+                  catalogueController.createCatalogueAndAddProduct(
+                    name,
+                    selectedProducts.first,
+                  );
+                  for (int i = 1; i < selectedProducts.length; i++) {
+                    catalogueController.addProductToExistingCatalogue(
+                      name,
+                      selectedProducts[i],
+                    );
+                  }
+                  Navigator.pop(ctx);
+                  Get.snackbar(
+                    'Catalogue created',
+                    '${selectedProducts.length} products added to "$name".',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -608,6 +891,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         ),
                         const SizedBox(height: 12),
 
+                        // TITLE + COUNT
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -633,6 +917,94 @@ class _CategoriesPageState extends State<CategoriesSection> {
                               ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+
+                        // --- SELECT ALL / UNSELECT ALL / ADD TO CATALOGUE ---
+                        Row(
+                          children: [
+                            // Left side: select/unselect (scrollable if small width)
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Checkbox(
+                                          value: _isAllSelected,
+                                          onChanged: (val) =>
+                                              _toggleSelectAll(val),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'Select All',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'Poppins',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 12),
+                                    TextButton(
+                                      onPressed: _selectedProductIds.isEmpty
+                                          ? null
+                                          : _unselectAll,
+                                      child: const Text(
+                                        'Unselect All',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontFamily: 'Poppins',
+                                        ),
+                                      ),
+                                    ),
+                                    if (_selectedProductIds.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 4),
+                                        child: Text(
+                                          '(${_selectedProductIds.length} selected)',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 8),
+
+                            // Right side: primary button
+                            SizedBox(
+                              height: 36,
+                              child: ElevatedButton.icon(
+                                onPressed: _onAddSelectedToCatalogue,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: accentColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                icon: const Icon(Iconsax.book_saved, size: 16),
+                                label: const Text(
+                                  'Add to Catalogue',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
                         const SizedBox(height: 10),
 
                         Expanded(
@@ -672,11 +1044,25 @@ class _CategoriesPageState extends State<CategoriesSection> {
                                       ),
                                   itemBuilder: (context, index) {
                                     final product = _displayedProducts[index];
+                                    final isSelected = _selectedProductIds
+                                        .contains(product.id);
 
                                     return VerticalProductCard(
                                       product: product,
                                       availableCatalogues:
                                           catalogueController.catalogueNames,
+                                      isSelected: isSelected,
+                                      onSelectionToggle: () {
+                                        setState(() {
+                                          if (isSelected) {
+                                            _selectedProductIds.remove(
+                                              product.id,
+                                            );
+                                          } else {
+                                            _selectedProductIds.add(product.id);
+                                          }
+                                        });
+                                      },
                                       onCatalogueSelected:
                                           (p, catalogueName, isNew) {
                                             if (isNew) {

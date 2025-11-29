@@ -29,10 +29,16 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   String _selectedSortLabel = 'Popular'; // For Display
   String _orderBy = 'popularity'; // For API
   String _order = 'desc'; // For API
+
+  // Catalogue controller
   final catalogueController = Get.put(CatalogueController(), permanent: true);
+
   // Price Filter Range (Default 0 to 10,000)
   RangeValues _currentPriceRange = const RangeValues(0, 10000);
   final double _maxFilterLimit = 20000;
+
+  // NEW: Selected product IDs for checkbox state in cards
+  final Set<int> _selectedProductIds = {};
 
   @override
   void initState() {
@@ -43,7 +49,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   Future<void> _fetchCategoryProducts() async {
     setState(() => _isLoading = true);
     try {
-      // Pass the state variables to the API
       final products = await ApiService.fetchProductsByCategory(
         widget.categoryId,
         orderBy: _orderBy,
@@ -60,6 +65,10 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
         setState(() {
           _products = products;
           _isLoading = false;
+          // Clear selections if list changed
+          _selectedProductIds.removeWhere(
+            (id) => !_products.any((p) => p.id == id),
+          );
         });
       }
     } catch (e) {
@@ -128,12 +137,10 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
   // --- 2. FILTER BOTTOM SHEET ---
   void _openFilterSheet() {
-    // Temp variable to hold change before applying
     RangeValues tempRange = _currentPriceRange;
 
     Get.bottomSheet(
       StatefulBuilder(
-        // Needed to update slider inside bottom sheet
         builder: (context, setModalState) {
           return Container(
             padding: const EdgeInsets.all(24),
@@ -158,7 +165,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     ),
                     TextButton(
                       onPressed: () {
-                        // Reset Logic
                         setModalState(() {
                           tempRange = const RangeValues(0, 10000);
                         });
@@ -178,7 +184,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                 ),
                 const SizedBox(height: 10),
 
-                // Price Labels
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -193,7 +198,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                   ],
                 ),
 
-                // Slider
                 RangeSlider(
                   values: tempRange,
                   min: 0,
@@ -214,7 +218,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
                 const SizedBox(height: 24),
 
-                // Apply Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -253,7 +256,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB), // Light grey background
+      backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -271,7 +274,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             fontSize: 16,
           ),
         ),
-        // Removed Actions (Search/Cart) as requested
       ),
       body: Column(
         children: [
@@ -281,12 +283,12 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             child: Row(
               children: [
-                // Sort Dropdown
+                // Sort
                 Expanded(
                   child: GestureDetector(
                     onTap: _openSortSheet,
                     child: Container(
-                      color: Colors.transparent, // Hit test area
+                      color: Colors.transparent,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -297,7 +299,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            _selectedSortLabel, // Dynamic Label
+                            _selectedSortLabel,
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -317,10 +319,9 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                   ),
                 ),
 
-                // Divider
                 Container(height: 20, width: 1, color: Colors.grey.shade300),
 
-                // Filter Button
+                // Filter
                 Expanded(
                   child: GestureDetector(
                     onTap: _openFilterSheet,
@@ -344,7 +345,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                               color: Colors.black87,
                             ),
                           ),
-                          // Show dot if filter is active
                           if (_currentPriceRange.start > 0 ||
                               _currentPriceRange.end < 20000)
                             Container(
@@ -364,7 +364,8 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEEEEEE)), // Clean separator
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
           // --- 2. PRODUCT GRID ---
           Expanded(
             child: _isLoading
@@ -379,16 +380,26 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.58, // Tweaked for vertical card
+                          childAspectRatio: 0.58,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
                         ),
                     itemBuilder: (context, index) {
                       final product = _products[index];
+
                       return VerticalProductCard(
                         product: product,
-                        availableCatalogues:
-                            catalogueController.catalogueNames, // List<String>
+                        availableCatalogues: catalogueController.catalogueNames,
+                        isSelected: _selectedProductIds.contains(product.id),
+                        onSelectionToggle: () {
+                          setState(() {
+                            if (_selectedProductIds.contains(product.id)) {
+                              _selectedProductIds.remove(product.id);
+                            } else {
+                              _selectedProductIds.add(product.id);
+                            }
+                          });
+                        },
                         onCatalogueSelected: (product, catalogueName, isNew) {
                           if (isNew) {
                             catalogueController.createCatalogueAndAddProduct(
@@ -430,7 +441,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
           const SizedBox(height: 8),
           TextButton(
             onPressed: () {
-              // Reset filters logic
               setState(() {
                 _currentPriceRange = const RangeValues(0, 20000);
                 _orderBy = 'popularity';

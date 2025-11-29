@@ -11,7 +11,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart
 import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
-// Import the new Wishlist Screen
 
 // --- CONSTANTS ---
 const Color _activeIconColor = Color(0xFFE91E63);
@@ -22,6 +21,7 @@ class NavigationController extends GetxController {
 
   NavigationController({required this.userData});
 
+  // selectedIndex is reactive
   final Rx<int> selectedIndex = 0.obs;
 
   List<Widget> get screens => [
@@ -29,7 +29,6 @@ class NavigationController extends GetxController {
     CategoriesSection(userData: userData),
     ToolsSection(userData: userData),
     CatalogueSection(userData: userData),
-    // Replaced the Text widget with the new Screen
     const WishlistScreen(),
   ];
 }
@@ -37,11 +36,22 @@ class NavigationController extends GetxController {
 class NavigationMenu extends StatelessWidget {
   final UserData userData;
 
-  const NavigationMenu({super.key, required this.userData});
+  /// 🔥 NEW: allow forcing a tab on open (0 = Home, 3 = Catalogue, etc.)
+  final int initialIndex;
+
+  const NavigationMenu({
+    super.key,
+    required this.userData,
+    this.initialIndex = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // Create or retrieve the NavigationController
     final controller = Get.put(NavigationController(userData: userData));
+
+    // Ensure correct tab is selected when this screen is shown
+    controller.selectedIndex.value = initialIndex;
 
     return Scaffold(
       body: Obx(() => controller.screens[controller.selectedIndex.value]),
@@ -100,7 +110,6 @@ class NavigationMenu extends StatelessWidget {
                 ),
                 label: 'Catalogue',
               ),
-              // Updated Label to Wishlist and Icon to Heart
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.heart,

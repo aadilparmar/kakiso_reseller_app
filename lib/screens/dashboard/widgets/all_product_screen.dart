@@ -18,14 +18,13 @@ import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class AllProductsScreen extends StatefulWidget {
   final String title;
-  // We pass initial sort settings to define the "type" of list (e.g., Newest, Trending)
   final String initialOrderBy;
   final String initialOrder;
 
   const AllProductsScreen({
     super.key,
     required this.title,
-    this.initialOrderBy = 'date', // Default to Newest
+    this.initialOrderBy = 'date',
     this.initialOrder = 'desc',
   });
 
@@ -37,12 +36,12 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
-  // --- STATE VARIABLES ---
+  // --- SORT STATE ---
   late String _orderBy;
   late String _order;
-  String _selectedSortLabel = 'Newest'; // Display text
+  String _selectedSortLabel = 'Newest';
 
-  // Filter State
+  // --- FILTER RANGE ---
   RangeValues _currentPriceRange = const RangeValues(0, 20000);
   final double _maxFilterLimit = 20000;
 
@@ -52,14 +51,15 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     permanent: true,
   );
 
+  // NEW: required for updated VerticalProductCard
+  final Set<int> _selectedProductIds = {};
+
   @override
   void initState() {
     super.initState();
-    // Initialize with constructor values
     _orderBy = widget.initialOrderBy;
     _order = widget.initialOrder;
     _determineLabel();
-
     _loadData();
   }
 
@@ -77,8 +77,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+
     try {
-      // Use the Generic API with dynamic parameters
       final products = await ApiService.fetchProducts(
         orderBy: _orderBy,
         order: _order,
@@ -90,19 +90,23 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
             : _currentPriceRange.end,
       );
 
-      if (mounted) {
-        setState(() {
-          _products = products;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _products = products;
+        _isLoading = false;
+
+        // Remove selections of items that are not in this list anymore
+        _selectedProductIds.removeWhere(
+          (id) => !_products.any((p) => p.id == id),
+        );
+      });
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      debugPrint("Error loading products: $e");
     }
   }
 
-  // --- 1. SORT BOTTOM SHEET ---
+  // --- SORT SHEET ---
   void _openSortSheet() {
     Get.bottomSheet(
       Container(
@@ -128,22 +132,21 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
             _buildSortOption("Newest First", "date", "desc"),
             _buildSortOption("Price: Low to High", "price", "asc"),
             _buildSortOption("Price: High to Low", "price", "desc"),
-            const SizedBox(height: 10),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSortOption(String label, String apiOrderBy, String apiOrder) {
-    final bool isSelected = _orderBy == apiOrderBy && _order == apiOrder;
+  Widget _buildSortOption(String label, String by, String order) {
+    final isSelected = _orderBy == by && _order == order;
+
     return ListTile(
-      contentPadding: EdgeInsets.zero,
       title: Text(
         label,
         style: TextStyle(
-          fontFamily: 'Poppins',
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          fontFamily: 'Poppins',
           color: isSelected ? accentColor : Colors.black87,
         ),
       ),
@@ -151,16 +154,16 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
       onTap: () {
         setState(() {
           _selectedSortLabel = label;
-          _orderBy = apiOrderBy;
-          _order = apiOrder;
+          _orderBy = by;
+          _order = order;
         });
         Get.back();
-        _loadData(); // Refresh
+        _loadData();
       },
     );
   }
 
-  // --- 2. FILTER BOTTOM SHEET ---
+  // --- FILTER SHEET ---
   void _openFilterSheet() {
     RangeValues tempRange = _currentPriceRange;
 
@@ -175,7 +178,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -201,35 +203,22 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                const Text(
-                  "Price Range",
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Price Range",
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
                 ),
-                const SizedBox(height: 10),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "₹${tempRange.start.toInt()}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      "₹${tempRange.end.toInt()}+",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 8),
 
                 RangeSlider(
                   values: tempRange,
                   min: 0,
                   max: _maxFilterLimit,
-                  divisions: 20,
                   activeColor: accentColor,
-                  inactiveColor: accentColor.withOpacity(0.2),
                   labels: RangeLabels(
                     "₹${tempRange.start.toInt()}",
                     "₹${tempRange.end.toInt()}",
@@ -239,30 +228,28 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                   },
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _currentPriceRange = tempRange;
+                    });
+                    Get.back();
+                    _loadData();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    onPressed: () {
-                      setState(() => _currentPriceRange = tempRange);
-                      Get.back();
-                      _loadData(); // Refresh
-                    },
-                    child: const Text(
-                      "Apply Filter",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  child: const Text(
+                    "Apply Filter",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -274,6 +261,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     );
   }
 
+  // --- UI ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -288,9 +276,9 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         title: Text(
           widget.title,
           style: const TextStyle(
-            color: Colors.black,
             fontFamily: 'Poppins',
             fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
         actions: [
@@ -300,131 +288,123 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           ),
         ],
       ),
+
       body: Column(
         children: [
-          // --- SORT & FILTER BAR ---
+          // SORT & FILTER BAR
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             child: Row(
               children: [
-                // Sort Button
+                // SORT
                 Expanded(
                   child: GestureDetector(
                     onTap: _openSortSheet,
-                    child: Container(
-                      color: Colors.transparent,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Iconsax.sort,
-                            size: 18,
-                            color: Colors.black87,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Iconsax.sort, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedSortLabel,
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _selectedSortLabel,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Poppins',
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.keyboard_arrow_down, size: 16),
+                      ],
                     ),
                   ),
                 ),
 
                 Container(height: 20, width: 1, color: Colors.grey.shade300),
 
-                // Filter Button
+                // FILTER
                 Expanded(
                   child: GestureDetector(
                     onTap: _openFilterSheet,
-                    child: Container(
-                      color: Colors.transparent,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Iconsax.filter,
-                            size: 18,
-                            color: Colors.black87,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Iconsax.filter, size: 18),
+                        const SizedBox(width: 6),
+                        const Text(
+                          "Filter",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            "Filter",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Poppins',
-                              color: Colors.black87,
+                        ),
+                        if (_currentPriceRange.start > 0 ||
+                            _currentPriceRange.end < _maxFilterLimit)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: accentColor,
+                              shape: BoxShape.circle,
                             ),
                           ),
-                          if (_currentPriceRange.start > 0 ||
-                              _currentPriceRange.end < _maxFilterLimit)
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: accentColor,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          const Divider(height: 1),
 
-          // --- PRODUCT GRID ---
+          // PRODUCT GRID
           Expanded(
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: accentColor),
                   )
-                : _products.isEmpty
-                ? const Center(child: Text("No products found."))
                 : GridView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     itemCount: _products.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.58,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
+                          childAspectRatio: 0.58,
                         ),
-                    itemBuilder: (context, index) {
-                      final product = _products[index];
+                    itemBuilder: (_, i) {
+                      final product = _products[i];
 
                       return VerticalProductCard(
                         product: product,
                         availableCatalogues: catalogueController.catalogueNames,
-                        onCatalogueSelected: (p, catalogueName, isNew) {
+
+                        // NEW REQUIRED PARAMETER
+                        isSelected: _selectedProductIds.contains(product.id),
+
+                        // NEW CALLBACK
+                        onSelectionToggle: () {
+                          setState(() {
+                            if (_selectedProductIds.contains(product.id)) {
+                              _selectedProductIds.remove(product.id);
+                            } else {
+                              _selectedProductIds.add(product.id);
+                            }
+                          });
+                        },
+
+                        onCatalogueSelected: (product, catalogueName, isNew) {
                           if (isNew) {
                             catalogueController.createCatalogueAndAddProduct(
                               catalogueName,
-                              p,
+                              product,
                             );
                           } else {
                             catalogueController.addProductToExistingCatalogue(
                               catalogueName,
-                              p,
+                              product,
                             );
                           }
                         },

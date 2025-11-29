@@ -2,9 +2,16 @@ import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
 import 'package:get/get.dart'; // Required for Navigation
 import 'package:iconsax/iconsax.dart';
+
+// MODELS
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
+import 'package:kakiso_reseller_app/navigation_menu.dart';
+
+// SCREENS
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
+
+// SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -286,7 +293,18 @@ class _HomeDrawerState extends State<HomeDrawer> {
           borderRadius: BorderRadius.circular(14),
           onTap: () {
             Navigator.pop(context);
-            widget.onNavigate(uniqueId);
+
+            // ✅ SPECIAL HANDLING FOR "My Catalog" -> open NavigationMenu on Catalogue tab
+            if (uniqueId == 'MyCatalog') {
+              Get.offAll(
+                () => NavigationMenu(
+                  userData: widget.userData,
+                  initialIndex: 3, // 3 = Catalogue tab
+                ),
+              );
+            } else {
+              widget.onNavigate(uniqueId);
+            }
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -463,7 +481,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
               duration: const Duration(milliseconds: 300),
             );
           } else {
-            // It's a Menu Item (e.g. "Orders") -> Switch Tab
+            // It's a Menu Item (e.g. "Orders") -> Switch Tab or route
             widget.onNavigate(uniqueId);
           }
         },
