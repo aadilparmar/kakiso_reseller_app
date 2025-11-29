@@ -10,12 +10,14 @@ import 'package:kakiso_reseller_app/navigation_menu.dart';
 
 // SCREENS
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 
 // SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// --- IMPORT CATEGORY DETAILS PAGE ---
+// --- HOME DRAWER ---
 class HomeDrawer extends StatefulWidget {
   final UserData userData;
   final String selectedTitle;
@@ -122,6 +124,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                         Iconsax.personalcard,
                         'Business Details',
                         'BusinessDetails',
+                      ),
+                      _buildDrawerItem(
+                        context,
+                        Iconsax.location,
+                        'Customer Addresses',
+                        'CustomerAddress',
                       ),
                       _buildDrawerItem(
                         context,
@@ -294,15 +302,23 @@ class _HomeDrawerState extends State<HomeDrawer> {
           onTap: () {
             Navigator.pop(context);
 
-            // ✅ SPECIAL HANDLING FOR "My Catalog" -> open NavigationMenu on Catalogue tab
+            // 🔹 Special routes
             if (uniqueId == 'MyCatalog') {
+              // Go to catalogue tab in bottom navigation
               Get.offAll(
                 () => NavigationMenu(
                   userData: widget.userData,
                   initialIndex: 3, // 3 = Catalogue tab
                 ),
               );
+            } else if (uniqueId == 'BusinessDetails') {
+              // Go to Business Details page we created
+              Get.to(() => BusinessDetailsPage(userData: widget.userData));
+            } else if (uniqueId == 'CustomerAddress') {
+              // Go to Customer Address page we created
+              Get.to(() => const CustomerAddressPage());
             } else {
+              // Fallback: let parent handle navigation
               widget.onNavigate(uniqueId);
             }
           },
@@ -426,7 +442,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // --- THE IMPORTANT FIX FOR NAVIGATION ---
+  // --- CATEGORY ITEM ---
   Widget _buildSubDrawerItem(
     BuildContext context,
     String title,

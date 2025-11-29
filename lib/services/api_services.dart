@@ -283,4 +283,71 @@ class ApiService {
 
     return XFile(filePath);
   }
+
+  // --- 11. UPDATE BUSINESS DETAILS (Reseller Profile → WooCommerce Customer) ---
+  ///
+  /// Call this from BusinessDetailsPage with the form payload.
+  /// If userId is null/invalid, the method will simply log and return
+  /// (so your UI doesn't crash).
+  static Future<void> updateBusinessDetails({
+    String? userId, // WordPress/WooCommerce customer ID as string (optional)
+    required Map<String, dynamic> data,
+  }) async {
+    // If we don't have a valid userId, skip remote update silently for now.
+    final int? customerId = int.tryParse((userId ?? '').trim());
+    if (customerId == null || customerId <= 0) {
+      // You can remove this print in production if you want it completely silent.
+      print(
+        '[ApiService.updateBusinessDetails] Skipping update: invalid/missing userId="$userId"',
+      );
+      return;
+    }
+
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/customers/$customerId');
+
+    // Map our form fields into WooCommerce customer structure
+    final Map<String, dynamic> payload = {
+      "first_name": data["ownerName"],
+      "email": data["email"],
+      "billing": {
+        "first_name": data["ownerName"],
+        "company": data["businessName"],
+        "address_1": data["address"],
+        "city": data["city"],
+        "postcode": data["pincode"],
+        "country": "IN", // change if needed
+        "email": data["email"],
+        "phone": data["phone"],
+      },
+      "shipping": {
+        "first_name": data["ownerName"],
+        "company": data["businessName"],
+        "address_1": data["address"],
+        "city": data["city"],
+        "postcode": data["pincode"],
+        "country": "IN",
+      },
+      "meta_data": [
+        {"key": "kakiso_whatsapp", "value": data["whatsapp"]},
+        {"key": "kakiso_gstin", "value": data["gstin"]},
+        {"key": "kakiso_business_name", "value": data["businessName"]},
+      ],
+    };
+
+    try {
+      final response = await http.put(
+        url,
+        headers: _headers,
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Business Details Error: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error saving business details: $e');
+    }
+  }
 }

@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // Import GetX
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/controllers/cart_controller.dart'; // Import Controller
-import 'package:kakiso_reseller_app/utils/constants.dart'; // For accentColor
 
-class InventoryPage extends StatelessWidget {
-  const InventoryPage({super.key});
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
+import 'package:kakiso_reseller_app/models/user.dart'; // ✅ NEW
+import 'package:kakiso_reseller_app/utils/constants.dart';
+
+class InventoryPage extends StatefulWidget {
+  /// Optional – old calls `InventoryPage()` still work.
+  final UserData? userData;
+
+  const InventoryPage({super.key, this.userData});
+
+  @override
+  State<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends State<InventoryPage> {
+  final CartController cartController = Get.put(CartController());
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
-    // Instantiate controller
-    final CartController cartController = Get.put(CartController());
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -38,13 +49,18 @@ class InventoryPage extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Search Bar (Visual only for now)
           _buildSearchAndFilter(),
-
-          // List of Items
+          _buildCartSummary(),
           Expanded(
             child: Obx(() {
-              if (cartController.cartItems.isEmpty) {
+              final filteredItems = cartController.cartItems.where((item) {
+                if (_searchQuery.isEmpty) return true;
+                return item.product.name.toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                );
+              }).toList();
+
+              if (filteredItems.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -56,7 +72,9 @@ class InventoryPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Your cart is empty',
+                        _searchQuery.isEmpty
+                            ? 'Your cart is empty'
+                            : 'No items match your search',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 16,
@@ -72,10 +90,10 @@ class InventoryPage extends StatelessWidget {
                   horizontal: 16,
                   vertical: 12,
                 ),
-                itemCount: cartController.cartItems.length,
+                itemCount: filteredItems.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final item = cartController.cartItems[index];
+                  final item = filteredItems[index];
                   return _buildInventoryItemCard(item, cartController);
                 },
               );
@@ -87,6 +105,131 @@ class InventoryPage extends StatelessWidget {
     );
   }
 
+  // -------- Summary Card --------
+  Widget _buildCartSummary() {
+    return Obx(() {
+      final items = cartController.cartItems;
+      if (items.isEmpty) return const SizedBox.shrink();
+
+      int totalUnits = 0;
+      double mrpTotal = 0;
+
+      for (final item in items) {
+        final qty = item.quantity;
+        totalUnits += qty;
+
+        final regularPriceStr = (item.product.regularPrice.isNotEmpty)
+            ? item.product.regularPrice
+            : item.product.price;
+
+        final regular =
+            double.tryParse(regularPriceStr) ??
+            double.tryParse(item.product.price) ??
+            0;
+
+        mrpTotal += regular * qty;
+      }
+
+      final sellingTotal = cartController.totalPrice;
+      final rawSavings = mrpTotal - sellingTotal;
+      final savings = rawSavings > 0 ? rawSavings : 0;
+
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Items',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$totalUnits',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'MRP',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '₹${mrpTotal.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'You Save',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(
+                        Iconsax.discount_circle,
+                        size: 16,
+                        color: savings > 0
+                            ? Colors.green
+                            : Colors.grey.shade400,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '₹${savings.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: savings > 0
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // -------- Item Card --------
   Widget _buildInventoryItemCard(CartItem item, CartController controller) {
     return Container(
       decoration: BoxDecoration(
@@ -104,7 +247,6 @@ class InventoryPage extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.network(
@@ -121,8 +263,6 @@ class InventoryPage extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-
-          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,14 +294,11 @@ class InventoryPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Use formatted price
                 Text(
                   'Unit Price: ₹${item.product.price}',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 12),
-
-                // Controls
                 Row(
                   children: [
                     Container(
@@ -218,59 +355,101 @@ class InventoryPage extends StatelessWidget {
     );
   }
 
+  // -------- Bottom Bar (Checkout) --------
   Widget _buildPurchaseBar(CartController controller) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16).copyWith(bottom: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
-                Obx(
-                  () => Text(
+    return Obx(() {
+      final isEmpty = controller.cartItems.isEmpty;
+
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(16).copyWith(bottom: 24),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Total',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (!isEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${controller.itemCount} items',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
                     '₹${controller.totalPrice.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isEmpty
+                  ? null
+                  : () {
+                      // ✅ userData may be null; BusinessDetailsPage already accepts UserData?
+                      Get.to(
+                        () => BusinessDetailsPage(userData: widget.userData),
+                      );
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
                 ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Checkout',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
-            child: const Text(
-              'Checkout',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 
+  // -------- Search Bar --------
   Widget _buildSearchAndFilter() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
         children: [
           Expanded(
@@ -280,9 +459,21 @@ class InventoryPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
+                onChanged: (value) {
+                  setState(() => _searchQuery = value);
+                },
                 decoration: InputDecoration(
-                  hintText: 'Search cart...',
+                  hintText: 'Search in cart...',
                   prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          color: Colors.grey.shade600,
+                          onPressed: () {
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
