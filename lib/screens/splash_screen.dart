@@ -7,6 +7,7 @@ import 'package:kakiso_reseller_app/screens/intro/intro.dart';
 
 import 'package:get/get.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,7 +30,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final authToken = await _storage.read(key: 'authToken');
 
     if (authToken == null || authToken.isEmpty) {
-      Get.offAll(() => const KIntroScreen());
+      Get.offAll(() => const KakisoIntroScreen());
       return;
     }
 
@@ -40,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
     } catch (e) {
       print("Token validation failed: $e");
       await _storage.delete(key: 'authToken');
-      Get.offAll(() => const KIntroScreen());
+      Get.offAll(() => const KakisoIntroScreen());
     }
   }
 

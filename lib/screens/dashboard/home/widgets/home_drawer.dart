@@ -12,6 +12,7 @@ import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
+import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 
 // SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
@@ -514,7 +515,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
         borderRadius: const BorderRadius.only(bottomRight: Radius.circular(30)),
       ),
       child: InkWell(
-        onTap: widget.onLogoutPressed,
+        onTap: () {
+          Get.offAll(() => const KakisoIntroScreen());
+        },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
