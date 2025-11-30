@@ -1,22 +1,24 @@
+// lib/screens/splash/splash_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:kakiso_reseller_app/models/user.dart';
-import 'package:kakiso_reseller_app/navigation_menu.dart';
-
 import 'package:get/get.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+
+import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
+import 'package:kakiso_reseller_app/services/session_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
-  final _storage = const FlutterSecureStorage();
+
   @override
   void initState() {
     super.initState();
@@ -24,22 +26,28 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkLoginStatus() async {
+    // Small delay to show splash logo
     await Future.delayed(const Duration(milliseconds: 1500));
 
-    final authToken = await _storage.read(key: 'authToken');
+    // 🔹 Read token from secure storage via SessionService
+    final authToken = await SessionService.getAuthToken();
 
+    // ❌ No token => user is logged out -> go to intro
     if (authToken == null || authToken.isEmpty) {
       Get.offAll(() => const KakisoIntroScreen());
       return;
     }
 
+    // ✅ Token exists: verify by calling /viewer
     try {
       final userData = await _fetchUserData(authToken);
-      // Token is valid and we have data, go to Dashboard
+
+      // Token valid & user fetched -> go to home/dashboard
       Get.offAll(() => NavigationMenu(userData: userData));
     } catch (e) {
-      print("Token validation failed: $e");
-      await _storage.delete(key: 'authToken');
+      // Token failed (expired/invalid) -> clear and go to intro
+      debugPrint("Token validation failed: $e");
+      await SessionService.clearSession();
       Get.offAll(() => const KakisoIntroScreen());
     }
   }
@@ -48,7 +56,9 @@ class _SplashScreenState extends State<SplashScreen> {
     final HttpLink httpLink = HttpLink(_graphqlUrl);
     final AuthLink authLink = AuthLink(getToken: () async => 'Bearer $token');
     final Link link = authLink.concat(httpLink);
+
     final client = GraphQLClient(link: link, cache: GraphQLCache());
+
     const String getMeQuery = r'''
       query GetMe {
         viewer {
@@ -63,6 +73,7 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       }
     ''';
+
     final QueryOptions options = QueryOptions(document: gql(getMeQuery));
     final QueryResult result = await client.query(options);
 
@@ -72,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (result.data != null && result.data!['viewer'] != null) {
       final userData = result.data!['viewer'];
-      // Map the response to your UserData model
+
       return UserData(
         name: '${userData['firstName']} ${userData['lastName']}',
         email: userData['email'],

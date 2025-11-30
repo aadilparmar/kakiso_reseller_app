@@ -16,6 +16,7 @@ import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_scree
 
 // SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/services/session_service.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 // --- HOME DRAWER ---
@@ -495,6 +496,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
+  // --- LOGOUT BUTTON WITH CONFIRMATION DIALOG ---
   Widget _buildLogoutButton() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -504,15 +506,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
         borderRadius: const BorderRadius.only(bottomRight: Radius.circular(30)),
       ),
       child: InkWell(
-        onTap: () {
-          // 1️⃣ Let parent clear tokens / prefs / user session
-          widget.onLogoutPressed();
-
-          // ❌ NO cart clear here so cart persists across logins
-
-          // 2️⃣ Navigate to intro & clear navigation stack
-          Get.offAll(() => const KakisoIntroScreen());
-        },
+        onTap: _showLogoutConfirmDialog,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 15),
@@ -540,5 +534,75 @@ class _HomeDrawerState extends State<HomeDrawer> {
         ),
       ),
     );
+  }
+
+  Future<void> _showLogoutConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Text(
+            'Log out?',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: const Text(
+            'Are you sure you want to log out?',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop(false); // cancel
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop(true); // confirm
+              },
+              child: const Text(
+                'Yes, log out',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      // 1️⃣ Parent callback (if you use it for extra cleanup)
+      widget.onLogoutPressed();
+
+      // 2️⃣ Clear stored session (but NOT cart)
+      await SessionService.clearSession();
+
+      // 3️⃣ Navigate to intro and clear nav stack
+      Get.offAll(() => const KakisoIntroScreen());
+    }
   }
 }
