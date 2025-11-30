@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
-import 'package:kakiso_reseller_app/screens/intro/intro.dart';
 
 import 'package:get/get.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';

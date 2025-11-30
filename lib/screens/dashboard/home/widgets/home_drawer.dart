@@ -305,21 +305,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
             // 🔹 Special routes
             if (uniqueId == 'MyCatalog') {
-              // Go to catalogue tab in bottom navigation
               Get.offAll(
-                () => NavigationMenu(
-                  userData: widget.userData,
-                  initialIndex: 3, // 3 = Catalogue tab
-                ),
+                () =>
+                    NavigationMenu(userData: widget.userData, initialIndex: 3),
               );
             } else if (uniqueId == 'BusinessDetails') {
-              // Go to Business Details page we created
               Get.to(() => BusinessDetailsPage(userData: widget.userData));
             } else if (uniqueId == 'CustomerAddress') {
-              // Go to Customer Address page we created
               Get.to(() => const CustomerAddressPage());
             } else {
-              // Fallback: let parent handle navigation
               widget.onNavigate(uniqueId);
             }
           },
@@ -361,10 +355,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
   // --- DYNAMIC CATEGORY LOGIC ---
 
   Widget _buildCategoryExpansion(BuildContext context) {
-    // Filter Top-Level
     final parentCategories = _categories
         .where((c) => c.parent == 0)
-        .take(5) // Optional: Limit to 5
+        .take(5)
         .toList();
 
     return Theme(
@@ -393,7 +386,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
           children: parentCategories.map((parent) {
-            // Find children
             final children = _categories
                 .where((c) => c.parent == parent.id)
                 .toList();
@@ -482,13 +474,11 @@ class _HomeDrawerState extends State<HomeDrawer> {
           ),
         ),
         onTap: () {
-          Navigator.pop(context); // Close Drawer
+          Navigator.pop(context);
 
-          // --- CHECK IF THIS IS A CATEGORY ID ---
           int? categoryId = int.tryParse(uniqueId);
 
           if (categoryId != null) {
-            // It's a Category -> Go to Details Page
             Get.to(
               () => CategoryDetailsPage(
                 categoryId: categoryId,
@@ -498,7 +488,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
               duration: const Duration(milliseconds: 300),
             );
           } else {
-            // It's a Menu Item (e.g. "Orders") -> Switch Tab or route
             widget.onNavigate(uniqueId);
           }
         },
@@ -516,6 +505,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
       ),
       child: InkWell(
         onTap: () {
+          // 1️⃣ Let parent clear tokens / prefs / user session
+          widget.onLogoutPressed();
+
+          // ❌ NO cart clear here so cart persists across logins
+
+          // 2️⃣ Navigate to intro & clear navigation stack
           Get.offAll(() => const KakisoIntroScreen());
         },
         borderRadius: BorderRadius.circular(12),

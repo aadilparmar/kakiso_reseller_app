@@ -1,10 +1,11 @@
+// lib/screens/dashboard/my_cart/inventory_page.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
-import 'package:kakiso_reseller_app/models/user.dart'; // ✅ NEW
+import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class InventoryPage extends StatefulWidget {
@@ -18,7 +19,9 @@ class InventoryPage extends StatefulWidget {
 }
 
 class _InventoryPageState extends State<InventoryPage> {
-  final CartController cartController = Get.put(CartController());
+  // ✅ use existing global instance, do NOT re-create
+  final CartController cartController = Get.find<CartController>();
+
   String _searchQuery = '';
 
   @override
@@ -415,7 +418,6 @@ class _InventoryPageState extends State<InventoryPage> {
               onPressed: isEmpty
                   ? null
                   : () {
-                      // ✅ userData may be null; BusinessDetailsPage already accepts UserData?
                       Get.to(
                         () => BusinessDetailsPage(userData: widget.userData),
                       );

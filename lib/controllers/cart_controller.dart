@@ -1,6 +1,10 @@
+// lib/controllers/cart_controller.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
+
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
@@ -10,19 +14,51 @@ class CartItem {
 
   CartItem({required this.product, this.quantity = 1});
 
-  double get totalPrice => double.tryParse(product.price) != null
-      ? double.parse(product.price) * quantity
-      : 0.0;
+  double get totalPrice {
+    final price = double.tryParse(product.price) ?? 0.0;
+    return price * quantity;
+  }
+
+  // ---------- Persistence helpers ----------
+
+  Map<String, dynamic> toJson() => {
+    'product': product.toJson(), // ⚠️ ProductModel must have toJson()
+    'quantity': quantity,
+  };
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      product: ProductModel.fromJson(json['product'] as Map<String, dynamic>),
+      quantity: (json['quantity'] ?? 1) as int,
+    );
+  }
 }
 
 class CartController extends GetxController {
+  static const String _storageKey = 'cart_items';
+
+  final GetStorage _box = GetStorage();
+
   // Observable list of cart items
-  var cartItems = <CartItem>[].obs;
+  final RxList<CartItem> cartItems = <CartItem>[].obs;
+
+  // ---------- Lifecycle ----------
+
+  @override
+  void onInit() {
+    super.onInit();
+    _loadCartFromStorage();
+
+    // Whenever cartItems changes → save to storage
+    ever<List<CartItem>>(cartItems, (_) => _saveCartToStorage());
+  }
+
+  // ---------- Public API ----------
 
   // Add item to cart
   void addToCart(ProductModel product) {
     // Check if item already exists
-    var existingItem = cartItems.firstWhereOrNull(
+    final existingItem = cartItems.firstWhereOrNull(
       (item) => item.product.id == product.id,
     );
 
@@ -41,14 +77,14 @@ class CartController extends GetxController {
 
   // Increase Quantity
   void incrementQuantity(int productId) {
-    var item = cartItems.firstWhere((item) => item.product.id == productId);
+    final item = cartItems.firstWhere((item) => item.product.id == productId);
     item.quantity++;
     cartItems.refresh();
   }
 
   // Decrease Quantity
   void decrementQuantity(int productId) {
-    var item = cartItems.firstWhere((item) => item.product.id == productId);
+    final item = cartItems.firstWhere((item) => item.product.id == productId);
     if (item.quantity > 1) {
       item.quantity--;
       cartItems.refresh();
@@ -57,44 +93,46 @@ class CartController extends GetxController {
     }
   }
 
+  // Clear cart completely (use on manual logout if you want)
+  void clearCart() {
+    cartItems.clear();
+  }
+
+  // Get Total Price
+  double get totalPrice =>
+      cartItems.fold(0.0, (sum, item) => sum + item.totalPrice);
+
+  // Get Item Count
+  int get itemCount => cartItems.fold(0, (sum, item) => sum + item.quantity);
+
+  // ---------- Snackbar UI ----------
+
   void showCustomCartSnackbar(ProductModel product) {
     Get.snackbar(
       '',
       '',
-      // --- 1. POSITION CHANGED TO BOTTOM ---
       snackPosition: SnackPosition.BOTTOM,
-
-      // Add margin specifically to the bottom to make it "float"
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
-
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       borderRadius: 24,
       maxWidth: 400,
-
-      // --- 2. STYLING ---
-      backgroundColor: Colors.white.withOpacity(
-        0.95,
-      ), // Slightly more opaque for bottom visibility
+      backgroundColor: Colors.white.withOpacity(0.95),
       barBlur: 20,
       overlayBlur: 0.0,
       colorText: Colors.black,
-
-      // Shadows
       boxShadows: [
         BoxShadow(
           color: Colors.black.withOpacity(0.1),
           blurRadius: 20,
           spreadRadius: 5,
-          offset: const Offset(0, 4), // Shadow
+          offset: const Offset(0, 4),
         ),
       ],
-
-      // --- 3. CUSTOM CONTENT ---
       titleText: Row(
         children: [
           // PRODUCT IMAGE THUMBNAIL
           Container(
-            width: 45, // Slightly larger for better visibility
+            width: 45,
             height: 45,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
@@ -138,10 +176,7 @@ class CartController extends GetxController {
           ),
         ],
       ),
-
       messageText: const SizedBox(height: 0),
-
-      // --- 4. ACTION BUTTON ---
       mainButton: TextButton(
         onPressed: () => Get.to(() => const InventoryPage()),
         style: TextButton.styleFrom(
@@ -167,20 +202,31 @@ class CartController extends GetxController {
           ],
         ),
       ),
-
-      // --- 5. ANIMATION ---
-      duration: const Duration(seconds: 4), // Gives user time to react
+      duration: const Duration(seconds: 4),
       animationDuration: const Duration(milliseconds: 600),
       isDismissible: true,
-      // Pop up from bottom
       forwardAnimationCurve: Curves.easeOutBack,
     );
   }
 
-  // Get Total Price
-  double get totalPrice =>
-      cartItems.fold(0, (sum, item) => sum + item.totalPrice);
+  // ---------- Persistence ----------
 
-  // Get Item Count
-  int get itemCount => cartItems.fold(0, (sum, item) => sum + item.quantity);
+  void _loadCartFromStorage() {
+    final stored = _box.read<List<dynamic>>(_storageKey);
+    if (stored == null) return;
+
+    try {
+      final items = stored
+          .map((e) => CartItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      cartItems.assignAll(items);
+    } catch (_) {
+      cartItems.clear(); // if corrupted, reset
+    }
+  }
+
+  void _saveCartToStorage() {
+    final data = cartItems.map((item) => item.toJson()).toList();
+    _box.write(_storageKey, data);
+  }
 }
