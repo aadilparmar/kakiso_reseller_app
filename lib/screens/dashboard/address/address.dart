@@ -11,7 +11,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out
 import 'package:kakiso_reseller_app/screens/dashboard/checkout/checkout.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// 🔹 STEP HEADER
+// 🔹 STEP: Customer Address (Step 3)
 
 class CustomerAddressPage extends StatefulWidget {
   /// Optional – pass from BusinessDetailsPage if you have it:
@@ -31,6 +31,10 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   final TextEditingController _customerPhoneCtrl = TextEditingController();
   final TextEditingController _addressCtrl = TextEditingController();
   final TextEditingController _cityCtrl = TextEditingController();
+  final TextEditingController _stateCtrl = TextEditingController();
+  final TextEditingController _countryCtrl = TextEditingController(
+    text: 'India',
+  );
   final TextEditingController _pincodeCtrl = TextEditingController();
 
   bool _isSaving = false;
@@ -65,6 +69,8 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     _customerPhoneCtrl.dispose();
     _addressCtrl.dispose();
     _cityCtrl.dispose();
+    _stateCtrl.dispose();
+    _countryCtrl.dispose();
     _pincodeCtrl.dispose();
     super.dispose();
   }
@@ -77,6 +83,8 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       phone: _customerPhoneCtrl.text.trim(),
       addressLine: _addressCtrl.text.trim(),
       city: _cityCtrl.text.trim(),
+      state: _stateCtrl.text.trim(),
+      country: _countryCtrl.text.trim(),
       pincode: _pincodeCtrl.text.trim(),
     );
   }
@@ -121,6 +129,8 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       final String ownerName = (data['ownerName'] as String?)?.trim() ?? '';
       final String street = (data['address'] as String?)?.trim() ?? '';
       final String city = (data['city'] as String?)?.trim() ?? '';
+      final String state = (data['state'] as String?)?.trim() ?? '';
+      final String country = (data['country'] as String?)?.trim() ?? '';
       final String pincode = (data['pincode'] as String?)?.trim() ?? '';
       final String phone = (data['phone'] as String?)?.trim() ?? '';
 
@@ -128,12 +138,24 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
           ? businessName
           : 'Your Business';
 
-      final String addressText = [
-        street,
-        if (city.isNotEmpty || pincode.isNotEmpty) '$city - $pincode',
-        if (phone.isNotEmpty) 'Phone: $phone',
-        if (ownerName.isNotEmpty) 'Owner: $ownerName',
-      ].where((e) => e.trim().isNotEmpty).join('\n');
+      // Build nicer multi-line address
+      final List<String> line1Parts = [];
+      if (street.isNotEmpty) line1Parts.add(street);
+      if (city.isNotEmpty) line1Parts.add(city);
+      if (state.isNotEmpty) line1Parts.add(state);
+      if (country.isNotEmpty) line1Parts.add(country);
+
+      String line1 = line1Parts.join(', ');
+      if (pincode.isNotEmpty) {
+        line1 = line1.isEmpty ? pincode : '$line1 - $pincode';
+      }
+
+      final List<String> finalLines = [];
+      if (line1.trim().isNotEmpty) finalLines.add(line1);
+      if (phone.isNotEmpty) finalLines.add('Phone: $phone');
+      if (ownerName.isNotEmpty) finalLines.add('Owner: $ownerName');
+
+      final String addressText = finalLines.join('\n');
 
       setState(() {
         _businessAddressLabel = label;
@@ -154,7 +176,10 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
 
     try {
       final newAddress = _buildAddressFromForm();
-      _savedAddresses.insert(0, newAddress); // latest on top
+      _savedAddresses.insert(
+        0,
+        newAddress,
+      ); // latest on top, treated as default
       _selectedIndex = 0;
 
       await _saveAddressesToStorage();
@@ -164,6 +189,11 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       _customerPhoneCtrl.clear();
       _addressCtrl.clear();
       _cityCtrl.clear();
+      _stateCtrl.clear();
+      // keep country as India if it was India
+      if (_countryCtrl.text.trim().isEmpty) {
+        _countryCtrl.text = 'India';
+      }
       _pincodeCtrl.clear();
 
       if (!mounted) return;
@@ -255,11 +285,31 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       duration: const Duration(seconds: 2),
     );
 
-    // -------- Build Customer Address Text --------
+    // -------- Build Customer Address Text (nice formatting) --------
+    final List<String> lineParts = [];
+    if (selected.addressLine.trim().isNotEmpty) {
+      lineParts.add(selected.addressLine.trim());
+    }
+    if (selected.city.trim().isNotEmpty) {
+      lineParts.add(selected.city.trim());
+    }
+    if (selected.state.trim().isNotEmpty) {
+      lineParts.add(selected.state.trim());
+    }
+    if (selected.country.trim().isNotEmpty) {
+      lineParts.add(selected.country.trim());
+    }
+
+    String line1 = lineParts.join(', ');
+    if (selected.pincode.trim().isNotEmpty) {
+      line1 = '$line1 - ${selected.pincode.trim()}';
+    }
+
     final String customerLabel = selected.name;
-    final String customerText =
-        "${selected.addressLine}, ${selected.city} - ${selected.pincode}\n"
-        "Phone: ${selected.phone}";
+    final String customerText = [
+      line1,
+      'Phone: ${selected.phone}',
+    ].where((e) => e.trim().isNotEmpty).join('\n');
 
     // -------- Business Address (from secure storage) --------
     final String businessLabel = _businessAddressLabel ?? "Your Business";
@@ -403,6 +453,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               controller: _customerNameCtrl,
               label: 'Customer Name',
               icon: Iconsax.user,
+              hint: 'Eg. Aadil Parmar',
               validator: (v) =>
                   v!.trim().isEmpty ? 'Customer name required' : null,
             ),
@@ -412,6 +463,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               label: 'Customer Phone Number',
               keyboardType: TextInputType.phone,
               icon: Iconsax.call,
+              hint: '10-digit mobile number',
               validator: (v) {
                 if (v!.trim().isEmpty) return 'Phone number required';
                 if (v.trim().length < 10) return 'Invalid number';
@@ -423,10 +475,13 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               controller: _addressCtrl,
               label: 'House / Street / Area',
               icon: Iconsax.location,
+              hint: 'Flat / building / street / area',
               maxLines: 2,
               validator: (v) => v!.trim().isEmpty ? 'Address required' : null,
             ),
             const SizedBox(height: 12),
+
+            // City + State
             Row(
               children: [
                 Expanded(
@@ -434,8 +489,37 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                     controller: _cityCtrl,
                     label: 'City',
                     icon: Iconsax.location5,
+                    hint: 'Eg. Rajkot',
                     validator: (v) =>
                         v!.trim().isEmpty ? 'City required' : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTextField(
+                    controller: _stateCtrl,
+                    label: 'State',
+                    icon: Iconsax.map,
+                    hint: 'Eg. Gujarat',
+                    validator: (v) =>
+                        v!.trim().isEmpty ? 'State required' : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Country + Pincode
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _countryCtrl,
+                    label: 'Country',
+                    icon: Iconsax.global,
+                    hint: 'Eg. India',
+                    validator: (v) =>
+                        v!.trim().isEmpty ? 'Country required' : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -445,9 +529,10 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                     label: 'Pincode',
                     keyboardType: TextInputType.number,
                     icon: Iconsax.location_tick,
+                    hint: 'Eg. 360001',
                     validator: (v) {
                       if (v!.trim().isEmpty) return 'Pincode required';
-                      if (v.trim().length < 6) return 'Invalid';
+                      if (v.trim().length < 6) return 'Invalid pincode';
                       return null;
                     },
                   ),
@@ -556,6 +641,31 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
           itemBuilder: (context, index) {
             final address = _savedAddresses[index];
             final bool isSelected = _selectedIndex == index;
+            final bool isDefault = index == 0;
+
+            // Combine address lines nicely
+            final partsLine1 = <String>[];
+            if (address.addressLine.trim().isNotEmpty) {
+              partsLine1.add(address.addressLine.trim());
+            }
+            final partsLine2 = <String>[];
+            if (address.city.trim().isNotEmpty) {
+              partsLine2.add(address.city.trim());
+            }
+            if (address.state.trim().isNotEmpty) {
+              partsLine2.add(address.state.trim());
+            }
+            final partsLine3 = <String>[];
+            if (address.country.trim().isNotEmpty) {
+              partsLine3.add(address.country.trim());
+            }
+            if (address.pincode.trim().isNotEmpty) {
+              partsLine3.add(address.pincode.trim());
+            }
+
+            final line1 = partsLine1.join(', ');
+            final line2 = partsLine2.join(', ');
+            final line3 = partsLine3.join(' • ');
 
             return GestureDetector(
               onTap: () {
@@ -619,25 +729,58 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                                   fontFamily: 'Poppins',
                                 ),
                               ),
+                              if (isDefault) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Text(
+                                    'Default',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.green,
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            "${address.addressLine}, ",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade800,
-                              fontFamily: 'Poppins',
+                          if (line1.isNotEmpty)
+                            Text(
+                              line1,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade800,
+                                fontFamily: 'Poppins',
+                              ),
                             ),
-                          ),
-                          Text(
-                            "${address.city} • ${address.pincode}",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade800,
-                              fontFamily: 'Poppins',
+                          if (line2.isNotEmpty)
+                            Text(
+                              line2,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade800,
+                                fontFamily: 'Poppins',
+                              ),
                             ),
-                          ),
+                          if (line3.isNotEmpty)
+                            Text(
+                              line3,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade800,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -667,6 +810,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     required IconData icon,
     TextInputType? keyboardType,
     int maxLines = 1,
+    String? hint,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -676,6 +820,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
+        hintText: hint,
         prefixIcon: Icon(icon, size: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         isDense: true,
@@ -778,6 +923,8 @@ class CustomerAddress {
   final String phone;
   final String addressLine;
   final String city;
+  final String state;
+  final String country;
   final String pincode;
 
   CustomerAddress({
@@ -786,6 +933,8 @@ class CustomerAddress {
     required this.phone,
     required this.addressLine,
     required this.city,
+    required this.state,
+    required this.country,
     required this.pincode,
   });
 
@@ -795,6 +944,8 @@ class CustomerAddress {
     "phone": phone,
     "addressLine": addressLine,
     "city": city,
+    "state": state,
+    "country": country,
     "pincode": pincode,
   };
 
@@ -805,6 +956,8 @@ class CustomerAddress {
       phone: json["phone"] ?? "",
       addressLine: json["addressLine"] ?? "",
       city: json["city"] ?? "",
+      state: json["state"] ?? "",
+      country: json["country"] ?? "",
       pincode: json["pincode"] ?? "",
     );
   }

@@ -97,17 +97,39 @@ class FinalCheckoutPage extends StatelessWidget {
           );
         }
 
+        // ---- BASE TOTAL (your cost) ----
         final int totalItems = items.fold(
           0,
           (sum, item) => sum + item.quantity,
         );
-        final double subTotal = cartController.totalPrice;
+        final double baseSubTotal = cartController.totalPrice;
+
+        // ---- CUSTOMER AMOUNT (selling price * qty) ----
+        double amountToCollect = 0;
+        for (final item in items) {
+          final double basePrice = double.tryParse(item.product.price) ?? 0;
+          // Get saved selling price (with margin) from CartController
+          final double? selling = cartController.getSellingPrice(
+            item.product.id,
+          );
+          final double perUnit = (selling != null && selling > 0)
+              ? selling
+              : basePrice;
+          amountToCollect += perUnit * item.quantity;
+        }
 
         // If you have shipping / tax logic, adjust here:
         const double shipping = 0; // Free shipping for now
         const double tax = 0; // Add tax calculation if needed
 
-        final double grandTotal = subTotal + shipping + tax;
+        // Your total cost (base + shipping + tax)
+        final double costGrandTotal = baseSubTotal + shipping + tax;
+
+        // Profit made by reseller on this order
+        final double profit = (amountToCollect - costGrandTotal).clamp(
+          0,
+          double.infinity,
+        );
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -162,12 +184,13 @@ class FinalCheckoutPage extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // PRICING SUMMARY
+              // PRICING SUMMARY + AMOUNT TO COLLECT
               _buildPriceBreakup(
-                subTotal: subTotal,
+                baseSubTotal: baseSubTotal,
                 shipping: shipping,
                 tax: tax,
-                grandTotal: grandTotal,
+                amountToCollect: amountToCollect,
+                profit: profit,
               ),
 
               const SizedBox(height: 24),
@@ -258,11 +281,14 @@ class FinalCheckoutPage extends StatelessWidget {
 
   // --- PRICE BREAKUP ---
   Widget _buildPriceBreakup({
-    required double subTotal,
+    required double baseSubTotal,
     required double shipping,
     required double tax,
-    required double grandTotal,
+    required double amountToCollect,
+    required double profit,
   }) {
+    final double costGrandTotal = baseSubTotal + shipping + tax;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -277,14 +303,89 @@ class FinalCheckoutPage extends StatelessWidget {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _priceRow('Subtotal', subTotal),
+          // Your cost block
+          _priceRow('Your cost (base)', baseSubTotal),
           const SizedBox(height: 6),
-          _priceRow('Shipping', shipping, isFree: shipping == 0),
+          if (shipping != 0)
+            _priceRow('Shipping cost', shipping)
+          else
+            _priceRow('Shipping cost', shipping, isFree: true),
           const SizedBox(height: 6),
-          _priceRow('Tax', tax, isFree: tax == 0),
+          if (tax != 0)
+            _priceRow('Tax', tax)
+          else
+            _priceRow('Tax', tax, isFree: true),
           const Divider(height: 20),
-          _priceRow('Total Payable', grandTotal, isBold: true, highlight: true),
+
+          _priceRow('Total cost to you', costGrandTotal, isBold: true),
+
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 🔹 Amount to be collected (wrapped safely)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Amount to be collected from customer',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '₹${amountToCollect.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: accentColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Your profit on this order',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '₹${profit.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: profit > 0 ? Colors.green.shade700 : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -295,38 +396,38 @@ class FinalCheckoutPage extends StatelessWidget {
     double amount, {
     bool isFree = false,
     bool isBold = false,
-    bool highlight = false,
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
-            color: Colors.grey.shade700,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
+              color: Colors.grey.shade700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 8),
         isFree
             ? Text(
                 'FREE',
                 style: TextStyle(
-                  fontSize: highlight ? 14 : 13,
-                  fontWeight: isBold || highlight
-                      ? FontWeight.w700
-                      : FontWeight.w500,
-                  color: highlight ? accentColor : Colors.green,
+                  fontSize: 13,
+                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+                  color: Colors.green,
                 ),
               )
             : Text(
                 '₹${amount.toStringAsFixed(2)}',
                 style: TextStyle(
-                  fontSize: highlight ? 16 : 13,
-                  fontWeight: isBold || highlight
-                      ? FontWeight.w700
-                      : FontWeight.w500,
-                  color: highlight ? accentColor : Colors.black87,
+                  fontSize: isBold ? 14 : 13,
+                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+                  color: Colors.black87,
                 ),
               ),
       ],
@@ -400,7 +501,7 @@ class FinalCheckoutPage extends StatelessWidget {
     );
   }
 
-  // --- BOTTOM BAR (now goes to PaymentPage) ---
+  // --- BOTTOM BAR (now uses amountToCollect) ---
   Widget _buildBottomBar() {
     final CartController cartController = Get.find<CartController>();
 
@@ -408,7 +509,17 @@ class FinalCheckoutPage extends StatelessWidget {
       final items = cartController.cartItems;
       if (items.isEmpty) return const SizedBox.shrink();
 
-      final total = cartController.totalPrice;
+      final double baseSubTotal = cartController.totalPrice;
+
+      double amountToCollect = 0;
+      for (final item in items) {
+        final double basePrice = double.tryParse(item.product.price) ?? 0;
+        final double? selling = cartController.getSellingPrice(item.product.id);
+        final double perUnit = (selling != null && selling > 0)
+            ? selling
+            : basePrice;
+        amountToCollect += perUnit * item.quantity;
+      }
 
       return Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -430,26 +541,31 @@ class FinalCheckoutPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Total Payable',
+                    'Amount to be collected',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '₹${total.toStringAsFixed(2)}',
+                    '₹${amountToCollect.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Your cost: ₹${baseSubTotal.toStringAsFixed(2)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   ),
                 ],
               ),
             ),
             ElevatedButton(
               onPressed: () {
-                // 👉 Go to online payment screen
+                // 👉 Go to online payment screen with customer amount
                 Get.to(
                   () => PaymentPage(
-                    payableAmount: total,
+                    payableAmount: amountToCollect,
                     userData: userData,
                     businessAddressLabel: businessAddressLabel,
                     customerAddressLabel: customerAddressLabel,
@@ -540,11 +656,15 @@ class _AddressSectionCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -606,6 +726,14 @@ class _OrderItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = item.product;
+    final CartController cartController = Get.find<CartController>();
+
+    final double basePrice = double.tryParse(product.price) ?? 0;
+    final double? selling = cartController.getSellingPrice(product.id);
+    final double perUnit = (selling != null && selling > 0)
+        ? selling
+        : basePrice;
+    final double lineTotal = perUnit * item.quantity;
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -656,12 +784,17 @@ class _OrderItemTile extends StatelessWidget {
                   'Qty: ${item.quantity}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  'Selling: ₹${perUnit.toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 10),
           Text(
-            '₹${item.totalPrice.toStringAsFixed(2)}',
+            '₹${lineTotal.toStringAsFixed(2)}',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,

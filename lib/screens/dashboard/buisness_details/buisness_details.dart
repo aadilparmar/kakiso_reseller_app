@@ -10,7 +10,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// 🔹 NEW: Checkout step header (shared widget)
+// 🔹 Checkout step: Business details (Step 2)
 
 class BusinessDetailsPage extends StatefulWidget {
   final UserData? userData; // optional, to prefill if available
@@ -33,9 +33,16 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _whatsappCtrl = TextEditingController();
-  final TextEditingController _addressCtrl = TextEditingController();
+
+  // Address controllers
+  final TextEditingController _addressCtrl = TextEditingController(); // Street
   final TextEditingController _cityCtrl = TextEditingController();
+  final TextEditingController _stateCtrl = TextEditingController();
+  final TextEditingController _countryCtrl = TextEditingController(
+    text: 'India',
+  );
   final TextEditingController _pincodeCtrl = TextEditingController();
+
   final TextEditingController _gstinCtrl = TextEditingController();
 
   bool _isWhatsAppSame = true;
@@ -71,9 +78,13 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _phoneCtrl.text = data['phone'] ?? '';
         _whatsappCtrl.text = data['whatsapp'] ?? '';
         _emailCtrl.text = data['email'] ?? _emailCtrl.text;
+
         _addressCtrl.text = data['address'] ?? '';
         _cityCtrl.text = data['city'] ?? '';
+        _stateCtrl.text = data['state'] ?? '';
+        _countryCtrl.text = data['country'] ?? _countryCtrl.text;
         _pincodeCtrl.text = data['pincode'] ?? '';
+
         _gstinCtrl.text = data['gstin'] ?? '';
 
         _isWhatsAppSame =
@@ -93,9 +104,13 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _whatsappCtrl.dispose();
+
     _addressCtrl.dispose();
     _cityCtrl.dispose();
+    _stateCtrl.dispose();
+    _countryCtrl.dispose();
     _pincodeCtrl.dispose();
+
     _gstinCtrl.dispose();
     super.dispose();
   }
@@ -116,6 +131,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       "email": _emailCtrl.text.trim(),
       "address": _addressCtrl.text.trim(),
       "city": _cityCtrl.text.trim(),
+      "state": _stateCtrl.text.trim(),
+      "country": _countryCtrl.text.trim(),
       "pincode": _pincodeCtrl.text.trim(),
       "gstin": _gstinCtrl.text.trim(),
     };
@@ -188,6 +205,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
             _buildInfoBanner(),
             if (_hasSavedDetails)
               _buildSavedSummaryCard(), // 🔹 summary if saved
+
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -228,6 +246,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
                       _buildSectionCard(
                         title: 'Contact Details',
                         child: Column(
@@ -318,6 +337,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
+                      // 🔹 Address section (nicer layout)
                       _buildSectionCard(
                         title: 'Address',
                         child: Column(
@@ -330,16 +351,17 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                               maxLines: 2,
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your address';
+                                  return 'Please enter your street address';
                                 }
                                 return null;
                               },
                             ),
                             const SizedBox(height: 12),
+
+                            // City + State
                             Row(
                               children: [
                                 Expanded(
-                                  flex: 2,
                                   child: _buildTextField(
                                     controller: _cityCtrl,
                                     label: 'City',
@@ -348,7 +370,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     validator: (value) {
                                       if (value == null ||
                                           value.trim().isEmpty) {
-                                        return 'Required';
+                                        return 'City required';
                                       }
                                       return null;
                                     },
@@ -356,7 +378,44 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  flex: 1,
+                                  child: _buildTextField(
+                                    controller: _stateCtrl,
+                                    label: 'State',
+                                    hint: 'Eg. Gujarat',
+                                    icon: Iconsax.map,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'State required';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Country + Pincode
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _countryCtrl,
+                                    label: 'Country',
+                                    hint: 'Eg. India',
+                                    icon: Iconsax.global,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Country required';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
                                   child: _buildTextField(
                                     controller: _pincodeCtrl,
                                     label: 'Pincode',
@@ -366,7 +425,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     validator: (value) {
                                       if (value == null ||
                                           value.trim().isEmpty) {
-                                        return 'Required';
+                                        return 'Pincode required';
                                       }
                                       if (value.trim().length < 6) {
                                         return 'Invalid';
@@ -381,6 +440,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
                       _buildSectionCard(
                         title: 'GST & Compliance (Optional)',
                         child: Column(
@@ -457,8 +517,28 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     );
   }
 
-  // 🔹 NEW: Summary when details already saved
+  // 🔹 Summary when details already saved
   Widget _buildSavedSummaryCard() {
+    // Build a clean one-line address for summary
+    final street = _addressCtrl.text.trim();
+    final city = _cityCtrl.text.trim();
+    final state = _stateCtrl.text.trim();
+    final country = _countryCtrl.text.trim();
+    final pin = _pincodeCtrl.text.trim();
+
+    final List<String> parts = [];
+    if (street.isNotEmpty) parts.add(street);
+    if (city.isNotEmpty) parts.add(city);
+    if (state.isNotEmpty) parts.add(state);
+    if (country.isNotEmpty) parts.add(country);
+
+    String addressLine = parts.isEmpty
+        ? 'No address added yet'
+        : parts.join(', ');
+    if (pin.isNotEmpty) {
+      addressLine = '$addressLine - $pin';
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       padding: const EdgeInsets.all(12),
@@ -537,9 +617,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                   ),
                 const SizedBox(height: 2),
                 Text(
-                  _addressCtrl.text.trim().isEmpty
-                      ? 'No address added yet'
-                      : "${_addressCtrl.text.trim()}, ${_cityCtrl.text.trim()} - ${_pincodeCtrl.text.trim()}",
+                  addressLine,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade700,

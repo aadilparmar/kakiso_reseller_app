@@ -9,8 +9,7 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// 🔹 NEW: Checkout step header
-
+// 🔹 Checkout step: CART (Step 1)
 class InventoryPage extends StatefulWidget {
   final UserData? userData;
   const InventoryPage({super.key, this.userData});
@@ -23,7 +22,7 @@ class _InventoryPageState extends State<InventoryPage> {
   final CartController cartController = Get.find<CartController>();
   String _searchQuery = '';
 
-  /// Store user-entered selling prices per productId
+  /// Local text controllers for selling price per productId
   final Map<int, TextEditingController> _sellingPriceControllers = {};
 
   @override
@@ -34,22 +33,37 @@ class _InventoryPageState extends State<InventoryPage> {
     super.dispose();
   }
 
+  /// Get / create controller for a product's selling price.
+  /// Prefers:
+  ///   1. Existing TextEditingController (if already created)
+  ///   2. Saved selling price in CartController (persisted)
+  ///   3. Default = basePrice * 1.2 (20% margin)
   TextEditingController _getControllerForItem(int productId, double basePrice) {
     if (_sellingPriceControllers[productId] != null) {
       return _sellingPriceControllers[productId]!;
     }
 
-    // Suggest default = basePrice * 1.20 (20% margin) if basePrice > 0
-    final String defaultText = basePrice > 0
-        ? (basePrice * 1.2).toStringAsFixed(0)
-        : '';
+    // 1) Try to use saved selling price from CartController
+    final saved = cartController.getSellingPrice(productId);
+    String initialText = '';
 
-    final controller = TextEditingController(text: defaultText);
+    if (saved != null && saved > 0) {
+      initialText = saved.toStringAsFixed(0);
+    } else if (basePrice > 0) {
+      // 2) Default 20% margin
+      final defaultPrice = basePrice * 1.2;
+      initialText = defaultPrice.toStringAsFixed(0);
+      // Save default in controller for persistence and later use (review page)
+      cartController.setSellingPrice(productId, defaultPrice);
+    }
+
+    final controller = TextEditingController(text: initialText);
     _sellingPriceControllers[productId] = controller;
     return controller;
   }
 
-  /// Check that every cart item has a selling price giving margin > 9.99%
+  /// ✅ Check that every cart item has a selling price giving margin > 9.99%
+  /// Uses _getControllerForItem so default 20% margin is applied for all.
   bool _areAllMarginsValid() {
     final items = cartController.cartItems;
 
@@ -59,8 +73,8 @@ class _InventoryPageState extends State<InventoryPage> {
       final basePrice = double.tryParse(item.product.price) ?? 0;
       if (basePrice <= 0) return false;
 
-      final ctrl = _sellingPriceControllers[item.product.id];
-      if (ctrl == null) return false;
+      // Always go via helper (creates controller + default / uses saved)
+      final ctrl = _getControllerForItem(item.product.id, basePrice);
 
       final selling = double.tryParse(ctrl.text);
       if (selling == null || selling <= 0) return false;
@@ -71,6 +85,24 @@ class _InventoryPageState extends State<InventoryPage> {
       }
     }
     return true;
+  }
+
+  /// 💰 Total amount to be collected from customer (selling prices * qty)
+  double _computeAmountToCollect() {
+    double total = 0;
+    final items = cartController.cartItems;
+
+    for (final item in items) {
+      final basePrice = double.tryParse(item.product.price) ?? 0;
+      final ctrl = _getControllerForItem(item.product.id, basePrice);
+      final selling = double.tryParse(ctrl.text) ?? 0;
+
+      if (selling > 0) {
+        total += selling * item.quantity;
+      }
+    }
+
+    return total;
   }
 
   @override
@@ -192,8 +224,9 @@ class _InventoryPageState extends State<InventoryPage> {
         mrpTotal += regular * qty;
       }
 
-      final sellingTotal = cartController.totalPrice;
-      final rawSavings = mrpTotal - sellingTotal;
+      // Base total = cost to reseller
+      final baseTotal = cartController.totalPrice;
+      final rawSavings = mrpTotal - baseTotal;
       final savings = rawSavings > 0 ? rawSavings : 0;
 
       return Container(
@@ -236,7 +269,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'MRP',
+                    'MRP Total',
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                   const SizedBox(height: 2),
@@ -255,7 +288,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   const Text(
-                    'You Save',
+                    'You Save (vs MRP)',
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                   const SizedBox(height: 2),
@@ -309,7 +342,9 @@ class _InventoryPageState extends State<InventoryPage> {
     }
 
     final bool marginOk =
-        marginPercent != null && marginPercent > 9.99 && sellingPrice! > 0;
+        marginPercent != null &&
+        marginPercent > 9.99 &&
+        (sellingPrice ?? 0) > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -480,7 +515,18 @@ class _InventoryPageState extends State<InventoryPage> {
                         ),
                         onChanged: (value) {
                           setState(() {
-                            // recalc margin + enable/disable checkout
+                            final parsed = double.tryParse(value);
+                            if (parsed != null && parsed > 0) {
+                              cartController.setSellingPrice(
+                                item.product.id,
+                                parsed,
+                              );
+                            } else {
+                              // If invalid, remove saved selling price
+                              cartController.sellingPrices.remove(
+                                item.product.id,
+                              );
+                            }
                           });
                         },
                       ),
@@ -495,7 +541,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   children: [
                     Text(
                       marginOk
-                          ? 'Margin: ${marginPercent.toStringAsFixed(1)}%  (₹${marginAmount!.toStringAsFixed(2)} total)'
+                          ? 'Margin: ${marginPercent!.toStringAsFixed(1)}%  (₹${marginAmount!.toStringAsFixed(2)} total)'
                           : 'Margin must be > 9.99%',
                       style: TextStyle(
                         fontSize: 11,
@@ -534,6 +580,13 @@ class _InventoryPageState extends State<InventoryPage> {
       final isEmpty = controller.cartItems.isEmpty;
       final bool marginsValid = _areAllMarginsValid();
 
+      final double baseTotal = controller.totalPrice;
+      final double collectTotal = _computeAmountToCollect();
+      final double profit = (collectTotal - baseTotal).clamp(
+        0,
+        double.infinity,
+      );
+
       return Container(
         color: Colors.white,
         padding: const EdgeInsets.all(16).copyWith(bottom: 24),
@@ -547,9 +600,9 @@ class _InventoryPageState extends State<InventoryPage> {
                   Row(
                     children: [
                       Text(
-                        'Total (base)',
+                        'Your cost (base)',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 11,
                           color: Colors.grey.shade600,
                         ),
                       ),
@@ -574,14 +627,47 @@ class _InventoryPageState extends State<InventoryPage> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    '₹${controller.totalPrice.toStringAsFixed(2)}',
+                    '₹${baseTotal.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        'Amount to collect: ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      Text(
+                        '₹${collectTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Your profit: ₹${profit.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: profit > 0
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   if (!isEmpty && !marginsValid)
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
