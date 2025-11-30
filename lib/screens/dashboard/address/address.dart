@@ -1,13 +1,24 @@
+// lib/screens/dashboard/address/address.dart
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/checkout/checkout.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
+// 🔹 STEP HEADER
+
 class CustomerAddressPage extends StatefulWidget {
-  const CustomerAddressPage({super.key});
+  /// Optional – pass from BusinessDetailsPage if you have it:
+  /// Get.to(() => CustomerAddressPage(userData: widget.userData));
+  final UserData? userData;
+
+  const CustomerAddressPage({super.key, this.userData});
 
   @override
   State<CustomerAddressPage> createState() => _CustomerAddressPageState();
@@ -28,14 +39,24 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _storageKey = 'customer_addresses';
 
+  // business details storage key (same as in BusinessDetailsPage)
+  static const String _businessStorageKey = 'business_details';
+
   // ---- IN-MEMORY LIST OF SAVED ADDRESSES ----
   List<CustomerAddress> _savedAddresses = [];
   int? _selectedIndex; // which saved address is chosen
+
+  // ---- BUSINESS ADDRESS (for FinalCheckoutPage) ----
+  String? _businessAddressLabel;
+  String? _businessAddressText;
+
+  UserData? get _userData => widget.userData;
 
   @override
   void initState() {
     super.initState();
     _loadSavedAddresses();
+    _loadBusinessDetails(); // 🔹 load business address for final checkout
   }
 
   @override
@@ -60,7 +81,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     );
   }
 
-  // ----------------- STORAGE -----------------
+  // ----------------- STORAGE : CUSTOMER ADDRESSES -----------------
   Future<void> _loadSavedAddresses() async {
     try {
       final String? jsonStr = await _storage.read(key: _storageKey);
@@ -85,6 +106,44 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   Future<void> _saveAddressesToStorage() async {
     final jsonList = _savedAddresses.map((e) => e.toJson()).toList();
     await _storage.write(key: _storageKey, value: jsonEncode(jsonList));
+  }
+
+  // ----------------- STORAGE : BUSINESS DETAILS -----------------
+  Future<void> _loadBusinessDetails() async {
+    try {
+      final String? jsonStr = await _storage.read(key: _businessStorageKey);
+      if (jsonStr == null) return;
+
+      final Map<String, dynamic> data = jsonDecode(jsonStr);
+
+      final String businessName =
+          (data['businessName'] as String?)?.trim() ?? '';
+      final String ownerName = (data['ownerName'] as String?)?.trim() ?? '';
+      final String street = (data['address'] as String?)?.trim() ?? '';
+      final String city = (data['city'] as String?)?.trim() ?? '';
+      final String pincode = (data['pincode'] as String?)?.trim() ?? '';
+      final String phone = (data['phone'] as String?)?.trim() ?? '';
+
+      final String label = businessName.isNotEmpty
+          ? businessName
+          : 'Your Business';
+
+      final String addressText = [
+        street,
+        if (city.isNotEmpty || pincode.isNotEmpty) '$city - $pincode',
+        if (phone.isNotEmpty) 'Phone: $phone',
+        if (ownerName.isNotEmpty) 'Owner: $ownerName',
+      ].where((e) => e.trim().isNotEmpty).join('\n');
+
+      setState(() {
+        _businessAddressLabel = label;
+        _businessAddressText = addressText.isNotEmpty
+            ? addressText
+            : 'Business address not provided';
+      });
+    } catch (e) {
+      debugPrint('Failed to load business details for checkout: $e');
+    }
   }
 
   // ----------------- ACTIONS -----------------
@@ -186,21 +245,37 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
 
     final selected = _savedAddresses[_selectedIndex!];
 
-    // You can pass this forward or use Get.back(result: selected.toJson());
+    // Optional toast
     Get.snackbar(
       "Address selected",
       "Delivering to ${selected.name}, ${selected.city}.",
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.green,
       colorText: Colors.white,
+      duration: const Duration(seconds: 2),
     );
 
-    // TODO: Navigate to Order Summary / Payment page,
-    // and pass `selected` (CustomerAddress) there.
-    // Example:
-    // Get.to(() => OrderSummaryPage(
-    //   customerAddress: selected,
-    // ));
+    // -------- Build Customer Address Text --------
+    final String customerLabel = selected.name;
+    final String customerText =
+        "${selected.addressLine}, ${selected.city} - ${selected.pincode}\n"
+        "Phone: ${selected.phone}";
+
+    // -------- Business Address (from secure storage) --------
+    final String businessLabel = _businessAddressLabel ?? "Your Business";
+    final String businessText =
+        _businessAddressText ?? "Business address not provided";
+
+    // -------- Navigate to Final Checkout Page --------
+    Get.to(
+      () => FinalCheckoutPage(
+        userData: _userData,
+        businessAddressLabel: businessLabel,
+        businessAddressText: businessText,
+        customerAddressLabel: customerLabel,
+        customerAddressText: customerText,
+      ),
+    );
   }
 
   // ----------------- UI -----------------
@@ -228,6 +303,14 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       body: SafeArea(
         child: Column(
           children: [
+            const SizedBox(height: 8),
+
+            // 🔹 STEP HEADER – Address step
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: CheckoutStepHeader(currentStep: 3),
+            ),
+
             _buildInfoBanner(),
             Expanded(
               child: SingleChildScrollView(

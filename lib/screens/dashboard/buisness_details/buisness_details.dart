@@ -7,7 +7,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
+
+// 🔹 NEW: Checkout step header (shared widget)
 
 class BusinessDetailsPage extends StatefulWidget {
   final UserData? userData; // optional, to prefill if available
@@ -135,7 +138,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       );
 
       // 🔹 Go to Customer / Delivery Address step
-      Get.to(() => const CustomerAddressPage());
+      Get.to(() => CustomerAddressPage(userData: widget.userData));
     } catch (e) {
       if (!mounted) return;
       Get.snackbar(
@@ -174,8 +177,17 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       body: SafeArea(
         child: Column(
           children: [
+            const SizedBox(height: 8),
+
+            // 🔹 STEP 2: Business
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: CheckoutStepHeader(currentStep: 2),
+            ),
+
             _buildInfoBanner(),
-            if (_hasSavedDetails) _buildSavedSummaryCard(), // 🔹 NEW
+            if (_hasSavedDetails)
+              _buildSavedSummaryCard(), // 🔹 summary if saved
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
