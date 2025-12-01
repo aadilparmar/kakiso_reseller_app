@@ -541,7 +541,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   children: [
                     Text(
                       marginOk
-                          ? 'Margin: ${marginPercent!.toStringAsFixed(1)}%  (₹${marginAmount!.toStringAsFixed(2)} total)'
+                          ? 'Margin: ${marginPercent.toStringAsFixed(1)}%  (₹${marginAmount!.toStringAsFixed(2)} total)'
                           : 'Margin must be > 9.99%',
                       style: TextStyle(
                         fontSize: 11,

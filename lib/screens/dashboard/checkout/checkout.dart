@@ -13,17 +13,6 @@ import 'package:kakiso_reseller_app/utils/constants.dart';
 /// Call this after:
 /// 1. Business details (your business address) are filled
 /// 2. Customer address is selected
-///
-/// Example navigation:
-/// Get.to(
-///   () => FinalCheckoutPage(
-///     userData: userData,
-///     businessAddressLabel: "Kakiso Reseller - ${userData.name}",
-///     businessAddressText: businessFullAddressString,
-///     customerAddressLabel: selectedCustomerName,
-///     customerAddressText: selectedCustomerAddressString,
-///   ),
-/// );
 class FinalCheckoutPage extends StatelessWidget {
   final UserData? userData;
 
@@ -38,6 +27,11 @@ class FinalCheckoutPage extends StatelessWidget {
 
   /// Full formatted customer address text
   final String customerAddressText;
+
+  // 🔹 Fixed charges
+  static const double shippingFee = 100.0;
+  static const double platformFee = 15.0;
+  static const double convenienceFee = 12.0;
 
   const FinalCheckoutPage({
     super.key,
@@ -97,39 +91,45 @@ class FinalCheckoutPage extends StatelessWidget {
           );
         }
 
-        // ---- BASE TOTAL (your cost) ----
+        // ---- BASE TOTAL (product cost for reseller) ----
         final int totalItems = items.fold(
           0,
           (sum, item) => sum + item.quantity,
         );
         final double baseSubTotal = cartController.totalPrice;
 
-        // ---- CUSTOMER AMOUNT (selling price * qty) ----
-        double amountToCollect = 0;
+        // ---- TOTAL CHARGES (shipping + platform + convenience) ----
+        final double totalCharges = shippingFee + platformFee + convenienceFee;
+
+        // ---- MARGIN TOTAL (difference between selling & base for all items) ----
+        double marginTotal = 0;
         for (final item in items) {
           final double basePrice = double.tryParse(item.product.price) ?? 0;
-          // Get saved selling price (with margin) from CartController
           final double? selling = cartController.getSellingPrice(
             item.product.id,
           );
+
           final double perUnit = (selling != null && selling > 0)
               ? selling
               : basePrice;
-          amountToCollect += perUnit * item.quantity;
+
+          double perUnitMargin = perUnit - basePrice;
+          if (perUnitMargin < 0) perUnitMargin = 0; // just in case
+
+          marginTotal += perUnitMargin * item.quantity;
         }
 
-        // If you have shipping / tax logic, adjust here:
-        const double shipping = 0; // Free shipping for now
-        const double tax = 0; // Add tax calculation if needed
+        // ---- AMOUNT RESELLER PAYS TO KAKISO ----
+        // product cost + all charges
+        final double resellerPayAmount = baseSubTotal + totalCharges;
 
-        // Your total cost (base + shipping + tax)
-        final double costGrandTotal = baseSubTotal + shipping + tax;
+        // ---- AMOUNT KAKISO COLLECTS FROM CUSTOMER (on reseller's behalf) ----
+        // reseller pay amount + margin
+        final double customerCollectAmount = resellerPayAmount + marginTotal;
 
-        // Profit made by reseller on this order
-        final double profit = (amountToCollect - costGrandTotal).clamp(
-          0,
-          double.infinity,
-        );
+        // ---- PROFIT FOR RESELLER ----
+        // profit = marginTotal
+        final double profit = marginTotal;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -184,12 +184,12 @@ class FinalCheckoutPage extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // PRICING SUMMARY + AMOUNT TO COLLECT
+              // PRICING SUMMARY (reseller pays vs Kakiso collects)
               _buildPriceBreakup(
                 baseSubTotal: baseSubTotal,
-                shipping: shipping,
-                tax: tax,
-                amountToCollect: amountToCollect,
+                totalCharges: totalCharges,
+                resellerPayAmount: resellerPayAmount,
+                customerCollectAmount: customerCollectAmount,
                 profit: profit,
               ),
 
@@ -281,14 +281,12 @@ class FinalCheckoutPage extends StatelessWidget {
 
   // --- PRICE BREAKUP ---
   Widget _buildPriceBreakup({
-    required double baseSubTotal,
-    required double shipping,
-    required double tax,
-    required double amountToCollect,
-    required double profit,
+    required double baseSubTotal, // product cost
+    required double totalCharges, // shipping + platform + convenience
+    required double resellerPayAmount, // baseSubTotal + totalCharges
+    required double customerCollectAmount, // resellerPayAmount + margin
+    required double profit, // marginTotal
   }) {
-    final double costGrandTotal = baseSubTotal + shipping + tax;
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -305,83 +303,62 @@ class FinalCheckoutPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Your cost block
-          _priceRow('Your cost (base)', baseSubTotal),
+          // SECTION 1: Amount reseller pays
+          const Text(
+            'Amount you will pay to Kakiso',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
-          if (shipping != 0)
-            _priceRow('Shipping cost', shipping)
-          else
-            _priceRow('Shipping cost', shipping, isFree: true),
+          _priceRow('Products cost', baseSubTotal),
+          const SizedBox(height: 4),
+          _priceRow('Shipping fee', shippingFee),
+          const SizedBox(height: 4),
+          _priceRow('Platform fee', platformFee),
+          const SizedBox(height: 4),
+          _priceRow('Convenience fee', convenienceFee),
           const SizedBox(height: 6),
-          if (tax != 0)
-            _priceRow('Tax', tax)
-          else
-            _priceRow('Tax', tax, isFree: true),
-          const Divider(height: 20),
+          _priceRow('Total you will pay', resellerPayAmount, isBold: true),
+          const Divider(height: 24),
 
-          _priceRow('Total cost to you', costGrandTotal, isBold: true),
-
+          // SECTION 2: Amount Kakiso collects from customer
+          const Text(
+            'Amount Kakiso will collect from your customer',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          _priceRow('Customer will pay', customerCollectAmount, isBold: true),
           const SizedBox(height: 10),
+
+          // SECTION 3: Profit
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 🔹 Amount to be collected (wrapped safely)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Amount to be collected from customer',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                Expanded(
+                  child: Text(
+                    'Your profit (margin) on this order',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade800,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '₹${amountToCollect.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: accentColor,
-                      ),
-                    ),
-                  ],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Your profit on this order',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '₹${profit.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: profit > 0 ? Colors.green.shade700 : Colors.grey,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                Text(
+                  '₹${profit.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: profit > 0 ? Colors.green.shade700 : Colors.grey,
+                  ),
                 ),
               ],
             ),
@@ -391,12 +368,7 @@ class FinalCheckoutPage extends StatelessWidget {
     );
   }
 
-  Widget _priceRow(
-    String label,
-    double amount, {
-    bool isFree = false,
-    bool isBold = false,
-  }) {
+  Widget _priceRow(String label, double amount, {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -408,28 +380,19 @@ class FinalCheckoutPage extends StatelessWidget {
               fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
               color: Colors.grey.shade700,
             ),
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: 8),
-        isFree
-            ? Text(
-                'FREE',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-                  color: Colors.green,
-                ),
-              )
-            : Text(
-                '₹${amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: isBold ? 14 : 13,
-                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-                  color: Colors.black87,
-                ),
-              ),
+        Text(
+          '₹${amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: isBold ? 14 : 13,
+            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
       ],
     );
   }
@@ -501,7 +464,9 @@ class FinalCheckoutPage extends StatelessWidget {
     );
   }
 
-  // --- BOTTOM BAR (now uses amountToCollect) ---
+  // --- BOTTOM BAR ---
+  // Reseller pays: product cost + all charges (this is sent to PaymentPage)
+  // Kakiso collects from customer: that amount + margin
   Widget _buildBottomBar() {
     final CartController cartController = Get.find<CartController>();
 
@@ -510,16 +475,25 @@ class FinalCheckoutPage extends StatelessWidget {
       if (items.isEmpty) return const SizedBox.shrink();
 
       final double baseSubTotal = cartController.totalPrice;
+      final double totalCharges = shippingFee + platformFee + convenienceFee;
 
-      double amountToCollect = 0;
+      // Margin total
+      double marginTotal = 0;
       for (final item in items) {
         final double basePrice = double.tryParse(item.product.price) ?? 0;
         final double? selling = cartController.getSellingPrice(item.product.id);
         final double perUnit = (selling != null && selling > 0)
             ? selling
             : basePrice;
-        amountToCollect += perUnit * item.quantity;
+
+        double perUnitMargin = perUnit - basePrice;
+        if (perUnitMargin < 0) perUnitMargin = 0;
+
+        marginTotal += perUnitMargin * item.quantity;
       }
+
+      final double resellerPayAmount = baseSubTotal + totalCharges;
+      final double customerCollectAmount = resellerPayAmount + marginTotal;
 
       return Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -541,12 +515,12 @@ class FinalCheckoutPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Amount to be collected',
+                    'You will pay (products + charges)',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '₹${amountToCollect.toStringAsFixed(2)}',
+                    '₹${resellerPayAmount.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -554,7 +528,7 @@ class FinalCheckoutPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Your cost: ₹${baseSubTotal.toStringAsFixed(2)}',
+                    'Kakiso will collect from your customer: ₹${customerCollectAmount.toStringAsFixed(2)}',
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   ),
                 ],
@@ -562,10 +536,10 @@ class FinalCheckoutPage extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                // 👉 Go to online payment screen with customer amount
+                // 👉 PaymentPage charges what the reseller pays: product cost + charges
                 Get.to(
                   () => PaymentPage(
-                    payableAmount: amountToCollect,
+                    payableAmount: resellerPayAmount,
                     userData: userData,
                     businessAddressLabel: businessAddressLabel,
                     customerAddressLabel: customerAddressLabel,
