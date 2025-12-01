@@ -1,16 +1,26 @@
 // lib/screens/authentication/login/login.dart
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/forget_password.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
+
+// ─────────────────────────────────────────────────────────────
+//  THEME CONSTANTS (MATCHING INTRO SCREEN)
+// ─────────────────────────────────────────────────────────────
+const Color kPrimaryDeep = Color(0xFF4B3DAF);
+const Color kPrimaryLight = Color(0xFF7B45C9);
+const Color kAccentColor = Color(0xFFE91E63);
+const Color kBgColor = Color(0xFFF8F7FF);
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,7 +29,8 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
@@ -29,8 +40,8 @@ class _LoginPageState extends State<LoginPage> {
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
   late GraphQLClient _client;
 
-  // This is still here if you want to use it for other keys,
-  // but for auth we now go through SessionService.
+  // Background animation controller (for ambient blobs)
+  late AnimationController _bgController;
 
   // GoogleSignIn instance
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -42,16 +53,24 @@ class _LoginPageState extends State<LoginPage> {
     super.initState();
     final HttpLink httpLink = HttpLink(_graphqlUrl);
     _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
+
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _bgController.dispose();
     super.dispose();
   }
 
-  /// Logs in using the WPGraphQL JWT Authentication plugin.
+  // ─────────────────────────────────────────────────────────
+  //  API LOGIN (SAME LOGIC AS BEFORE)
+  // ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> _apiLoginRaw(
     String email,
     String password,
@@ -194,230 +213,487 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // ─────────────────────────────────────────────────────────
+  //  UI
+  // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 32.0,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Image.asset('assets/logos/login-logo.png', height: 80),
-                const SizedBox(height: 60),
-                const Text(
-                  'Log In',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 38,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF4A317E),
-                  ),
+      backgroundColor: kBgColor,
+      body: Stack(
+        children: [
+          _buildAmbientBackground(),
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 24,
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Login to Your Reseller Panel',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
-                ),
-                const SizedBox(height: 32),
-
-                // Email
-                TextFormField(
-                  controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: 'Email Id / Mobile Number',
-                    labelStyle: const TextStyle(color: Colors.black54),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF6A1B9A),
-                        width: 2.0,
-                      ),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 16.0,
-                      horizontal: 16.0,
-                    ),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: !_isLoading,
-                ),
-                const SizedBox(height: 20),
-
-                // Password
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: !_isPasswordVisible,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    labelStyle: const TextStyle(color: Colors.black54),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: const Color(0xFFEE3054),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFE91E63),
-                        width: 2.0,
-                      ),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 16.0,
-                      horizontal: 16.0,
-                    ),
-                  ),
-                  enabled: !_isLoading,
-                ),
-                const SizedBox(height: 16),
-
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () => Get.to(() => const ForgotPasswordPage()),
-                    child: const Text(
-                      'Forgot password?',
-                      style: TextStyle(
-                        color: Color(0xFFE91E63),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Login button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE91E63),
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    elevation: 5,
-                    shadowColor: const Color(0xFFE91E63).withOpacity(0.4),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text(
-                          'Log in',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 24),
-
-                // Google button
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _handleGoogleSignIn,
-                  icon: Image.network(
-                    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                    height: 22.0,
-                  ),
-                  label: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Sign in with Google',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    side: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 40),
-
-                // Sign up
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Get.to(() => const RegisterPage()),
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          color: Color(0xFFE91E63),
-                          decoration: TextDecoration.underline,
-                          decorationColor: Color(0xFFE91E63),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
+                    // TOP BACK / LOGO
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Image.asset('assets/logos/login-logo.png', height: 40),
+                        const SizedBox(width: 40), // balance the row
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // TITLE & SUBTITLE
+                    const Text(
+                      'Welcome👋',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDeep,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     const Text(
-                      'join the largest dropship marketplace in India....',
-                      style: TextStyle(color: Colors.black54, fontSize: 12),
+                      'Login to your reseller panel\nand continue growing your brand.',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        height: 1.4,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // MAIN CARD
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 20,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // small badge
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: kPrimaryDeep.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                'Kakiso Reseller Login',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: kPrimaryDeep,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // EMAIL FIELD
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              labelText: 'Email Id / Mobile Number',
+                              labelStyle: const TextStyle(
+                                color: Colors.black54,
+                                fontFamily: 'Poppins',
+                              ),
+                              prefixIcon: const Icon(
+                                Iconsax.sms,
+                                size: 20,
+                                color: kPrimaryDeep,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                                borderSide: const BorderSide(
+                                  color: kPrimaryDeep,
+                                  width: 2.0,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFDFDFF),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 16.0,
+                                horizontal: 14.0,
+                              ),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                            enabled: !_isLoading,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // PASSWORD FIELD
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: !_isPasswordVisible,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              labelStyle: const TextStyle(
+                                color: Colors.black54,
+                                fontFamily: 'Poppins',
+                              ),
+                              prefixIcon: const Icon(
+                                Iconsax.lock_1,
+                                size: 20,
+                                color: kPrimaryDeep,
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _isPasswordVisible
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: kAccentColor,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isPasswordVisible = !_isPasswordVisible;
+                                  });
+                                },
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                                borderSide: const BorderSide(
+                                  color: kAccentColor,
+                                  width: 2.0,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFFDFDFF),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 16.0,
+                                horizontal: 14.0,
+                              ),
+                            ),
+                            enabled: !_isLoading,
+                          ),
+                          const SizedBox(height: 8),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () => Get.to(
+                                      () => const ForgotPasswordPage(),
+                                    ),
+                              child: const Text(
+                                'Forgot password?',
+                                style: TextStyle(
+                                  color: kAccentColor,
+                                  fontSize: 13,
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // LOGIN BUTTON (Bouncy)
+                          _BouncyButton(
+                            onPressed: _isLoading ? () {} : _handleLogin,
+                            child: Container(
+                              width: double.infinity,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [kPrimaryDeep, kPrimaryLight],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: kPrimaryDeep.withOpacity(0.35),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.8,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Log in',
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // Divider with "Or continue with"
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 1,
+                                  color: Colors.grey.shade200,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Or continue with',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: Colors.black45,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Container(
+                                  height: 1,
+                                  color: Colors.grey.shade200,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // GOOGLE BUTTON
+                          OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _handleGoogleSignIn,
+                            icon: Image.network(
+                              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
+                              height: 22.0,
+                            ),
+                            label: _isLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Sign in with Google',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14.0,
+                              ),
+                              side: BorderSide(
+                                color: Colors.grey[300]!,
+                                width: 1.4,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // SIGN UP TEXT
+                    Column(
+                      children: [
+                        GestureDetector(
+                          onTap: _isLoading
+                              ? null
+                              : () => Get.to(() => const RegisterPage()),
+                          child: const Text(
+                            'New to Kakiso? Create an account',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: kAccentColor,
+                              decoration: TextDecoration.underline,
+                              decorationColor: kAccentColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Join the largest dropship marketplace in India.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  AMBIENT BACKGROUND (Blurred Blobs)
+  // ─────────────────────────────────────────────────────────
+  Widget _buildAmbientBackground() {
+    return AnimatedBuilder(
+      animation: _bgController,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            Positioned(
+              top: -120 + (_bgController.value * 30),
+              right: -40,
+              child: WidgetBlurExtension(
+                Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kPrimaryLight.withOpacity(0.18),
+                  ),
+                ),
+              ).blur(60),
+            ),
+            Positioned(
+              bottom: -80 - (_bgController.value * 20),
+              left: -60,
+              child: WidgetBlurExtension(
+                Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kAccentColor.withOpacity(0.14),
+                  ),
+                ),
+              ).blur(55),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  HELPER EXTENSION & BOUNCY BUTTON (Same feel as intro screen)
+// ─────────────────────────────────────────────────────────────
+
+extension WidgetBlurExtension on Widget {
+  Widget blur(double sigma) {
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+      child: this,
+    );
+  }
+}
+
+class _BouncyButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+
+  const _BouncyButton({required this.child, required this.onPressed});
+
+  @override
+  State<_BouncyButton> createState() => _BouncyButtonState();
+}
+
+class _BouncyButtonState extends State<_BouncyButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(_controller);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onPressed();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) =>
+            Transform.scale(scale: _scaleAnimation.value, child: widget.child),
       ),
     );
   }

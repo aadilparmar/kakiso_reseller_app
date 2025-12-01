@@ -196,12 +196,14 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
             Positioned(
               top: -100 + (_bgAnimationController.value * 30),
               right: -50,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kPrimaryLight.withOpacity(0.15),
+              child: widgetExtensions(
+                Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kPrimaryLight.withOpacity(0.15),
+                  ),
                 ),
               ).blur(60),
             ),
@@ -209,12 +211,14 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
             Positioned(
               bottom: 100 - (_bgAnimationController.value * 40),
               left: -80,
-              child: Container(
-                width: 250,
-                height: 250,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kAccentColor.withOpacity(0.1),
+              child: widgetExtensions(
+                Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kAccentColor.withOpacity(0.1),
+                  ),
                 ),
               ).blur(50),
             ),

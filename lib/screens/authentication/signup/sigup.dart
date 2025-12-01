@@ -1,11 +1,23 @@
+// lib/screens/authentication/signup/sigup.dart
+
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:kakiso_reseller_app/screens/authentication/success.dart';
+import 'package:iconsax/iconsax.dart';
 
-// --- IMPORTS ADDED FOR API ---
-import 'dart:async';
-import 'package:graphql_flutter/graphql_flutter.dart';
-// --- END OF IMPORTS ---
+import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+
+// If you already have a registration service / GraphQL client,
+// import it here and plug into _handleRegister() where marked.
+
+// ─────────────────────────────────────────────────────────────
+//  THEME CONSTANTS (MATCHING INTRO & LOGIN)
+// ─────────────────────────────────────────────────────────────
+const Color kPrimaryDeep = Color(0xFF4B3DAF);
+const Color kPrimaryLight = Color(0xFF7B45C9);
+const Color kAccentColor = Color(0xFFE91E63);
+const Color kBgColor = Color(0xFFF8F7FF);
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,485 +26,664 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageState extends State<RegisterPage>
+    with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+
   bool _isPasswordVisible = false;
-  bool _receiveWhatsappUpdates = false;
-
-  // --- ADDED FOR API LOGIC ---
+  bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
+  bool _acceptTerms = false;
 
-  // 1. Add controllers for all your fields
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _mobileController = TextEditingController();
-  final _otpController = TextEditingController(); // For the OTP field
+  // Controllers
+  final _fullNameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _referralController = TextEditingController();
 
-  // 2. Setup the GraphQL client
-  final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
-  late GraphQLClient _client;
+  // Background animation
+  late AnimationController _bgController;
 
   @override
   void initState() {
     super.initState();
-    final HttpLink httpLink = HttpLink(_graphqlUrl);
-    _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    // 3. Dispose all controllers
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _mobileController.dispose();
-    _otpController.dispose();
+    _bgController.dispose();
+    _fullNameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
-  // --- END OF API LOGIC SETUP ---
 
-  // 4. API Registration Function
-  Future<void> _apiRegister() async {
-    // This mutation uses the email as the username, which is a common setup.
-    const String registerMutation = r'''
-      mutation RegisterUser(
-        $email: String!, 
-        $password: String!, 
-        $firstName: String!, 
-        $lastName: String!
-      ) {
-        registerUser(
-          input: {
-            username: $email, 
-            email: $email, 
-            password: $password, 
-            firstName: $firstName, 
-            lastName: $lastName,
-          }
-        ) {
-          user {
-            id
-            email
-          }
-        }
-      }
-    ''';
+  // ─────────────────────────────────────────────────────────
+  //  REGISTER HANDLER (PLUG YOUR BACKEND HERE)
+  // ─────────────────────────────────────────────────────────
+  Future<void> _handleRegister() async {
+    if (_isLoading) return;
 
-    final MutationOptions options = MutationOptions(
-      document: gql(registerMutation),
-      variables: <String, dynamic>{
-        'email': _emailController.text.trim(),
-        'password': _passwordController.text,
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        // Note: Mobile number and OTP are not standard fields.
-        // Adding them requires custom-coded plugin functions on your server.
-      },
-    );
-
-    final QueryResult result = await _client.mutate(options);
-
-    if (result.hasException) {
-      print(result.exception.toString());
-      String errorMessage = "Registration failed.";
-      if (result.exception!.graphqlErrors.isNotEmpty) {
-        errorMessage = result.exception!.graphqlErrors[0].message;
-      }
-      throw Exception(errorMessage);
+    // Validate form first
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
 
-    if (result.data == null || result.data!['registerUser']?['user'] == null) {
-      throw Exception("Registration failed. Server returned no data.");
+    if (!_acceptTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Please accept Terms & Privacy Policy to continue.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
     }
-    // If we reach here, registration was successful!
-  }
-
-  // 5. Handle "Create Account" button press
-  Future<void> _handleCreateAccount() async {
-    // --- NOTE: OTP VALIDATION WOULD GO HERE ---
-    // For now, we'll skip it.
-    // Example:
-    // if (_otpController.text != "THE_CORRECT_OTP") {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(content: Text("Invalid OTP.")),
-    //   );
-    //   return;
-    // }
-    // ---
 
     setState(() => _isLoading = true);
 
     try {
-      // Call the API
-      await _apiRegister();
+      final fullName = _fullNameController.text.trim();
+      final phone = _phoneController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+      final referral = _referralController.text.trim();
 
-      // If successful, stop loading and navigate to success screen
-      if (mounted) {
-        setState(() => _isLoading = false);
-        Get.to(() => const AccountCreatedScreen());
-      }
-    } catch (e) {
-      // If API call fails, stop loading and show an error
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst("Exception: ", "")),
-            backgroundColor: Colors.red.shade700,
+      // TODO: Replace this mock delay with your real API call / GraphQL mutation
+      // Example:
+      // await MyAuthService.registerUser(
+      //   name: fullName,
+      //   phone: phone,
+      //   email: email,
+      //   password: password,
+      //   referralCode: referral.isEmpty ? null : referral,
+      // );
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      // 🎉 Show success & redirect to login
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Account created successfully! Please log in to continue.',
+            style: const TextStyle(fontFamily: 'Poppins'),
           ),
-        );
-      }
+          backgroundColor: Colors.green.shade600,
+        ),
+      );
+
+      // Go back to Login
+      Get.offAll(() => const LoginPage());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+            style: const TextStyle(fontFamily: 'Poppins'),
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 
-  // 6. Handle "Send OTP" (We'll leave this blank for now)
-  // Future<void> _handleSendOtp() async {
-  //   // This requires a custom backend plugin.
-  //   // This is where you would call your "Send OTP" API.
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     const SnackBar(
-  //       content: Text("OTP functionality is not yet implemented."),
-  //       backgroundColor: Colors.blue,
-  //     ),
-  //   );
-  // }
-
+  // ─────────────────────────────────────────────────────────
+  //  UI
+  // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // <-- FIX: Removed the extra ". "
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () {
-            Navigator.pop(context); // Go back to the previous screen
-          },
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 0.0,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 1. Logo
-                Image.asset('assets/logos/login-logo.png', height: 80),
-                const SizedBox(height: 30),
-                // 2. Register Title
-                const Text(
-                  'Register',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 38,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF4A317E),
-                  ),
+      backgroundColor: kBgColor,
+      body: Stack(
+        children: [
+          _buildAmbientBackground(),
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 24,
                 ),
-                const SizedBox(height: 8),
-
-                // 3. Subtitle
-                const Text(
-                  'Create Reseller Account',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.black54),
-                ),
-                const SizedBox(height: 32),
-
-                // 4. First Name Field
-                _buildTextField(
-                  'First Name',
-                  controller: _firstNameController, // <-- Wire up controller
-                  keyboardType: TextInputType.text,
-                  enabled: !_isLoading, // <-- Disable when loading
-                ),
-                const SizedBox(height: 16),
-
-                // 5. Last Name Field
-                _buildTextField(
-                  'Last Name',
-                  controller: _lastNameController, // <-- Wire up controller
-                  keyboardType: TextInputType.text,
-                  enabled: !_isLoading, // <-- Disable when loading
-                ),
-                const SizedBox(height: 16),
-
-                // 6. Mobile Number Field with Send OTP button
-                Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: _buildTextField(
-                        'Mobile Number',
-                        controller: _mobileController, // <-- Wire up controller
-                        keyboardType: TextInputType.phone,
-                        enabled: !_isLoading, // <-- Disable when loading
+                    // TOP BACK / LOGO
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Image.asset('assets/logos/login-logo.png', height: 40),
+                        const SizedBox(width: 40),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    const Text(
+                      'Create your Kakiso account',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDeep,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    // SizedBox(
-                    //   width: 100, // Fixed width for the button
-                    //   child: ElevatedButton(
-                    //     onPressed: _isLoading
-                    //         ? null
-                    //         : _handleSendOtp, // <-- Call OTP handler
-                    //     style: ElevatedButton.styleFrom(
-                    //       backgroundColor: const Color(0xFFE91E63),
-                    //       padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    //       shape: RoundedRectangleBorder(
-                    //         borderRadius: BorderRadius.circular(10.0),
-                    //       ),
-                    //       elevation: 0,
-                    //     ),
-                    //     child: const Text(
-                    //       'Send OTP',
-                    //       style: TextStyle(
-                    //         fontSize: 14,
-                    //         fontWeight: FontWeight.w600,
-                    //         color: Colors.white,
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // 7. Enter OTP Field
-                // _buildTextField(
-                //   'Enter OTP',
-                //   controller: _otpController, // <-- Wire up controller
-                //   keyboardType: TextInputType.number,
-                //   enabled: !_isLoading, // <-- Disable when loading
-                // ),
-                // const SizedBox(height: 16),
-
-                // 8. Email ID Field
-                _buildTextField(
-                  'Email ID',
-                  controller: _emailController, // <-- Wire up controller
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: !_isLoading, // <-- Disable when loading
-                ),
-                const SizedBox(height: 16),
-
-                // 9. Password Field
-                TextFormField(
-                  controller: _passwordController, // <-- Wire up controller
-                  enabled: !_isLoading, // <-- Disable when loading
-                  obscureText: !_isPasswordVisible,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    labelStyle: const TextStyle(color: Colors.black54),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Join thousands of resellers building their own brands.',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
                         color: Colors.black54,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF6A1B9A),
-                        width: 2.0,
+                        height: 1.4,
                       ),
                     ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 16.0,
-                      horizontal: 16.0,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                // 10. WhatsApp Updates Checkbox
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 24.0,
-                      height: 24.0,
-                      child: Checkbox(
-                        value: _receiveWhatsappUpdates,
-                        // Disable checkbox when loading
-                        onChanged: _isLoading
-                            ? null
-                            : (bool? newValue) {
+                    // MAIN CARD
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 20,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kPrimaryDeep.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: const Text(
+                                  'New Reseller Sign Up',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: kPrimaryDeep,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Full Name
+                            TextFormField(
+                              controller: _fullNameController,
+                              decoration: _inputDecoration(
+                                label: 'Full Name',
+                                icon: Iconsax.user,
+                              ),
+                              textCapitalization: TextCapitalization.words,
+                              validator: (value) {
+                                if (value == null || value.trim().length < 3) {
+                                  return 'Please enter your full name.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Phone (REQUIRED)
+                            TextFormField(
+                              controller: _phoneController,
+                              decoration: _inputDecoration(
+                                label: 'Phone Number',
+                                icon: Iconsax.call,
+                              ).copyWith(hintText: '10-digit WhatsApp number'),
+                              keyboardType: TextInputType.phone,
+                              validator: (value) {
+                                final v = value?.trim() ?? '';
+                                if (v.isEmpty) {
+                                  return 'Phone number is required.';
+                                }
+                                if (v.length < 10) {
+                                  return 'Please enter a valid phone number.';
+                                }
+                                if (!RegExp(r'^[0-9+\-\s]+$').hasMatch(v)) {
+                                  return 'Only digits and + allowed.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Email
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: _inputDecoration(
+                                label: 'Email Address',
+                                icon: Iconsax.sms,
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (value) {
+                                final v = value?.trim() ?? '';
+                                if (v.isEmpty) {
+                                  return 'Email is required.';
+                                }
+                                if (!RegExp(
+                                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                                ).hasMatch(v)) {
+                                  return 'Enter a valid email address.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Password
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: !_isPasswordVisible,
+                              decoration:
+                                  _inputDecoration(
+                                    label: 'Password',
+                                    icon: Iconsax.lock_1,
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _isPasswordVisible
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: kAccentColor,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _isPasswordVisible =
+                                              !_isPasswordVisible;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                              validator: (value) {
+                                final v = value ?? '';
+                                if (v.length < 6) {
+                                  return 'Password must be at least 6 characters.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Password helper
+                            Row(
+                              children: const [
+                                Icon(
+                                  Iconsax.shield_tick,
+                                  size: 16,
+                                  color: Colors.green,
+                                ),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Use 6+ characters. Mix letters & numbers for better security.',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 11,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Confirm Password
+                            TextFormField(
+                              controller: _confirmPasswordController,
+                              obscureText: !_isConfirmPasswordVisible,
+                              decoration:
+                                  _inputDecoration(
+                                    label: 'Confirm Password',
+                                    icon: Iconsax.lock,
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _isConfirmPasswordVisible
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: kAccentColor,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _isConfirmPasswordVisible =
+                                              !_isConfirmPasswordVisible;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                              validator: (value) {
+                                if (value != _passwordController.text) {
+                                  return 'Passwords do not match.';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Optional Referral Code
+                            TextFormField(
+                              controller: _referralController,
+                              decoration: _inputDecoration(
+                                label: 'Referral / Invite Code (optional)',
+                                icon: Iconsax.ticket_discount,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Terms & Privacy
+                            GestureDetector(
+                              onTap: () {
                                 setState(() {
-                                  _receiveWhatsappUpdates = newValue ?? false;
+                                  _acceptTerms = !_acceptTerms;
                                 });
                               },
-                        activeColor: const Color(0xFFE91E63),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Checkbox(
+                                    value: _acceptTerms,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _acceptTerms = v ?? false;
+                                      });
+                                    },
+                                    activeColor: kPrimaryDeep,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: RichText(
+                                      text: const TextSpan(
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12,
+                                          color: Colors.black87,
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: 'I agree to Kakiso’s ',
+                                          ),
+                                          TextSpan(
+                                            text: 'Terms of Use',
+                                            style: TextStyle(
+                                              color: kPrimaryDeep,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          TextSpan(text: ' and '),
+                                          TextSpan(
+                                            text: 'Privacy Policy',
+                                            style: TextStyle(
+                                              color: kPrimaryDeep,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          TextSpan(text: '.'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // SIGN UP BUTTON
+                            _BouncyButton(
+                              onPressed: _isLoading ? () {} : _handleRegister,
+                              child: Container(
+                                width: double.infinity,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [kPrimaryDeep, kPrimaryLight],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: kPrimaryDeep.withOpacity(0.35),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.6,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Create account',
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'I want to receive important updates on Whatsapp',
-                        style: TextStyle(fontSize: 13, color: Colors.black87),
-                      ),
+
+                    const SizedBox(height: 24),
+
+                    // Already have account
+                    Column(
+                      children: [
+                        GestureDetector(
+                          onTap: _isLoading
+                              ? null
+                              : () => Get.offAll(() => const LoginPage()),
+                          child: const Text(
+                            'Already have an account? Log in',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: kAccentColor,
+                              decoration: TextDecoration.underline,
+                              decorationColor: kAccentColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'It takes less than a minute to start selling with Kakiso.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
-                // 11. Create Account Button
-                ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : _handleCreateAccount, // <-- Call create account handler
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE91E63),
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    elevation: 5,
-                    shadowColor: const Color(0xFFE91E63).withOpacity(0.4),
-                  ),
-                  child:
-                      _isLoading // <-- Show loading spinner
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text(
-                          'Create Account',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 20),
-
-                // 12. Sign in with Google Button
-                OutlinedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : () {}, // <-- Disable when loading
-                  icon: Image.network(
-                    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                    height: 22.0,
-                  ),
-                  label: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    side: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // 13. Terms and Conditions / Privacy Policy text
-                RichText(
-                  // ... (your existing code, no changes needed)
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    text: 'By clicking you agree to our "Create Account", ',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
-                    children: [
-                      TextSpan(
-                        text: 'Terms and conditions',
-                        style: const TextStyle(
-                          color: Color(0xFF6A1B9A),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const TextSpan(text: ' and '),
-                      TextSpan(
-                        text: 'Privacy policy',
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // Helper method to build consistent TextFormFields
-  TextFormField _buildTextField(
-    String labelText, {
-    TextInputType keyboardType = TextInputType.text,
-    TextEditingController? controller, // <-- Add controller
-    bool enabled = true, // <-- Add enabled flag
+  // ─────────────────────────────────────────────────────────
+  //  AMBIENT BACKGROUND (BLURRED BLOBS)
+  // ─────────────────────────────────────────────────────────
+  Widget _buildAmbientBackground() {
+    return AnimatedBuilder(
+      animation: _bgController,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            Positioned(
+              top: -120 + (_bgController.value * 30),
+              right: -40,
+              child: WidgetBlurExtension(
+                Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kPrimaryLight.withOpacity(0.18),
+                  ),
+                ),
+              ).blur(60),
+            ),
+            Positioned(
+              bottom: -80 - (_bgController.value * 20),
+              left: -60,
+              child: WidgetBlurExtension(
+                Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kAccentColor.withOpacity(0.14),
+                  ),
+                ),
+              ).blur(55),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  COMMON INPUT DECORATION
+  // ─────────────────────────────────────────────────────────
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
   }) {
-    return TextFormField(
-      controller: controller, // <-- Assign controller
-      enabled: enabled, // <-- Assign enabled
-      decoration: InputDecoration(
-        labelText: labelText,
-        labelStyle: const TextStyle(color: Colors.black54),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10.0),
-          borderSide: const BorderSide(color: Color(0xFF6A1B9A), width: 2.0),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 16.0,
-          horizontal: 16.0,
-        ),
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.black54, fontFamily: 'Poppins'),
+      prefixIcon: Icon(icon, size: 20, color: kPrimaryDeep),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14.0),
+        borderSide: BorderSide(color: Colors.grey[300]!),
       ),
-      keyboardType: keyboardType,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14.0),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14.0),
+        borderSide: const BorderSide(color: kPrimaryDeep, width: 2.0),
+      ),
+      filled: true,
+      fillColor: const Color(0xFFFDFDFF),
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 16.0,
+        horizontal: 14.0,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  EXTENSION + BOUNCY BUTTON (same as intro/login feel)
+// ─────────────────────────────────────────────────────────────
+
+extension WidgetBlurExtension on Widget {
+  Widget blur(double sigma) {
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+      child: this,
+    );
+  }
+}
+
+class _BouncyButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+
+  const _BouncyButton({required this.child, required this.onPressed});
+
+  @override
+  State<_BouncyButton> createState() => _BouncyButtonState();
+}
+
+class _BouncyButtonState extends State<_BouncyButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(_controller);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onPressed();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) =>
+            Transform.scale(scale: _scaleAnimation.value, child: widget.child),
+      ),
     );
   }
 }
