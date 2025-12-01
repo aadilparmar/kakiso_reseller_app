@@ -15,7 +15,15 @@ import 'package:kakiso_reseller_app/utils/constants.dart';
 class BusinessDetailsPage extends StatefulWidget {
   final UserData? userData; // optional, to prefill if available
 
-  const BusinessDetailsPage({super.key, this.userData});
+  /// If true → opened from drawer (settings mode)
+  /// If false / null → opened from checkout flow
+  final bool fromDrawer;
+
+  const BusinessDetailsPage({
+    super.key,
+    this.userData,
+    this.fromDrawer = false,
+  });
 
   @override
   State<BusinessDetailsPage> createState() => _BusinessDetailsPageState();
@@ -146,16 +154,29 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _hasSavedDetails = true; // 🔹 ensure UI reflects saved state
       });
 
-      Get.snackbar(
-        'Business details saved',
-        'Your information will be used on invoices & catalogues.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      if (widget.fromDrawer) {
+        // ✅ SETTINGS MODE (opened from drawer)
+        Get.snackbar(
+          'Details updated',
+          'Your business details have been updated.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        // stay on same page, no navigation
+      } else {
+        // ✅ CHECKOUT FLOW
+        Get.snackbar(
+          'Business details saved',
+          'Your information will be used on invoices & catalogues.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
 
-      // 🔹 Go to Customer / Delivery Address step
-      Get.to(() => CustomerAddressPage(userData: widget.userData));
+        // 🔹 Go to Customer / Delivery Address step
+        Get.to(() => CustomerAddressPage(userData: widget.userData));
+      }
     } catch (e) {
       if (!mounted) return;
       Get.snackbar(
@@ -172,6 +193,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool fromDrawer = widget.fromDrawer;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
@@ -196,13 +219,16 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           children: [
             const SizedBox(height: 8),
 
-            // 🔹 STEP 2: Business
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: CheckoutStepHeader(currentStep: 2),
-            ),
+            // 🔹 STEP 2 header only in checkout flow (NOT from drawer)
+            if (!fromDrawer)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: CheckoutStepHeader(currentStep: 2),
+              ),
 
-            _buildInfoBanner(),
+            // Info banner only in checkout mode
+            if (!fromDrawer) _buildInfoBanner(),
+
             if (_hasSavedDetails)
               _buildSavedSummaryCard(), // 🔹 summary if saved
 
@@ -666,34 +692,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () {
-                      // Form below already has values; this just hints user
-                      Get.snackbar(
-                        'Edit mode',
-                        'You can edit your details in the form below.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        backgroundColor: Colors.black87,
-                        colorText: Colors.white,
-                        duration: const Duration(seconds: 2),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      minimumSize: Size.zero,
-                    ),
-                    icon: const Icon(Iconsax.edit, size: 16),
-                    label: const Text(
-                      "Edit details",
-                      style: TextStyle(fontSize: 12, fontFamily: 'Poppins'),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -791,6 +789,16 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   }
 
   Widget _buildBottomButton() {
+    final bool fromDrawer = widget.fromDrawer;
+
+    // ✅ Decide button label based on context
+    String buttonText;
+    if (fromDrawer) {
+      buttonText = _hasSavedDetails ? 'Update & Save' : 'Save';
+    } else {
+      buttonText = _hasSavedDetails ? 'Update & Continue' : 'Save & Continue';
+    }
+
     return SafeArea(
       top: false,
       child: Container(
@@ -820,9 +828,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _hasSavedDetails
-                            ? 'Update & Continue'
-                            : 'Save & Continue',
+                        buttonText,
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontWeight: FontWeight.w600,

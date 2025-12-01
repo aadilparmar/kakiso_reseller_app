@@ -1,18 +1,17 @@
+// lib/screens/authentication/login/login.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/forget_password.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
-import 'dart:async';
-
-// GraphQL
-import 'package:graphql_flutter/graphql_flutter.dart';
-
-// Secure storage
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-// Google Sign-In
+import 'package:kakiso_reseller_app/services/session_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -31,8 +30,8 @@ class _LoginPageState extends State<LoginPage> {
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
   late GraphQLClient _client;
 
-  // Secure storage
-  final _storage = const FlutterSecureStorage();
+  // This is still here if you want to use it for other keys,
+  // but for auth we now go through SessionService.
 
   // GoogleSignIn instance
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -54,7 +53,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   /// Logs in using the WPGraphQL JWT Authentication plugin.
-  Future<UserData> _apiLogin(String email, String password) async {
+  Future<Map<String, dynamic>> _apiLoginRaw(
+    String email,
+    String password,
+  ) async {
     const String loginMutation = r'''
       mutation LoginUser($username: String!, $password: String!) {
         login(input: { username: $username, password: $password }) {
@@ -81,9 +83,6 @@ class _LoginPageState extends State<LoginPage> {
     final QueryResult result = await _client.mutate(options);
 
     if (result.hasException) {
-      print('--- GRAPHQL API ERROR ---');
-      print(result.exception.toString());
-      print('-------------------------');
       String errorMessage = 'Login failed. Please check your credentials.';
       if (result.exception!.graphqlErrors.isNotEmpty) {
         errorMessage = result.exception!.graphqlErrors[0].message;
@@ -91,54 +90,60 @@ class _LoginPageState extends State<LoginPage> {
       throw Exception(errorMessage);
     }
 
-    if (result.data != null && result.data!['login'] != null) {
-      final loginData = result.data!['login'];
-      final userData = loginData['user'];
-
-      final String authToken = loginData['authToken'];
-
-      await _storage.write(key: 'authToken', value: authToken);
-
-      return UserData(
-        name: '${userData['firstName']} ${userData['lastName']}',
-        email: userData['email'],
-        userId: userData['databaseId'].toString(),
-        joined: DateTime.parse(userData['registeredDate']),
-        profilePicUrl: userData['avatar']?['url'] ?? '',
-      );
-    } else {
+    final loginData = result.data?['login'];
+    if (loginData == null) {
       throw Exception('Login failed. Received invalid data from server.');
     }
+
+    return loginData as Map<String, dynamic>;
   }
 
   Future<void> _handleLogin() async {
+    if (_isLoading) return;
+
     setState(() => _isLoading = true);
 
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      final userData = await _apiLogin(email, password);
+      final loginData = await _apiLoginRaw(email, password);
 
-      if (mounted) {
-        setState(() => _isLoading = false);
-        Get.offAll(() => NavigationMenu(userData: userData));
-      }
+      final String authToken = loginData['authToken'] as String;
+
+      final userData = loginData['user'] as Map<String, dynamic>;
+      final user = UserData(
+        name: '${userData['firstName']} ${userData['lastName']}',
+        email: userData['email'] ?? '',
+        userId: userData['databaseId'].toString(),
+        joined: DateTime.parse(userData['registeredDate']),
+        profilePicUrl: userData['avatar']?['url'] ?? '',
+      );
+
+      // ✅ Persist session so user stays logged in
+      await SessionService.saveSession(authToken: authToken, user: user);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      // Go to app & clear all previous routes
+      Get.offAll(() => NavigationMenu(userData: user));
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst("Exception: ", "")),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 
   /// Google Sign-In flow
   Future<void> _handleGoogleSignIn() async {
+    if (_isLoading) return;
+
     setState(() => _isLoading = true);
 
     try {
@@ -152,24 +157,14 @@ class _LoginPageState extends State<LoginPage> {
 
       final GoogleSignInAuthentication auth = await account.authentication;
 
-      // ID token: can be sent to your backend to verify/exchange for a server-side token
+      // ID token / access token
       final String? idToken = auth.idToken;
       final String? accessToken = auth.accessToken;
 
-      // Persist token locally for now so other parts of app can use it.
-      if (idToken != null) {
-        await _storage.write(key: 'authToken', value: idToken);
-      } else if (accessToken != null) {
-        await _storage.write(key: 'authToken', value: accessToken);
-      }
-
-      // TODO: If your backend supports exchanging Google idToken for your app's auth token,
-      // send `idToken` to your backend here and receive a server auth token.
-      // Example:
-      // final serverToken = await exchangeTokenWithYourBackend(idToken);
+      final String tokenToStore = idToken ?? accessToken ?? '';
 
       // Build a UserData instance from Google profile
-      final userData = UserData(
+      final user = UserData(
         name: account.displayName ?? account.email.split('@').first,
         email: account.email,
         userId: account.id,
@@ -177,24 +172,26 @@ class _LoginPageState extends State<LoginPage> {
         profilePicUrl: account.photoUrl ?? '',
       );
 
-      if (mounted) {
-        setState(() => _isLoading = false);
-        Get.offAll(() => NavigationMenu(userData: userData));
-      }
+      // ✅ Persist session so user stays logged in
+      await SessionService.saveSession(authToken: tokenToStore, user: user);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      Get.offAll(() => NavigationMenu(userData: user));
     } catch (e) {
-      // On error, ensure user is signed out of google client to allow retry
       try {
         await _googleSignIn.signOut();
       } catch (_) {}
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google sign-in failed: ${e.toString()}'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
-      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google sign-in failed: ${e.toString()}'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 
@@ -231,6 +228,8 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(fontSize: 16, color: Colors.black54),
                 ),
                 const SizedBox(height: 32),
+
+                // Email
                 TextFormField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -262,6 +261,8 @@ class _LoginPageState extends State<LoginPage> {
                   enabled: !_isLoading,
                 ),
                 const SizedBox(height: 20),
+
+                // Password
                 TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
@@ -306,6 +307,7 @@ class _LoginPageState extends State<LoginPage> {
                   enabled: !_isLoading,
                 ),
                 const SizedBox(height: 16),
+
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -323,6 +325,8 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // Login button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
@@ -353,6 +357,8 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                 ),
                 const SizedBox(height: 24),
+
+                // Google button
                 OutlinedButton.icon(
                   onPressed: _isLoading ? null : _handleGoogleSignIn,
                   icon: Image.network(
@@ -382,6 +388,8 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
+
+                // Sign up
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

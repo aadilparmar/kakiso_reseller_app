@@ -311,9 +311,21 @@ class _HomeDrawerState extends State<HomeDrawer> {
                     NavigationMenu(userData: widget.userData, initialIndex: 3),
               );
             } else if (uniqueId == 'BusinessDetails') {
-              Get.to(() => BusinessDetailsPage(userData: widget.userData));
+              // ✅ FROM DRAWER → pass fromDrawer: true
+              Get.to(
+                () => BusinessDetailsPage(
+                  userData: widget.userData,
+                  fromDrawer: true,
+                ),
+              );
             } else if (uniqueId == 'CustomerAddress') {
-              Get.to(() => const CustomerAddressPage());
+              // ✅ FROM DRAWER → address settings mode
+              Get.to(
+                () => CustomerAddressPage(
+                  userData: widget.userData,
+                  fromDrawer: true,
+                ),
+              );
             } else {
               widget.onNavigate(uniqueId);
             }

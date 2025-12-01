@@ -18,7 +18,14 @@ class CustomerAddressPage extends StatefulWidget {
   /// Get.to(() => CustomerAddressPage(userData: widget.userData));
   final UserData? userData;
 
-  const CustomerAddressPage({super.key, this.userData});
+  /// If true -> opened from drawer (settings mode, no step header + no continue)
+  final bool fromDrawer;
+
+  const CustomerAddressPage({
+    super.key,
+    this.userData,
+    this.fromDrawer = false,
+  });
 
   @override
   State<CustomerAddressPage> createState() => _CustomerAddressPageState();
@@ -261,7 +268,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     await _saveAddressesToStorage();
   }
 
-  void _onContinue() {
+  void _onContinueCheckout() {
     if (_selectedIndex == null || _savedAddresses.isEmpty) {
       Get.snackbar(
         "Select address",
@@ -328,9 +335,35 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     );
   }
 
+  Future<void> _onUpdateFromDrawer() async {
+    // When opened from drawer, just ensure addresses are saved and show snackbar
+    if (_savedAddresses.isEmpty) {
+      Get.snackbar(
+        "No address found",
+        "Add at least one customer address, then tap Update & Save.",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    await _saveAddressesToStorage();
+
+    Get.snackbar(
+      "Addresses updated",
+      "Your customer address list has been updated.",
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
+  }
+
   // ----------------- UI -----------------
   @override
   Widget build(BuildContext context) {
+    final bool fromDrawer = widget.fromDrawer;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
@@ -340,9 +373,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
           onPressed: () => Get.back(),
         ),
-        title: const Text(
-          'Customer Delivery Address',
-          style: TextStyle(
+        title: Text(
+          fromDrawer ? 'Customer Addresses' : 'Customer Delivery Address',
+          style: const TextStyle(
             fontSize: 16,
             fontFamily: 'Poppins',
             fontWeight: FontWeight.w600,
@@ -355,13 +388,15 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
           children: [
             const SizedBox(height: 8),
 
-            // 🔹 STEP HEADER – Address step
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: CheckoutStepHeader(currentStep: 3),
-            ),
+            // 🔹 STEP HEADER – Address step (only in checkout flow)
+            if (!fromDrawer)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: CheckoutStepHeader(currentStep: 3),
+              ),
 
-            _buildInfoBanner(),
+            if (!fromDrawer) _buildInfoBanner(),
+
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -828,8 +863,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     );
   }
 
-  // --------- BOTTOM CONTINUE BAR ----------
+  // --------- BOTTOM CONTINUE / UPDATE BAR ----------
   Widget _buildBottomBar() {
+    final bool fromDrawer = widget.fromDrawer;
     final bool hasSelection =
         _selectedIndex != null && _savedAddresses.isNotEmpty;
 
@@ -841,7 +877,16 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
         child: Row(
           children: [
             Expanded(
-              child: hasSelection
+              child: fromDrawer
+                  ? Text(
+                      "Saved addresses: ${_savedAddresses.length}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontFamily: 'Poppins',
+                      ),
+                    )
+                  : hasSelection
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,7 +924,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
             SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: hasSelection ? _onContinue : null,
+                onPressed: fromDrawer
+                    ? _onUpdateFromDrawer
+                    : (hasSelection ? _onContinueCheckout : null),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accentColor,
                   disabledBackgroundColor: Colors.grey.shade300,
@@ -891,20 +938,24 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                     vertical: 10,
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      "Continue",
-                      style: TextStyle(
+                      fromDrawer ? "Update & Save" : "Continue",
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         fontFamily: 'Poppins',
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(width: 6),
-                    Icon(Iconsax.arrow_right_3, size: 18, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Icon(
+                      fromDrawer ? Iconsax.tick_circle : Iconsax.arrow_right_3,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ],
                 ),
               ),
