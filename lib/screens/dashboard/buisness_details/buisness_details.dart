@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 // 🔹 Checkout step: Business details (Step 2)
@@ -128,7 +129,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
     setState(() => _isSaving = true);
 
-    // Build the payload that we save locally
+    // Build the payload that we save locally AND send to WooCommerce
     final Map<String, dynamic> payload = {
       "businessName": _businessNameCtrl.text.trim(),
       "ownerName": _ownerNameCtrl.text.trim(),
@@ -146,7 +147,29 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     };
 
     try {
+      // 1️⃣ Save locally in secure storage (so we can prefill next time)
       await _storage.write(key: _storageKey, value: jsonEncode(payload));
+
+      // 2️⃣ Push to WooCommerce / Admin (server)
+      try {
+        await ApiService.updateBusinessDetails(
+          userId: widget.userData?.userId, // comes from WordPress user
+          data: payload,
+        );
+      } catch (e) {
+        // Don’t block UI/navigation if server sync fails, but inform user.
+        debugPrint('Remote business update failed: $e');
+        if (mounted) {
+          Get.snackbar(
+            'Saved locally',
+            'We could not sync your details with Kakiso admin right now. They will still be used on this device.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 4),
+          );
+        }
+      }
 
       if (!mounted) return;
 
@@ -154,7 +177,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _hasSavedDetails = true; // 🔹 ensure UI reflects saved state
       });
 
-      if (widget.fromDrawer) {
+      final bool fromDrawer = widget.fromDrawer;
+
+      if (fromDrawer) {
         // ✅ SETTINGS MODE (opened from drawer)
         Get.snackbar(
           'Details updated',
@@ -163,7 +188,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-        // stay on same page, no navigation
+        // stay on same page
       } else {
         // ✅ CHECKOUT FLOW
         Get.snackbar(

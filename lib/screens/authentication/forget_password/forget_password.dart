@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/reset_password.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -10,6 +12,75 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+  final TextEditingController _emailController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  bool _isValidEmail(String value) {
+    final email = value.trim();
+    if (email.isEmpty) return false;
+    // Very simple email pattern – enough for basic validation
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    return regex.hasMatch(email);
+  }
+
+  Future<void> _submit() async {
+    if (_isLoading) return;
+
+    final email = _emailController.text.trim();
+
+    if (!_isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService.requestPasswordReset(email);
+
+      if (!mounted) return;
+
+      // ✅ Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'If an account exists for $email, you will receive a reset link shortly.',
+          ),
+          backgroundColor: Colors.green.shade600,
+        ),
+      );
+
+      // ✅ Navigate to confirmation screen
+      Get.to(() => const PasswordResetConfirmationPage());
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to request password reset: ${e.toString().replaceFirst("Exception: ", "")}',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -18,12 +89,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Colors.black,
-          ), // Standard back arrow
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            Navigator.pop(context); // Go back to the previous screen
+            Navigator.pop(context);
           },
         ),
       ),
@@ -35,38 +103,38 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               vertical: 20.0,
             ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
 
-                // 1. Forgot Password Title
+                // Title
                 const Text(
                   'Forgot Password',
                   textAlign: TextAlign.start,
                   style: TextStyle(
                     fontSize: 32,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                     color: Colors.black,
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // 2. Subtitle
+                // Subtitle
                 const Text(
-                  'Dont worry sometimes people can forget too , enter your email we will send you the reset link',
+                  'Don\'t worry, it happens! Enter your registered email and we\'ll send you a reset link.',
                   textAlign: TextAlign.start,
                   style: TextStyle(fontSize: 16, color: Colors.black54),
                 ),
                 const SizedBox(height: 40),
 
-                // 3. E-Mail Field
+                // Email input
                 TextFormField(
+                  controller: _emailController,
                   decoration: InputDecoration(
-                    hintText: 'E-Mail', // Using hintText as seen in image
+                    hintText: 'E-Mail',
                     hintStyle: const TextStyle(color: Colors.black54),
                     prefixIcon: const Icon(
-                      Icons.send_outlined, // Icon from the image
+                      Icons.send_outlined,
                       color: Colors.black54,
                     ),
                     border: OutlineInputBorder(
@@ -80,7 +148,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10.0),
                       borderSide: const BorderSide(
-                        color: Color(0xFF0277BD), // Blue color from button
+                        color: Color(0xFFE91E63),
                         width: 2.0,
                       ),
                     ),
@@ -92,32 +160,39 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     ),
                   ),
                   keyboardType: TextInputType.emailAddress,
+                  enabled: !_isLoading,
                 ),
                 const SizedBox(height: 32),
 
-                // 4. Submit Button
+                // Submit button
                 ElevatedButton(
-                  onPressed: () =>
-                      Get.to(() => const PasswordResetConfirmationPage()),
+                  onPressed: _isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(
-                      0xFFE91E63,
-                    ), // Light blue from image
+                    backgroundColor: const Color(0xFFE91E63),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10.0),
                     ),
                     elevation: 5,
-                    shadowColor: const Color(0xFF29B6F6).withOpacity(0.4),
+                    shadowColor: const Color(0xFFE91E63).withOpacity(0.4),
                   ),
-                  child: const Text(
-                    'Submit',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Text(
+                          'Submit',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ],
             ),

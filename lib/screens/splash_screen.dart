@@ -29,6 +29,9 @@ class _SplashScreenState extends State<SplashScreen> {
     // Small delay to show splash logo
     await Future.delayed(const Duration(milliseconds: 1500));
 
+    // Ensure SessionService is initialized (safe to call multiple times)
+    await SessionService.init();
+
     // 🔹 Read token from secure storage via SessionService
     final authToken = await SessionService.getAuthToken();
 
@@ -41,6 +44,9 @@ class _SplashScreenState extends State<SplashScreen> {
     // ✅ Token exists: verify by calling /viewer
     try {
       final userData = await _fetchUserData(authToken);
+
+      // You may also want to re-save it to overwrite any stale user in storage:
+      await SessionService.saveSession(authToken: authToken, user: userData);
 
       // Token valid & user fetched -> go to home/dashboard
       Get.offAll(() => NavigationMenu(userData: userData));
@@ -101,16 +107,11 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/logos/login-logo.png',
-              width: 150.0,
-              height: 150.0,
-              fit: BoxFit.contain,
-            ),
-          ],
+        child: Image.asset(
+          'assets/logos/login-logo.png',
+          width: 150.0,
+          height: 150.0,
+          fit: BoxFit.contain,
         ),
       ),
     );

@@ -350,4 +350,41 @@ class ApiService {
       throw Exception('Error saving business details: $e');
     }
   }
+
+  // --- 12. REQUEST PASSWORD RESET (WordPress Lost Password) ---
+  static Future<void> requestPasswordReset(String email) async {
+    // This uses the native WordPress lost password endpoint.
+    // It behaves the same as submitting the "Lost your password?" form in wp-login.php
+    final Uri url = Uri.parse('$baseUrl/wp-login.php?action=lostpassword');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          // WordPress expects form-encoded data (like a browser form submit)
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "KakisoResellerApp/1.0",
+        },
+        body: {
+          // This is the field WordPress uses internally
+          'user_login': email,
+          // Optional, but mimics the web form
+          'wp-submit': 'Get New Password',
+          'redirect_to': baseUrl,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Password reset request failed (${response.statusCode}).',
+        );
+      }
+
+      // If needed, you could inspect response.body (HTML) to confirm
+      // that WordPress says "Check your email for the confirmation link".
+      // For now we treat HTTP 200 as success.
+    } catch (e) {
+      throw Exception('Error requesting password reset: $e');
+    }
+  }
 }

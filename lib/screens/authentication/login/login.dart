@@ -12,11 +12,10 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/authentication/forget_password/forget_password.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
+import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 
-// ─────────────────────────────────────────────────────────────
-//  THEME CONSTANTS (MATCHING INTRO SCREEN)
-// ─────────────────────────────────────────────────────────────
+// Colors reused from intro
 const Color kPrimaryDeep = Color(0xFF4B3DAF);
 const Color kPrimaryLight = Color(0xFF7B45C9);
 const Color kAccentColor = Color(0xFFE91E63);
@@ -40,13 +39,11 @@ class _LoginPageState extends State<LoginPage>
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
   late GraphQLClient _client;
 
-  // Background animation controller (for ambient blobs)
-  late AnimationController _bgController;
-
-  // GoogleSignIn instance
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: <String>['email', 'profile'],
   );
+
+  late AnimationController _bgController;
 
   @override
   void initState() {
@@ -62,15 +59,12 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   void dispose() {
+    _bgController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _bgController.dispose();
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  API LOGIN (SAME LOGIC AS BEFORE)
-  // ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> _apiLoginRaw(
     String email,
     String password,
@@ -126,7 +120,6 @@ class _LoginPageState extends State<LoginPage>
       final password = _passwordController.text;
 
       final loginData = await _apiLoginRaw(email, password);
-
       final String authToken = loginData['authToken'] as String;
 
       final userData = loginData['user'] as Map<String, dynamic>;
@@ -138,13 +131,12 @@ class _LoginPageState extends State<LoginPage>
         profilePicUrl: userData['avatar']?['url'] ?? '',
       );
 
-      // ✅ Persist session so user stays logged in
+      // ✅ Persist session so user stays logged in forever (until logout)
       await SessionService.saveSession(authToken: authToken, user: user);
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      // Go to app & clear all previous routes
       Get.offAll(() => NavigationMenu(userData: user));
     } catch (e) {
       if (!mounted) return;
@@ -158,7 +150,6 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
-  /// Google Sign-In flow
   Future<void> _handleGoogleSignIn() async {
     if (_isLoading) return;
 
@@ -166,22 +157,17 @@ class _LoginPageState extends State<LoginPage>
 
     try {
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
-
       if (account == null) {
-        // user aborted the sign-in
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
       final GoogleSignInAuthentication auth = await account.authentication;
 
-      // ID token / access token
       final String? idToken = auth.idToken;
       final String? accessToken = auth.accessToken;
-
       final String tokenToStore = idToken ?? accessToken ?? '';
 
-      // Build a UserData instance from Google profile
       final user = UserData(
         name: account.displayName ?? account.email.split('@').first,
         email: account.email,
@@ -190,18 +176,15 @@ class _LoginPageState extends State<LoginPage>
         profilePicUrl: account.photoUrl ?? '',
       );
 
-      // ✅ Persist session so user stays logged in
       await SessionService.saveSession(authToken: tokenToStore, user: user);
 
       if (!mounted) return;
       setState(() => _isLoading = false);
-
       Get.offAll(() => NavigationMenu(userData: user));
     } catch (e) {
       try {
         await _googleSignIn.signOut();
       } catch (_) {}
-
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,9 +196,6 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  UI
-  // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -233,19 +213,25 @@ class _LoginPageState extends State<LoginPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // TOP BACK / LOGO
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        IconButton(
+                          onPressed: () =>
+                              Get.offAll(() => const KakisoIntroScreen()),
+                          icon: const Icon(
+                            Iconsax.arrow_left_2,
+                            color: Colors.black54,
+                          ),
+                        ),
                         Image.asset('assets/logos/login-logo.png', height: 40),
-                        const SizedBox(width: 40), // balance the row
+                        const SizedBox(width: 40),
                       ],
                     ),
                     const SizedBox(height: 24),
-
-                    // TITLE & SUBTITLE
                     const Text(
-                      'Welcome👋',
+                      'Welcome back, reseller 👋',
+                      textAlign: TextAlign.left,
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 26,
@@ -255,20 +241,18 @@ class _LoginPageState extends State<LoginPage>
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Login to your reseller panel\nand continue growing your brand.',
+                      'Log in to manage your catalogues, orders & earnings.',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 14,
-                        height: 1.4,
                         color: Colors.black54,
                       ),
                     ),
                     const SizedBox(height: 24),
 
-                    // MAIN CARD
+                    // Card
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
@@ -283,134 +267,42 @@ class _LoginPageState extends State<LoginPage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // small badge
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kPrimaryDeep.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'Kakiso Reseller Login',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: kPrimaryDeep,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // EMAIL FIELD
                           TextFormField(
                             controller: _emailController,
-                            decoration: InputDecoration(
-                              labelText: 'Email Id / Mobile Number',
-                              labelStyle: const TextStyle(
-                                color: Colors.black54,
-                                fontFamily: 'Poppins',
-                              ),
-                              prefixIcon: const Icon(
-                                Iconsax.sms,
-                                size: 20,
-                                color: kPrimaryDeep,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                                borderSide: const BorderSide(
-                                  color: kPrimaryDeep,
-                                  width: 2.0,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: const Color(0xFFFDFDFF),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 16.0,
-                                horizontal: 14.0,
-                              ),
+                            decoration: _inputDecoration(
+                              label: 'Email Id / Mobile Number',
+                              icon: Iconsax.sms,
                             ),
                             keyboardType: TextInputType.emailAddress,
                             enabled: !_isLoading,
                           ),
                           const SizedBox(height: 16),
-
-                          // PASSWORD FIELD
                           TextFormField(
                             controller: _passwordController,
                             obscureText: !_isPasswordVisible,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              labelStyle: const TextStyle(
-                                color: Colors.black54,
-                                fontFamily: 'Poppins',
-                              ),
-                              prefixIcon: const Icon(
-                                Iconsax.lock_1,
-                                size: 20,
-                                color: kPrimaryDeep,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordVisible
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  color: kAccentColor,
+                            decoration:
+                                _inputDecoration(
+                                  label: 'Password',
+                                  icon: Iconsax.lock_1,
+                                ).copyWith(
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _isPasswordVisible
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      color: kAccentColor,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _isPasswordVisible =
+                                            !_isPasswordVisible;
+                                      });
+                                    },
+                                  ),
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                                borderSide: const BorderSide(
-                                  color: kAccentColor,
-                                  width: 2.0,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: const Color(0xFFFDFDFF),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 16.0,
-                                horizontal: 14.0,
-                              ),
-                            ),
                             enabled: !_isLoading,
                           ),
                           const SizedBox(height: 8),
-
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
@@ -424,16 +316,13 @@ class _LoginPageState extends State<LoginPage>
                                 style: TextStyle(
                                   color: kAccentColor,
                                   fontSize: 13,
-                                  fontFamily: 'Poppins',
                                   fontWeight: FontWeight.w600,
+                                  fontFamily: 'Poppins',
                                 ),
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 8),
-
-                          // LOGIN BUTTON (Bouncy)
                           _BouncyButton(
                             onPressed: _isLoading ? () {} : _handleLogin,
                             child: Container(
@@ -461,7 +350,7 @@ class _LoginPageState extends State<LoginPage>
                                         height: 22,
                                         child: CircularProgressIndicator(
                                           color: Colors.white,
-                                          strokeWidth: 2.8,
+                                          strokeWidth: 2.6,
                                         ),
                                       )
                                     : const Text(
@@ -476,109 +365,65 @@ class _LoginPageState extends State<LoginPage>
                               ),
                             ),
                           ),
-
-                          const SizedBox(height: 18),
-
-                          // Divider with "Or continue with"
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 1,
-                                  color: Colors.grey.shade200,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Or continue with',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 12,
-                                  color: Colors.black45,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Container(
-                                  height: 1,
-                                  color: Colors.grey.shade200,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // GOOGLE BUTTON
-                          OutlinedButton.icon(
-                            onPressed: _isLoading ? null : _handleGoogleSignIn,
-                            icon: Image.network(
-                              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                              height: 22.0,
-                            ),
-                            label: _isLoading
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Sign in with Google',
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14.0,
-                              ),
-                              side: BorderSide(
-                                color: Colors.grey[300]!,
-                                width: 1.4,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14.0),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),
-
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _handleGoogleSignIn,
+                      icon: Image.network(
+                        'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
+                        height: 22.0,
+                      ),
+                      label: _isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Sign in with Google',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14.0),
+                        side: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14.0),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 28),
-
-                    // SIGN UP TEXT
                     Column(
                       children: [
-                        GestureDetector(
-                          onTap: _isLoading
+                        TextButton(
+                          onPressed: _isLoading
                               ? null
                               : () => Get.to(() => const RegisterPage()),
                           child: const Text(
-                            'New to Kakiso? Create an account',
+                            'New to Kakiso? Sign up',
                             style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
                               color: kAccentColor,
                               decoration: TextDecoration.underline,
                               decorationColor: kAccentColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Poppins',
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         const Text(
                           'Join the largest dropship marketplace in India.',
-                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
                             color: Colors.black54,
+                            fontSize: 12,
+                            fontFamily: 'Poppins',
                           ),
                         ),
                       ],
@@ -593,9 +438,6 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  AMBIENT BACKGROUND (Blurred Blobs)
-  // ─────────────────────────────────────────────────────────
   Widget _buildAmbientBackground() {
     return AnimatedBuilder(
       animation: _bgController,
@@ -635,11 +477,36 @@ class _LoginPageState extends State<LoginPage>
       },
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────
-//  HELPER EXTENSION & BOUNCY BUTTON (Same feel as intro screen)
-// ─────────────────────────────────────────────────────────────
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.black54, fontFamily: 'Poppins'),
+      prefixIcon: Icon(icon, size: 20, color: kPrimaryDeep),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14.0),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14.0),
+        borderSide: BorderSide(color: Colors.grey[300]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14.0),
+        borderSide: const BorderSide(color: kPrimaryDeep, width: 2.0),
+      ),
+      filled: true,
+      fillColor: const Color(0xFFFDFDFF),
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 16.0,
+        horizontal: 14.0,
+      ),
+    );
+  }
+}
 
 extension WidgetBlurExtension on Widget {
   Widget blur(double sigma) {

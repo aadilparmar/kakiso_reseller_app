@@ -93,11 +93,11 @@ class _RegisterPageState extends State<RegisterPage>
     setState(() => _isLoading = true);
 
     try {
-      final fullName = _fullNameController.text.trim();
-      final phone = _phoneController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
-      final referral = _referralController.text.trim();
+      // final fullName = _fullNameController.text.trim();
+      // final phone = _phoneController.text.trim();
+      // final email = _emailController.text.trim();
+      // final password = _passwordController.text.trim();
+      // final referral = _referralController.text.trim();
 
       // TODO: Replace this mock delay with your real API call / GraphQL mutation
       // Example:
