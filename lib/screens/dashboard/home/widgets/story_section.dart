@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
@@ -37,206 +36,7 @@ class _StorySectionState extends State<StorySection> {
     }
   }
 
-  // --- THE PREMIUM "QUICK VIEW" POPUP ---
-  void _openStoryPreview(CategoryModel story) {
-    Get.dialog(
-      BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(20),
-          child: Container(
-            width: double.infinity,
-            height: 500,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 30,
-                  spreadRadius: 10,
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Image Header
-                Expanded(
-                  flex: 10,
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(30),
-                        ),
-                        child: Image.network(
-                          story.imageUrl,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) =>
-                              Container(color: Colors.grey[200]),
-                        ),
-                      ),
-                      // Close Button
-                      Positioned(
-                        top: 15,
-                        right: 15,
-                        child: GestureDetector(
-                          onTap: () => Get.back(),
-                          child: CircleAvatar(
-                            backgroundColor: Colors.black.withOpacity(0.5),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Gradient
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: 120,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.8),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Title Overlay
-                      Positioned(
-                        bottom: 20,
-                        left: 20,
-                        right: 20,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "FEATURED",
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                letterSpacing: 1.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              story.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Poppins',
-                                height: 1.1,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Action Section
-                Expanded(
-                  flex: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "${story.count} Items Available",
-                            style: TextStyle(
-                              color: Colors.grey[800],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Get.back();
-                              Get.to(
-                                () => CategoryDetailsPage(
-                                  categoryId: story.id,
-                                  categoryName: story.name,
-                                ),
-                                transition: Transition.fadeIn,
-                                duration: const Duration(milliseconds: 300),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4A317E),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              elevation: 8,
-                              shadowColor: const Color(
-                                0xFF4A317E,
-                              ).withOpacity(0.4),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Text(
-                                  "Explore Category",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Icon(
-                                  Iconsax.arrow_right_1,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // 🔥 NOTE: _openStoryPreview REMOVED – no popup, direct navigation only
 
   @override
   Widget build(BuildContext context) {
@@ -280,19 +80,29 @@ class _StorySectionState extends State<StorySection> {
           ),
         ),
 
-        // --- HORIZONTAL LIST WITHOUT "LIVE" BUBBLE ---
+        // --- HORIZONTAL LIST WITHOUT POPUP ---
         Container(
           height: 115,
           margin: const EdgeInsets.only(top: 8),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.only(left: 16),
-            itemCount: _stories.length, // ❗ Removed "+1" for live bubble
+            itemCount: _stories.length,
             itemBuilder: (context, index) {
               final story = _stories[index];
 
               return GestureDetector(
-                onTap: () => _openStoryPreview(story),
+                onTap: () {
+                  // 👇 Directly open CategoryDetailsPage
+                  Get.to(
+                    () => CategoryDetailsPage(
+                      categoryId: story.id,
+                      categoryName: story.name,
+                    ),
+                    transition: Transition.fadeIn,
+                    duration: const Duration(milliseconds: 300),
+                  );
+                },
                 child: Container(
                   margin: const EdgeInsets.only(right: 16),
                   child: Column(

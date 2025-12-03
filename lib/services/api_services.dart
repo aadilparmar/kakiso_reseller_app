@@ -1,3 +1,4 @@
+// lib/services/api_services.dart
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,24 +13,30 @@ class ApiService {
   // Your Domain
   static const String baseUrl = 'https://prod-kakiso.smitpatadiya.me';
 
-  // Your Keys
+  // Your Keys (WooCommerce consumer key/secret used for wc/v3 endpoints)
   static const String consumerKey =
       'ck_2379795496deebd9ab611ce3e4e54f90ebe9d289';
   static const String consumerSecret =
       'cs_5dc571e56332bd0eb6effd7b318f81bb8c6347c7';
 
+  // Optional app-only API key header for your custom endpoint (leave empty if unused)
+  // If you set this, ensure your server's permission callback checks it.
+  static const String appApiKey = '';
+
   // Helper for Basic Auth Header
   static String get _basicAuth =>
-      'Basic ' + base64Encode(utf8.encode('$consumerKey:$consumerSecret'));
+      'Basic ${base64Encode(utf8.encode('$consumerKey:$consumerSecret'))}';
 
-  // Common headers
+  // Common headers for WooCommerce endpoints
   static Map<String, String> get _headers => {
     "Authorization": _basicAuth,
     "Content-Type": "application/json",
     "User-Agent": "KakisoResellerApp/1.0",
   };
 
-  // --- 1. FETCH CATEGORIES ---
+  // ---------------------------------------------------------------------------
+  // Product/Category helpers (unchanged)
+  // ---------------------------------------------------------------------------
   static Future<List<CategoryModel>> fetchCategories() async {
     final Uri url = Uri.parse(
       '$baseUrl/wp-json/wc/v3/products/categories?per_page=50&hide_empty=true',
@@ -49,22 +56,16 @@ class ApiService {
     }
   }
 
-  // --- 2. FETCH PRODUCTS (Single Page: Supports Pagination, Sort, Filter) ---
   static Future<List<ProductModel>> fetchProducts({
     int page = 1,
     int perPage = 20,
-    String orderBy = 'date', // date, price, popularity, rating
-    String order = 'desc', // asc, desc
+    String orderBy = 'date',
+    String order = 'desc',
     double? minPrice,
     double? maxPrice,
   }) async {
-    // Build Query Parameters
     String queryParams = 'status=publish&per_page=$perPage&page=$page';
-
-    // Add Sorting
     queryParams += '&orderby=$orderBy&order=$order';
-
-    // Add Filtering
     if (minPrice != null) queryParams += '&min_price=${minPrice.toInt()}';
     if (maxPrice != null) queryParams += '&max_price=${maxPrice.toInt()}';
 
@@ -84,16 +85,13 @@ class ApiService {
     }
   }
 
-  // --- 2B. FETCH ALL PRODUCTS (MULTI-PAGE) ---
-  /// Loops through WooCommerce pages and returns ALL products.
-  /// Used in ProductPickerScreen so you can see the full catalogue.
   static Future<List<ProductModel>> fetchAllProductsPaginated({
     String orderBy = 'date',
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
     int perPage = 50,
-    int maxPages = 20, // safety cap
+    int maxPages = 20,
   }) async {
     final List<ProductModel> all = [];
     int page = 1;
@@ -108,21 +106,11 @@ class ApiService {
         maxPrice: maxPrice,
       );
 
-      if (pageItems.isEmpty) {
-        break;
-      }
-
+      if (pageItems.isEmpty) break;
       all.addAll(pageItems);
-
-      // If we got less than perPage, it’s likely the last page
-      if (pageItems.length < perPage) {
-        break;
-      }
-
+      if (pageItems.length < perPage) break;
       page++;
-
       if (page > maxPages) {
-        // Avoid infinite loops if API misbehaves
         print(
           "ApiService.fetchAllProductsPaginated: Reached maxPages=$maxPages, stopping.",
         );
@@ -133,7 +121,6 @@ class ApiService {
     return all;
   }
 
-  // --- 3. FETCH PRODUCTS BY CATEGORY (With Sort & Filter) ---
   static Future<List<ProductModel>> fetchProductsByCategory(
     int categoryId, {
     String orderBy = 'popularity',
@@ -141,10 +128,8 @@ class ApiService {
     double? minPrice,
     double? maxPrice,
   }) async {
-    // Build Query
     String queryParams = 'category=$categoryId&status=publish&per_page=20';
     queryParams += '&orderby=$orderBy&order=$order';
-
     if (minPrice != null) queryParams += '&min_price=${minPrice.toInt()}';
     if (maxPrice != null) queryParams += '&max_price=${maxPrice.toInt()}';
 
@@ -152,7 +137,6 @@ class ApiService {
 
     try {
       final response = await http.get(url, headers: _headers);
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => ProductModel.fromJson(json)).toList();
@@ -164,13 +148,11 @@ class ApiService {
     }
   }
 
-  // --- 4. FETCH SINGLE PRODUCT BY ID ---
   static Future<ProductModel> fetchProductById(int id) async {
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/products/$id');
 
     try {
       final response = await http.get(url, headers: _headers);
-
       if (response.statusCode == 200) {
         return ProductModel.fromJson(json.decode(response.body));
       } else {
@@ -181,15 +163,12 @@ class ApiService {
     }
   }
 
-  // --- 5. FETCH TOP SELLING ---
   static Future<List<ProductModel>> fetchTopSellingProducts() async {
     final Uri url = Uri.parse(
       '$baseUrl/wp-json/wc/v3/products?per_page=10&status=publish&orderby=popularity',
     );
-
     try {
       final response = await http.get(url, headers: _headers);
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => ProductModel.fromJson(json)).toList();
@@ -201,15 +180,12 @@ class ApiService {
     }
   }
 
-  // --- 6. FETCH NEWEST ---
   static Future<List<ProductModel>> fetchNewestProducts() async {
     final Uri url = Uri.parse(
       '$baseUrl/wp-json/wc/v3/products?per_page=10&status=publish&orderby=date',
     );
-
     try {
       final response = await http.get(url, headers: _headers);
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => ProductModel.fromJson(json)).toList();
@@ -221,12 +197,10 @@ class ApiService {
     }
   }
 
-  // --- 7. FETCH TRENDING ---
   static Future<List<ProductModel>> fetchTrendingProducts() async {
     return fetchTopSellingProducts();
   }
 
-  // --- 8. FETCH BRANDS ---
   static Future<List<BrandModel>> fetchBrands() async {
     final Uri url = Uri.parse(
       '$baseUrl/wp-json/wc/v3/products/categories?per_page=10&orderby=count&order=desc&hide_empty=true',
@@ -234,7 +208,6 @@ class ApiService {
 
     try {
       final response = await http.get(url, headers: _headers);
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => BrandModel.fromJson(json)).toList();
@@ -246,15 +219,12 @@ class ApiService {
     }
   }
 
-  // --- 9. SEARCH PRODUCTS ---
   static Future<List<ProductModel>> searchProducts(String query) async {
     final Uri url = Uri.parse(
       '$baseUrl/wp-json/wc/v3/products?search=$query&status=publish&per_page=20',
     );
-
     try {
       final response = await http.get(url, headers: _headers);
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => ProductModel.fromJson(json)).toList();
@@ -266,37 +236,28 @@ class ApiService {
     }
   }
 
-  // --- 10. DOWNLOAD IMAGE AS FILE (For WhatsApp catalogue sharing) ---
   static Future<XFile> downloadImageAsFile(String imageUrl) async {
     final response = await http.get(Uri.parse(imageUrl));
-
     if (response.statusCode != 200) {
       throw Exception('Failed to download image for WhatsApp share');
     }
-
     final tempDir = await getTemporaryDirectory();
     final filePath =
         "${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg";
-
     final file = File(filePath);
     await file.writeAsBytes(response.bodyBytes);
-
     return XFile(filePath);
   }
 
-  // --- 11. UPDATE BUSINESS DETAILS (Reseller Profile → WooCommerce Customer) ---
-  ///
-  /// Call this from BusinessDetailsPage with the form payload.
-  /// If userId is null/invalid, the method will simply log and return
-  /// (so your UI doesn't crash).
+  // ---------------------------------------------------------------------------
+  // 11. updateBusinessDetails -> only WooCommerce billing/shipping + kakiso meta
+  // ---------------------------------------------------------------------------
   static Future<void> updateBusinessDetails({
-    String? userId, // WordPress/WooCommerce customer ID as string (optional)
+    String? userId,
     required Map<String, dynamic> data,
   }) async {
-    // If we don't have a valid userId, skip remote update silently for now.
     final int? customerId = int.tryParse((userId ?? '').trim());
     if (customerId == null || customerId <= 0) {
-      // You can remove this print in production if you want it completely silent.
       print(
         '[ApiService.updateBusinessDetails] Skipping update: invalid/missing userId="$userId"',
       );
@@ -305,7 +266,6 @@ class ApiService {
 
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/customers/$customerId');
 
-    // Map our form fields into WooCommerce customer structure
     final Map<String, dynamic> payload = {
       "first_name": data["ownerName"],
       "email": data["email"],
@@ -315,7 +275,7 @@ class ApiService {
         "address_1": data["address"],
         "city": data["city"],
         "postcode": data["pincode"],
-        "country": "IN", // change if needed
+        "country": data["country"] ?? "IN",
         "email": data["email"],
         "phone": data["phone"],
       },
@@ -325,7 +285,7 @@ class ApiService {
         "address_1": data["address"],
         "city": data["city"],
         "postcode": data["pincode"],
-        "country": "IN",
+        "country": data["country"] ?? "IN",
       },
       "meta_data": [
         {"key": "kakiso_whatsapp", "value": data["whatsapp"]},
@@ -340,7 +300,6 @@ class ApiService {
         headers: _headers,
         body: jsonEncode(payload),
       );
-
       if (response.statusCode != 200) {
         throw Exception(
           'Business Details Error: ${response.statusCode} ${response.body}',
@@ -351,24 +310,21 @@ class ApiService {
     }
   }
 
-  // --- 12. REQUEST PASSWORD RESET (WordPress Lost Password) ---
+  // ---------------------------------------------------------------------------
+  // 12. REQUEST PASSWORD RESET
+  // ---------------------------------------------------------------------------
   static Future<void> requestPasswordReset(String email) async {
-    // This uses the native WordPress lost password endpoint.
-    // It behaves the same as submitting the "Lost your password?" form in wp-login.php
     final Uri url = Uri.parse('$baseUrl/wp-login.php?action=lostpassword');
 
     try {
       final response = await http.post(
         url,
         headers: {
-          // WordPress expects form-encoded data (like a browser form submit)
           "Content-Type": "application/x-www-form-urlencoded",
           "User-Agent": "KakisoResellerApp/1.0",
         },
         body: {
-          // This is the field WordPress uses internally
           'user_login': email,
-          // Optional, but mimics the web form
           'wp-submit': 'Get New Password',
           'redirect_to': baseUrl,
         },
@@ -379,12 +335,157 @@ class ApiService {
           'Password reset request failed (${response.statusCode}).',
         );
       }
-
-      // If needed, you could inspect response.body (HTML) to confirm
-      // that WordPress says "Check your email for the confirmation link".
-      // For now we treat HTTP 200 as success.
     } catch (e) {
       throw Exception('Error requesting password reset: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 13. FETCH BUSINESS DETAILS FOR CURRENT USER (reads WooCommerce customer)
+  // ---------------------------------------------------------------------------
+  static Future<Map<String, dynamic>?> fetchBusinessDetails({
+    required String userId,
+  }) async {
+    final int? customerId = int.tryParse(userId.trim());
+    if (customerId == null || customerId <= 0) {
+      print('[ApiService.fetchBusinessDetails] invalid userId="$userId"');
+      return null;
+    }
+
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/customers/$customerId');
+
+    try {
+      final response = await http.get(url, headers: _headers);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'fetchBusinessDetails Error: ${response.statusCode} ${response.body}',
+        );
+      }
+
+      final Map<String, dynamic> data = json.decode(response.body);
+      final billing = (data['billing'] as Map?) ?? {};
+      final List meta = (data['meta_data'] as List?) ?? [];
+
+      String? whatsapp;
+      String? gstin;
+      String? kakisoBusinessName;
+
+      for (final m in meta) {
+        if (m is Map<String, dynamic>) {
+          final key = m['key'];
+          final value = m['value'];
+          if (key == 'kakiso_whatsapp') whatsapp = value?.toString();
+          if (key == 'kakiso_gstin') gstin = value?.toString();
+          if (key == 'kakiso_business_name')
+            kakisoBusinessName = value?.toString();
+        }
+      }
+
+      return {
+        "businessName":
+            kakisoBusinessName ?? billing['company']?.toString() ?? '',
+        "ownerName": data['first_name']?.toString() ?? '',
+        "phone": billing['phone']?.toString() ?? '',
+        "whatsapp": whatsapp ?? billing['phone']?.toString() ?? '',
+        "email":
+            billing['email']?.toString() ?? data['email']?.toString() ?? '',
+        "address": billing['address_1']?.toString() ?? '',
+        "city": billing['city']?.toString() ?? '',
+        "state": billing['state']?.toString() ?? '',
+        "country": billing['country']?.toString() ?? 'India',
+        "pincode": billing['postcode']?.toString() ?? '',
+        "gstin": gstin ?? '',
+      };
+    } catch (e) {
+      throw Exception('Error fetching business details: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // NEW: updateResellerBusinessMeta -> writes reseller-specific fields into user meta
+  // Preferred: call custom REST endpoint '/wp-json/kakiso/v1/reseller-meta'
+  // Fallback: try updating wp/v2/users/<id> meta (requires server support/auth)
+  // ---------------------------------------------------------------------------
+  static Future<void> updateResellerBusinessMeta({
+    String? userId,
+    required Map<String, dynamic> data,
+  }) async {
+    final int? uid = int.tryParse((userId ?? '').trim());
+    if (uid == null || uid <= 0) {
+      print(
+        '[ApiService.updateResellerBusinessMeta] Skipping update: invalid/missing userId="$userId"',
+      );
+      return;
+    }
+
+    // Build meta payload (exact meta keys that your WP admin expects)
+    final Map<String, dynamic> metaPayload = {
+      'reseller_store_store_name': data['businessName'] ?? '',
+      'reseller_store_business_name': data['ownerName'] ?? '',
+      'reseller_store_locality': data['address'] ?? '',
+      'reseller_store_city': data['city'] ?? '',
+      'reseller_store_state': data['state'] ?? '',
+      'reseller_store_country': data['country'] ?? '',
+      'reseller_store_postcode': data['pincode'] ?? '',
+      'reseller_store_phone': data['phone'] ?? '',
+      'reseller_store_whatsapp': data['whatsapp'] ?? '',
+      'reseller_store_email': data['email'] ?? '',
+      'reseller_store_gstin': data['gstin'] ?? '',
+    };
+
+    // 1) Preferred: call a custom REST endpoint that writes user meta on server-side
+    final Uri customUrl = Uri.parse('$baseUrl/wp-json/kakiso/v1/reseller-meta');
+
+    try {
+      final headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "KakisoResellerApp/1.0",
+      };
+      if (appApiKey.isNotEmpty) {
+        headers['x-kakiso-api-key'] = appApiKey;
+      }
+
+      final response = await http.post(
+        customUrl,
+        headers: headers,
+        body: jsonEncode({'user_id': uid, 'meta': metaPayload}),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // success on custom endpoint
+        return;
+      } else {
+        // Log & fallthrough to fallback attempt
+        print(
+          '[ApiService.updateResellerBusinessMeta] custom endpoint returned ${response.statusCode}: ${response.body}',
+        );
+      }
+    } catch (e) {
+      print(
+        '[ApiService.updateResellerBusinessMeta] custom endpoint call failed: $e',
+      );
+      // fallthrough to fallback
+    }
+
+    // 2) Fallback: try wp/v2/users/<id> with meta object (server must permit this)
+    final Uri wpUsersUrl = Uri.parse('$baseUrl/wp-json/wp/v2/users/$uid');
+    try {
+      final response = await http.post(
+        wpUsersUrl,
+        headers: _headers,
+        body: jsonEncode({'meta': metaPayload}),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      } else {
+        throw Exception(
+          'wp/v2/users fallback failed (${response.statusCode}): ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error updating reseller business meta: $e');
     }
   }
 }

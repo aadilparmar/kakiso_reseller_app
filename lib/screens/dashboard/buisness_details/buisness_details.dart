@@ -57,6 +57,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   bool _isWhatsAppSame = true;
   bool _isSaving = false;
   bool _hasSavedDetails = false; // 🔹 to know if user already saved once
+  bool _isRemoteLoading = false; // 🔹 when fetching from server
 
   @override
   void initState() {
@@ -68,10 +69,14 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       _emailCtrl.text = widget.userData!.email;
     }
 
-    // Load any previously saved business details
+    // Load any previously saved business details (device-local)
     _loadSavedDetails();
+
+    // Then load from server so details follow the user across devices
+    _loadRemoteDetails();
   }
 
+  // 🔹 load from secure storage (fast, device-only)
   Future<void> _loadSavedDetails() async {
     try {
       final String? jsonStr = await _storage.read(key: _storageKey);
@@ -106,6 +111,51 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     }
   }
 
+  // 🔹 load from WooCommerce/Kakiso backend (cross-device source of truth)
+  Future<void> _loadRemoteDetails() async {
+    final userId = widget.userData?.userId;
+    if (userId == null || userId.trim().isEmpty) {
+      return;
+    }
+
+    setState(() => _isRemoteLoading = true);
+
+    try {
+      final remoteData = await ApiService.fetchBusinessDetails(userId: userId);
+
+      if (remoteData == null || !mounted) return;
+
+      setState(() {
+        _businessNameCtrl.text =
+            remoteData['businessName'] ?? _businessNameCtrl.text;
+        _ownerNameCtrl.text = remoteData['ownerName'] ?? _ownerNameCtrl.text;
+        _phoneCtrl.text = remoteData['phone'] ?? _phoneCtrl.text;
+        _whatsappCtrl.text = remoteData['whatsapp'] ?? _whatsappCtrl.text;
+        _emailCtrl.text = remoteData['email'] ?? _emailCtrl.text;
+
+        _addressCtrl.text = remoteData['address'] ?? _addressCtrl.text;
+        _cityCtrl.text = remoteData['city'] ?? _cityCtrl.text;
+        _stateCtrl.text = remoteData['state'] ?? _stateCtrl.text;
+        _countryCtrl.text = remoteData['country'] ?? _countryCtrl.text;
+        _pincodeCtrl.text = remoteData['pincode'] ?? _pincodeCtrl.text;
+
+        _gstinCtrl.text = remoteData['gstin'] ?? _gstinCtrl.text;
+
+        _isWhatsAppSame =
+            _whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text;
+
+        _hasSavedDetails = true;
+      });
+
+      // Also sync to local storage so next open is instant
+      await _storage.write(key: _storageKey, value: jsonEncode(remoteData));
+    } catch (e) {
+      debugPrint('Failed to fetch remote business details: $e');
+    } finally {
+      if (mounted) setState(() => _isRemoteLoading = false);
+    }
+  }
+
   @override
   void dispose() {
     _businessNameCtrl.dispose();
@@ -129,7 +179,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
     setState(() => _isSaving = true);
 
-    // Build the payload that we save locally AND send to WooCommerce
+    // Build the payload that we save locally AND send to backend
     final Map<String, dynamic> payload = {
       "businessName": _businessNameCtrl.text.trim(),
       "ownerName": _ownerNameCtrl.text.trim(),
@@ -147,40 +197,29 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     };
 
     try {
-      // 1️⃣ Save locally in secure storage (so we can prefill next time)
+      // 1️⃣ Save locally (for app reuse)
       await _storage.write(key: _storageKey, value: jsonEncode(payload));
 
-      // 2️⃣ Push to WooCommerce / Admin (server)
-      try {
-        await ApiService.updateBusinessDetails(
-          userId: widget.userData?.userId, // comes from WordPress user
-          data: payload,
-        );
-      } catch (e) {
-        // Don’t block UI/navigation if server sync fails, but inform user.
-        debugPrint('Remote business update failed: $e');
-        if (mounted) {
-          Get.snackbar(
-            'Saved locally',
-            'We could not sync your details with Kakiso admin right now. They will still be used on this device.',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 4),
-          );
-        }
-      }
+      // 2️⃣ Push to WooCommerce "customer" (billing/shipping)
+      await ApiService.updateBusinessDetails(
+        userId: widget.userData?.userId,
+        data: payload,
+      );
+
+      // 3️⃣ Push to WordPress "Business Details (Reseller)" user meta box
+      await ApiService.updateResellerBusinessMeta(
+        userId: widget.userData?.userId,
+        data: payload,
+      );
 
       if (!mounted) return;
 
       setState(() {
-        _hasSavedDetails = true; // 🔹 ensure UI reflects saved state
+        _hasSavedDetails = true;
       });
 
-      final bool fromDrawer = widget.fromDrawer;
-
-      if (fromDrawer) {
-        // ✅ SETTINGS MODE (opened from drawer)
+      if (widget.fromDrawer) {
+        // SETTINGS MODE
         Get.snackbar(
           'Details updated',
           'Your business details have been updated.',
@@ -188,9 +227,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-        // stay on same page
       } else {
-        // ✅ CHECKOUT FLOW
+        // CHECKOUT FLOW
         Get.snackbar(
           'Business details saved',
           'Your information will be used on invoices & catalogues.',
@@ -198,19 +236,17 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-
-        // 🔹 Go to Customer / Delivery Address step
         Get.to(() => CustomerAddressPage(userData: widget.userData));
       }
     } catch (e) {
       if (!mounted) return;
-      Get.snackbar(
-        'Error',
-        'Failed to save business details locally: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      // Get.snackbar(
+      //   'Error',
+      //   'Failed to save business details: $e',
+      //   snackPosition: SnackPosition.BOTTOM,
+      //   backgroundColor: Colors.red,
+      //   colorText: Colors.white,
+      // );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -249,6 +285,32 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: CheckoutStepHeader(currentStep: 2),
+              ),
+
+            if (_isRemoteLoading)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 4,
+                ),
+                child: Row(
+                  children: const [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Syncing your saved business details…',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'Poppins',
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
             // Info banner only in checkout mode

@@ -8,9 +8,6 @@ import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 
-// If you already have a registration service / GraphQL client,
-// import it here and plug into _handleRegister() where marked.
-
 // ─────────────────────────────────────────────────────────────
 //  THEME CONSTANTS (MATCHING INTRO & LOGIN)
 // ─────────────────────────────────────────────────────────────
@@ -18,6 +15,26 @@ const Color kPrimaryDeep = Color(0xFF4B3DAF);
 const Color kPrimaryLight = Color(0xFF7B45C9);
 const Color kAccentColor = Color(0xFFE91E63);
 const Color kBgColor = Color(0xFFF8F7FF);
+
+// Basic protection against obvious disposable / dummy emails (frontend only)
+// Real protection must be on backend.
+const List<String> _blockedDisposableDomains = [
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'mailinator.com',
+  'sharklasers.com',
+];
+
+const List<String> _blockedDummyLocalParts = [
+  'test',
+  'demo',
+  'dummy',
+  'fake',
+  'sample',
+  'asdf',
+  'qwerty',
+];
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -99,11 +116,12 @@ class _RegisterPageState extends State<RegisterPage>
       // final password = _passwordController.text.trim();
       // final referral = _referralController.text.trim();
 
-      // TODO: Replace this mock delay with your real API call / GraphQL mutation
+      // // Compose full phone with country code
+      // final fullPhoneWithCode = '+91$phone';
       // Example:
       // await MyAuthService.registerUser(
       //   name: fullName,
-      //   phone: phone,
+      //   phone: fullPhoneWithCode,
       //   email: email,
       //   password: password,
       //   referralCode: referral.isEmpty ? null : referral,
@@ -254,31 +272,37 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                             const SizedBox(height: 14),
 
-                            // Phone (REQUIRED)
+                            // Phone (REQUIRED) with +91 prefix (NO OTP)
                             TextFormField(
                               controller: _phoneController,
-                              decoration: _inputDecoration(
-                                label: 'Phone Number',
-                                icon: Iconsax.call,
-                              ).copyWith(hintText: '10-digit WhatsApp number'),
+                              decoration:
+                                  _inputDecoration(
+                                    label: 'Phone Number',
+                                    icon: Iconsax.call,
+                                  ).copyWith(
+                                    hintText: '10-digit WhatsApp number',
+                                    prefixText: '+91 ',
+                                    prefixStyle: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                               keyboardType: TextInputType.phone,
                               validator: (value) {
                                 final v = value?.trim() ?? '';
                                 if (v.isEmpty) {
                                   return 'Phone number is required.';
                                 }
-                                if (v.length < 10) {
-                                  return 'Please enter a valid phone number.';
-                                }
-                                if (!RegExp(r'^[0-9+\-\s]+$').hasMatch(v)) {
-                                  return 'Only digits and + allowed.';
+                                if (!RegExp(r'^[0-9]{10}$').hasMatch(v)) {
+                                  return 'Enter a valid 10-digit mobile number.';
                                 }
                                 return null;
                               },
                             ),
                             const SizedBox(height: 14),
 
-                            // Email
+                            // Email with extra anti-dummy checks
                             TextFormField(
                               controller: _emailController,
                               decoration: _inputDecoration(
@@ -291,17 +315,38 @@ class _RegisterPageState extends State<RegisterPage>
                                 if (v.isEmpty) {
                                   return 'Email is required.';
                                 }
-                                if (!RegExp(
+                                final emailRegex = RegExp(
                                   r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                                ).hasMatch(v)) {
+                                );
+                                if (!emailRegex.hasMatch(v)) {
                                   return 'Enter a valid email address.';
                                 }
+
+                                final parts = v.split('@');
+                                if (parts.length != 2) {
+                                  return 'Enter a valid email address.';
+                                }
+                                final localPart = parts.first.toLowerCase();
+                                final domain = parts.last.toLowerCase();
+
+                                if (_blockedDummyLocalParts.contains(
+                                  localPart,
+                                )) {
+                                  return 'Please use your real email address.';
+                                }
+
+                                if (_blockedDisposableDomains.any(
+                                  (d) => domain.endsWith(d),
+                                )) {
+                                  return 'Temporary email addresses are not allowed.';
+                                }
+
                                 return null;
                               },
                             ),
                             const SizedBox(height: 14),
 
-                            // Password
+                            // Password (strong rules)
                             TextFormField(
                               controller: _passwordController,
                               obscureText: !_isPasswordVisible,
@@ -327,9 +372,22 @@ class _RegisterPageState extends State<RegisterPage>
                                   ),
                               validator: (value) {
                                 final v = value ?? '';
-                                if (v.length < 6) {
-                                  return 'Password must be at least 6 characters.';
+                                if (v.length < 9) {
+                                  return 'Password must be more than 8 characters.';
                                 }
+                                if (!RegExp(r'[A-Z]').hasMatch(v)) {
+                                  return 'Include at least one uppercase letter.';
+                                }
+                                if (!RegExp(r'[a-z]').hasMatch(v)) {
+                                  return 'Include at least one lowercase letter.';
+                                }
+                                if (!RegExp(r'[0-9]').hasMatch(v)) {
+                                  return 'Include at least one number.';
+                                }
+                                // Optional: uncomment to enforce special char
+                                // if (!RegExp(r'[!@#\$&*~.,;:?_\-]').hasMatch(v)) {
+                                //   return 'Include at least one special character.';
+                                // }
                                 return null;
                               },
                             ),
@@ -346,7 +404,7 @@ class _RegisterPageState extends State<RegisterPage>
                                 SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'Use 6+ characters. Mix letters & numbers for better security.',
+                                    'Use 9+ characters with uppercase, lowercase letters & numbers.',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 11,
@@ -612,9 +670,9 @@ class _RegisterPageState extends State<RegisterPage>
         borderRadius: BorderRadius.circular(14.0),
         borderSide: BorderSide(color: Colors.grey[300]!),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14.0),
-        borderSide: const BorderSide(color: kPrimaryDeep, width: 2.0),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14.0)),
+        borderSide: BorderSide(color: kPrimaryDeep, width: 2.0),
       ),
       filled: true,
       fillColor: const Color(0xFFFDFDFF),

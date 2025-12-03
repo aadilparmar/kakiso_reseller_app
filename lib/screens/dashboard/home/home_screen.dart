@@ -254,12 +254,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const Spacer(),
-            IconButton(
-              icon: const Icon(Iconsax.notification_bing),
-              color: accentColor,
-              iconSize: 30,
-              onPressed: () {},
-            ),
 
             // --- CART ICON WITH BADGE ---
             Stack(

@@ -29,32 +29,44 @@ class _SplashScreenState extends State<SplashScreen> {
     // Small delay to show splash logo
     await Future.delayed(const Duration(milliseconds: 1500));
 
-    // Ensure SessionService is initialized (safe to call multiple times)
+    // Make sure SessionService is ready (safe even if no-op)
     await SessionService.init();
 
-    // 🔹 Read token from secure storage via SessionService
-    final authToken = await SessionService.getAuthToken();
+    // Read token + cached user from secure storage
+    final String? authToken = await SessionService.getAuthToken();
+    final UserData? cachedUser = await SessionService.getUser();
 
-    // ❌ No token => user is logged out -> go to intro
-    if (authToken == null || authToken.isEmpty) {
+    // ❌ No token OR no cached user => treat as logged out
+    if (authToken == null || authToken.isEmpty || cachedUser == null) {
       Get.offAll(() => const KakisoIntroScreen());
       return;
     }
 
-    // ✅ Token exists: verify by calling /viewer
+    // ✅ We have a token & cached user → user is "logged in".
+    // Now we **optionally** validate the token, but we will NOT log them out
+    // if anything fails (timeout, network, invalid token, etc.).
     try {
-      final userData = await _fetchUserData(authToken);
+      final UserData freshUser = await _fetchUserData(
+        authToken,
+      ).timeout(const Duration(seconds: 10));
 
-      // You may also want to re-save it to overwrite any stale user in storage:
-      await SessionService.saveSession(authToken: authToken, user: userData);
+      // Refresh stored session (overwrites stale user data)
+      await SessionService.saveSession(authToken: authToken, user: freshUser);
 
-      // Token valid & user fetched -> go to home/dashboard
-      Get.offAll(() => NavigationMenu(userData: userData));
+      // Go to home with fresh user
+      Get.offAll(() => NavigationMenu(userData: freshUser));
+    } on TimeoutException catch (e) {
+      // ⏱ Slow or no network: just go in with cached user
+      debugPrint("Splash token validation timeout: $e");
+      Get.offAll(() => NavigationMenu(userData: cachedUser));
     } catch (e) {
-      // Token failed (expired/invalid) -> clear and go to intro
-      debugPrint("Token validation failed: $e");
-      await SessionService.clearSession();
-      Get.offAll(() => const KakisoIntroScreen());
+      // Any other error (network, auth, server, etc.)
+      debugPrint("Splash token validation error: $e");
+
+      // 🔴 IMPORTANT:
+      // We DO NOT clear SessionService and DO NOT send to intro.
+      // We still treat the user as logged in using cached data.
+      Get.offAll(() => NavigationMenu(userData: cachedUser));
     }
   }
 
@@ -84,6 +96,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final QueryResult result = await client.query(options);
 
     if (result.hasException) {
+      // Same kind of OperationException you saw in logs
       throw Exception(result.exception.toString());
     }
 

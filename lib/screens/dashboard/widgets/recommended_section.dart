@@ -123,6 +123,26 @@ class _RecommendedSectionState extends State<RecommendedSection> {
     );
   }
 
+  // --- HELPER: Parse and Calculate RSP ---
+  String _calculateRsp(String priceString) {
+    try {
+      // 1. Remove non-numeric chars (keeps dots for decimals)
+      final cleaned = priceString.replaceAll(RegExp(r'[^0-9.]'), '');
+      if (cleaned.isEmpty) return '₹0';
+
+      // 2. Parse to double
+      double price = double.parse(cleaned);
+
+      // 3. Calculate 30% Markup (Price * 1.3)
+      double rspValue = price * 1.30;
+
+      // 4. Return formatted string (rounded to whole number)
+      return '₹${rspValue.round()}';
+    } catch (e) {
+      return priceString; // Fallback if parsing fails
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -147,9 +167,9 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                   ),
                   const SizedBox(width: 8),
 
-                  // "Selected"
+                  // "Featured"
                   const Text(
-                    'Selected',
+                    'Featured',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -160,9 +180,9 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                   ),
                   const SizedBox(width: 6),
 
-                  // "For You" (Colored)
+                  // "Products" (Colored)
                   const Text(
-                    'For You',
+                    'Products',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -173,7 +193,7 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                   ),
                   const SizedBox(width: 8),
 
-                  // Icon
+                  // Heart Icon
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -227,7 +247,7 @@ class _RecommendedSectionState extends State<RecommendedSection> {
 
         // --- 2. HORIZONTAL LIST ---
         SizedBox(
-          height: 170, // Height to fit the card + shadow
+          height: 175, // Adjusted height to accommodate the new card design
           child: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(color: Color(0xFF4A317E)),
@@ -241,14 +261,22 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                   itemBuilder: (context, index) {
                     final product = _products[index];
 
+                    // Calculate RSP (Price + 30%)
+                    final String calculatedRsp = _calculateRsp(product.price);
+
                     return Padding(
                       padding: const EdgeInsets.only(right: 12.0),
                       child: HorizontalProductCard(
                         imageUrl: product.image,
                         title: product.name,
                         companyName: "Kakiso",
+
+                        // Buying Price
                         price: '₹${product.price}',
-                        // Pass original price if available
+
+                        // Calculated RSP passed here
+                        rsp: calculatedRsp,
+
                         originalPrice: product.regularPrice.isNotEmpty
                             ? '₹${product.regularPrice}'
                             : '',
@@ -257,7 +285,6 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                           cartController.addToCart(product);
                           _showPremiumPopup(product);
                         },
-                        // --- 3. ADD NAVIGATION LOGIC HERE ---
                         onPressed: () {
                           Get.to(
                             () => ProductDetailsPage(product: product),
