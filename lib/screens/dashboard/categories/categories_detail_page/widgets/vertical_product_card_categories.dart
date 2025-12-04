@@ -337,28 +337,7 @@ class VerticalProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Small "Resell 30%+" hint
-                  if (resellPrice != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4FF),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        "Resell +30%",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: kPrimaryColor,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 6),
+                  if (resellPrice != null) const SizedBox(height: 6),
                   Text(
                     product.name,
                     maxLines: 2,
@@ -512,30 +491,34 @@ class VerticalProductCard extends StatelessWidget {
                         },
                         child: Container(
                           height: double.infinity,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [kPrimaryColor, kAccentColor],
-                            ),
-                          ),
+                          decoration: const BoxDecoration(color: kPrimaryColor),
                           child: Center(
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
-                              child: Row(
+                              child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Icon(
-                                    Iconsax.shopping_bag,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                                  SizedBox(width: 6),
+                                  // Icon(
+                                  //   Iconsax.shopping_bag,
+                                  //   size: 16,
+                                  //   color: Colors.white,
+                                  // ),
+                                  // SizedBox(width: 6),
                                   Text(
-                                    "Add",
+                                    "Add to",
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
-                                      fontSize: 11.5,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+
+                                  Text(
+                                    "Cart",
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12.5,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white,
                                     ),
@@ -557,31 +540,37 @@ class VerticalProductCard extends StatelessWidget {
                         onTap: () => _onAddToCataloguePressed(context),
                         child: Container(
                           height: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border(
-                              left: BorderSide(color: kBorderColor),
-                            ),
+                          decoration: const BoxDecoration(
+                            color: Color.fromARGB(255, 255, 73, 152),
                           ),
                           child: Center(
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
-                              child: Row(
+                              child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Icon(
-                                    Iconsax.export_3,
-                                    size: 16,
-                                    color: kPrimaryColor,
+                                  // Icon(
+                                  //   Iconsax.export_3,
+                                  //   size: 16,
+                                  //   color: kPrimaryColor,
+                                  // ),
+                                  // SizedBox(width: 6),
+                                  Text(
+                                    "Add to",
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color.fromARGB(255, 255, 255, 255),
+                                    ),
                                   ),
-                                  SizedBox(width: 6),
                                   Text(
                                     "Catalog",
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
-                                      fontSize: 11.5,
+                                      fontSize: 12.5,
                                       fontWeight: FontWeight.w600,
-                                      color: kPrimaryColor,
+                                      color: Color.fromARGB(255, 255, 255, 255),
                                     ),
                                   ),
                                 ],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 
@@ -10,6 +12,7 @@ import 'package:kakiso_reseller_app/utils/constants.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
 
 // --- WIDGET IMPORTS ---
 import 'widgets/home_drawer.dart';
@@ -18,7 +21,6 @@ import 'widgets/search_header.dart';
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-// 1. IMPORT THE SEARCH SCREEN HERE
 
 // --- DASHBOARD SECTIONS IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/story_section.dart';
@@ -41,27 +43,16 @@ class _HomePageState extends State<HomePage> {
   String _selectedTitle = 'BusinessDetails';
   final _storage = const FlutterSecureStorage();
 
-  // Initialize Controller
+  // Controllers
   final CartController cartController = Get.put(CartController());
+  final HomeProductsController homeProductsController = Get.put(
+    HomeProductsController(),
+  );
 
   @override
   void initState() {
     super.initState();
     _userData = widget.userData;
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    try {
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {});
-        print("Error loading products: $e");
-      }
-    }
   }
 
   void _handleNavigation(String pageId) {
@@ -327,11 +318,10 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 2. FIXED SEARCH HEADER ---
+            // SEARCH
             SearchHeader(
-              readOnly: true, // Prevents typing here
+              readOnly: true,
               onTap: () {
-                // Navigates to Search Screen
                 Get.to(
                   () => const ProductSearchScreen(),
                   transition: Transition.fadeIn,
@@ -339,19 +329,51 @@ class _HomePageState extends State<HomePage> {
               },
             ),
 
-            // --- CONTENT SECTIONS ---
+            // SECTIONS
             const StorySection(),
             const SizedBox(height: 16),
             const RecommendedSection(),
             const SizedBox(height: 16),
-            // const BrandsSection(),
-            const TopRankingSection(),
             const FlashSaleBanner(),
             const SizedBox(height: 16),
+            const TopRankingSection(),
+            const SizedBox(height: 6),
             const NewArrivalSection(),
             const TrendingProducts(),
             const SizedBox(height: 16),
             const CuratedCollections(),
+            const SizedBox(height: 16),
+
+            // 🔹 Budget Store Section with fetched products
+            Obx(() {
+              if (homeProductsController.isLoading.value) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (homeProductsController.errorMessage.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    homeProductsController.errorMessage.value,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              }
+
+              final products = homeProductsController.allProducts;
+              return BudgetStoreSection(
+                products: products,
+                onProductAddedToCart: showCustomCartSnackbar,
+              );
+            }),
+
             const SizedBox(height: 16),
           ],
         ),

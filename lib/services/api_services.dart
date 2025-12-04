@@ -488,4 +488,67 @@ class ApiService {
       throw Exception('Error updating reseller business meta: $e');
     }
   }
+
+  // 🔥 Leaderboard category IDs (set these to real IDs from WP)
+  // Go to Products > Categories, open the category, and copy the tag_ID from the URL.
+  // Example URL: ...edit-tags.php?action=edit&taxonomy=product_cat&tag_ID=37...
+  static const int topRankingCategoryId = 513; // TODO: change to your real ID
+  static const int hotRankingCategoryId = 512; // TODO: change to your real ID
+
+  /// Products admin marked as "Top Ranking" (WP category)
+  static Future<List<ProductModel>> fetchTopRankingProducts() async {
+    try {
+      final products = await fetchProductsByCategory(
+        topRankingCategoryId,
+        // use custom sorting (menu order) if you sort in Woo admin
+        orderBy: 'menu_order',
+        order: 'asc',
+      );
+
+      print(
+        '[ApiService.fetchTopRankingProducts] got ${products.length} items for category $topRankingCategoryId',
+      );
+
+      // Fallback so app UI doesn't look empty while you configure WP
+      if (products.isEmpty) {
+        print(
+          '[ApiService.fetchTopRankingProducts] empty, falling back to fetchTopSellingProducts()',
+        );
+        return fetchTopSellingProducts();
+      }
+
+      return products;
+    } catch (e) {
+      print('[ApiService.fetchTopRankingProducts] error: $e');
+      // Fallback on error too
+      return fetchTopSellingProducts();
+    }
+  }
+
+  /// Products admin marked as "Hot Ranking" (WP category)
+  static Future<List<ProductModel>> fetchHotRankingProducts() async {
+    try {
+      final products = await fetchProductsByCategory(
+        hotRankingCategoryId,
+        orderBy: 'menu_order',
+        order: 'asc',
+      );
+
+      print(
+        '[ApiService.fetchHotRankingProducts] got ${products.length} items for category $hotRankingCategoryId',
+      );
+
+      if (products.isEmpty) {
+        print(
+          '[ApiService.fetchHotRankingProducts] empty, falling back to fetchTopSellingProducts()',
+        );
+        return fetchTopSellingProducts();
+      }
+
+      return products;
+    } catch (e) {
+      print('[ApiService.fetchHotRankingProducts] error: $e');
+      return fetchTopSellingProducts();
+    }
+  }
 }

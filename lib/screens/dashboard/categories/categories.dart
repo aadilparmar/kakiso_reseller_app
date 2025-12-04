@@ -11,7 +11,6 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
-import 'package:kakiso_reseller_app/services/pdf_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 // --- WIDGET IMPORTS ---
@@ -647,111 +646,111 @@ class _CategoriesPageState extends State<CategoriesSection> {
   }
 
   // --- PDF LOGIC ---
-  void _promptCreatePdf() {
-    if (_categoryProducts.isEmpty) {
-      Get.snackbar("Empty", "No products to create PDF from.");
-      return;
-    }
-    final TextEditingController businessNameCtrl = TextEditingController();
-    final TextEditingController marginCtrl = TextEditingController();
-    businessNameCtrl.text = widget.userData.name;
+  // void _promptCreatePdf() {
+  //   if (_categoryProducts.isEmpty) {
+  //     Get.snackbar("Empty", "No products to create PDF from.");
+  //     return;
+  //   }
+  //   final TextEditingController businessNameCtrl = TextEditingController();
+  //   final TextEditingController marginCtrl = TextEditingController();
+  //   businessNameCtrl.text = widget.userData.name;
 
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Create Catalog",
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "Customize your PDF catalog.",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: businessNameCtrl,
-              decoration: InputDecoration(
-                labelText: "Business Name",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: marginCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: "Add Margin",
-                prefixText: "₹ ",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              final String name = businessNameCtrl.text.isEmpty
-                  ? "Reseller"
-                  : businessNameCtrl.text;
-              final double margin = double.tryParse(marginCtrl.text) ?? 0;
-              Get.back();
-              _generatePdf(name, margin);
-            },
-            child: const Text(
-              "Create PDF",
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  //   Get.dialog(
+  //     AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //       title: const Text(
+  //         "Create Catalog",
+  //         style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold),
+  //       ),
+  //       content: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           const Text(
+  //             "Customize your PDF catalog.",
+  //             style: TextStyle(fontSize: 12, color: Colors.grey),
+  //           ),
+  //           const SizedBox(height: 16),
+  //           TextField(
+  //             controller: businessNameCtrl,
+  //             decoration: InputDecoration(
+  //               labelText: "Business Name",
+  //               border: OutlineInputBorder(
+  //                 borderRadius: BorderRadius.circular(12),
+  //               ),
+  //               isDense: true,
+  //             ),
+  //           ),
+  //           const SizedBox(height: 12),
+  //           TextField(
+  //             controller: marginCtrl,
+  //             keyboardType: TextInputType.number,
+  //             decoration: InputDecoration(
+  //               labelText: "Add Margin",
+  //               prefixText: "₹ ",
+  //               border: OutlineInputBorder(
+  //                 borderRadius: BorderRadius.circular(12),
+  //               ),
+  //               isDense: true,
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Get.back(),
+  //           child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+  //         ),
+  //         ElevatedButton(
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: accentColor,
+  //             shape: RoundedRectangleBorder(
+  //               borderRadius: BorderRadius.circular(8),
+  //             ),
+  //           ),
+  //           onPressed: () {
+  //             final String name = businessNameCtrl.text.isEmpty
+  //                 ? "Reseller"
+  //                 : businessNameCtrl.text;
+  //             final double margin = double.tryParse(marginCtrl.text) ?? 0;
+  //             Get.back();
+  //             _generatePdf(name, margin);
+  //           },
+  //           child: const Text(
+  //             "Create PDF",
+  //             style: TextStyle(color: Colors.white),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
-  Future<void> _generatePdf(String businessName, double extraMargin) async {
-    setState(() => isGeneratingPdf = true);
-    try {
-      await PdfService.createAndShareCatalog(
-        categoryName: selectedCategoryLabel,
-        products: _categoryProducts,
-        businessName: businessName,
-        extraMargin: extraMargin,
-      );
-      Get.snackbar(
-        "Success",
-        "PDF Created successfully!",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      Get.snackbar(
-        "Error",
-        "Failed to create PDF: $e",
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      if (mounted) setState(() => isGeneratingPdf = false);
-    }
-  }
+  // Future<void> _generatePdf(String businessName, double extraMargin) async {
+  //   setState(() => isGeneratingPdf = true);
+  //   try {
+  //     await PdfService.createAndShareCatalog(
+  //       categoryName: selectedCategoryLabel,
+  //       products: _categoryProducts,
+  //       businessName: businessName,
+  //       extraMargin: extraMargin,
+  //     );
+  //     Get.snackbar(
+  //       "Success",
+  //       "PDF Created successfully!",
+  //       backgroundColor: Colors.green,
+  //       colorText: Colors.white,
+  //     );
+  //   } catch (e) {
+  //     Get.snackbar(
+  //       "Error",
+  //       "Failed to create PDF: $e",
+  //       backgroundColor: Colors.red,
+  //       colorText: Colors.white,
+  //     );
+  //   } finally {
+  //     if (mounted) setState(() => isGeneratingPdf = false);
+  //   }
+  // }
 
   // --- DRAWER LOGIC ---
   Future<void> _showLogoutConfirmation() async {
@@ -823,24 +822,24 @@ class _CategoriesPageState extends State<CategoriesSection> {
               ),
             ),
             const Spacer(),
-            if (!isCategoriesLoading && !isProductsLoading)
-              IconButton(
-                icon: isGeneratingPdf
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: accentColor,
-                        ),
-                      )
-                    : const Icon(
-                        Iconsax.document_download,
-                        color: Colors.black,
-                      ),
-                onPressed: isGeneratingPdf ? null : _promptCreatePdf,
-                tooltip: "Download Catalog PDF",
-              ),
+            // if (!isCategoriesLoading && !isProductsLoading)
+            //   IconButton(
+            //     icon: isGeneratingPdf
+            //         ? const SizedBox(
+            //             width: 20,
+            //             height: 20,
+            //             child: CircularProgressIndicator(
+            //               strokeWidth: 2,
+            //               color: accentColor,
+            //             ),
+            //           )
+            //         : const Icon(
+            //             Iconsax.document_download,
+            //             color: Colors.black,
+            //           ),
+            //     onPressed: isGeneratingPdf ? null : _promptCreatePdf,
+            //     tooltip: "Download Catalog PDF",
+            //   ),
             IconButton(
               icon: const Icon(Iconsax.shopping_cart),
               color: accentColor,
