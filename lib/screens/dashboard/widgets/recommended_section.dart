@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
@@ -9,7 +12,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/widgets/horizontal_product
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
-// --- IMPORT PRODUCT DETAILS PAGE ---
+const Color _kPrimary = Color(0xFF4A317E);
 
 class RecommendedSection extends StatefulWidget {
   const RecommendedSection({super.key});
@@ -18,21 +21,37 @@ class RecommendedSection extends StatefulWidget {
   State<RecommendedSection> createState() => _RecommendedSectionState();
 }
 
-class _RecommendedSectionState extends State<RecommendedSection> {
+class _RecommendedSectionState extends State<RecommendedSection>
+    with SingleTickerProviderStateMixin {
   final CartController cartController = Get.put(CartController());
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
+  late final AnimationController _bgController;
+
   @override
   void initState() {
     super.initState();
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 22),
+    )..repeat();
     _fetchProducts();
+  }
+
+  @override
+  void dispose() {
+    _bgController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchProducts() async {
     try {
-      // Fetch standard products (or use a specific 'recommended' API endpoint)
-      final products = await ApiService.fetchProducts();
+      final products = await ApiService.fetchProducts(
+        perPage: 15,
+        orderBy: 'popularity',
+        order: 'desc',
+      );
       if (mounted) {
         setState(() {
           _products = products;
@@ -88,7 +107,7 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Poppins',
-                    color: Color(0xFF4A317E),
+                    color: _kPrimary,
                   ),
                 ),
                 Text(
@@ -109,13 +128,10 @@ class _RecommendedSectionState extends State<RecommendedSection> {
           children: [
             Text(
               "View",
-              style: TextStyle(
-                color: Color(0xFF4A317E),
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold),
             ),
             SizedBox(width: 4),
-            Icon(Iconsax.arrow_right_3, size: 16, color: Color(0xFF4A317E)),
+            Icon(Iconsax.arrow_right_3, size: 16, color: _kPrimary),
           ],
         ),
       ),
@@ -123,23 +139,17 @@ class _RecommendedSectionState extends State<RecommendedSection> {
     );
   }
 
-  // --- HELPER: Parse and Calculate RSP ---
+  // --- HELPER: Parse and Calculate RSP (Price + 30%) ---
   String _calculateRsp(String priceString) {
     try {
-      // 1. Remove non-numeric chars (keeps dots for decimals)
       final cleaned = priceString.replaceAll(RegExp(r'[^0-9.]'), '');
       if (cleaned.isEmpty) return '₹0';
 
-      // 2. Parse to double
-      double price = double.parse(cleaned);
-
-      // 3. Calculate 30% Markup (Price * 1.3)
-      double rspValue = price * 1.30;
-
-      // 4. Return formatted string (rounded to whole number)
+      final double price = double.parse(cleaned);
+      final double rspValue = price * 1.30;
       return '₹${rspValue.round()}';
-    } catch (e) {
-      return priceString; // Fallback if parsing fails
+    } catch (_) {
+      return priceString;
     }
   }
 
@@ -148,7 +158,7 @@ class _RecommendedSectionState extends State<RecommendedSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- 1. THE WORLD CLASS HEADER ---
+        // --- HEADER ---
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
@@ -156,66 +166,82 @@ class _RecommendedSectionState extends State<RecommendedSection> {
             children: [
               Row(
                 children: [
-                  // Decorative Pill Indicator
+                  // Soft holo accent bar
                   Container(
                     width: 4,
-                    height: 24,
+                    height: 26,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4A317E), // Deep Purple
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(999),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFa855f7), Color(0xFF22d3ee)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // "Featured"
                   const Text(
                     'Featured',
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       color: Colors.black,
                       fontFamily: 'Poppins',
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(width: 6),
-
-                  // "Products" (Colored)
-                  const Text(
-                    'Products',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4A317E),
-                      fontFamily: 'Poppins',
-                      letterSpacing: -0.5,
+                  ShaderMask(
+                    shaderCallback: (rect) {
+                      return const LinearGradient(
+                        colors: [Color(0xFFa855f7), Color(0xFF22d3ee)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(rect);
+                    },
+                    child: const Text(
+                      'Products',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Heart Icon
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4A317E).withOpacity(0.1),
                       shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF22d3ee), Color(0xFFa855f7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF22d3ee).withOpacity(0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: const Icon(
                       Iconsax.heart5,
-                      color: Color(0xFF4A317E),
+                      color: Colors.white,
                       size: 18,
                     ),
                   ),
                 ],
               ),
-
-              // "View All" Button
               GestureDetector(
                 onTap: () {
                   Get.to(
                     () => const AllProductsScreen(
-                      title: "Recommended",
-                      initialOrderBy: 'popularity', // or 'rating'
+                      title: "Featured Products",
+                      initialOrderBy: 'popularity',
                       initialOrder: 'desc',
                     ),
                   );
@@ -226,18 +252,37 @@ class _RecommendedSectionState extends State<RecommendedSection> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: const Text(
-                    'View All',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                      fontFamily: 'Poppins',
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.purpleAccent.withOpacity(0.25),
                     ),
+                  ),
+                  child: Row(
+                    children: const [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF4B5563),
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Iconsax.arrow_right_3,
+                        size: 14,
+                        color: Color(0xFF4B5563),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -245,60 +290,217 @@ class _RecommendedSectionState extends State<RecommendedSection> {
           ),
         ),
 
-        // --- 2. HORIZONTAL LIST ---
+        // --- AURORA / HOLOGRAPHIC BACKGROUND + HORIZONTAL LIST ---
         SizedBox(
-          height: 175, // Adjusted height to accommodate the new card design
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF4A317E)),
-                )
-              : _products.isEmpty
-              ? const Center(child: Text("No recommendations found."))
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 16), // Padding start
-                  itemCount: _products.length,
-                  itemBuilder: (context, index) {
-                    final product = _products[index];
-
-                    // Calculate RSP (Price + 30%)
-                    final String calculatedRsp = _calculateRsp(product.price);
-
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: HorizontalProductCard(
-                        imageUrl: product.image,
-                        title: product.name,
-                        companyName: "Kakiso",
-
-                        // Buying Price
-                        price: '₹${product.price}',
-
-                        // Calculated RSP passed here
-                        rsp: calculatedRsp,
-
-                        originalPrice: product.regularPrice.isNotEmpty
-                            ? '₹${product.regularPrice}'
-                            : '',
-                        discountPercentage: product.discountPercentage,
-                        onAddToCartPressed: () {
-                          cartController.addToCart(product);
-                          _showPremiumPopup(product);
-                        },
-                        onPressed: () {
-                          Get.to(
-                            () => ProductDetailsPage(product: product),
-                            transition: Transition.fadeIn,
-                            duration: const Duration(milliseconds: 300),
-                          );
-                        },
+          height: 190,
+          child: AnimatedBuilder(
+            animation: _bgController,
+            builder: (context, _) {
+              final progress = _bgController.value;
+              return Stack(
+                children: [
+                  // Aurora animated background
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _AuroraWavePainter(progress: progress),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+
+                  // Content
+                  if (_isLoading)
+                    const Center(
+                      child: CircularProgressIndicator(color: _kPrimary),
+                    )
+                  else if (_products.isEmpty)
+                    const Center(
+                      child: Text(
+                        "No recommendations found.",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(left: 16, right: 12),
+                      itemCount: _products.length,
+                      itemBuilder: (context, index) {
+                        final product = _products[index];
+                        final String calculatedRsp = _calculateRsp(
+                          product.price,
+                        );
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10.0),
+                          child: HorizontalProductCard(
+                            imageUrl: product.image,
+                            title: product.name,
+                            companyName: "Kakiso",
+                            price: '₹${product.price}',
+                            rsp: calculatedRsp,
+                            originalPrice: product.regularPrice.isNotEmpty
+                                ? '₹${product.regularPrice}'
+                                : '',
+                            discountPercentage: product.discountPercentage,
+                            onAddToCartPressed: () {
+                              cartController.addToCart(product);
+                              _showPremiumPopup(product);
+                            },
+                            onPressed: () {
+                              Get.to(
+                                () => ProductDetailsPage(product: product),
+                                transition: Transition.fadeIn,
+                                duration: const Duration(milliseconds: 300),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              );
+            },
+          ),
         ),
         const SizedBox(height: 8),
       ],
     );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// AURORA / HOLOGRAPHIC WAVE BACKGROUND PAINTER
+/// ---------------------------------------------------------------------------
+class _AuroraWavePainter extends CustomPainter {
+  final double progress; // 0 → 1 loop
+
+  _AuroraWavePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint();
+
+    // ---------- 1. BASE BACKGROUND GRADIENT ----------
+    final Rect bgRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    paint.shader = const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Color(0xFF020617), // dark navy
+        Color(0xFF111827),
+        Color(0xFF1f2937),
+      ],
+    ).createShader(bgRect);
+    canvas.drawRect(bgRect, paint);
+
+    // ---------- 2. AURORA WAVE RIBBONS ----------
+    // We'll draw 3 layered waves, each with slightly different color & phase.
+
+    _drawWave(
+      canvas,
+      size,
+      color: const Color(0xFF22d3ee).withOpacity(0.55),
+      baseHeightFactor: 0.55,
+      amplitude: 24,
+      phaseShift: progress * 2 * math.pi,
+    );
+
+    _drawWave(
+      canvas,
+      size,
+      color: const Color(0xFFa855f7).withOpacity(0.40),
+      baseHeightFactor: 0.68,
+      amplitude: 30,
+      phaseShift: progress * 2 * math.pi + math.pi / 2,
+    );
+
+    _drawWave(
+      canvas,
+      size,
+      color: const Color(0xFFf97316).withOpacity(0.28),
+      baseHeightFactor: 0.80,
+      amplitude: 18,
+      phaseShift: progress * 2 * math.pi + math.pi,
+    );
+
+    // ---------- 3. FLOATING PARTICLES ----------
+    final Paint dotPaint = Paint();
+    final int dots = 24;
+
+    for (int i = 0; i < dots; i++) {
+      final t = i / dots;
+      final double x = size.width * t;
+      final double yBase = size.height * (0.25 + 0.5 * t);
+      final double yOffset = math.sin(progress * 4 * math.pi + i * 0.7) * 10;
+      final double y = yBase + yOffset;
+
+      final double alphaFactor =
+          0.4 + 0.6 * (0.5 + 0.5 * math.sin(progress * 6 * math.pi + i));
+
+      dotPaint.color = Colors.white.withOpacity(0.09 * alphaFactor);
+      canvas.drawCircle(Offset(x, y), 1.6, dotPaint);
+    }
+
+    // ---------- 4. TOP SOFT GLOW ----------
+    final Paint glowPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.0, -0.9),
+        radius: 1.1,
+        colors: [const Color(0xFF22d3ee).withOpacity(0.35), Colors.transparent],
+      ).createShader(bgRect);
+    canvas.drawRect(bgRect, glowPaint);
+  }
+
+  void _drawWave(
+    Canvas canvas,
+    Size size, {
+    required Color color,
+    required double baseHeightFactor,
+    required double amplitude,
+    required double phaseShift,
+  }) {
+    final Path path = Path();
+    final double baseY = size.height * baseHeightFactor;
+
+    path.moveTo(0, baseY);
+
+    const int segments = 40;
+    for (int i = 0; i <= segments; i++) {
+      final double t = i / segments;
+      final double x = size.width * t;
+
+      // nice smooth sine-based wave
+      final double wave = math.sin((t * 3 * math.pi) + phaseShift) * amplitude;
+      final double y = baseY + wave;
+
+      path.lineTo(x, y);
+    }
+
+    // Close wave to bottom
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    final Paint p = Paint()
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [color, color.withOpacity(0.02)],
+          ).createShader(
+            Rect.fromLTWH(0, baseY - amplitude * 2, size.width, amplitude * 3),
+          );
+
+    canvas.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AuroraWavePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

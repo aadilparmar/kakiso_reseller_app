@@ -333,7 +333,7 @@ class _HomePageState extends State<HomePage> {
             const StorySection(),
             const SizedBox(height: 16),
             const RecommendedSection(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             const FlashSaleBanner(),
             const SizedBox(height: 16),
             const TopRankingSection(),

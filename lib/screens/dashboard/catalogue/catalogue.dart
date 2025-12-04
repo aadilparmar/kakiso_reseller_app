@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http; // ✅ for downloading images
 import 'package:path_provider/path_provider.dart'; // ✅ for temp dir
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart'; // ✅ CART CONTROLLER
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
@@ -27,7 +28,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogu
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_sort_bar.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_empty_state.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_empty_state.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_card.dart';
 
 class CatalogueSection extends StatefulWidget {
   final UserData userData;
@@ -45,6 +45,9 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     CatalogueController(),
     permanent: true,
   );
+
+  // ✅ Cart controller for badge logic
+  final CartController cartController = Get.put(CartController());
 
   String _searchQuery = '';
   CatalogueSort _currentSort = CatalogueSort.newest;
@@ -283,7 +286,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                   ? "Reseller"
                   : nameCtrl.text.trim();
 
-              // 🔹 Margin is now PERCENT
               final double marginPercent =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
 
@@ -464,9 +466,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  // --- WHATSAPP CATALOGUE:
-  // 1) Copy TEXT (with margin) to clipboard
-  // 2) Share IMAGES as files (no links)
+  // --- WHATSAPP CATALOGUE: copy text + share images ---
   Future<void> _shareCatalogueOnWhatsApp(
     CatalogueModel cat,
     double marginPercent,
@@ -480,7 +480,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       return;
     }
 
-    // 1) Build text (NO image links)
     final buffer = StringBuffer();
 
     buffer.writeln("📦 *${cat.name}*");
@@ -514,17 +513,14 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
     final text = buffer.toString();
 
-    // ✅ Copy text to clipboard
     await Clipboard.setData(ClipboardData(text: text));
 
-    // 2) Download product images & share
     Get.showOverlay(
       asyncFunction: () async {
         try {
           final xFiles = await _downloadProductImages(cat);
 
           if (xFiles.isEmpty) {
-            // No images, fallback to just text
             Get.snackbar(
               "Copied text",
               "Catalogue text copied. No images found to share.",
@@ -534,11 +530,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             return;
           }
 
-          // Share only images; user will paste text manually in WhatsApp
-          await Share.shareXFiles(
-            xFiles,
-            text: "", // no text, because we already copied it for manual paste
-          );
+          await Share.shareXFiles(xFiles, text: "");
 
           Get.snackbar(
             "Ready on WhatsApp",
@@ -632,150 +624,65 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  void _showCatalogueActionsSheet(CatalogueModel cat) {
-    Get.bottomSheet(
-      SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Wrap(
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
+  // --- Small helper button widget for actions ---
+  Widget _buildCatalogueActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+    Color? bgColor,
+    bool outlined = false,
+  }) {
+    final Color effectiveColor = color ?? accentColor;
+    final Color effectiveBg = bgColor ?? Colors.white;
 
-              // WHATSAPP CATALOGUE (TEXT + separate IMAGES)
-              ListTile(
-                leading: const Icon(Iconsax.sms, size: 20, color: accentColor),
-                title: const Text(
-                  "Share on WhatsApp",
-                  style: TextStyle(fontFamily: 'Poppins'),
+    return SizedBox(
+      height: 34,
+      child: outlined
+          ? OutlinedButton.icon(
+              onPressed: onTap,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: effectiveColor.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                subtitle: Text(
-                  "Copies text, shares product images",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                onTap: () {
-                  Get.back();
-                  _openWhatsappMarginDialog(cat);
-                },
               ),
-
-              // SHARE COLLAGE
-              ListTile(
-                leading: const Icon(
-                  Iconsax.gallery,
-                  size: 20,
-                  color: accentColor,
+              icon: Icon(icon, size: 16, color: effectiveColor),
+              label: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  color: effectiveColor,
                 ),
-                title: const Text(
-                  "Share Collage",
-                  style: TextStyle(fontFamily: 'Poppins'),
-                ),
-                subtitle: Text(
-                  "Create 3×3 photo grid",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                onTap: () {
-                  Get.back();
-                  _shareCatalogueCollage(cat);
-                },
               ),
-
-              // PDF
-              ListTile(
-                leading: const Icon(
-                  Iconsax.document_download,
-                  size: 20,
-                  color: accentColor,
+            )
+          : TextButton.icon(
+              onPressed: onTap,
+              style: TextButton.styleFrom(
+                backgroundColor: effectiveBg,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                title: const Text(
-                  "Download PDF catalogue",
-                  style: TextStyle(fontFamily: 'Poppins'),
-                ),
-                subtitle: Text(
-                  "Generate PDF with custom margin",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                onTap: () {
-                  Get.back();
-                  _openPdfMarginDialog(cat);
-                },
               ),
-
-              // DELETE
-              ListTile(
-                leading: const Icon(Iconsax.trash, size: 20, color: Colors.red),
-                title: const Text(
-                  "Delete catalogue",
-                  style: TextStyle(fontFamily: 'Poppins', color: Colors.red),
+              icon: Icon(icon, size: 16, color: effectiveColor),
+              label: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  color: effectiveColor,
                 ),
-                subtitle: Text(
-                  "Remove this catalogue and its saved products list",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                onTap: () {
-                  Get.back();
-                  Get.dialog(
-                    AlertDialog(
-                      title: const Text("Delete Catalogue"),
-                      content: Text("Delete \"${cat.name}\"?"),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Get.back(),
-                          child: const Text("Cancel"),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            catalogueController.deleteCatalogue(cat.id);
-                            Get.back();
-                          },
-                          child: const Text(
-                            "Delete",
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
   // --- BUILD ---
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -819,12 +726,51 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               iconSize: 30,
               onPressed: () {},
             ),
-            IconButton(
-              icon: const Icon(Iconsax.shopping_cart),
-              color: accentColor,
-              iconSize: 30,
-              onPressed: () => Get.to(() => const InventoryPage()),
+
+            // ✅ CART ICON WITH BADGE (same logic as HomePage)
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.shopping_cart),
+                  color: accentColor,
+                  iconSize: 30,
+                  onPressed: () => Get.to(() => const InventoryPage()),
+                ),
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: Obx(() {
+                    final count = cartController.itemCount;
+                    if (count == 0) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 22,
+                        minHeight: 22,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
+
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Iconsax.profile_circle),
@@ -893,13 +839,259 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final cat = items[index];
-                  return CatalogueCard(
-                    cat: cat,
+
+                  return GestureDetector(
                     onTap: () {
                       Get.to(() => CatalogueDetailsPage(catalogueId: cat.id));
                     },
-                    onMorePressed: () => _showCatalogueActionsSheet(cat),
-                    onLongPress: () => _showCatalogueActionsSheet(cat),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top gradient strip + title
+                          Container(
+                            decoration: const BoxDecoration(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(18),
+                              ),
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Iconsax.folder_2,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    cat.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Iconsax.arrow_right_3,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Middle info section
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (cat.description.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6.0),
+                                    child: Text(
+                                      cat.description,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 11,
+                                        color: Color(0xFF4B5563),
+                                      ),
+                                    ),
+                                  ),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE0F2FE),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Iconsax.bag_2,
+                                            size: 13,
+                                            color: Color(0xFF1D4ED8),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "${cat.products.length} items",
+                                            style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF1D4ED8),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF5F3FF),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Icon(
+                                            Iconsax.star1,
+                                            size: 13,
+                                            color: Color(0xFF8B5CF6),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            "My Catalogue",
+                                            style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF6D28D9),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const Divider(
+                            height: 14,
+                            thickness: 0.7,
+                            color: Color(0xFFE5E7EB),
+                          ),
+
+                          // Actions row (visible)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildCatalogueActionButton(
+                                  icon: Iconsax.sms,
+                                  label: "WhatsApp",
+                                  onTap: () => _openWhatsappMarginDialog(cat),
+                                  bgColor: const Color(0xFFEFF6FF),
+                                  color: const Color(0xFF1D4ED8),
+                                ),
+                                _buildCatalogueActionButton(
+                                  icon: Iconsax.category_2,
+                                  label: "Collage",
+                                  onTap: () => _shareCatalogueCollage(cat),
+                                  bgColor: const Color(0xFFFFFBEB),
+                                  color: const Color(0xFFF59E0B),
+                                ),
+                                _buildCatalogueActionButton(
+                                  icon: Iconsax.document_code,
+                                  label: "PDF",
+                                  onTap: () => _openPdfMarginDialog(cat),
+                                  bgColor: const Color(0xFFF5F3FF),
+                                  color: const Color(0xFF7C3AED),
+                                ),
+                                _buildCatalogueActionButton(
+                                  icon: Iconsax.trash,
+                                  label: "Delete",
+                                  onTap: () {
+                                    Get.dialog(
+                                      AlertDialog(
+                                        title: const Text(
+                                          "Delete Catalogue",
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        content: Text(
+                                          "Delete \"${cat.name}\"?",
+                                          style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Get.back(),
+                                            child: const Text("Cancel"),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              catalogueController
+                                                  .deleteCatalogue(cat.id);
+                                              Get.back();
+                                            },
+                                            child: const Text(
+                                              "Delete",
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  outlined: true,
+                                  color: Colors.red,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               );

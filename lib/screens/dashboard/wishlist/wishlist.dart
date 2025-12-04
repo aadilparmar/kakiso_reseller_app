@@ -4,37 +4,111 @@ import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/wishlist_controller.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/utils/constants.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class WishlistScreen extends StatelessWidget {
-  const WishlistScreen({super.key});
+  WishlistScreen({super.key});
+
+  // Make sure controllers are available
+  final WishlistController wishlistController = Get.put(WishlistController());
+  final CartController cartController = Get.put(CartController());
+  // if you ever need it later
 
   @override
   Widget build(BuildContext context) {
-    // Make sure controller is available
-    Get.put(WishlistController());
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text('My Wishlist'),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-      ),
-      body: Obx(() {
-        final controller = WishlistController.instance;
 
-        if (controller.wishlistItems.isEmpty) {
+      // --- APP BAR (MATCHING HOME WITH CART BADGE) ---
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: true,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            const SizedBox(width: 8),
+            const Text(
+              'My Wishlist',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+                color: Colors.black,
+              ),
+            ),
+            const Spacer(),
+
+            // --- CART ICON WITH BADGE ---
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.shopping_cart),
+                  color: accentColor,
+                  iconSize: 30,
+                  onPressed: () => Get.to(() => const InventoryPage()),
+                ),
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: Obx(() {
+                    final count = cartController.itemCount;
+                    if (count == 0) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 22,
+                        minHeight: 22,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Iconsax.profile_circle),
+              color: accentColor,
+              iconSize: 30,
+              onPressed: () {},
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+      ),
+
+      body: Obx(() {
+        if (wishlistController.wishlistItems.isEmpty) {
           return _buildEmptyState();
         }
 
         return ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: controller.wishlistItems.length,
+          itemCount: wishlistController.wishlistItems.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
-            final product = controller.wishlistItems[index];
-            return _buildWishlistTile(product, controller);
+            final product = wishlistController.wishlistItems[index];
+            return _buildWishlistTile(product, wishlistController);
           },
         );
       }),

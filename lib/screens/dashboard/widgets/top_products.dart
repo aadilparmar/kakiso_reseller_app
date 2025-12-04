@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -16,7 +17,8 @@ class TopRankingSection extends StatefulWidget {
   State<TopRankingSection> createState() => _TopRankingSectionState();
 }
 
-class _TopRankingSectionState extends State<TopRankingSection> {
+class _TopRankingSectionState extends State<TopRankingSection>
+    with SingleTickerProviderStateMixin {
   List<ProductModel> _products = [];
   bool _isLoading = true;
   String _selectedTab = 'Top'; // "Top" or "Hot"
@@ -27,9 +29,16 @@ class _TopRankingSectionState extends State<TopRankingSection> {
     keepPage: true,
   );
 
+  late final AnimationController _bgController;
+
   @override
   void initState() {
     super.initState();
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 24),
+    )..repeat();
+
     _fetchProductsForTab(_selectedTab);
     _pageController.addListener(_onPageScroll);
   }
@@ -84,6 +93,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
   void dispose() {
     _pageController.removeListener(_onPageScroll);
     _pageController.dispose();
+    _bgController.dispose();
     super.dispose();
   }
 
@@ -111,43 +121,72 @@ class _TopRankingSectionState extends State<TopRankingSection> {
         ? basePrice * 1.3
         : null; // +30%
 
-    return Container(
-      decoration: const BoxDecoration(
-        // gradient: LinearGradient(
-        //   colors: [Color(0xFFF9FAFB), Color(0xFFF3E8FF)],
-        //   begin: Alignment.topCenter,
-        //   end: Alignment.bottomCenter,
-        // ),
-      ),
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 8),
-
-          // SMALL STATS + CURRENT PRODUCT SNAPSHOT
-          if (focusedProduct != null)
-            _CurrentProductStrip(
-              product: focusedProduct,
-              basePrice: basePrice,
-              resellPrice: resellPrice,
-              rank: _currentIndex + 1,
-              isHotTab: _selectedTab == 'Hot',
+    // IMPORTANT: Fixed height so PageView & Stack are bounded
+    return SizedBox(
+      height: 420, // tweak if you want more/less height
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(0),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFF4B5563).withOpacity(0.15),
+                width: 1,
+              ),
             ),
+            child: Stack(
+              children: [
+                // === SCI-FI ANIMATED BACKGROUND ===
+                Positioned.fill(
+                  child: _SciFiBackground(controller: _bgController),
+                ),
 
-          const SizedBox(height: 6),
+                // Slight dark overlay so content is readable
+                Positioned.fill(
+                  child: Container(color: Colors.black.withOpacity(0.40)),
+                ),
 
-          // MAIN 3D FEEL CAROUSEL
-          SizedBox(
-            height: 260,
-            child: _isLoading
-                ? _buildLoading()
-                : _products.isEmpty
-                ? _buildEmpty()
-                : _buildCarousel(),
+                // === FOREGROUND CONTENT ===
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 8),
+
+                        // SMALL STATS + CURRENT PRODUCT SNAPSHOT
+                        if (focusedProduct != null)
+                          _CurrentProductStrip(
+                            product: focusedProduct,
+                            basePrice: basePrice,
+                            resellPrice: resellPrice,
+                            rank: _currentIndex + 1,
+                            isHotTab: _selectedTab == 'Hot',
+                          ),
+
+                        const SizedBox(height: 6),
+
+                        // MAIN 3D FEEL CAROUSEL
+                        SizedBox(
+                          height: 260,
+                          child: _isLoading
+                              ? _buildLoading()
+                              : _products.isEmpty
+                              ? _buildEmpty()
+                              : _buildCarousel(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -164,15 +203,15 @@ class _TopRankingSectionState extends State<TopRankingSection> {
             padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFf97316), Color(0xFFea580c)],
+                colors: [Color(0xFF22D3EE), Color(0xFF818CF8)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFea580c).withOpacity(0.4),
-                  blurRadius: 16,
+                  color: const Color(0xFF22D3EE).withOpacity(0.5),
+                  blurRadius: 18,
                   offset: const Offset(0, 6),
                 ),
               ],
@@ -185,7 +224,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Daily Leaderboard",
+                  "Galaxy Leaderboard",
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 11,
@@ -200,7 +239,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
                     fontFamily: 'Poppins',
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111827),
+                    color: Colors.white,
                     height: 1.1,
                   ),
                 ),
@@ -233,9 +272,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
             margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE5E7EB), Color(0xFFF3F4F6)],
-              ),
+              color: Colors.white.withOpacity(0.04),
             ),
             child: Column(
               children: [
@@ -247,7 +284,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      color: Colors.white,
+                      color: Colors.white.withOpacity(0.06),
                     ),
                   ),
                 ),
@@ -258,7 +295,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
                     borderRadius: const BorderRadius.vertical(
                       bottom: Radius.circular(28),
                     ),
-                    color: Colors.grey.shade100,
+                    color: Colors.white.withOpacity(0.03),
                   ),
                 ),
               ],
@@ -275,14 +312,14 @@ class _TopRankingSectionState extends State<TopRankingSection> {
         margin: const EdgeInsets.symmetric(horizontal: 32),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.black.withOpacity(0.55),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.40),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -298,7 +335,7 @@ class _TopRankingSectionState extends State<TopRankingSection> {
                 fontFamily: 'Poppins',
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF4B5563),
+                color: Colors.white,
               ),
             ),
             SizedBox(height: 4),
@@ -357,6 +394,182 @@ class _TopRankingSectionState extends State<TopRankingSection> {
 }
 
 // ----------------------------------------------------------
+// SCI-FI BACKGROUND
+// ----------------------------------------------------------
+
+class _SciFiBackground extends StatelessWidget {
+  final AnimationController controller;
+
+  const _SciFiBackground({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) {
+        return CustomPaint(painter: _SciFiPainter(progress: controller.value));
+      },
+    );
+  }
+}
+
+class _SciFiPainter extends CustomPainter {
+  final double progress;
+
+  _SciFiPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint();
+
+    // --- 1. Base gradient background ---
+    final Rect rect = Offset.zero & size;
+    final Gradient gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: const [Color(0xFF020617), Color(0xFF020617), Color(0xFF111827)],
+      stops: const [0.0, 0.4, 1.0],
+    );
+    paint.shader = gradient.createShader(rect);
+    canvas.drawRect(rect, paint);
+
+    // --- 2. Neon diagonal glow streak ---
+    final double streakY =
+        size.height * (0.2 + 0.2 * math.sin(progress * 2 * math.pi));
+    final Rect streakRect = Rect.fromLTWH(
+      -size.width * 0.2,
+      streakY,
+      size.width * 1.4,
+      80,
+    );
+
+    final Gradient streakGradient = LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        Colors.transparent,
+        _kAccent.withOpacity(0.35),
+        _kPrimary.withOpacity(0.2),
+        Colors.transparent,
+      ],
+      stops: const [0.0, 0.35, 0.65, 1.0],
+    );
+    paint.shader = streakGradient.createShader(streakRect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(streakRect, const Radius.circular(40)),
+      paint,
+    );
+
+    // --- 3. Parallax grid lines (bottom half) ---
+    final double gridTop = size.height * 0.45;
+    final double gridHeight = size.height * 0.55;
+
+    final Paint gridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.06)
+      ..strokeWidth = 0.7;
+
+    // Horizontal grid lines
+    const int hLines = 6;
+    for (int i = 0; i <= hLines; i++) {
+      final double t = i / hLines;
+      final double y = gridTop + t * gridHeight;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    // Vertical perspective grid lines
+    const int vLines = 6;
+    for (int i = -1; i <= vLines + 1; i++) {
+      final double t = i / vLines;
+      final double xMid = size.width * 0.5;
+      final double offsetX = (t - 0.5) * size.width * 0.9;
+
+      final Offset start = Offset(xMid + offsetX * 0.1, gridTop);
+      final Offset end = Offset(xMid + offsetX, size.height);
+      canvas.drawLine(start, end, gridPaint);
+    }
+
+    // --- 4. Floating orbs (parallax) ---
+    final List<_OrbConfig> orbs = [
+      _OrbConfig(
+        base: Offset(size.width * 0.15, size.height * 0.18),
+        radius: 16,
+        color: const Color(0xFF38BDF8),
+        speed: 1.0,
+      ),
+      _OrbConfig(
+        base: Offset(size.width * 0.85, size.height * 0.25),
+        radius: 22,
+        color: const Color(0xFFA855F7),
+        speed: 1.4,
+      ),
+      _OrbConfig(
+        base: Offset(size.width * 0.25, size.height * 0.60),
+        radius: 14,
+        color: const Color(0xFF22C55E),
+        speed: 0.8,
+      ),
+    ];
+
+    for (final orb in orbs) {
+      final double angle = progress * 2 * math.pi * orb.speed;
+      final double dx = math.sin(angle) * 10;
+      final double dy = math.cos(angle) * 8;
+
+      final Offset center = orb.base.translate(dx, dy);
+
+      final Rect orbRect = Rect.fromCircle(center: center, radius: orb.radius);
+      final Gradient orbGradient = RadialGradient(
+        colors: [orb.color.withOpacity(0.9), orb.color.withOpacity(0.0)],
+      );
+      final Paint orbPaint = Paint()
+        ..shader = orbGradient.createShader(orbRect);
+      canvas.drawCircle(center, orb.radius * 1.5, orbPaint);
+    }
+
+    // --- 5. Star particles ---
+    final Paint starPaint = Paint()
+      ..color = Colors.white.withOpacity(0.7)
+      ..style = PaintingStyle.fill;
+
+    const int starCount = 40;
+    for (int i = 0; i < starCount; i++) {
+      final double seed = i / starCount;
+      final double px =
+          (seed * size.width * 3 + progress * size.width * 60) % size.width;
+      final double py =
+          size.height *
+          (0.1 +
+              0.6 *
+                  ((seed * 37.0 +
+                          math.sin(progress * 2 * math.pi * (0.3 + seed))) %
+                      1.0));
+
+      final double r = 0.8 + 0.7 * math.sin(progress * 2 * math.pi + i);
+      canvas.drawCircle(Offset(px, py), r, starPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SciFiPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
+class _OrbConfig {
+  final Offset base;
+  final double radius;
+  final Color color;
+  final double speed;
+
+  _OrbConfig({
+    required this.base,
+    required this.radius,
+    required this.color,
+    required this.speed,
+  });
+}
+
+// ----------------------------------------------------------
 // HEADER TAB WIDGET
 // ----------------------------------------------------------
 
@@ -372,15 +585,9 @@ class _SegmentedTabs extends StatelessWidget {
       height: 34,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: Colors.white.withOpacity(0.20)),
       ),
       child: Row(
         children: [
@@ -415,7 +622,7 @@ class _SegmentedTabs extends StatelessWidget {
             Icon(
               icon,
               size: 14,
-              color: isActive ? Colors.white : const Color(0xFF6B7280),
+              color: isActive ? Colors.white : const Color(0xFF9CA3AF),
             ),
             const SizedBox(width: 4),
             Text(
@@ -424,7 +631,7 @@ class _SegmentedTabs extends StatelessWidget {
                 fontFamily: 'Poppins',
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                color: isActive ? Colors.white : const Color(0xFF4B5563),
+                color: isActive ? Colors.white : const Color(0xFFE5E7EB),
               ),
             ),
           ],
@@ -465,14 +672,8 @@ class _CurrentProductStrip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.white.withOpacity(0.9),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: Colors.black.withOpacity(0.60),
+          border: Border.all(color: Colors.white.withOpacity(0.10)),
         ),
         child: Row(
           children: [
@@ -495,7 +696,7 @@ class _CurrentProductStrip extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.20),
+                    color: Colors.black.withOpacity(0.35),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -528,7 +729,7 @@ class _CurrentProductStrip extends StatelessWidget {
                       fontFamily: 'Poppins',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF111827),
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -551,7 +752,7 @@ class _CurrentProductStrip extends StatelessWidget {
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 10,
-                            color: Color(0xFF6B7280),
+                            color: Color(0xFFCBD5F5),
                           ),
                         ),
                       ],
@@ -571,14 +772,14 @@ class _CurrentProductStrip extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: const Color(0xFFDCFCE7),
+                  color: const Color(0xFF064E3B),
                 ),
                 child: Row(
                   children: [
                     const Icon(
                       Iconsax.trend_up,
                       size: 12,
-                      color: Color(0xFF15803D),
+                      color: Color(0xFF22C55E),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -587,7 +788,7 @@ class _CurrentProductStrip extends StatelessWidget {
                         fontFamily: 'Poppins',
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF15803D),
+                        color: Color(0xFFBBF7D0),
                       ),
                     ),
                   ],
@@ -602,8 +803,8 @@ class _CurrentProductStrip extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
                   color: isHotTab
-                      ? const Color(0xFFFFEDD5)
-                      : const Color(0xFFE0F2FE),
+                      ? const Color(0xFF7C2D12)
+                      : const Color(0xFF1D3557),
                 ),
                 child: Row(
                   children: [
@@ -611,19 +812,17 @@ class _CurrentProductStrip extends StatelessWidget {
                       isHotTab ? Iconsax.flash_1 : Iconsax.star1,
                       size: 12,
                       color: isHotTab
-                          ? const Color(0xFFEA580C)
-                          : const Color(0xFF2563EB),
+                          ? const Color(0xFFF97316)
+                          : const Color(0xFFFACC15),
                     ),
                     const SizedBox(width: 4),
                     Text(
                       isHotTab ? "Hot pick" : "Top pick",
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: isHotTab
-                            ? const Color(0xFF9A3412)
-                            : const Color(0xFF1D4ED8),
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -686,17 +885,18 @@ class _LeaderboardCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           gradient: const LinearGradient(
-            colors: [Color(0xFF111827), Color(0xFF020617)],
+            colors: [Color(0xFF020617), Color(0xFF020617)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
-            // BoxShadow(
-            //   color: Colors.black.withOpacity(0.35),
-            //   blurRadius: 20,
-            //   offset: const Offset(0, 14),
-            // ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.6),
+              blurRadius: 20,
+              offset: const Offset(0, 14),
+            ),
           ],
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
         ),
         child: Column(
           children: [
@@ -726,23 +926,19 @@ class _LeaderboardCard extends StatelessWidget {
                       ),
                     ),
 
-                    // Dim gradient for reading text
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: 120,
-                      child: Container(
-                        // decoration: BoxDecoration(
-                        //   gradient: LinearGradient(
-                        //     colors: [
-                        //       Colors.transparent,
-                        //       Colors.black.withOpacity(0.85),
-                        //     ],
-                        //     begin: Alignment.topCenter,
-                        //     end: Alignment.bottomCenter,
-                        //   ),
-                        // ),
+                    // Slight radial vignette
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: const Alignment(0, -0.2),
+                            radius: 1.0,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.6),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
 
@@ -760,9 +956,9 @@ class _LeaderboardCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(999),
-                          color: Colors.black.withOpacity(0.45),
+                          color: Colors.black.withOpacity(0.5),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.18),
+                            color: Colors.white.withOpacity(0.20),
                           ),
                         ),
                         child: Row(
@@ -810,8 +1006,8 @@ class _LeaderboardCard extends StatelessWidget {
                               height: 1.2,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withOpacity(0.8),
-                                  blurRadius: 8,
+                                  color: Colors.black.withOpacity(0.9),
+                                  blurRadius: 10,
                                 ),
                               ],
                             ),
@@ -858,15 +1054,15 @@ class _LeaderboardCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(28),
                 ),
-                // gradient: LinearGradient(
-                //   colors: [
-                //     Colors.white.withOpacity(0.08),
-                //     Colors.white.withOpacity(0.02),
-                //   ],
-                //   begin: Alignment.topLeft,
-                //   end: Alignment.bottomRight,
-                // ),
-                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.06),
+                    Colors.white.withOpacity(0.02),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -895,7 +1091,7 @@ class _LeaderboardCard extends StatelessWidget {
                                     fontFamily: 'Poppins',
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF22C55E),
+                                    color: Color(0xFF4ADE80),
                                   ),
                                 ),
                               ],
@@ -953,9 +1149,9 @@ class _LeaderboardCard extends StatelessWidget {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: _kAccent.withOpacity(0.45),
-                                blurRadius: 14,
-                                offset: const Offset(0, 6),
+                                color: _kAccent.withOpacity(0.55),
+                                blurRadius: 16,
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),

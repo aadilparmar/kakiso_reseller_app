@@ -29,7 +29,7 @@ class NavigationController extends GetxController {
     CategoriesSection(userData: userData),
     ToolsSection(userData: userData),
     CatalogueSection(userData: userData),
-    const WishlistScreen(),
+    WishlistScreen(),
   ];
 }
 

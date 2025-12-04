@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 
 // --- MODELS & SERVICES ---
 import 'package:kakiso_reseller_app/models/categories.dart';
@@ -59,6 +60,9 @@ class _CategoriesPageState extends State<CategoriesSection> {
 
   final _storage = const FlutterSecureStorage();
   final catalogueController = Get.put(CatalogueController(), permanent: true);
+
+  // Same CartController used in HomePage
+  final CartController cartController = Get.find<CartController>();
 
   @override
   void initState() {
@@ -138,7 +142,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
     if (query.isEmpty) {
       setState(() {
         _displayedProducts = _categoryProducts;
-        // Optional: clear selection when search changes
         _selectedProductIds.removeWhere(
           (id) => !_displayedProducts.any((p) => p.id == id),
         );
@@ -365,7 +368,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
           );
         },
       ),
-      isScrollControlled: true, // Allow full height if needed
+      isScrollControlled: true,
     );
   }
 
@@ -515,7 +518,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         color: Colors.grey,
                       ),
                       onTap: () {
-                        // Add all selected products to this catalogue
                         for (final p in selectedProducts) {
                           catalogueController.addProductToExistingCatalogue(
                             name,
@@ -611,7 +613,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
               onPressed: () {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
-                  // Create catalogue with first product, then add rest
                   catalogueController.createCatalogueAndAddProduct(
                     name,
                     selectedProducts.first,
@@ -644,113 +645,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
       },
     );
   }
-
-  // --- PDF LOGIC ---
-  // void _promptCreatePdf() {
-  //   if (_categoryProducts.isEmpty) {
-  //     Get.snackbar("Empty", "No products to create PDF from.");
-  //     return;
-  //   }
-  //   final TextEditingController businessNameCtrl = TextEditingController();
-  //   final TextEditingController marginCtrl = TextEditingController();
-  //   businessNameCtrl.text = widget.userData.name;
-
-  //   Get.dialog(
-  //     AlertDialog(
-  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-  //       title: const Text(
-  //         "Create Catalog",
-  //         style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold),
-  //       ),
-  //       content: Column(
-  //         mainAxisSize: MainAxisSize.min,
-  //         children: [
-  //           const Text(
-  //             "Customize your PDF catalog.",
-  //             style: TextStyle(fontSize: 12, color: Colors.grey),
-  //           ),
-  //           const SizedBox(height: 16),
-  //           TextField(
-  //             controller: businessNameCtrl,
-  //             decoration: InputDecoration(
-  //               labelText: "Business Name",
-  //               border: OutlineInputBorder(
-  //                 borderRadius: BorderRadius.circular(12),
-  //               ),
-  //               isDense: true,
-  //             ),
-  //           ),
-  //           const SizedBox(height: 12),
-  //           TextField(
-  //             controller: marginCtrl,
-  //             keyboardType: TextInputType.number,
-  //             decoration: InputDecoration(
-  //               labelText: "Add Margin",
-  //               prefixText: "₹ ",
-  //               border: OutlineInputBorder(
-  //                 borderRadius: BorderRadius.circular(12),
-  //               ),
-  //               isDense: true,
-  //             ),
-  //           ),
-  //         ],
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Get.back(),
-  //           child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-  //         ),
-  //         ElevatedButton(
-  //           style: ElevatedButton.styleFrom(
-  //             backgroundColor: accentColor,
-  //             shape: RoundedRectangleBorder(
-  //               borderRadius: BorderRadius.circular(8),
-  //             ),
-  //           ),
-  //           onPressed: () {
-  //             final String name = businessNameCtrl.text.isEmpty
-  //                 ? "Reseller"
-  //                 : businessNameCtrl.text;
-  //             final double margin = double.tryParse(marginCtrl.text) ?? 0;
-  //             Get.back();
-  //             _generatePdf(name, margin);
-  //           },
-  //           child: const Text(
-  //             "Create PDF",
-  //             style: TextStyle(color: Colors.white),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // Future<void> _generatePdf(String businessName, double extraMargin) async {
-  //   setState(() => isGeneratingPdf = true);
-  //   try {
-  //     await PdfService.createAndShareCatalog(
-  //       categoryName: selectedCategoryLabel,
-  //       products: _categoryProducts,
-  //       businessName: businessName,
-  //       extraMargin: extraMargin,
-  //     );
-  //     Get.snackbar(
-  //       "Success",
-  //       "PDF Created successfully!",
-  //       backgroundColor: Colors.green,
-  //       colorText: Colors.white,
-  //     );
-  //   } catch (e) {
-  //     Get.snackbar(
-  //       "Error",
-  //       "Failed to create PDF: $e",
-  //       backgroundColor: Colors.red,
-  //       colorText: Colors.white,
-  //     );
-  //   } finally {
-  //     if (mounted) setState(() => isGeneratingPdf = false);
-  //   }
-  // }
 
   // --- DRAWER LOGIC ---
   Future<void> _showLogoutConfirmation() async {
@@ -822,29 +716,49 @@ class _CategoriesPageState extends State<CategoriesSection> {
               ),
             ),
             const Spacer(),
-            // if (!isCategoriesLoading && !isProductsLoading)
-            //   IconButton(
-            //     icon: isGeneratingPdf
-            //         ? const SizedBox(
-            //             width: 20,
-            //             height: 20,
-            //             child: CircularProgressIndicator(
-            //               strokeWidth: 2,
-            //               color: accentColor,
-            //             ),
-            //           )
-            //         : const Icon(
-            //             Iconsax.document_download,
-            //             color: Colors.black,
-            //           ),
-            //     onPressed: isGeneratingPdf ? null : _promptCreatePdf,
-            //     tooltip: "Download Catalog PDF",
-            //   ),
-            IconButton(
-              icon: const Icon(Iconsax.shopping_cart),
-              color: accentColor,
-              iconSize: 30,
-              onPressed: () => Get.to(() => const InventoryPage()),
+
+            // CART ICON WITH BADGE
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.shopping_cart),
+                  color: accentColor,
+                  iconSize: 30,
+                  onPressed: () => Get.to(() => const InventoryPage()),
+                ),
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: Obx(() {
+                    final count = cartController.itemCount;
+                    if (count == 0) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 22,
+                        minHeight: 22,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             ),
           ],
         ),
@@ -921,31 +835,53 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         // --- SELECT ALL / UNSELECT ALL / ADD TO CATALOGUE ---
                         Row(
                           children: [
-                            // Left side: select/unselect (scrollable if small width)
                             Expanded(
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Checkbox(
-                                          value: _isAllSelected,
-                                          onChanged: (val) =>
-                                              _toggleSelectAll(val),
-                                          visualDensity: VisualDensity.compact,
+                                    OutlinedButton.icon(
+                                      onPressed: _displayedProducts.isEmpty
+                                          ? null
+                                          : () => _toggleSelectAll(true),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 8,
                                         ),
-                                        const SizedBox(width: 4),
-                                        const Text(
-                                          'Select All',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontFamily: 'Poppins',
+                                        side: BorderSide(
+                                          color: _isAllSelected
+                                              ? accentColor
+                                              : Colors.grey.shade300,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            20,
                                           ),
                                         ),
-                                      ],
+                                      ),
+                                      // icon: Icon(
+                                      //   _isAllSelected
+                                      //       ? Iconsax.tick_circle
+                                      //       : Iconsax.tick_square,
+                                      //   size: 16,
+                                      //   color: _isAllSelected
+                                      //       ? accentColor
+                                      //       : Colors.black87,
+                                      // ),
+                                      label: Text(
+                                        'Select All',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w500,
+                                          color: _isAllSelected
+                                              ? accentColor
+                                              : Colors.black87,
+                                        ),
+                                      ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 8),
                                     TextButton(
                                       onPressed: _selectedProductIds.isEmpty
                                           ? null
@@ -976,7 +912,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
 
                             const SizedBox(width: 8),
 
-                            // Right side: primary button
                             SizedBox(
                               height: 36,
                               child: ElevatedButton.icon(
@@ -991,7 +926,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                icon: const Icon(Iconsax.book_saved, size: 16),
+                                // icon: const Icon(Iconsax.book_saved, size: 16),
                                 label: const Text(
                                   'Add to Catalogue',
                                   style: TextStyle(

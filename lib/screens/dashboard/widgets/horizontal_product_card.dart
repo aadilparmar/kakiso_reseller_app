@@ -34,7 +34,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
   double _scale = 1.0;
 
   void _onTapDown(TapDownDetails _) {
-    setState(() => _scale = 0.98);
+    setState(() => _scale = 0.97);
   }
 
   void _onTapUp(TapUpDetails _) {
@@ -49,21 +49,21 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
   Widget build(BuildContext context) {
     final bool showDiscount = (widget.discountPercentage ?? 0) > 0;
 
+    // Profit (rough, from strings)
+    num? profit;
+    try {
+      final cp = num.parse(widget.price.replaceAll(RegExp(r'[^0-9.]'), ''));
+      final sp = num.parse(widget.rsp.replaceAll(RegExp(r'[^0-9.]'), ''));
+      profit = sp - cp;
+    } catch (_) {
+      profit = null;
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         double widgetWidth = constraints.maxWidth;
         if (widgetWidth == double.infinity) {
           widgetWidth = 325.0; // safe width for horizontal list
-        }
-
-        // Profit (rough, string parsing – adjust if you already get num)
-        num? profit;
-        try {
-          final cp = num.parse(widget.price.replaceAll(RegExp(r'[^0-9.]'), ''));
-          final sp = num.parse(widget.rsp.replaceAll(RegExp(r'[^0-9.]'), ''));
-          profit = sp - cp;
-        } catch (_) {
-          profit = null;
         }
 
         return GestureDetector(
@@ -79,36 +79,41 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
               width: widgetWidth,
               margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(20),
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF4A317E), Color(0xFFEB2A7E)],
+                  colors: [
+                    Color(0xFF22D3EE), // cyan
+                    Color(0xFF6366F1), // indigo
+                    Color(0xFFEC4899), // pink
+                  ],
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF22D3EE).withOpacity(0.35),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: Container(
-                margin: const EdgeInsets.all(1.2),
+                margin: const EdgeInsets.all(1.4),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(17),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF4A317E).withOpacity(0.06),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFF020617).withOpacity(0.92),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.06),
+                    width: 0.8,
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(10.0),
                   child: Row(
                     children: [
-                      // --- LEFT: IMAGE + DISCOUNT PILL ---
+                      // ------------------------------------------------------------------
+                      // LEFT: IMAGE + DISCOUNT / COMPANY CHIP
+                      // ------------------------------------------------------------------
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -116,53 +121,63 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                             width: 110,
                             height: 135,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(16),
                               gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [Color(0xFFF5F3FF), Color(0xFFFDF2FF)],
+                                colors: [Color(0xFF0F172A), Color(0xFF111827)],
                               ),
                             ),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(16),
                               child: Image.network(
                                 widget.imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, stack) => const Center(
+                                errorBuilder: (ctx, err, stack) => Container(
+                                  color: const Color(0xFF020617),
                                   child: Icon(
                                     Iconsax.image,
-                                    color: Colors.grey,
+                                    color: Colors.grey.shade600,
                                     size: 26,
                                   ),
                                 ),
                               ),
                             ),
                           ),
+
+                          // Discount badge
                           if (showDiscount)
                             Positioned(
                               top: 6,
                               left: 6,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
+                                  horizontal: 8,
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(999),
                                   gradient: const LinearGradient(
                                     colors: [
-                                      Color(0xFF111827),
-                                      Color(0xFF4B5563),
+                                      Color(0xFFF97316),
+                                      Color(0xFFDC2626),
                                     ],
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.35),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(
                                       Iconsax.flash_1,
-                                      size: 10,
-                                      color: Colors.yellow,
+                                      size: 11,
+                                      color: Colors.white,
                                     ),
                                     const SizedBox(width: 3),
                                     Text(
@@ -178,20 +193,63 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                 ),
                               ),
                             ),
+
+                          // Company chip (bottom-left)
+                          Positioned(
+                            bottom: 6,
+                            left: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(999),
+                                color: Colors.black.withOpacity(0.65),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.16),
+                                  width: 0.6,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Iconsax.buildings4,
+                                    size: 11,
+                                    color: Colors.white70,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    widget.companyName.toUpperCase(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      fontFamily: 'Poppins',
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
 
                       const SizedBox(width: 12),
 
-                      // --- RIGHT: DETAILS + CTA ---
+                      // ------------------------------------------------------------------
+                      // RIGHT: CONTENT
+                      // ------------------------------------------------------------------
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Top row: company + favourite / tag
-                            const SizedBox(height: 6),
-
-                            // Title
+                            // TITLE
+                            const SizedBox(height: 2),
                             Text(
                               widget.title,
                               maxLines: 2,
@@ -199,7 +257,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                               style: const TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF111827),
+                                color: Colors.white,
                                 height: 1.25,
                                 fontFamily: 'Poppins',
                               ),
@@ -207,53 +265,69 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
 
                             const SizedBox(height: 6),
 
-                            if (profit != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(999),
-                                  color: const Color(0xFFE0FBEA),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Iconsax.trend_up,
-                                      size: 12,
-                                      color: Color(0xFF15803D),
+                            // RESALE TAG / PROFIT
+                            Row(
+                              children: [
+                                if (profit != null) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
                                     ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Profit ~ ₹${profit.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF166534),
-                                        fontFamily: 'Poppins',
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(999),
+                                      color: const Color(
+                                        0xFF166534,
+                                      ).withOpacity(0.15),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF22C55E,
+                                        ).withOpacity(0.7),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Iconsax.money_2,
+                                          size: 11,
+                                          color: Color(0xFF22C55E),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          "Profit ~ ₹${profit.toStringAsFixed(0)}",
+                                          style: const TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF4ADE80),
+                                            fontFamily: 'Poppins',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
 
                             const Spacer(),
 
-                            // --- BOTTOM: PRICES + ADD BUTTON ---
+                            // ------------------------------------------------------------------
+                            // BOTTOM: PRICES + CTA
+                            // ------------------------------------------------------------------
                             Container(
                               padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF9FAFB),
                                 borderRadius: BorderRadius.circular(14),
+                                color: Colors.white.withOpacity(0.04),
                                 border: Border.all(
-                                  color: Colors.grey.withOpacity(0.10),
+                                  color: Colors.white.withOpacity(0.06),
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  // PRICES
+                                  // PRICES COLUMN
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -261,7 +335,6 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        // RSP (Hero) big
                                         Row(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.end,
@@ -271,7 +344,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w500,
-                                                color: Color(0xFF6B7280),
+                                                color: Color(0xFF9CA3AF),
                                                 fontFamily: 'Poppins',
                                               ),
                                             ),
@@ -283,7 +356,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                                 style: const TextStyle(
                                                   fontSize: 17,
                                                   fontWeight: FontWeight.w800,
-                                                  color: Color(0xFF4A317E),
+                                                  color: Color(0xFF22D3EE),
                                                   fontFamily: 'Poppins',
                                                   height: 1.0,
                                                 ),
@@ -292,7 +365,6 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                           ],
                                         ),
                                         const SizedBox(height: 3),
-                                        // Buy + MRP line
                                         RichText(
                                           text: TextSpan(
                                             style: const TextStyle(
@@ -304,7 +376,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                                 style: const TextStyle(
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w600,
-                                                  color: Colors.black87,
+                                                  color: Colors.white,
                                                 ),
                                               ),
                                               if (widget
@@ -334,7 +406,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
 
                                   const SizedBox(width: 6),
 
-                                  // ADD BUTTON
+                                  // ADD BUTTON (NEON PILL)
                                   Material(
                                     color: Colors.transparent,
                                     borderRadius: BorderRadius.circular(999),
@@ -352,17 +424,17 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                             colors: [
-                                              Color(0xFF4A317E),
-                                              Color(0xFFEB2A7E),
+                                              Color(0xFF6366F1),
+                                              Color(0xFFEC4899),
                                             ],
                                           ),
                                           boxShadow: [
                                             BoxShadow(
                                               color: const Color(
-                                                0xFF4A317E,
-                                              ).withOpacity(0.35),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 4),
+                                                0xFFEC4899,
+                                              ).withOpacity(0.55),
+                                              blurRadius: 14,
+                                              offset: const Offset(0, 5),
                                             ),
                                           ],
                                         ),
