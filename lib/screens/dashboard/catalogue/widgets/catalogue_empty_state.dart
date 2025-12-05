@@ -20,7 +20,7 @@ class CatalogueEmptyState extends StatelessWidget {
             Icon(Iconsax.folder_open, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             const Text(
-              "No catalogues yet",
+              "No catalogs yet",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w600,
@@ -29,7 +29,7 @@ class CatalogueEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              "Create a catalogue and start adding products for your customers.",
+              "Create a catalog and start adding products for your customers.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Poppins',
@@ -48,7 +48,7 @@ class CatalogueEmptyState extends StatelessWidget {
               ),
               icon: const Icon(Iconsax.add, color: Colors.white),
               label: const Text(
-                "Create Catalogue",
+                "Create Catalog",
                 style: TextStyle(color: Colors.white),
               ),
             ),

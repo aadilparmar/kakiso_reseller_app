@@ -21,7 +21,7 @@ class CatalogueSearchEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              "No matching catalogues",
+              "No matching catalog",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w600,

@@ -298,7 +298,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                 ),
               ),
               Text(
-                'Add ${selectedProducts.length} products to catalogue',
+                'Add ${selectedProducts.length} products to catalog',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -325,7 +325,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        "No catalogues found",
+                        "No catalogs found",
                         style: TextStyle(
                           color: Colors.grey,
                           fontSize: 13,
@@ -334,7 +334,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        "Create a new catalogue to start saving products.",
+                        "Create a new catalog to start saving products.",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.grey,
@@ -399,7 +399,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                         Navigator.pop(ctx);
 
                         Get.snackbar(
-                          'Added to catalogue',
+                          'Added to catalog',
                           '${selectedProducts.length} products added to "$name".',
                           snackPosition: SnackPosition.BOTTOM,
                         );
@@ -422,7 +422,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     _showCreateNewCatalogueDialogForBulk(selectedProducts);
                   },
                   icon: const Icon(Iconsax.add_circle, size: 20),
-                  label: const Text('Create New Catalogue'),
+                  label: const Text('Create New Catalog'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accentColor,
                     foregroundColor: Colors.white,
@@ -453,7 +453,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: const Text(
-            'New Catalogue',
+            'New Catalog',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w500,
@@ -464,7 +464,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             autofocus: true,
             style: const TextStyle(fontFamily: 'Poppins'),
             decoration: InputDecoration(
-              labelText: 'Catalogue Name',
+              labelText: 'Catalog Name',
               hintText: 'e.g. Diwali Collection',
               filled: true,
               fillColor: const Color.fromARGB(185, 250, 250, 250),
@@ -501,7 +501,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                   Navigator.pop(ctx);
 
                   Get.snackbar(
-                    'Catalogue created',
+                    'Catalog created',
                     '${products.length} products added to "$name".',
                     snackPosition: SnackPosition.BOTTOM,
                   );
@@ -704,7 +704,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                               }
 
                               Get.snackbar(
-                                'Added to catalogue',
+                                'Added to catalog',
                                 '"${product.name}" added to "$catalogueName".',
                                 snackPosition: SnackPosition.BOTTOM,
                               );
@@ -778,7 +778,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                         ),
                       ),
                       child: const Text(
-                        'Add to Catalogue',
+                        'Add to Catalog',
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,

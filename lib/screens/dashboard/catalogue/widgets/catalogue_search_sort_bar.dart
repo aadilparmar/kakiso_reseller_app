@@ -49,7 +49,7 @@ class CatalogueSearchAndSortBar extends StatelessWidget {
                       controller: searchController,
                       onChanged: onSearchChanged,
                       decoration: const InputDecoration(
-                        hintText: "Search catalogues...",
+                        hintText: "Search catalogs...",
                         border: InputBorder.none,
                         isDense: true,
                       ),

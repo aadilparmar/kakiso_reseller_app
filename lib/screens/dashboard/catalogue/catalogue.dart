@@ -122,7 +122,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          "Create Catalogue",
+          "Create Catalog",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         content: Column(
@@ -131,7 +131,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             TextField(
               controller: nameCtrl,
               decoration: InputDecoration(
-                labelText: "Catalogue Name",
+                labelText: "Catalog Name",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -170,7 +170,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               }
               catalogueController.createCatalogue(
                 name,
-                desc.isEmpty ? "Custom catalogue" : desc,
+                desc.isEmpty ? "Custom catalog" : desc,
               );
               Get.back();
             },
@@ -215,7 +215,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   void _openPdfMarginDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalogue",
+        "Empty catalog",
         "Add products before generating a PDF.",
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -231,7 +231,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          "Download Catalogue PDF",
+          "Download Catalog PDF",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         content: Column(
@@ -323,7 +323,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
           Get.snackbar(
             "Success",
-            "Catalogue PDF generated.",
+            "Catalog PDF generated.",
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.green,
             colorText: Colors.white,
@@ -401,7 +401,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   void _openWhatsappMarginDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalogue",
+        "Empty catalog",
         "Add products before sharing.",
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -414,7 +414,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          "WhatsApp Catalogue",
+          "WhatsApp Catalog",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         content: Column(
@@ -473,7 +473,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   ) async {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalogue",
+        "Empty catalog",
         "Add products before sharing.",
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -490,7 +490,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       "Total items: ${cat.products.length} • Margin: ${marginPercent.toStringAsFixed(0)}%",
     );
     buffer.writeln("");
-    buffer.writeln("🛍 *Catalogue Items*:");
+    buffer.writeln("🛍 *Catalog Items*:");
     buffer.writeln("");
 
     for (int i = 0; i < cat.products.length; i++) {
@@ -523,7 +523,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           if (xFiles.isEmpty) {
             Get.snackbar(
               "Copied text",
-              "Catalogue text copied. No images found to share.",
+              "Catalog text copied. No images found to share.",
               snackPosition: SnackPosition.BOTTOM,
             );
             await Share.share(text);
@@ -575,7 +575,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   Future<void> _shareCatalogueCollage(CatalogueModel cat) async {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalogue",
+        "Empty catalog",
         "Add products before sharing collage.",
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -786,10 +786,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         backgroundColor: accentColor,
         onPressed: _openCreateCatalogueDialog,
         icon: const Icon(Iconsax.folder_add, color: Colors.white),
-        label: const Text(
-          "New Catalogue",
-          style: TextStyle(color: Colors.white),
-        ),
+        label: const Text("New Catalog", style: TextStyle(color: Colors.white)),
       ),
       body: Column(
         children: [
@@ -990,7 +987,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                           ),
                                           SizedBox(width: 4),
                                           Text(
-                                            "My Catalogue",
+                                            "My Catalog",
                                             style: TextStyle(
                                               fontFamily: 'Poppins',
                                               fontSize: 11,
@@ -1048,7 +1045,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                     Get.dialog(
                                       AlertDialog(
                                         title: const Text(
-                                          "Delete Catalogue",
+                                          "Delete Catalog",
                                           style: TextStyle(
                                             fontFamily: 'Poppins',
                                             fontWeight: FontWeight.w600,

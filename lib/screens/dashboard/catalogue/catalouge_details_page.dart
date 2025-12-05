@@ -54,7 +54,7 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
                   setState(() => _searchQuery = value);
                 },
                 decoration: const InputDecoration(
-                  hintText: "Search products in this catalogue...",
+                  hintText: "Search products in this catalog...",
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -82,8 +82,8 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
 
       if (catalogue == null) {
         return Scaffold(
-          appBar: AppBar(title: const Text("Catalogue")),
-          body: const Center(child: Text("Catalogue not found")),
+          appBar: AppBar(title: const Text("Catalog")),
+          body: const Center(child: Text("Catalog not found")),
         );
       }
 
@@ -167,7 +167,7 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
                           ),
                           const SizedBox(height: 16),
                           const Text(
-                            "No products in this catalogue.",
+                            "No products in this catalog.",
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.w500,

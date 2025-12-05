@@ -73,8 +73,8 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
           Expanded(
             child: Text(
               alreadyCount > 0
-                  ? "Tap a product to add it to this catalogue. $alreadyCount item${alreadyCount == 1 ? '' : 's'} already added."
-                  : "Tap a product to add it to this catalogue.",
+                  ? "Tap a product to add it to this catalog. $alreadyCount item${alreadyCount == 1 ? '' : 's'} already added."
+                  : "Tap a product to add it to this catalog.",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 12,
@@ -154,7 +154,7 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
               ),
             ),
           ),
-          body: const Center(child: Text("Catalogue not found")),
+          body: const Center(child: Text("Catalog not found")),
         );
       }
 
@@ -280,7 +280,7 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
                                   if (isInCatalogue) {
                                     Get.snackbar(
                                       "Already added",
-                                      "This product is already in this catalogue.",
+                                      "This product is already in this catalog.",
                                       snackPosition: SnackPosition.BOTTOM,
                                     );
                                   } else {

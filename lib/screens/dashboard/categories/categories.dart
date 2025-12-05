@@ -450,7 +450,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                 ),
               ),
               Text(
-                'Add ${selectedProducts.length} products to catalogue',
+                'Add ${selectedProducts.length} products to catalog',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -477,7 +477,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        "No catalogues found",
+                        "No catalogs found",
                         style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
                     ],
@@ -526,7 +526,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         }
                         Navigator.pop(ctx);
                         Get.snackbar(
-                          'Added to catalogue',
+                          'Added to catalog',
                           '${selectedProducts.length} products added to "$name".',
                           snackPosition: SnackPosition.BOTTOM,
                         );
@@ -545,7 +545,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                     _showCreateNewCatalogueDialogForSelected(selectedProducts);
                   },
                   icon: const Icon(Iconsax.add_circle, size: 20),
-                  label: const Text('Create New Catalogue'),
+                  label: const Text('Create New Catalog'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accentColor,
                     foregroundColor: Colors.white,
@@ -577,7 +577,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: const Text(
-            'New Catalogue',
+            'New Catalog',
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w500,
@@ -588,7 +588,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
             autofocus: true,
             style: const TextStyle(fontFamily: 'Poppins'),
             decoration: InputDecoration(
-              labelText: 'Catalogue Name',
+              labelText: 'Catalog Name',
               hintText: 'e.g. Diwali Offers',
               filled: true,
               fillColor: const Color.fromARGB(185, 250, 250, 250),
@@ -625,7 +625,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                   }
                   Navigator.pop(ctx);
                   Get.snackbar(
-                    'Catalogue created',
+                    'Catalog created',
                     '${selectedProducts.length} products added to "$name".',
                     snackPosition: SnackPosition.BOTTOM,
                   );
@@ -928,7 +928,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                                 ),
                                 // icon: const Icon(Iconsax.book_saved, size: 16),
                                 label: const Text(
-                                  'Add to Catalogue',
+                                  'Add to Catalog',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,

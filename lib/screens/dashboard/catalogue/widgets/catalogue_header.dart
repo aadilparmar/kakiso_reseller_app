@@ -21,7 +21,7 @@ class CatalogueHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            "My Catalogue",
+            "My Catalog",
             style: TextStyle(
               fontFamily: 'Poppins',
               fontSize: 22,
