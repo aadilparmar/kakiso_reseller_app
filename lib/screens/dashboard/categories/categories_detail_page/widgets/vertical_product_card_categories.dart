@@ -133,8 +133,10 @@ class VerticalProductCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(kRadius),
             border: Border.all(
-              color: isSelected ? kPrimaryColor.withOpacity(0.9) : kBorderColor,
-              width: isSelected ? 1.6 : 1,
+              color: isSelected
+                  ? const Color.fromARGB(209, 171, 142, 235).withOpacity(0.9)
+                  : kBorderColor,
+              width: isSelected ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -148,7 +150,7 @@ class VerticalProductCard extends StatelessWidget {
           ),
           // ✅ Inner padding so border is never covered by children
           child: Padding(
-            padding: const EdgeInsets.all(3.0),
+            padding: const EdgeInsets.all(0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

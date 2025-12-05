@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/all_product_screen.dart';
@@ -251,15 +253,25 @@ class TrendingProducts extends StatefulWidget {
   State<TrendingProducts> createState() => _TrendingProductsState();
 }
 
-class _TrendingProductsState extends State<TrendingProducts> {
+class _TrendingProductsState extends State<TrendingProducts>
+    with SingleTickerProviderStateMixin {
   late final ScrollController _scrollController;
   List<ProductModel> _products = [];
   bool _isLoading = true;
+
+  late final AnimationController _bgController;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+
+    // Background animation controller (soft, slow motion)
+    _bgController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..repeat();
+
     _fetchTrendingProducts();
   }
 
@@ -281,6 +293,7 @@ class _TrendingProductsState extends State<TrendingProducts> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _bgController.dispose();
     super.dispose();
   }
 
@@ -307,25 +320,34 @@ class _TrendingProductsState extends State<TrendingProducts> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Text(
-                    'KakiSo',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFEB2A7E),
-                      fontFamily: 'Poppins',
+                  ShaderMask(
+                    shaderCallback: (rect) {
+                      return const LinearGradient(
+                        colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(rect);
+                    },
+                    child: const Text(
+                      'KakiSo',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: const Color(0xFFFFEDD5),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Iconsax.trend_up,
-                      color: Colors.orange,
+                      color: Color(0xFFFB923C),
                       size: 20,
                     ),
                   ),
@@ -348,7 +370,7 @@ class _TrendingProductsState extends State<TrendingProducts> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
+                    color: Colors.grey[600],
                     fontFamily: 'Poppins',
                   ),
                 ),
@@ -357,27 +379,184 @@ class _TrendingProductsState extends State<TrendingProducts> {
           ),
         ),
 
-        // --- HORIZONTAL LIST ---
+        // --- HORIZONTAL LIST + ANIMATED BLOB BACKGROUND ---
         SizedBox(
           height: 270,
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFFEB2A7E)),
-                )
-              : _products.isEmpty
-              ? const Center(child: Text("No trending items."))
-              : ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 16),
-                  itemCount: _products.length,
-                  itemBuilder: (context, index) {
-                    final product = _products[index];
-                    return TrendingCard(product: product, index: index);
-                  },
-                ),
+          child: AnimatedBuilder(
+            animation: _bgController,
+            builder: (context, _) {
+              final progress = _bgController.value;
+
+              return Stack(
+                children: [
+                  // Background – soft blurry blobs & tiny particles
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _BlobBackgroundPainter(progress: progress),
+                      ),
+                    ),
+                  ),
+
+                  // Foreground content
+                  if (_isLoading)
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFEB2A7E),
+                      ),
+                    )
+                  else if (_products.isEmpty)
+                    const Center(
+                      child: Text(
+                        "No trending items.",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      controller: _scrollController,
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(left: 16),
+                      itemCount: _products.length,
+                      itemBuilder: (context, index) {
+                        final product = _products[index];
+                        return TrendingCard(product: product, index: index);
+                      },
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
+  }
+}
+
+/// ------------------------------------------------------------
+/// Soft Blurry Color Blobs Background (Myntra / Nykaa-esque)
+/// ------------------------------------------------------------
+class _BlobBackgroundPainter extends CustomPainter {
+  final double progress; // 0 → 1 loop
+
+  _BlobBackgroundPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint();
+
+    // 1. Base subtle gradient background
+    final Rect bgRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    paint.shader = const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFFF9FAFB), Color(0xFFFDF2FF)],
+    ).createShader(bgRect);
+    canvas.drawRect(bgRect, paint);
+
+    // 2. Soft color blobs (3 main blobs)
+    _drawBlob(
+      canvas,
+      size,
+      center: Offset(
+        size.width * (0.15 + 0.05 * math.sin(progress * 2 * math.pi)),
+        size.height * 0.3,
+      ),
+      radius: size.width * 0.32,
+      color: const Color(0xFFEC4899).withOpacity(0.24),
+    );
+
+    _drawBlob(
+      canvas,
+      size,
+      center: Offset(
+        size.width * (0.55 + 0.06 * math.cos(progress * 2 * math.pi)),
+        size.height * 0.15,
+      ),
+      radius: size.width * 0.30,
+      color: const Color(0xFF8B5CF6).withOpacity(0.26),
+    );
+
+    _drawBlob(
+      canvas,
+      size,
+      center: Offset(
+        size.width * (0.85 + 0.04 * math.sin(progress * 2 * math.pi + 1.4)),
+        size.height * 0.45,
+      ),
+      radius: size.width * 0.28,
+      color: const Color(0xFF22C7D5).withOpacity(0.22),
+    );
+
+    // 3. Tiny floating dots (particles)
+    final int dots = 26;
+    final Paint dotPaint = Paint();
+    for (int i = 0; i < dots; i++) {
+      final double t = i / dots;
+      final double baseX = size.width * t;
+      final double baseY = size.height * (0.2 + 0.5 * t);
+
+      final double yOffset = math.sin(progress * 4 * math.pi + i * 0.7) * 6.0;
+      final double xOffset = math.cos(progress * 3 * math.pi + i * 0.9) * 4.0;
+
+      final double x = baseX + xOffset;
+      final double y = baseY + yOffset;
+
+      final double alphaFactor =
+          0.35 + 0.65 * (0.5 + 0.5 * math.sin(progress * 6 * math.pi + i));
+
+      dotPaint.color = Colors.white.withOpacity(0.10 * alphaFactor);
+
+      canvas.drawCircle(Offset(x, y), 1.5, dotPaint);
+    }
+
+    // 4. Soft glow strip at bottom (behind cards)
+    final Paint glowPaint = Paint()
+      ..shader =
+          LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              const Color(0xFFEC4899).withOpacity(0.14),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromLTWH(
+              0,
+              size.height * 0.55,
+              size.width,
+              size.height * 0.45,
+            ),
+          );
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height * 0.55, size.width, size.height * 0.45),
+      glowPaint,
+    );
+  }
+
+  void _drawBlob(
+    Canvas canvas,
+    Size size, {
+    required Offset center,
+    required double radius,
+    required Color color,
+  }) {
+    final Rect rect = Rect.fromCircle(center: center, radius: radius);
+    final Paint p = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 0.9,
+        colors: [color, color.withOpacity(0.0)],
+      ).createShader(rect);
+    canvas.drawCircle(center, radius, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BlobBackgroundPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

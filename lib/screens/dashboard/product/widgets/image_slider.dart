@@ -23,7 +23,12 @@ class ProductImageSlider extends StatefulWidget {
 
 class _ProductImageSliderState extends State<ProductImageSlider> {
   late PageController _pageController;
-  final wishlistController = Get.put(WishlistController());
+
+  // Use the persistent WishlistController
+  final WishlistController wishlistController = Get.put(
+    WishlistController(),
+    permanent: true,
+  );
 
   @override
   void initState() {
@@ -50,24 +55,27 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
       pinned: true,
       stretch: true,
 
+      // BACK BUTTON
       leading: _buildGlassButton(
         icon: Icons.arrow_back,
         onTap: () => Get.back(),
       ),
 
+      // ACTIONS (WISHLIST)
       actions: [
-        // ❤️ WISHLIST ICON WITH TOGGLE
         Obx(() {
-          final isLiked = wishlistController.isWhishlisted(widget.product.id);
+          final bool isLiked = wishlistController.isInWishlist(
+            widget.product.id,
+          );
 
           return _buildGlassButton(
             icon: isLiked ? Iconsax.heart5 : Iconsax.heart,
+            iconColor: isLiked ? Colors.red : Colors.black,
             onTap: () {
               wishlistController.toggleWishlist(widget.product);
             },
           );
         }),
-
         const SizedBox(width: 12),
       ],
 
@@ -115,7 +123,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
               ),
             ),
 
-            // GRADIENT SHADOW
+            // GRADIENT SHADOW (BOTTOM)
             Positioned(
               bottom: 0,
               left: 0,
@@ -155,7 +163,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         return Obx(() {
-                          final isSelected =
+                          final bool isSelected =
                               widget.controller.currentImageIndex.value ==
                               index;
 
@@ -221,6 +229,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
   Widget _buildGlassButton({
     required IconData icon,
     required VoidCallback onTap,
+    Color iconColor = Colors.black,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -240,7 +249,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
             ),
           ],
         ),
-        child: Icon(icon, color: Colors.black, size: 22),
+        child: Icon(icon, color: iconColor, size: 22),
       ),
     );
   }

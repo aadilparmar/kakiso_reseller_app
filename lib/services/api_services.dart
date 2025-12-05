@@ -35,7 +35,7 @@ class ApiService {
   };
 
   // ---------------------------------------------------------------------------
-  // Product/Category helpers (unchanged)
+  // Product / Category helpers
   // ---------------------------------------------------------------------------
   static Future<List<CategoryModel>> fetchCategories() async {
     final Uri url = Uri.parse(
@@ -201,10 +201,20 @@ class ApiService {
     return fetchTopSellingProducts();
   }
 
+  // ---------------------------------------------------------------------------
+  // 🔹 BRANDS (with logo)
+  // ---------------------------------------------------------------------------
   static Future<List<BrandModel>> fetchBrands() async {
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products/categories?per_page=10&orderby=count&order=desc&hide_empty=true',
-    );
+    // NOTE:
+    // This assumes you're using a WooCommerce Brands plugin that exposes:
+    //   GET /wp-json/wc/v3/brands
+    //
+    // BrandModel.fromJson should read fields like:
+    //   id, name, slug, and image['src'] for logo URL.
+    //
+    // If your plugin uses a different route (e.g. /wp-json/wp/v2/pwb-brand),
+    // just change the URL below but keep the rest of the logic the same.
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/brands?per_page=100');
 
     try {
       final response = await http.get(url, headers: _headers);
@@ -212,7 +222,9 @@ class ApiService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => BrandModel.fromJson(json)).toList();
       } else {
-        throw Exception('Brands Error: ${response.statusCode}');
+        throw Exception(
+          'Brands Error: ${response.statusCode} ${response.body}',
+        );
       }
     } catch (e) {
       throw Exception('Error fetching brands: $e');
@@ -377,8 +389,9 @@ class ApiService {
           final value = m['value'];
           if (key == 'kakiso_whatsapp') whatsapp = value?.toString();
           if (key == 'kakiso_gstin') gstin = value?.toString();
-          if (key == 'kakiso_business_name')
+          if (key == 'kakiso_business_name') {
             kakisoBusinessName = value?.toString();
+          }
         }
       }
 
@@ -404,8 +417,6 @@ class ApiService {
 
   // ---------------------------------------------------------------------------
   // NEW: updateResellerBusinessMeta -> writes reseller-specific fields into user meta
-  // Preferred: call custom REST endpoint '/wp-json/kakiso/v1/reseller-meta'
-  // Fallback: try updating wp/v2/users/<id> meta (requires server support/auth)
   // ---------------------------------------------------------------------------
   static Future<void> updateResellerBusinessMeta({
     String? userId,

@@ -1,39 +1,33 @@
 class BrandModel {
   final int id;
   final String name;
-  final String image;
-  final int count;
+  final String slug;
+  final String? logoUrl;
 
   BrandModel({
     required this.id,
     required this.name,
-    required this.image,
-    required this.count,
+    required this.slug,
+    this.logoUrl,
   });
 
   factory BrandModel.fromJson(Map<String, dynamic> json) {
-    // Handle Image: Categories/Brands often have 'image' as an object or null
-    String imgUrl = '';
-    if (json['image'] != null) {
-      // Sometimes it's a Map, sometimes a direct URL depending on plugin
-      if (json['image'] is Map && json['image']['src'] != null) {
-        imgUrl = json['image']['src'];
-      } else if (json['image'] is String) {
-        imgUrl = json['image'];
-      }
-    }
-
-    // Fallback if no image
-    if (imgUrl.isEmpty) {
-      imgUrl =
-          'https://cdn-icons-png.flaticon.com/512/1532/1532495.png'; // Generic star icon
+    // Adjust keys according to your plugin’s response structure
+    String? logo;
+    final image = json['image'];
+    if (image != null && image is Map<String, dynamic>) {
+      logo = image['src']?.toString();
     }
 
     return BrandModel(
       id: json['id'] ?? 0,
-      name: json['name'] ?? 'Brand',
-      image: imgUrl,
-      count: json['count'] ?? 0,
+      name: json['name']?.toString() ?? '',
+      slug: json['slug']?.toString() ?? '',
+      logoUrl: logo,
     );
   }
+
+  factory BrandModel.empty() => BrandModel(id: 0, name: '', slug: '');
+
+  bool get isEmpty => id == 0 && name.isEmpty;
 }

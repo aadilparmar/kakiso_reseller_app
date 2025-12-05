@@ -11,6 +11,10 @@ class ProductModel {
   final List<ProductAttribute>
   attributes; // Dynamic attributes (Size, Color, Material)
 
+  // 🔹 NEW: brand fields
+  final String? brandName;
+  final String? brandLogoUrl;
+
   ProductModel({
     required this.id,
     required this.name,
@@ -22,6 +26,8 @@ class ProductModel {
     required this.images,
     this.discountPercentage,
     required this.attributes,
+    this.brandName,
+    this.brandLogoUrl,
   });
 
   /// Used for API / stored JSON -> ProductModel
@@ -42,11 +48,56 @@ class ProductModel {
           .toList();
     }
 
-    // Discount
+    // ---------- BRAND DETECTION ----------
+    String? brandName;
+    String? brandLogoUrl;
+
+    // 1) Official WooCommerce Brands style: "brands": [ { id, name, image: { src } } ]
+    if (json['brands'] is List && (json['brands'] as List).isNotEmpty) {
+      final firstBrand = (json['brands'] as List).first;
+      if (firstBrand is Map<String, dynamic>) {
+        brandName = firstBrand['name']?.toString();
+        if (firstBrand['image'] is Map<String, dynamic> &&
+            firstBrand['image']['src'] != null) {
+          brandLogoUrl = firstBrand['image']['src'].toString();
+        }
+      }
+    }
+
+    // 2) If no brand yet, try product attributes like "Brand", "BRAND NAME", etc.
+    if (brandName == null && attrs.isNotEmpty) {
+      for (final attr in attrs) {
+        final nameLower = attr.name.toLowerCase();
+        if (nameLower.contains('brand')) {
+          if (attr.options.isNotEmpty) {
+            brandName = attr.options.first;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3) If still null, try meta_data entries whose key contains "brand"
+    if (brandName == null && json['meta_data'] is List) {
+      for (final m in (json['meta_data'] as List)) {
+        if (m is Map<String, dynamic>) {
+          final key = m['key']?.toString().toLowerCase();
+          if (key != null && key.contains('brand')) {
+            final value = m['value'];
+            if (value != null && value.toString().trim().isNotEmpty) {
+              brandName = value.toString();
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // ---------- Discount ----------
     double priceVal = double.tryParse(json['price'].toString()) ?? 0;
     double regPriceVal = double.tryParse(json['regular_price'].toString()) ?? 0;
     int discount = 0;
-    if (regPriceVal > priceVal) {
+    if (regPriceVal > priceVal && regPriceVal > 0) {
       discount = (((regPriceVal - priceVal) / regPriceVal) * 100).round();
     }
 
@@ -67,6 +118,8 @@ class ProductModel {
       images: gallery,
       discountPercentage: discount,
       attributes: attrs,
+      brandName: brandName,
+      brandLogoUrl: brandLogoUrl,
     );
   }
 
@@ -82,8 +135,10 @@ class ProductModel {
       'short_description': shortDescription,
       'images': images.map((src) => {'src': src}).toList(),
       'attributes': attributes.map((a) => a.toJson()).toList(),
-      // extra field not used by fromJson but safe to keep
       'discount_percentage': discountPercentage,
+      // 🔹 Keep brand data if you persist it
+      'brand_name': brandName,
+      'brand_logo_url': brandLogoUrl,
     };
   }
 }
