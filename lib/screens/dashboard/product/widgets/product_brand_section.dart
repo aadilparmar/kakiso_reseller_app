@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/brand/brand_details_page.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class ProductBrandSection extends StatelessWidget {
@@ -9,126 +10,131 @@ class ProductBrandSection extends StatelessWidget {
 
   const ProductBrandSection({super.key, required this.product});
 
-  String? _extractBrandName() {
-    // 1) Prefer the parsed brandName from ProductModel
-    if (product.brandName != null && product.brandName!.trim().isNotEmpty) {
-      return product.brandName!.trim();
-    }
-
-    // 2) Fallback: look in attributes if needed
-    for (final attr in product.attributes) {
-      final nameLower = attr.name.toLowerCase();
-      if (nameLower.contains('brand')) {
-        if (attr.options.isNotEmpty) {
-          return attr.options.first;
-        }
-      }
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final brandName = _extractBrandName();
+    final String? brandName = product.brandName;
+    final String? brandLogoUrl = product.brandLogoUrl;
 
-    // If this product does not have any brand-related data, hide the section.
-    if (brandName == null || brandName.trim().isEmpty) {
+    final bool hasName = brandName != null && brandName.trim().isNotEmpty;
+    final bool hasLogo =
+        brandLogoUrl != null &&
+        brandLogoUrl.trim().isNotEmpty &&
+        brandLogoUrl.trim().startsWith('http');
+
+    if (!hasName && !hasLogo) {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Row(
-        children: [
-          // --- Logo / initials avatar ---
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: _buildBrandAvatar(brandName),
-          ),
+    final String displayName = hasName ? brandName.trim() : 'Brand';
 
-          const SizedBox(width: 12),
-
-          // --- Brand text ---
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Brand',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF9CA3AF),
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  brandName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF111827),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'From a trusted catalogue brand',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        // 🔹 Navigate to BrandDetailsPage
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BrandDetailsPage(
+              brandName: displayName,
+              brandLogoUrl: hasLogo ? brandLogoUrl.trim() : null,
             ),
           ),
-
-          const Icon(Iconsax.verify5, size: 20, color: accentColor),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          children: [
+            // avatar / logo
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: _buildLogoOrInitials(
+                  displayName,
+                  hasLogo ? brandLogoUrl.trim() : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Brand',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF9CA3AF),
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Tap to see more from this brand',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Iconsax.arrow_right_3,
+              size: 18,
+              color: Color(0xFF9CA3AF),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBrandAvatar(String brandName) {
-    if (product.brandLogoUrl != null &&
-        product.brandLogoUrl!.trim().isNotEmpty) {
-      // If we have a brand logo URL, show it
-      return ClipOval(
-        child: Image.network(
-          product.brandLogoUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildInitials(brandName),
-        ),
+  Widget _buildLogoOrInitials(String brandName, String? logoUrl) {
+    if (logoUrl != null && logoUrl.isNotEmpty && logoUrl.startsWith('http')) {
+      return Image.network(
+        logoUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildInitialsAvatar(brandName),
       );
     }
-
-    // Fallback: initials avatar
-    return _buildInitials(brandName);
+    return _buildInitialsAvatar(brandName);
   }
 
-  Widget _buildInitials(String brandName) {
+  Widget _buildInitialsAvatar(String brandName) {
     final initials = brandName
         .trim()
         .split(' ')

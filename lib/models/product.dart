@@ -1,3 +1,5 @@
+// lib/models/product.dart
+
 class ProductModel {
   final int id;
   final String name;
@@ -8,12 +10,12 @@ class ProductModel {
   final String image; // Main thumbnail
   final List<String> images; // All gallery images
   final int? discountPercentage;
-  final List<ProductAttribute>
-  attributes; // Dynamic attributes (Size, Color, Material)
+  final List<ProductAttribute> attributes;
 
-  // 🔹 NEW: brand fields
+  // 🔹 Brand fields
   final String? brandName;
-  final String? brandLogoUrl;
+  final String?
+  brandLogoUrl; // this should come from product_cat_thumbnail when possible
 
   ProductModel({
     required this.id,
@@ -30,9 +32,8 @@ class ProductModel {
     this.brandLogoUrl,
   });
 
-  /// Used for API / stored JSON -> ProductModel
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // Images
+    // ---------------- IMAGES ----------------
     List<String> gallery = [];
     if (json['images'] != null) {
       gallery = (json['images'] as List)
@@ -40,7 +41,7 @@ class ProductModel {
           .toList();
     }
 
-    // Attributes
+    // ---------------- ATTRIBUTES ----------------
     List<ProductAttribute> attrs = [];
     if (json['attributes'] != null) {
       attrs = (json['attributes'] as List)
@@ -48,62 +49,86 @@ class ProductModel {
           .toList();
     }
 
-    // ---------- BRAND DETECTION ----------
+    // ---------------- DISCOUNT ----------------
+    final double priceVal = double.tryParse(json['price'].toString()) ?? 0;
+    final double regPriceVal =
+        double.tryParse(json['regular_price'].toString()) ?? 0;
+    int discount = 0;
+    if (regPriceVal > priceVal && regPriceVal > 0) {
+      discount = (((regPriceVal - priceVal) / regPriceVal) * 100).round();
+    }
+
+    // ---------------- DESCRIPTION (clean HTML) ----------------
+    String rawDesc = json['description'] ?? '';
+    String cleanDesc = rawDesc.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
+
+    // ---------------- BRAND ----------------
     String? brandName;
     String? brandLogoUrl;
 
-    // 1) Official WooCommerce Brands style: "brands": [ { id, name, image: { src } } ]
-    if (json['brands'] is List && (json['brands'] as List).isNotEmpty) {
-      final firstBrand = (json['brands'] as List).first;
-      if (firstBrand is Map<String, dynamic>) {
-        brandName = firstBrand['name']?.toString();
-        if (firstBrand['image'] is Map<String, dynamic> &&
-            firstBrand['image']['src'] != null) {
-          brandLogoUrl = firstBrand['image']['src'].toString();
-        }
-      }
-    }
+    // 1) Try brand taxonomy array: json["brands"][0]
+    try {
+      final brands = json['brands'];
+      if (brands is List && brands.isNotEmpty) {
+        final first = brands.first;
+        if (first is Map<String, dynamic>) {
+          // Brand name
+          final n = first['name'];
+          if (n != null && n.toString().trim().isNotEmpty) {
+            brandName = n.toString().trim();
+          }
 
-    // 2) If no brand yet, try product attributes like "Brand", "BRAND NAME", etc.
-    if (brandName == null && attrs.isNotEmpty) {
-      for (final attr in attrs) {
-        final nameLower = attr.name.toLowerCase();
-        if (nameLower.contains('brand')) {
-          if (attr.options.isNotEmpty) {
-            brandName = attr.options.first;
-            break;
+          // CASE A: plugin exposes logo directly as "product_cat_thumbnail"
+          final thumbDirect = first['product_cat_thumbnail'];
+          if (thumbDirect != null && thumbDirect.toString().trim().isNotEmpty) {
+            brandLogoUrl = thumbDirect.toString().trim();
+          }
+
+          // CASE B: standard Woo/brands style image.src
+          if ((brandLogoUrl == null || brandLogoUrl.isEmpty) &&
+              first['image'] is Map<String, dynamic>) {
+            final img = first['image'] as Map<String, dynamic>;
+            final src = img['src'];
+            if (src != null && src.toString().trim().isNotEmpty) {
+              brandLogoUrl = src.toString().trim();
+            }
           }
         }
       }
+    } catch (_) {
+      // ignore, we'll fallback below
     }
 
-    // 3) If still null, try meta_data entries whose key contains "brand"
-    if (brandName == null && json['meta_data'] is List) {
-      for (final m in (json['meta_data'] as List)) {
-        if (m is Map<String, dynamic>) {
-          final key = m['key']?.toString().toLowerCase();
-          if (key != null && key.contains('brand')) {
-            final value = m['value'];
-            if (value != null && value.toString().trim().isNotEmpty) {
-              brandName = value.toString();
-              break;
+    // 2) Fallback: read from meta_data key "product_cat_thumbnail"
+    if (brandLogoUrl == null || brandLogoUrl.isEmpty) {
+      final meta = json['meta_data'];
+      if (meta is List) {
+        for (final m in meta) {
+          if (m is Map<String, dynamic>) {
+            final key = m['key'];
+            if (key == 'product_cat_thumbnail') {
+              final value = m['value'];
+              if (value != null && value.toString().trim().isNotEmpty) {
+                brandLogoUrl = value.toString().trim();
+              }
             }
           }
         }
       }
     }
 
-    // ---------- Discount ----------
-    double priceVal = double.tryParse(json['price'].toString()) ?? 0;
-    double regPriceVal = double.tryParse(json['regular_price'].toString()) ?? 0;
-    int discount = 0;
-    if (regPriceVal > priceVal && regPriceVal > 0) {
-      discount = (((regPriceVal - priceVal) / regPriceVal) * 100).round();
+    // 3) Fallback for brand name from attributes ("Brand", "BRAND NAME", etc.)
+    if (brandName == null || brandName.isEmpty) {
+      for (final attr in attrs) {
+        final lower = attr.name.toLowerCase();
+        if (lower.contains('brand')) {
+          if (attr.options.isNotEmpty) {
+            brandName = attr.options.first.trim();
+          }
+          break;
+        }
+      }
     }
-
-    // Clean HTML from description
-    String rawDesc = json['description'] ?? '';
-    String cleanDesc = rawDesc.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
 
     return ProductModel(
       id: json['id'],
@@ -123,8 +148,6 @@ class ProductModel {
     );
   }
 
-  /// Used for saving locally (catalogues, cache, etc.)
-  /// This matches the structure expected by fromJson above.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -136,9 +159,12 @@ class ProductModel {
       'images': images.map((src) => {'src': src}).toList(),
       'attributes': attributes.map((a) => a.toJson()).toList(),
       'discount_percentage': discountPercentage,
-      // 🔹 Keep brand data if you persist it
-      'brand_name': brandName,
-      'brand_logo_url': brandLogoUrl,
+      // keep brand info in a simple structure
+      'brands': brandName == null && brandLogoUrl == null
+          ? null
+          : [
+              {'name': brandName, 'product_cat_thumbnail': brandLogoUrl},
+            ],
     };
   }
 }
