@@ -3,7 +3,6 @@ import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/brand/brand_details_page.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class ProductBrandSection extends StatelessWidget {
   final ProductModel product;
@@ -153,19 +152,6 @@ class ProductBrandSection extends StatelessWidget {
             fontSize: 16,
             fontWeight: FontWeight.bold,
             fontFamily: 'Poppins',
-          ),
-        ),
-        Positioned(
-          bottom: 4,
-          right: 6,
-          child: Container(
-            width: 14,
-            height: 14,
-            decoration: const BoxDecoration(
-              color: accentColor,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Iconsax.star5, size: 10, color: Colors.white),
           ),
         ),
       ],

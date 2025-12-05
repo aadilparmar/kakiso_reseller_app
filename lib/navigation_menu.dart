@@ -108,7 +108,7 @@ class NavigationMenu extends StatelessWidget {
                   3,
                   controller.selectedIndex.value,
                 ),
-                label: 'Catalogue',
+                label: 'Catalog',
               ),
               NavigationDestination(
                 icon: _buildIcon(
