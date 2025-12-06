@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 
@@ -328,6 +329,9 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
+            const SizedBox(height: 8),
+
+            HomeVideoBanner(assetPath: 'assets/videos/banner_2.mp4'),
 
             // SECTIONS
             const StorySection(),

@@ -1,5 +1,3 @@
-// lib/models/product.dart
-
 class ProductModel {
   final int id;
   final String name;
@@ -7,15 +5,18 @@ class ProductModel {
   final String regularPrice;
   final String description;
   final String shortDescription;
-  final String image; // Main thumbnail
-  final List<String> images; // All gallery images
+  final String image;
+  final List<String> images;
   final int? discountPercentage;
   final List<ProductAttribute> attributes;
 
-  // 🔹 Brand fields
+  // BRAND
   final String? brandName;
-  final String?
-  brandLogoUrl; // this should come from product_cat_thumbnail when possible
+  final String? brandLogoUrl;
+
+  // 🔹 NEW: HSN + GST fields
+  final String? hsnCode;
+  final String? gst;
 
   ProductModel({
     required this.id,
@@ -30,6 +31,8 @@ class ProductModel {
     required this.attributes,
     this.brandName,
     this.brandLogoUrl,
+    this.hsnCode,
+    this.gst,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -53,82 +56,51 @@ class ProductModel {
     final double priceVal = double.tryParse(json['price'].toString()) ?? 0;
     final double regPriceVal =
         double.tryParse(json['regular_price'].toString()) ?? 0;
+
     int discount = 0;
     if (regPriceVal > priceVal && regPriceVal > 0) {
       discount = (((regPriceVal - priceVal) / regPriceVal) * 100).round();
     }
 
-    // ---------------- DESCRIPTION (clean HTML) ----------------
-    String rawDesc = json['description'] ?? '';
-    String cleanDesc = rawDesc.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
-
     // ---------------- BRAND ----------------
     String? brandName;
     String? brandLogoUrl;
 
-    // 1) Try brand taxonomy array: json["brands"][0]
     try {
       final brands = json['brands'];
       if (brands is List && brands.isNotEmpty) {
         final first = brands.first;
         if (first is Map<String, dynamic>) {
-          // Brand name
-          final n = first['name'];
-          if (n != null && n.toString().trim().isNotEmpty) {
-            brandName = n.toString().trim();
-          }
-
-          // CASE A: plugin exposes logo directly as "product_cat_thumbnail"
-          final thumbDirect = first['product_cat_thumbnail'];
-          if (thumbDirect != null && thumbDirect.toString().trim().isNotEmpty) {
-            brandLogoUrl = thumbDirect.toString().trim();
-          }
-
-          // CASE B: standard Woo/brands style image.src
-          if ((brandLogoUrl == null || brandLogoUrl.isEmpty) &&
-              first['image'] is Map<String, dynamic>) {
-            final img = first['image'] as Map<String, dynamic>;
-            final src = img['src'];
-            if (src != null && src.toString().trim().isNotEmpty) {
-              brandLogoUrl = src.toString().trim();
-            }
-          }
+          brandName = first['name'];
+          brandLogoUrl =
+              first['product_cat_thumbnail'] ?? first['image']?['src'];
         }
       }
-    } catch (_) {
-      // ignore, we'll fallback below
-    }
+    } catch (_) {}
 
-    // 2) Fallback: read from meta_data key "product_cat_thumbnail"
-    if (brandLogoUrl == null || brandLogoUrl.isEmpty) {
-      final meta = json['meta_data'];
-      if (meta is List) {
-        for (final m in meta) {
-          if (m is Map<String, dynamic>) {
-            final key = m['key'];
-            if (key == 'product_cat_thumbnail') {
-              final value = m['value'];
-              if (value != null && value.toString().trim().isNotEmpty) {
-                brandLogoUrl = value.toString().trim();
-              }
-            }
+    // ---------------- META DATA (HSN + GST) ----------------
+    String? hsnCode;
+    String? gst;
+
+    if (json['meta_data'] is List) {
+      for (final m in json['meta_data']) {
+        if (m is Map<String, dynamic>) {
+          final key = m['key'];
+          final value = m['value']?.toString();
+
+          if (key == 'product_hsn_code') {
+            hsnCode = value;
+          }
+          if (key == 'product_gst') {
+            gst = value;
           }
         }
       }
     }
 
-    // 3) Fallback for brand name from attributes ("Brand", "BRAND NAME", etc.)
-    if (brandName == null || brandName.isEmpty) {
-      for (final attr in attrs) {
-        final lower = attr.name.toLowerCase();
-        if (lower.contains('brand')) {
-          if (attr.options.isNotEmpty) {
-            brandName = attr.options.first.trim();
-          }
-          break;
-        }
-      }
-    }
+    // ---------------- CLEAN DESCRIPTION ----------------
+    String rawDesc = json['description'] ?? '';
+    String cleanDesc = rawDesc.replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ' ');
 
     return ProductModel(
       id: json['id'],
@@ -145,6 +117,10 @@ class ProductModel {
       attributes: attrs,
       brandName: brandName,
       brandLogoUrl: brandLogoUrl,
+
+      // NEW
+      hsnCode: hsnCode,
+      gst: gst,
     );
   }
 
@@ -159,12 +135,13 @@ class ProductModel {
       'images': images.map((src) => {'src': src}).toList(),
       'attributes': attributes.map((a) => a.toJson()).toList(),
       'discount_percentage': discountPercentage,
-      // keep brand info in a simple structure
       'brands': brandName == null && brandLogoUrl == null
           ? null
           : [
               {'name': brandName, 'product_cat_thumbnail': brandLogoUrl},
             ],
+      'product_hsn_code': hsnCode,
+      'product_gst': gst,
     };
   }
 }

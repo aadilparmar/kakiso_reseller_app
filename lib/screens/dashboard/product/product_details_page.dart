@@ -31,11 +31,59 @@ class ProductDetailsPage extends StatelessWidget {
     permanent: true,
   );
 
+  /// Resolve HSN code:
+  /// 1) Use product.hsnCode (from model/meta_data)
+  /// 2) Fallback to any attribute whose name contains "hsn"
+  /// 3) Fallback to regex scan in description / shortDescription (e.g. "HSN: 1234")
+  String? _getHsnCode(ProductModel product) {
+    // 1) direct field from model
+    if (product.hsnCode != null && product.hsnCode!.trim().isNotEmpty) {
+      return product.hsnCode!.trim();
+    }
+
+    // 2) fallback from attributes like "HSN", "HSN Code" etc.
+    for (final attr in product.attributes) {
+      final lowerName = attr.name.toLowerCase();
+      if (lowerName.contains('hsn')) {
+        if (attr.options.isNotEmpty) {
+          final val = attr.options.first.trim();
+          if (val.isNotEmpty) return val;
+        }
+      }
+    }
+
+    // 3) fallback from description text (if your store writes HSN in the content)
+    String combinedText = '${product.description} ${product.shortDescription}'
+        .toLowerCase();
+
+    // If nothing even contains 'hsn', skip
+    if (!combinedText.contains('hsn')) {
+      return null;
+    }
+
+    // Try to find something like "hsn", then some non-digits, then 4–8 digits
+    final regex = RegExp(r'hsn[^0-9]{0,10}([0-9]{4,8})', caseSensitive: false);
+    final match = regex.firstMatch(
+      '${product.description} ${product.shortDescription}',
+    );
+
+    if (match != null && match.groupCount >= 1) {
+      final code = match.group(1)?.trim();
+      if (code != null && code.isNotEmpty) {
+        return code;
+      }
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Initialize Controller
     final controller = Get.put(ProductDetailsController());
     controller.initialize(product);
+
+    final String? hsnCode = _getHsnCode(product);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -80,8 +128,81 @@ class ProductDetailsPage extends StatelessWidget {
 
                         const SizedBox(height: 16),
 
-                        // 🔹 BRAND SECTION (from product attributes)
+                        // 🔹 BRAND SECTION
                         ProductBrandSection(product: product),
+
+                        // 🔹 HSN CODE ROW (only if resolved)
+                        if (hsnCode != null && hsnCode.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Iconsax.document_text,
+                                  size: 18,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'HSN Code: ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Poppins',
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    hsnCode,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Poppins',
+                                      color: Colors.black87,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        // 🔹 GST ROW (only if available)
+                        if (product.gst != null &&
+                            product.gst!.trim().isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6.0),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Iconsax.percentage_square,
+                                  size: 18,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'GST: ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Poppins',
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    product.gst!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Poppins',
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
                         const SizedBox(height: 16),
                         const Divider(height: 1, color: Color(0xFFF3F4F6)),
@@ -366,9 +487,9 @@ class ProductDetailsPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: accentColor),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+                borderSide: BorderSide(color: accentColor),
               ),
             ),
           ),

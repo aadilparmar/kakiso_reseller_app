@@ -33,6 +33,7 @@ dependencies:
   gal: ^2.3.0             # To save images to Gallery
   pdf: ^3.10.4
   printing: ^5.11.0
+  video_player: ^2.9.1 
   # -----------------------------------------
 
 dev_dependencies:
@@ -45,6 +46,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logos/
+    - assets/videos/
     - assets/images/posters/
     - assets/images/icons/
     - assets/images/animations/
