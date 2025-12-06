@@ -1,3 +1,5 @@
+// lib/screens/dashboard/product/widgets/sticky_bottom_bar.dart
+
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -23,10 +25,9 @@ class ProductStickyBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final CartController cartController = Get.put(
-      CartController(),
-      permanent: true,
-    );
+    // Ensure CartController is registered somewhere globally.
+    // If needed, you can keep this find; you don't need it for addToCart now.
+    Get.find<CartController>();
 
     return Positioned(
       bottom: 0,
@@ -95,15 +96,11 @@ class ProductStickyBottomBar extends StatelessWidget {
                       return ElevatedButton(
                         onPressed: () {
                           if (addedToCart.value == false) {
-                            // ADD TO CART ACTION
-                            int qty = controller.quantity.value;
-                            for (int i = 0; i < qty; i++) {
-                              cartController.addToCart(product);
-                            }
+                            // ✅ ADD TO CART ACTION using controller logic
+                            // This includes selectedAttributes and snackbar.
+                            controller.addToCart(product);
 
-                            cartController.showCustomCartSnackbar(product);
-
-                            addedToCart.value = true; // now change the button
+                            addedToCart.value = true; // change button state
                           } else {
                             // GO TO CART ACTION
                             Get.to(() => const InventoryPage());

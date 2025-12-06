@@ -346,6 +346,15 @@ class _InventoryPageState extends State<InventoryPage> {
         marginPercent > 9.99 &&
         (sellingPrice ?? 0) > 0;
 
+    // 🔹 Build variation text:
+    //    ONLY show attributes actually selected on the product details page.
+    String variationText = '';
+    if (item.selectedAttributes.isNotEmpty) {
+      variationText = item.selectedAttributes.entries
+          .map((e) => '${e.key}: ${e.value}')
+          .join(' • ');
+    }
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -411,6 +420,35 @@ class _InventoryPageState extends State<InventoryPage> {
                         ),
                       ],
                     ),
+
+                    // 🔹 Variation row (Size / Color / etc.) – ONLY selected ones
+                    if (variationText.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Iconsax.category,
+                            size: 14,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              variationText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
+                                fontFamily: 'Poppins',
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     const SizedBox(height: 6),
                     Text(
                       'Base Price: ₹${item.product.price}',

@@ -1,3 +1,5 @@
+// lib/screens/dashboard/tools/tools_section.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
@@ -5,32 +7,19 @@ import 'package:iconsax/iconsax.dart';
 
 // --- MODEL IMPORTS ---
 import 'package:kakiso_reseller_app/models/tools.dart';
-import 'package:kakiso_reseller_app/models/user.dart'; // 1. Import UserData model
+import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 
-// --- TOOLS SUB-SCREENS ---
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/ai_caption_generator.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/auto_inventory_sync.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/auto_video_generator.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/broadcast_marketing_tools.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_wp_share/one_click_whatsapp.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/price_margin_tool.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/reseller_catalog_builder.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_products_dashboard.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/whats_app_store_builder.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/widgets/tools_card.dart';
-
 // --- DRAWER IMPORT ---
-import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart'; // Make sure path is correct
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
 
 const Color accentColor = Color(0xFFEB2A7E);
 
 class ToolsSection extends StatefulWidget {
-  // 2. Require UserData in constructor
   final UserData userData;
 
   const ToolsSection({super.key, required this.userData});
@@ -40,7 +29,6 @@ class ToolsSection extends StatefulWidget {
 }
 
 class _ToolsSectionState extends State<ToolsSection> {
-  // initial tool list (could be fetched from server later)
   late List<Tool> tools;
   String query = '';
   bool isGrid = true;
@@ -49,22 +37,24 @@ class _ToolsSectionState extends State<ToolsSection> {
   @override
   void initState() {
     super.initState();
+
+    // All tools are "Coming Soon" – pageBuilder is unused but required by Tool model
     tools = [
       Tool(
         id: 'whatsapp_share',
         title: 'One-click WhatsApp sharing',
-        subtitle: 'Share product quickly on WhatsApp',
+        subtitle: 'Share products instantly on WhatsApp',
         iconData: Iconsax.send_1,
         enabled: true,
-        pageBuilder: (_) => const OneClickWhatsAppPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'auto_video',
         title: 'Auto video generator',
-        subtitle: 'Create quick product videos',
+        subtitle: 'Create scroll-stopping videos in seconds',
         iconData: Iconsax.video,
         enabled: true,
-        pageBuilder: (_) => const AutoVideoGeneratorPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'whatsapp_store',
@@ -72,7 +62,7 @@ class _ToolsSectionState extends State<ToolsSection> {
         subtitle: 'Build a shareable WhatsApp catalog',
         iconData: Iconsax.shop,
         enabled: true,
-        pageBuilder: (_) => const WhatsappStoreBuilderPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'inventory_sync',
@@ -80,15 +70,15 @@ class _ToolsSectionState extends State<ToolsSection> {
         subtitle: 'Keep stock in sync automatically',
         iconData: Iconsax.refresh,
         enabled: true,
-        pageBuilder: (_) => const AutoInventorySyncPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'price_margin',
         title: 'Auto price margin tool',
-        subtitle: 'Set margin rules & suggestions',
+        subtitle: 'Set smart margin rules & suggestions',
         iconData: Iconsax.percentage_circle,
         enabled: true,
-        pageBuilder: (_) => const PriceMarginToolPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'reseller_catalog',
@@ -96,23 +86,23 @@ class _ToolsSectionState extends State<ToolsSection> {
         subtitle: 'Create reseller-specific catalogs',
         iconData: Iconsax.folder_2,
         enabled: true,
-        pageBuilder: (_) => const ResellerCatalogBuilderPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'ai_caption',
         title: 'AI caption generator',
-        subtitle: 'Generate captions with AI',
+        subtitle: 'Generate viral captions with AI',
         iconData: Iconsax.magic_star,
         enabled: true,
-        pageBuilder: (_) => const AICaptionGeneratorPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'trending',
         title: 'Trending products dashboard',
-        subtitle: 'See what\'s trending now',
+        subtitle: 'See what\'s trending right now',
         iconData: Iconsax.activity,
         enabled: true,
-        pageBuilder: (_) => const TrendingProductsDashboardPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'broadcast',
@@ -120,7 +110,7 @@ class _ToolsSectionState extends State<ToolsSection> {
         subtitle: 'Send bulk promotions & broadcasts',
         iconData: Iconsax.chart_1,
         enabled: true,
-        pageBuilder: (_) => const BroadcastMarketingToolsPage(),
+        pageBuilder: (_) => const SizedBox.shrink(),
       ),
     ];
   }
@@ -142,7 +132,8 @@ class _ToolsSectionState extends State<ToolsSection> {
     });
   }
 
-  // --- DRAWER LOGIC ---
+  // --- LOGOUT / DRAWER LOGIC ---
+
   Future<void> _showLogoutConfirmation() async {
     Get.dialog(
       AlertDialog(
@@ -194,21 +185,141 @@ class _ToolsSectionState extends State<ToolsSection> {
 
   void _handleDrawerNavigation(String pageId) {
     Navigator.pop(context); // Close drawer
-    // Navigate based on ID
     if (pageId == 'Home' || pageId == 'BusinessDetails') {
       Get.off(() => HomePage(userData: widget.userData));
     }
-    // Add other cases if needed
+  }
+
+  void _showComingSoonSheet(Tool tool) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Iconsax.flash_1, size: 16, color: accentColor),
+                    SizedBox(width: 6),
+                    Text(
+                      'Coming soon',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: accentColor,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(tool.iconData, color: accentColor, size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tool.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          tool.subtitle,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'We’re polishing this tool for you.\n'
+                'You’ll be able to use it very soon inside Kakiso.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                  height: 1.4,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Iconsax.tick_circle, size: 18),
+                  label: const Text(
+                    'Got it',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final toolsCount = tools.length;
+
     return Scaffold(
-      // 3. ASSIGN THE DRAWER
       drawer: HomeDrawer(
         userData: widget.userData,
-        selectedTitle:
-            'Tools', // You can create a unique ID for this screen if you want it highlighted
+        selectedTitle: 'Tools',
         onNavigate: _handleDrawerNavigation,
         onLogoutPressed: () {
           Navigator.pop(context);
@@ -222,7 +333,6 @@ class _ToolsSectionState extends State<ToolsSection> {
         automaticallyImplyLeading: false,
         title: Row(
           children: [
-            // 4. DRAWER TRIGGER
             Builder(
               builder: (ctx) => IconButton(
                 icon: const Icon(Icons.menu),
@@ -256,6 +366,46 @@ class _ToolsSectionState extends State<ToolsSection> {
       body: SafeArea(
         child: Column(
           children: [
+            // Header: Title + count
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 4,
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'Tools & automations',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Text(
+                      '$toolsCount coming soon',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: accentColor,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Search + view toggle
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -280,7 +430,7 @@ class _ToolsSectionState extends State<ToolsSection> {
                           Expanded(
                             child: TextField(
                               decoration: const InputDecoration(
-                                hintText: 'Search tools...',
+                                hintText: 'Search upcoming tools...',
                                 border: InputBorder.none,
                               ),
                               onChanged: (v) => setState(() => query = v),
@@ -332,14 +482,19 @@ class _ToolsSectionState extends State<ToolsSection> {
 
   Widget _buildGrid() {
     final list = filteredTools;
+    if (list.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         int crossAxisCount = 2;
         if (constraints.maxWidth > 1000) {
           crossAxisCount = 4;
-        } else if (constraints.maxWidth > 700)
-          // ignore: curly_braces_in_flow_control_structures
+        } else if (constraints.maxWidth > 700) {
           crossAxisCount = 3;
+        }
+
         return GridView.builder(
           itemCount: list.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -350,17 +505,9 @@ class _ToolsSectionState extends State<ToolsSection> {
           ),
           itemBuilder: (context, idx) {
             final tool = list[idx];
-            return ToolCard(
-              title: tool.title,
-              iconData: tool.iconData,
-              enabled: tool.enabled,
-              onTap: () {
-                if (!tool.enabled) {
-                  Get.snackbar('Disabled', '${tool.title} is disabled');
-                  return;
-                }
-                Get.to(() => tool.pageBuilder(context));
-              },
+            return _ComingSoonToolCard(
+              tool: tool,
+              onTap: () => _showComingSoonSheet(tool),
             );
           },
         );
@@ -370,52 +517,233 @@ class _ToolsSectionState extends State<ToolsSection> {
 
   Widget _buildList() {
     final list = filteredTools;
+    if (list.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return ListView.separated(
       itemCount: list.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, idx) {
         final t = list[idx];
-        return Material(
-          color: Colors.white,
+        return InkWell(
+          onTap: () => _showComingSoonSheet(t),
           borderRadius: BorderRadius.circular(12),
-          child: ListTile(
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(t.iconData, color: accentColor, size: 26),
-            ),
-            title: Text(
-              t.title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(t.subtitle),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Switch(
-                  value: t.enabled,
-                  activeColor: accentColor,
-                  onChanged: (v) => toggleEnabled(t.id, v),
-                ),
-                const SizedBox(width: 6),
-                IconButton(
-                  onPressed: t.enabled
-                      ? () => Get.to(() => t.pageBuilder(context))
-                      : null,
-                  icon: const Icon(Icons.arrow_forward_ios, size: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            onTap: t.enabled
-                ? () => Get.to(() => t.pageBuilder(context))
-                : null,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.09),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(t.iconData, color: accentColor, size: 26),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        t.subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                          fontFamily: 'Poppins',
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: const Text(
+                    'Coming soon',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: accentColor,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Iconsax.arrow_right_3,
+                  size: 18,
+                  color: Colors.grey.shade500,
+                ),
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Iconsax.lamp_on, size: 56, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          const Text(
+            'No tools found',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Try a different keyword to explore upcoming tools.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Grid card for a "Coming soon" tool
+class _ComingSoonToolCard extends StatelessWidget {
+  final Tool tool;
+  final VoidCallback onTap;
+
+  const _ComingSoonToolCard({required this.tool, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              colors: [
+                Colors.white,
+                Colors.white,
+                accentColor.withOpacity(0.03),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: accentColor.withOpacity(0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon + pill
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(tool.iconData, color: accentColor, size: 22),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: const Text(
+                      'Coming soon',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: accentColor,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                tool.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tool.subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade700,
+                  fontFamily: 'Poppins',
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

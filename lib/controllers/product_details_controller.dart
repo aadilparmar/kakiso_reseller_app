@@ -22,7 +22,7 @@ class ProductDetailsController extends GetxController {
   final RxBool isDownloading = false.obs;
   final RxBool isSharing = false.obs;
 
-  // Map to store selected options
+  // Map to store selected options (e.g. {"Size": "L", "Color": "Red"})
   final RxMap<String, String> selectedAttributes = <String, String>{}.obs;
 
   // Cart Controller Reference
@@ -33,6 +33,7 @@ class ProductDetailsController extends GetxController {
     currentImageIndex.value = 0;
     selectedAttributes.clear();
 
+    // Pre-select first option for each attribute
     for (var attr in product.attributes) {
       if (attr.options.isNotEmpty) {
         selectedAttributes[attr.name] = attr.options[0];
@@ -45,15 +46,18 @@ class ProductDetailsController extends GetxController {
     selectedAttributes[attributeName] = option;
   }
 
-  // --- ADD TO CART ---
-  // --- ADD TO CART (With Premium Popup) ---
   // --- ADD TO CART (With Navigation to InventoryPage) ---
   void addToCart(ProductModel product) {
     HapticFeedback.mediumImpact();
 
-    // Add items to the actual cart controller
+    // Take a snapshot of the selected attributes at the time of adding
+    final Map<String, String> selected = Map<String, String>.from(
+      selectedAttributes,
+    );
+
+    // Add items to the actual cart controller with variation info
     for (int i = 0; i < quantity.value; i++) {
-      cartController.addToCart(product);
+      cartController.addToCart(product, selectedAttributes: selected);
     }
 
     // Show Premium Popup
@@ -118,7 +122,7 @@ class ProductDetailsController extends GetxController {
       // --- VIEW BUTTON ACTION ---
       mainButton: TextButton(
         onPressed: () {
-          // Close the snackbar immediately so it doesn't cover the next screen
+          // Close the snackbar so it does not cover the next screen
           if (Get.isSnackbarOpen) Get.closeCurrentSnackbar();
 
           // Navigate to InventoryPage
@@ -356,9 +360,7 @@ class ProductDetailsController extends GetxController {
     }
   }
 
-  // --- 3. SHARE PRODUCT (Multi-Image) ---
   // --- 3. SHARE PRODUCT (Reseller Style: Images + Copy Text) ---
-  // --- 3. SHARE PRODUCT (Robust Logic) ---
   Future<void> shareProduct(ProductModel product, {String? customPrice}) async {
     if (isSharing.value) return;
 
@@ -386,11 +388,9 @@ class ProductDetailsController extends GetxController {
           "$desc\n\n"
           "🛍️ DM me to order!";
 
-      // Debug: Verify text is ready
       debugPrint("Ready to copy ${shareText.length} characters.");
 
-      // 2. PRE-COPY TO CLIPBOARD (Do this FIRST)
-      // We do this before downloading images to ensure it's ready.
+      // 2. PRE-COPY TO CLIPBOARD
       await Clipboard.setData(ClipboardData(text: shareText));
 
       // 3. Download Images
@@ -421,10 +421,8 @@ class ProductDetailsController extends GetxController {
 
       // 4. FINAL CLIPBOARD REFRESH & SHARE
       if (filesToShare.isNotEmpty) {
-        // Copy AGAIN right before sharing to be absolutely sure
         await Clipboard.setData(ClipboardData(text: shareText));
 
-        // Show Snackbar
         Get.snackbar(
           "Copied!",
           "Description is ready to paste.",
@@ -436,8 +434,6 @@ class ProductDetailsController extends GetxController {
           borderRadius: 12,
         );
 
-        // CRITICAL DELAY: Give the OS time to register the clipboard
-        // before the Share Sheet pops up and steals focus.
         await Future.delayed(const Duration(milliseconds: 800));
 
         // Open Share Sheet (Images Only)
@@ -456,29 +452,6 @@ class ProductDetailsController extends GetxController {
       isSharing.value = false;
     }
   }
-
-  // --- KEEP YOUR _cleanHtml HELPER ---
-  // String _cleanHtml(String htmlString) {
-  //   if (htmlString.isEmpty) return "";
-
-  //   // Replace Breaks with Newlines
-  //   String result = htmlString
-  //       .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-  //       .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
-  //       .replaceAll(RegExp(r'</li>', caseSensitive: false), '\n');
-
-  //   // Remove all other tags
-  //   result = result.replaceAll(RegExp(r'<[^>]*>'), '');
-
-  //   // Fix Entities
-  //   result = result
-  //       .replaceAll('&amp;', '&')
-  //       .replaceAll('&nbsp;', ' ')
-  //       .replaceAll('&quot;', '"')
-  //       .replaceAll('&#39;', "'");
-
-  //   return result.trim();
-  // }
 
   void copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));

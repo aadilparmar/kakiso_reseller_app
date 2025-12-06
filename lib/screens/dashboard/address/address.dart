@@ -36,13 +36,20 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
 
   final TextEditingController _customerNameCtrl = TextEditingController();
   final TextEditingController _customerPhoneCtrl = TextEditingController();
-  final TextEditingController _addressCtrl = TextEditingController();
+
+  // Address split into three lines
+  final TextEditingController _addressLine1Ctrl = TextEditingController();
+  final TextEditingController _addressLine2Ctrl = TextEditingController();
+  final TextEditingController _addressLine3Ctrl = TextEditingController();
+
   final TextEditingController _cityCtrl = TextEditingController();
-  final TextEditingController _stateCtrl = TextEditingController();
   final TextEditingController _countryCtrl = TextEditingController(
     text: 'India',
   );
   final TextEditingController _pincodeCtrl = TextEditingController();
+
+  // State dropdown selection
+  String? selectedState;
 
   bool _isSaving = false;
 
@@ -63,9 +70,49 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
 
   UserData? get _userData => widget.userData;
 
+  // List of Indian states and UTs for dropdown
+  final List<String> indianStates = [
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chhattisgarh",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal",
+    "Delhi",
+    "Jammu & Kashmir",
+    "Ladakh",
+    "Puducherry",
+    "Chandigarh",
+    "Andaman & Nicobar Islands",
+    "Lakshadweep",
+  ];
+
   @override
   void initState() {
     super.initState();
+    _countryCtrl.text = 'India';
     _loadSavedAddresses();
     _loadBusinessDetails(); // 🔹 load business address for final checkout
   }
@@ -74,9 +121,10 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   void dispose() {
     _customerNameCtrl.dispose();
     _customerPhoneCtrl.dispose();
-    _addressCtrl.dispose();
+    _addressLine1Ctrl.dispose();
+    _addressLine2Ctrl.dispose();
+    _addressLine3Ctrl.dispose();
     _cityCtrl.dispose();
-    _stateCtrl.dispose();
     _countryCtrl.dispose();
     _pincodeCtrl.dispose();
     super.dispose();
@@ -84,14 +132,21 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
 
   // ----------------- MODEL -----------------
   CustomerAddress _buildAddressFromForm() {
+    // Combine three address lines into a single stored address string
+    final fullAddress = [
+      _addressLine1Ctrl.text.trim(),
+      _addressLine2Ctrl.text.trim(),
+      _addressLine3Ctrl.text.trim(),
+    ].where((e) => e.isNotEmpty).join(", ");
+
     return CustomerAddress(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: _customerNameCtrl.text.trim(),
       phone: _customerPhoneCtrl.text.trim(),
-      addressLine: _addressCtrl.text.trim(),
+      addressLine: fullAddress,
       city: _cityCtrl.text.trim(),
-      state: _stateCtrl.text.trim(),
-      country: _countryCtrl.text.trim(),
+      state: selectedState ?? '',
+      country: 'India', // locked to India
       pincode: _pincodeCtrl.text.trim(),
     );
   }
@@ -194,14 +249,13 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       // clear form
       _customerNameCtrl.clear();
       _customerPhoneCtrl.clear();
-      _addressCtrl.clear();
+      _addressLine1Ctrl.clear();
+      _addressLine2Ctrl.clear();
+      _addressLine3Ctrl.clear();
       _cityCtrl.clear();
-      _stateCtrl.clear();
-      // keep country as India if it was India
-      if (_countryCtrl.text.trim().isEmpty) {
-        _countryCtrl.text = 'India';
-      }
       _pincodeCtrl.clear();
+      selectedState = null;
+      _countryCtrl.text = 'India';
 
       if (!mounted) return;
       Get.snackbar(
@@ -506,13 +560,28 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               },
             ),
             const SizedBox(height: 12),
+
+            // Address Lines
             _buildTextField(
-              controller: _addressCtrl,
-              label: 'House / Street / Area',
+              controller: _addressLine1Ctrl,
+              label: 'Address Line 1',
               icon: Iconsax.location,
-              hint: 'Flat / building / street / area',
-              maxLines: 2,
+              hint: 'House No. / Building / Street',
               validator: (v) => v!.trim().isEmpty ? 'Address required' : null,
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _addressLine2Ctrl,
+              label: 'Address Line 2 (Optional)',
+              icon: Iconsax.location,
+              hint: 'Area / Landmark',
+            ),
+            const SizedBox(height: 12),
+            _buildTextField(
+              controller: _addressLine3Ctrl,
+              label: 'Address Line 3 (Optional)',
+              icon: Iconsax.location,
+              hint: 'Locality / Additional Info',
             ),
             const SizedBox(height: 12),
 
@@ -531,13 +600,36 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildTextField(
-                    controller: _stateCtrl,
-                    label: 'State',
-                    icon: Iconsax.map,
-                    hint: 'Eg. Gujarat',
+                  child: DropdownButtonFormField<String>(
+                    value: selectedState,
+                    isExpanded:
+                        true, // 👈 important: prevent horizontal overflow
+                    items: indianStates
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(
+                              s,
+                              style: const TextStyle(fontFamily: 'Poppins'),
+                              overflow: TextOverflow
+                                  .ellipsis, // 👈 long names = ellipsis
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      setState(() => selectedState = val);
+                    },
+                    decoration: InputDecoration(
+                      labelText: "State",
+                      prefixIcon: const Icon(Iconsax.map, size: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      isDense: true,
+                    ),
                     validator: (v) =>
-                        v!.trim().isEmpty ? 'State required' : null,
+                        v == null || v.isEmpty ? 'State required' : null,
                   ),
                 ),
               ],
@@ -548,13 +640,17 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
             Row(
               children: [
                 Expanded(
-                  child: _buildTextField(
+                  child: TextFormField(
                     controller: _countryCtrl,
-                    label: 'Country',
-                    icon: Iconsax.global,
-                    hint: 'Eg. India',
-                    validator: (v) =>
-                        v!.trim().isEmpty ? 'Country required' : null,
+                    enabled: false, // locked to India
+                    decoration: InputDecoration(
+                      labelText: 'Country',
+                      prefixIcon: const Icon(Iconsax.global, size: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      isDense: true,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

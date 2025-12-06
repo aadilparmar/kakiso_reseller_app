@@ -43,8 +43,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _whatsappCtrl = TextEditingController();
 
-  // Address controllers
-  final TextEditingController _addressCtrl = TextEditingController(); // Street
+  // Address controllers (two lines)
+  final TextEditingController _addressLine1Ctrl = TextEditingController();
+  final TextEditingController _addressLine2Ctrl = TextEditingController();
   final TextEditingController _cityCtrl = TextEditingController();
   final TextEditingController _stateCtrl = TextEditingController();
   final TextEditingController _countryCtrl = TextEditingController(
@@ -59,6 +60,48 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   bool _hasSavedDetails = false; // 🔹 to know if user already saved once
   bool _isRemoteLoading = false; // 🔹 when fetching from server
 
+  // 🔹 Indian states list and selected state
+  final List<String> _indianStates = const [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+    'Andaman and Nicobar Islands',
+    'Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi',
+    'Jammu and Kashmir',
+    'Ladakh',
+    'Lakshadweep',
+    'Puducherry',
+  ];
+
+  String? _selectedState;
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +111,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       _ownerNameCtrl.text = widget.userData!.name;
       _emailCtrl.text = widget.userData!.email;
     }
+
+    // Country is always India
+    _countryCtrl.text = 'India';
 
     // Load any previously saved business details (device-local)
     _loadSavedDetails();
@@ -86,6 +132,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
       if (!mounted) return;
 
+      final String savedState = (data['state'] as String?)?.trim() ?? '';
+      final String savedLine1 = (data['addressLine1'] as String?)?.trim() ?? '';
+      final String savedLine2 = (data['addressLine2'] as String?)?.trim() ?? '';
+      final String savedAddressCombined =
+          (data['address'] as String?)?.trim() ?? '';
+
       setState(() {
         _businessNameCtrl.text = data['businessName'] ?? _businessNameCtrl.text;
         _ownerNameCtrl.text = data['ownerName'] ?? _ownerNameCtrl.text;
@@ -93,10 +145,28 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _whatsappCtrl.text = data['whatsapp'] ?? '';
         _emailCtrl.text = data['email'] ?? _emailCtrl.text;
 
-        _addressCtrl.text = data['address'] ?? '';
+        // Address lines
+        if (savedLine1.isNotEmpty || savedLine2.isNotEmpty) {
+          _addressLine1Ctrl.text = savedLine1;
+          _addressLine2Ctrl.text = savedLine2;
+        } else if (savedAddressCombined.isNotEmpty) {
+          _addressLine1Ctrl.text = savedAddressCombined;
+          _addressLine2Ctrl.text = '';
+        }
+
         _cityCtrl.text = data['city'] ?? '';
-        _stateCtrl.text = data['state'] ?? '';
-        _countryCtrl.text = data['country'] ?? _countryCtrl.text;
+
+        // State via dropdown
+        if (savedState.isNotEmpty && _indianStates.contains(savedState)) {
+          _selectedState = savedState;
+        } else {
+          _selectedState = null;
+        }
+        _stateCtrl.text = _selectedState ?? savedState;
+
+        // Country always India, ignore saved value
+        _countryCtrl.text = 'India';
+
         _pincodeCtrl.text = data['pincode'] ?? '';
 
         _gstinCtrl.text = data['gstin'] ?? '';
@@ -125,6 +195,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
       if (remoteData == null || !mounted) return;
 
+      final String remoteState = (remoteData['state'] as String?)?.trim() ?? '';
+      final String remoteAddress =
+          (remoteData['address'] as String?)?.trim() ?? '';
+
       setState(() {
         _businessNameCtrl.text =
             remoteData['businessName'] ?? _businessNameCtrl.text;
@@ -133,10 +207,26 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _whatsappCtrl.text = remoteData['whatsapp'] ?? _whatsappCtrl.text;
         _emailCtrl.text = remoteData['email'] ?? _emailCtrl.text;
 
-        _addressCtrl.text = remoteData['address'] ?? _addressCtrl.text;
+        // Only override address line 1 if empty and remote has value
+        if (_addressLine1Ctrl.text.trim().isEmpty && remoteAddress.isNotEmpty) {
+          _addressLine1Ctrl.text = remoteAddress;
+        }
         _cityCtrl.text = remoteData['city'] ?? _cityCtrl.text;
-        _stateCtrl.text = remoteData['state'] ?? _stateCtrl.text;
-        _countryCtrl.text = remoteData['country'] ?? _countryCtrl.text;
+
+        // State via dropdown
+        if (remoteState.isNotEmpty && _indianStates.contains(remoteState)) {
+          _selectedState = remoteState;
+        } else if (_stateCtrl.text.isNotEmpty &&
+            _indianStates.contains(_stateCtrl.text.trim())) {
+          _selectedState = _stateCtrl.text.trim();
+        } else {
+          _selectedState = null;
+        }
+        _stateCtrl.text = _selectedState ?? remoteState;
+
+        // Country always India, ignore remote value
+        _countryCtrl.text = 'India';
+
         _pincodeCtrl.text = remoteData['pincode'] ?? _pincodeCtrl.text;
 
         _gstinCtrl.text = remoteData['gstin'] ?? _gstinCtrl.text;
@@ -164,7 +254,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     _emailCtrl.dispose();
     _whatsappCtrl.dispose();
 
-    _addressCtrl.dispose();
+    _addressLine1Ctrl.dispose();
+    _addressLine2Ctrl.dispose();
     _cityCtrl.dispose();
     _stateCtrl.dispose();
     _countryCtrl.dispose();
@@ -174,10 +265,36 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     super.dispose();
   }
 
+  // 🔹 Submit (ONLY when opened from drawer)
   Future<void> _onSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Ensure state selected
+    if (_selectedState == null || _selectedState!.trim().isEmpty) {
+      Get.snackbar(
+        'State required',
+        'Please select your state from the list.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // Keep controllers in sync
+    _stateCtrl.text = _selectedState!;
+    _countryCtrl.text = 'India';
+
     setState(() => _isSaving = true);
+
+    final String line1 = _addressLine1Ctrl.text.trim();
+    final String line2 = _addressLine2Ctrl.text.trim();
+    String combinedAddress = line1;
+    if (line2.isNotEmpty) {
+      combinedAddress = combinedAddress.isEmpty
+          ? line2
+          : '$combinedAddress, $line2';
+    }
 
     // Build the payload that we save locally AND send to backend
     final Map<String, dynamic> payload = {
@@ -188,10 +305,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           ? _phoneCtrl.text.trim()
           : _whatsappCtrl.text.trim(),
       "email": _emailCtrl.text.trim(),
-      "address": _addressCtrl.text.trim(),
+      // store combined address for WooCommerce
+      "address": combinedAddress,
+      "addressLine1": line1,
+      "addressLine2": line2,
       "city": _cityCtrl.text.trim(),
-      "state": _stateCtrl.text.trim(),
-      "country": _countryCtrl.text.trim(),
+      // 🔹 Forced to dropdown value
+      "state": _selectedState ?? _stateCtrl.text.trim(),
+      // 🔹 Country always India
+      "country": 'India',
       "pincode": _pincodeCtrl.text.trim(),
       "gstin": _gstinCtrl.text.trim(),
     };
@@ -228,7 +350,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           colorText: Colors.white,
         );
       } else {
-        // CHECKOUT FLOW
+        // (we won’t normally hit this path now, submit is called only from drawer)
         Get.snackbar(
           'Business details saved',
           'Your information will be used on invoices & catalogues.',
@@ -240,16 +362,34 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      // Get.snackbar(
-      //   'Error',
-      //   'Failed to save business details: $e',
-      //   snackPosition: SnackPosition.BOTTOM,
-      //   backgroundColor: Colors.red,
-      //   colorText: Colors.white,
-      // );
+      // Keep same behaviour as before (silent or custom error).
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  // 🔹 Checkout flow: read-only, just continue
+  void _onContinueFromCheckout() {
+    // Basic check – if details are clearly missing, stop
+    if (_businessNameCtrl.text.trim().isEmpty ||
+        _ownerNameCtrl.text.trim().isEmpty ||
+        _phoneCtrl.text.trim().isEmpty ||
+        _addressLine1Ctrl.text.trim().isEmpty ||
+        _cityCtrl.text.trim().isEmpty ||
+        (_selectedState == null || _selectedState!.trim().isEmpty) ||
+        _pincodeCtrl.text.trim().isEmpty) {
+      Get.snackbar(
+        'Business details incomplete',
+        'Please open Business Details from the drawer to complete and save your information before checkout.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // If everything looks ok, proceed to customer address step
+    Get.to(() => CustomerAddressPage(userData: widget.userData));
   }
 
   @override
@@ -266,7 +406,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           onPressed: () => Get.back(),
         ),
         title: const Text(
-          'Your Business Details',
+          'Your Billing Details',
           style: TextStyle(
             fontFamily: 'Poppins',
             fontWeight: FontWeight.w600,
@@ -316,279 +456,357 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
             // Info banner only in checkout mode
             if (!fromDrawer) _buildInfoBanner(),
 
-            if (_hasSavedDetails)
-              _buildSavedSummaryCard(), // 🔹 summary if saved
+            if (_hasSavedDetails) _buildSavedSummaryCard(),
 
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      _buildSectionCard(
-                        title: 'Business Profile',
+                child: fromDrawer
+                    ? Form(
+                        key: _formKey,
                         child: Column(
                           children: [
-                            _buildTextField(
-                              controller: _businessNameCtrl,
-                              label: 'Business / Shop Name',
-                              hint: 'Eg. Aadil Fashion Hub',
-                              icon: Iconsax.shop,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your business name';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildTextField(
-                              controller: _ownerNameCtrl,
-                              label: 'Your Name',
-                              hint: 'Owner / Proprietor name',
-                              icon: Iconsax.user,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your name';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildSectionCard(
-                        title: 'Contact Details',
-                        child: Column(
-                          children: [
-                            _buildTextField(
-                              controller: _phoneCtrl,
-                              label: 'Primary Phone Number',
-                              hint: '10-digit mobile number',
-                              icon: Iconsax.call,
-                              keyboardType: TextInputType.phone,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter phone number';
-                                }
-                                if (value.trim().length < 10) {
-                                  return 'Enter a valid phone number';
-                                }
-                                return null;
-                              },
-                              onChanged: (val) {
-                                if (_isWhatsAppSame) {
-                                  _whatsappCtrl.text = val;
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: _isWhatsAppSame,
-                                  activeColor: accentColor,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      _isWhatsAppSame = val ?? true;
-                                      if (_isWhatsAppSame) {
-                                        _whatsappCtrl.text = _phoneCtrl.text;
+                            _buildSectionCard(
+                              title: 'Business Profile',
+                              child: Column(
+                                children: [
+                                  _buildTextField(
+                                    controller: _businessNameCtrl,
+                                    label: 'Business / Shop Name',
+                                    hint: 'Eg. Aadil Fashion Hub',
+                                    icon: Iconsax.shop,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter your business name';
                                       }
-                                    });
-                                  },
-                                ),
-                                const Expanded(
-                                  child: Text(
-                                    'WhatsApp number is same as phone',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontFamily: 'Poppins',
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildTextField(
+                                    controller: _ownerNameCtrl,
+                                    label: 'Your Name',
+                                    hint: 'Owner / Proprietor name',
+                                    icon: Iconsax.user,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter your name';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildSectionCard(
+                              title: 'Contact Details',
+                              child: Column(
+                                children: [
+                                  _buildTextField(
+                                    controller: _phoneCtrl,
+                                    label: 'Primary Phone Number',
+                                    hint: '10-digit mobile number',
+                                    icon: Iconsax.call,
+                                    keyboardType: TextInputType.phone,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter phone number';
+                                      }
+                                      if (value.trim().length < 10) {
+                                        return 'Enter a valid phone number';
+                                      }
+                                      return null;
+                                    },
+                                    onChanged: (val) {
+                                      if (_isWhatsAppSame) {
+                                        _whatsappCtrl.text = val;
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Checkbox(
+                                        value: _isWhatsAppSame,
+                                        activeColor: accentColor,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _isWhatsAppSame = val ?? true;
+                                            if (_isWhatsAppSame) {
+                                              _whatsappCtrl.text =
+                                                  _phoneCtrl.text;
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      const Expanded(
+                                        child: Text(
+                                          'WhatsApp number is same as phone',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'Poppins',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (!_isWhatsAppSame) ...[
+                                    const SizedBox(height: 4),
+                                    _buildTextField(
+                                      controller: _whatsappCtrl,
+                                      label: 'WhatsApp Number',
+                                      hint: 'WhatsApp contact',
+                                      icon: Iconsax.sms,
+                                      keyboardType: TextInputType.phone,
+                                      validator: (v) {
+                                        if (!_isWhatsAppSame) {
+                                          if (v == null || v.trim().isEmpty) {
+                                            return 'Please enter WhatsApp number';
+                                          }
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  _buildTextField(
+                                    controller: _emailCtrl,
+                                    label: 'Email',
+                                    hint: 'For invoices & communication',
+                                    icon: Iconsax.direct_right,
+                                    keyboardType: TextInputType.emailAddress,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter your email';
+                                      }
+                                      if (!value.contains('@')) {
+                                        return 'Enter a valid email';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 🔹 Address section (India + state dropdown + 2 lines)
+                            _buildSectionCard(
+                              title: 'Address',
+                              child: Column(
+                                children: [
+                                  _buildTextField(
+                                    controller: _addressLine1Ctrl,
+                                    label: 'Address Line 1',
+                                    hint: 'Building / Flat / House No.',
+                                    icon: Iconsax.location,
+                                    maxLines: 1,
+                                    validator: (value) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
+                                        return 'Please enter address line 1';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildTextField(
+                                    controller: _addressLine2Ctrl,
+                                    label: 'Address Line 2 (optional)',
+                                    hint: 'Street, Area, Landmark',
+                                    icon: Iconsax.location,
+                                    maxLines: 1,
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // City + State
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildTextField(
+                                          controller: _cityCtrl,
+                                          label: 'City',
+                                          hint: 'Eg. Rajkot',
+                                          icon: Iconsax.location5,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.trim().isEmpty) {
+                                              return 'City required';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: DropdownButtonFormField<String>(
+                                          value: _selectedState,
+                                          isExpanded: true,
+                                          items: _indianStates
+                                              .map(
+                                                (s) => DropdownMenuItem(
+                                                  value: s,
+                                                  child: Text(
+                                                    s,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontFamily: 'Poppins',
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                          onChanged: (val) {
+                                            setState(() {
+                                              _selectedState = val;
+                                              _stateCtrl.text = val ?? '';
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'State',
+                                            hintText: 'Select state',
+                                            prefixIcon: const Icon(
+                                              Iconsax.map,
+                                              size: 18,
+                                            ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            isDense: true,
+                                          ),
+                                          validator: (v) {
+                                            if (v == null || v.trim().isEmpty) {
+                                              return 'State required';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // Country (fixed India) + Pincode
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _countryCtrl,
+                                          enabled: false, // cannot change
+                                          decoration: InputDecoration(
+                                            labelText: 'Country',
+                                            hintText: 'India',
+                                            prefixIcon: const Icon(
+                                              Iconsax.global,
+                                              size: 18,
+                                            ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            isDense: true,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildTextField(
+                                          controller: _pincodeCtrl,
+                                          label: 'Pincode',
+                                          hint: 'Eg. 360001',
+                                          icon: Iconsax.location_tick,
+                                          keyboardType: TextInputType.number,
+                                          validator: (value) {
+                                            if (value == null ||
+                                                value.trim().isEmpty) {
+                                              return 'Pincode required';
+                                            }
+                                            if (value.trim().length < 6) {
+                                              return 'Invalid';
+                                            }
+                                            return null;
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildSectionCard(
+                              title: 'GST & Compliance (Optional)',
+                              child: Column(
+                                children: [
+                                  _buildTextField(
+                                    controller: _gstinCtrl,
+                                    label: 'GSTIN (optional)',
+                                    hint: 'Eg. 22AAAAA0000A1Z5',
+                                    icon: Iconsax.document_text,
+                                    textCapitalization:
+                                        TextCapitalization.characters,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'If you don’t have GST, you can leave this empty.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                        fontFamily: 'Poppins',
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            if (!_isWhatsAppSame) ...[
-                              const SizedBox(height: 4),
-                              _buildTextField(
-                                controller: _whatsappCtrl,
-                                label: 'WhatsApp Number',
-                                hint: 'WhatsApp contact',
-                                icon: Iconsax.sms,
-                                keyboardType: TextInputType.phone,
-                                validator: (v) {
-                                  if (!_isWhatsAppSame) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'Please enter WhatsApp number';
-                                    }
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ],
-                            const SizedBox(height: 12),
-                            _buildTextField(
-                              controller: _emailCtrl,
-                              label: 'Email',
-                              hint: 'For invoices & communication',
-                              icon: Iconsax.direct_right,
-                              keyboardType: TextInputType.emailAddress,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your email';
-                                }
-                                if (!value.contains('@')) {
-                                  return 'Enter a valid email';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 🔹 Address section (nicer layout)
-                      _buildSectionCard(
-                        title: 'Address',
-                        child: Column(
-                          children: [
-                            _buildTextField(
-                              controller: _addressCtrl,
-                              label: 'Street Address',
-                              hint: 'Building, street, area',
-                              icon: Iconsax.location,
-                              maxLines: 2,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your street address';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 12),
-
-                            // City + State
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildTextField(
-                                    controller: _cityCtrl,
-                                    label: 'City',
-                                    hint: 'Eg. Rajkot',
-                                    icon: Iconsax.location5,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'City required';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildTextField(
-                                    controller: _stateCtrl,
-                                    label: 'State',
-                                    hint: 'Eg. Gujarat',
-                                    icon: Iconsax.map,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'State required';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-
-                            // Country + Pincode
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildTextField(
-                                    controller: _countryCtrl,
-                                    label: 'Country',
-                                    hint: 'Eg. India',
-                                    icon: Iconsax.global,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Country required';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildTextField(
-                                    controller: _pincodeCtrl,
-                                    label: 'Pincode',
-                                    hint: 'Eg. 360001',
-                                    icon: Iconsax.location_tick,
-                                    keyboardType: TextInputType.number,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Pincode required';
-                                      }
-                                      if (value.trim().length < 6) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildSectionCard(
-                        title: 'GST & Compliance (Optional)',
-                        child: Column(
-                          children: [
-                            _buildTextField(
-                              controller: _gstinCtrl,
-                              label: 'GSTIN (optional)',
-                              hint: 'Eg. 22AAAAA0000A1Z5',
-                              icon: Iconsax.document_text,
-                              textCapitalization: TextCapitalization.characters,
-                            ),
-                            const SizedBox(height: 6),
-                            const Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'If you don’t have GST, you can leave this empty.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey,
-                                  fontFamily: 'Poppins',
-                                ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                      )
+                    : _buildReadOnlyBody(),
               ),
             ),
             _buildBottomButton(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildReadOnlyBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        SizedBox(height: 8),
+        Text(
+          'You cannot edit business details from checkout.',
+          style: TextStyle(
+            fontSize: 12,
+            fontFamily: 'Poppins',
+            color: Colors.black87,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'To update your business details, open the menu/drawer and go to "Business Details".',
+          style: TextStyle(
+            fontSize: 11,
+            fontFamily: 'Poppins',
+            color: Colors.grey,
+          ),
+        ),
+      ],
     );
   }
 
@@ -617,7 +835,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Add your shop details. These will be shown to your customers on catalogues & orders.',
+              'Review your shop details. These will be shown to your customers on catalogues & orders.',
               style: TextStyle(
                 fontSize: 12,
                 fontFamily: 'Poppins',
@@ -633,14 +851,16 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   // 🔹 Summary when details already saved
   Widget _buildSavedSummaryCard() {
     // Build a clean one-line address for summary
-    final street = _addressCtrl.text.trim();
+    final line1 = _addressLine1Ctrl.text.trim();
+    final line2 = _addressLine2Ctrl.text.trim();
     final city = _cityCtrl.text.trim();
-    final state = _stateCtrl.text.trim();
-    final country = _countryCtrl.text.trim();
+    final state = (_selectedState ?? _stateCtrl.text).trim();
+    final country = 'India';
     final pin = _pincodeCtrl.text.trim();
 
     final List<String> parts = [];
-    if (street.isNotEmpty) parts.add(street);
+    if (line1.isNotEmpty) parts.add(line1);
+    if (line2.isNotEmpty) parts.add(line2);
     if (city.isNotEmpty) parts.add(city);
     if (state.isNotEmpty) parts.add(state);
     if (country.isNotEmpty) parts.add(country);
@@ -736,7 +956,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                     color: Colors.grey.shade700,
                     fontFamily: 'Poppins',
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
@@ -878,12 +1098,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   Widget _buildBottomButton() {
     final bool fromDrawer = widget.fromDrawer;
 
-    // ✅ Decide button label based on context
     String buttonText;
     if (fromDrawer) {
       buttonText = _hasSavedDetails ? 'Update & Save' : 'Save';
     } else {
-      buttonText = _hasSavedDetails ? 'Update & Continue' : 'Save & Continue';
+      buttonText = 'Continue';
     }
 
     return SafeArea(
@@ -895,7 +1114,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _isSaving ? null : _onSubmit,
+            onPressed: _isSaving
+                ? null
+                : (fromDrawer ? _onSubmit : _onContinueFromCheckout),
             style: ElevatedButton.styleFrom(
               backgroundColor: accentColor,
               shape: RoundedRectangleBorder(

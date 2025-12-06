@@ -409,55 +409,55 @@ class _PaymentPageState extends State<PaymentPage> {
           const SizedBox(height: 12),
 
           // COD disabled tile (just to show it's not available)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-              color: Colors.grey.shade100,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Iconsax.money_remove,
-                    size: 18,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cash on Delivery (Not Available)',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'This order can only be paid online.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.lock, size: 18, color: Colors.grey),
-              ],
-            ),
-          ),
+          // Container(
+          //   padding: const EdgeInsets.all(12),
+          //   decoration: BoxDecoration(
+          //     borderRadius: BorderRadius.circular(12),
+          //     border: Border.all(color: Colors.grey.shade200),
+          //     color: Colors.grey.shade100,
+          //   ),
+          //   child: Row(
+          //     children: [
+          //       Container(
+          //         padding: const EdgeInsets.all(8),
+          //         decoration: BoxDecoration(
+          //           color: Colors.grey.shade300,
+          //           borderRadius: BorderRadius.circular(10),
+          //         ),
+          //         child: const Icon(
+          //           Iconsax.money_remove,
+          //           size: 18,
+          //           color: Colors.grey,
+          //         ),
+          //       ),
+          //       const SizedBox(width: 12),
+          //       Expanded(
+          //         child: Column(
+          //           crossAxisAlignment: CrossAxisAlignment.start,
+          //           children: [
+          //             Text(
+          //               'Cash on Delivery (Not Available)',
+          //               style: TextStyle(
+          //                 fontSize: 13,
+          //                 fontWeight: FontWeight.w600,
+          //                 color: Colors.grey.shade700,
+          //               ),
+          //             ),
+          //             const SizedBox(height: 2),
+          //             Text(
+          //               'This order can only be paid online.',
+          //               style: TextStyle(
+          //                 fontSize: 11,
+          //                 color: Colors.grey.shade600,
+          //               ),
+          //             ),
+          //           ],
+          //         ),
+          //       ),
+          //       const Icon(Icons.lock, size: 18, color: Colors.grey),
+          //     ],
+          //   ),
+          // ),
         ],
       ),
     );

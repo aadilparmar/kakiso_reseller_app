@@ -179,7 +179,7 @@ class ProductInfoHeader extends StatelessWidget {
 
         // --- 4. "INCLUSIVE OF TAXES" SUBTEXT ---
         const Text(
-          "Inclusive of all taxes • Free Shipping",
+          "Inclusive of all taxes • Shipping ₹100",
           style: TextStyle(
             color: Color(0xFF10B981), // Green
             fontSize: 12,

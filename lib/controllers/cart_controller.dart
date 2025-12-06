@@ -10,9 +10,18 @@ import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class CartItem {
   final ProductModel product;
+
+  /// 🔹 Selected variation attributes for this cart line
+  /// e.g. {"Size": "L", "Color": "Red"}
+  final Map<String, String> selectedAttributes;
+
   int quantity;
 
-  CartItem({required this.product, this.quantity = 1});
+  CartItem({
+    required this.product,
+    this.selectedAttributes = const {},
+    this.quantity = 1,
+  });
 
   double get totalPrice {
     final price = double.tryParse(product.price) ?? 0.0;
@@ -22,14 +31,27 @@ class CartItem {
   // ---------- Persistence helpers ----------
 
   Map<String, dynamic> toJson() => {
-    'product': product.toJson(), // ⚠️ ProductModel must have toJson()
+    'product': product.toJson(), // ProductModel must have toJson()
     'quantity': quantity,
+    'selectedAttributes': selectedAttributes,
   };
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
+    // Safely parse selectedAttributes (might not exist in old data)
+    Map<String, String> parsedAttrs = {};
+    final rawAttrs = json['selectedAttributes'];
+    if (rawAttrs is Map) {
+      rawAttrs.forEach((key, value) {
+        if (key != null && value != null) {
+          parsedAttrs[key.toString()] = value.toString();
+        }
+      });
+    }
+
     return CartItem(
       product: ProductModel.fromJson(json['product'] as Map<String, dynamic>),
       quantity: (json['quantity'] ?? 1) as int,
+      selectedAttributes: parsedAttrs,
     );
   }
 }
@@ -62,20 +84,40 @@ class CartController extends GetxController {
     ever<Map<int, double>>(sellingPrices, (_) => _saveSellingPricesToStorage());
   }
 
+  // ---------- Helpers ----------
+
+  bool _areAttributesEqual(Map<String, String> a, Map<String, String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
   // ---------- Public API ----------
 
-  // Add item to cart
-  void addToCart(ProductModel product) {
-    // Check if item already exists
+  /// Add item to cart with optional selected variation.
+  ///
+  /// Existing calls `addToCart(product)` will still work (variation = {}).
+  /// Items are grouped by (productId + selectedAttributes).
+  void addToCart(
+    ProductModel product, {
+    Map<String, String>? selectedAttributes,
+  }) {
+    final Map<String, String> attrs = selectedAttributes ?? const {};
+
     final existingItem = cartItems.firstWhereOrNull(
-      (item) => item.product.id == product.id,
+      (item) =>
+          item.product.id == product.id &&
+          _areAttributesEqual(item.selectedAttributes, attrs),
     );
 
     if (existingItem != null) {
       existingItem.quantity++;
       cartItems.refresh(); // Notify listeners
     } else {
-      cartItems.add(CartItem(product: product));
+      cartItems.add(CartItem(product: product, selectedAttributes: attrs));
     }
   }
 
