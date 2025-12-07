@@ -14,10 +14,37 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 
+// --- TOOLS SCREENS (LIVE TOOLS) ---
+import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_wp_share/one_click_whatsapp.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/price_margin_tool.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/reseller_catalog_builder.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_products_dashboard.dart';
+
 // --- DRAWER IMPORT ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
 
-const Color accentColor = Color(0xFFEB2A7E);
+// ───────────────────── THEME COLORS (LIGHT MODE) ─────────────────────
+
+// Primary accents
+const Color accentColor = Color(0xFF2563EB); // Blue
+const Color accentPurple = Color(0xFF7C3AED);
+
+// Backgrounds
+const Color bgTop = Color(0xFFF1F5F9); // Light cool gray
+const Color bgBottom = Color(0xFFFFFFFF);
+
+// Surfaces
+const Color surfaceColor = Colors.white;
+const Color cardBorderColor = Color(0xFFE5E7EB);
+
+// Text
+const Color textPrimary = Color(0xFF111827);
+const Color textSecondary = Color(0xFF6B7280);
+const Color textMuted = Color(0xFF9CA3AF);
+
+// Others
+const Color chipBg = Color(0xFFF3F4F6);
+const Color dividerColor = Color(0xFFE5E7EB);
 
 class ToolsSection extends StatefulWidget {
   final UserData userData;
@@ -29,138 +56,164 @@ class ToolsSection extends StatefulWidget {
 }
 
 class _ToolsSectionState extends State<ToolsSection> {
+  final _storage = const FlutterSecureStorage();
+
   late List<Tool> tools;
   String query = '';
-  bool isGrid = true;
-  final _storage = const FlutterSecureStorage();
+  String selectedChip = 'All';
+
+  // IDs of tools that are LIVE (available now)
+  final Set<String> _liveToolIds = {
+    'whatsapp_share',
+    'reseller_catalog',
+    'trending',
+    'price_margin',
+  };
 
   @override
   void initState() {
     super.initState();
 
-    // All tools are "Coming Soon" – pageBuilder is unused but required by Tool model
+    // Tools list: some live, some coming soon
     tools = [
       Tool(
         id: 'whatsapp_share',
         title: 'One-click WhatsApp sharing',
-        subtitle: 'Share products instantly on WhatsApp',
+        subtitle: 'Instantly broadcast products to your WhatsApp customers.',
         iconData: Iconsax.send_1,
         enabled: true,
-        pageBuilder: (_) => const SizedBox.shrink(),
+        pageBuilder: (_) => const OneClickWhatsAppPage(),
       ),
       Tool(
         id: 'auto_video',
         title: 'Auto video generator',
-        subtitle: 'Create scroll-stopping videos in seconds',
+        subtitle: 'Convert product photos into short vertical videos.',
         iconData: Iconsax.video,
-        enabled: true,
+        enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'whatsapp_store',
         title: 'WhatsApp store builder',
-        subtitle: 'Build a shareable WhatsApp catalog',
+        subtitle: 'Create a shareable store link for your catalog.',
         iconData: Iconsax.shop,
-        enabled: true,
+        enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'inventory_sync',
         title: 'Auto inventory sync',
-        subtitle: 'Keep stock in sync automatically',
+        subtitle: 'Keep stock in sync across platforms automatically.',
         iconData: Iconsax.refresh,
-        enabled: true,
+        enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'price_margin',
-        title: 'Auto price margin tool',
-        subtitle: 'Set smart margin rules & suggestions',
+        title: 'Smart price margin tool',
+        subtitle: 'Define rules and get recommended margins automatically.',
         iconData: Iconsax.percentage_circle,
         enabled: true,
-        pageBuilder: (_) => const SizedBox.shrink(),
+        pageBuilder: (_) => const PriceMarginToolPage(),
       ),
       Tool(
         id: 'reseller_catalog',
         title: 'Reseller catalog builder',
-        subtitle: 'Create reseller-specific catalogs',
+        subtitle: 'Generate curated catalogs for specific resellers.',
         iconData: Iconsax.folder_2,
         enabled: true,
-        pageBuilder: (_) => const SizedBox.shrink(),
+        pageBuilder: (_) => const ResellerCatalogBuilderPage(),
       ),
       Tool(
         id: 'ai_caption',
         title: 'AI caption generator',
-        subtitle: 'Generate viral captions with AI',
+        subtitle: 'AI-written captions for your product posts.',
         iconData: Iconsax.magic_star,
-        enabled: true,
+        enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
         id: 'trending',
         title: 'Trending products dashboard',
-        subtitle: 'See what\'s trending right now',
+        subtitle: 'See what’s trending across categories in real time.',
         iconData: Iconsax.activity,
         enabled: true,
-        pageBuilder: (_) => const SizedBox.shrink(),
+        pageBuilder: (_) => const TrendingProductsDashboardPage(),
       ),
       Tool(
         id: 'broadcast',
         title: 'Broadcast marketing tools',
-        subtitle: 'Send bulk promotions & broadcasts',
+        subtitle: 'Plan and send bulk promotions to your buyers.',
         iconData: Iconsax.chart_1,
-        enabled: true,
+        enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
     ];
   }
 
+  // ───────────────────────── FILTER LOGIC ─────────────────────────
+
   List<Tool> get filteredTools {
     final q = query.trim().toLowerCase();
-    if (q.isEmpty) return tools;
-    return tools.where((t) {
+
+    Iterable<Tool> data = tools;
+
+    // Super-light "category" logic based on id
+    if (selectedChip == 'Automation') {
+      data = tools.where(
+        (t) =>
+            t.id.contains('inventory') ||
+            t.id.contains('price') ||
+            t.id.contains('auto'),
+      );
+    } else if (selectedChip == 'Marketing') {
+      data = tools.where(
+        (t) =>
+            t.id.contains('whatsapp') ||
+            t.id.contains('broadcast') ||
+            t.id.contains('caption'),
+      );
+    } else if (selectedChip == 'Insights') {
+      data = tools.where((t) => t.id.contains('trending'));
+    }
+
+    if (q.isEmpty) return data.toList();
+
+    return data.where((t) {
       return t.title.toLowerCase().contains(q) ||
           t.subtitle.toLowerCase().contains(q) ||
           t.id.toLowerCase().contains(q);
     }).toList();
   }
 
-  void toggleEnabled(String id, bool value) {
-    setState(() {
-      final i = tools.indexWhere((t) => t.id == id);
-      if (i >= 0) tools[i] = tools[i].copyWith(enabled: value);
-    });
-  }
-
-  // --- LOGOUT / DRAWER LOGIC ---
+  // ───────────────────────── DRAWER / LOGOUT ──────────────────────
 
   Future<void> _showLogoutConfirmation() async {
     Get.dialog(
       AlertDialog(
+        backgroundColor: surfaceColor,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
+          borderRadius: BorderRadius.circular(18.0),
         ),
         title: const Text(
           'Logout',
           style: TextStyle(
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
             fontFamily: 'Poppins',
             fontSize: 20,
+            color: textPrimary,
           ),
         ),
         content: const Text(
           'Do you want to log out?',
-          style: TextStyle(fontFamily: 'Poppins'),
+          style: TextStyle(fontFamily: 'Poppins', color: textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: Text(
+            child: const Text(
               'Cancel',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontFamily: 'Poppins',
-              ),
+              style: TextStyle(color: textSecondary, fontFamily: 'Poppins'),
             ),
           ),
           TextButton(
@@ -173,7 +226,7 @@ class _ToolsSectionState extends State<ToolsSection> {
               'Logout',
               style: TextStyle(
                 color: accentColor,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 fontFamily: 'Poppins',
               ),
             ),
@@ -184,33 +237,58 @@ class _ToolsSectionState extends State<ToolsSection> {
   }
 
   void _handleDrawerNavigation(String pageId) {
-    Navigator.pop(context); // Close drawer
+    Navigator.pop(context); // close drawer
     if (pageId == 'Home' || pageId == 'BusinessDetails') {
       Get.off(() => HomePage(userData: widget.userData));
     }
   }
 
+  // ───────────────────────── COMING SOON SHEET ───────────────────
+
   void _showComingSoonSheet(Tool tool) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
-      showDragHandle: true,
+      backgroundColor: surfaceColor,
+      showDragHandle: false,
+      isScrollControlled: false,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        return Container(
+          decoration: const BoxDecoration(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            gradient: LinearGradient(
+              colors: [Colors.white, Color(0xFFF9FAFB)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 26),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: dividerColor,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.08),
+                  gradient: LinearGradient(
+                    colors: [
+                      accentColor.withOpacity(0.06),
+                      accentPurple.withOpacity(0.06),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: Row(
@@ -230,17 +308,31 @@ class _ToolsSectionState extends State<ToolsSection> {
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Container(
-                    width: 52,
-                    height: 52,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          accentColor.withOpacity(0.18),
+                          accentPurple.withOpacity(0.30),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.18),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    child: Icon(tool.iconData, color: accentColor, size: 28),
+                    child: Icon(tool.iconData, color: Colors.white, size: 26),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -253,15 +345,16 @@ class _ToolsSectionState extends State<ToolsSection> {
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                             fontFamily: 'Poppins',
+                            color: textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           tool.subtitle,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade700,
                             fontFamily: 'Poppins',
+                            color: textSecondary,
                           ),
                         ),
                       ],
@@ -270,25 +363,24 @@ class _ToolsSectionState extends State<ToolsSection> {
                 ],
               ),
               const SizedBox(height: 18),
-              Text(
-                'We’re polishing this tool for you.\n'
-                'You’ll be able to use it very soon inside Kakiso.',
+              const Text(
+                'We’re building this tool for you. Once it’s live, you’ll be able to run powerful automations directly from Kakiso – without leaving your phone.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.grey.shade700,
-                  height: 1.4,
                   fontFamily: 'Poppins',
+                  color: textSecondary,
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () => Navigator.pop(ctx),
                   icon: const Icon(Iconsax.tick_circle, size: 18),
                   label: const Text(
-                    'Got it',
+                    'Nice, waiting for it',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -302,6 +394,7 @@ class _ToolsSectionState extends State<ToolsSection> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
+                    elevation: 0,
                   ),
                 ),
               ),
@@ -312,9 +405,15 @@ class _ToolsSectionState extends State<ToolsSection> {
     );
   }
 
+  // ───────────────────────── BUILD ────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final toolsCount = tools.length;
+    final visibleTools = filteredTools;
+    final liveCount = visibleTools
+        .where((t) => _liveToolIds.contains(t.id))
+        .length;
+    final comingSoonCount = visibleTools.length - liveCount;
 
     return Scaffold(
       drawer: HomeDrawer(
@@ -326,8 +425,9 @@ class _ToolsSectionState extends State<ToolsSection> {
           _showLogoutConfirmation();
         },
       ),
+      backgroundColor: bgTop,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         titleSpacing: 0,
         automaticallyImplyLeading: false,
@@ -336,306 +436,257 @@ class _ToolsSectionState extends State<ToolsSection> {
             Builder(
               builder: (ctx) => IconButton(
                 icon: const Icon(Icons.menu),
-                color: accentColor,
-                iconSize: 28,
+                color: textPrimary,
+                iconSize: 24,
                 onPressed: () => Scaffold.of(ctx).openDrawer(),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Image.asset('assets/logos/login-logo.png', height: 22),
             const Spacer(),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Iconsax.notification_bing),
-              color: accentColor,
-            ),
+
             IconButton(
               onPressed: () => Get.to(() => const InventoryPage()),
               icon: const Icon(Iconsax.shopping_cart),
-              color: accentColor,
+              color: textPrimary,
             ),
             IconButton(
               onPressed: () {},
               icon: const Icon(Iconsax.profile_circle),
-              color: accentColor,
+              color: textPrimary,
             ),
             const SizedBox(width: 8),
           ],
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header: Title + count
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 4,
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'Tools & automations',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Text(
-                      '$toolsCount coming soon',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: accentColor,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Search + view toggle
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 10,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 50,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Iconsax.search_normal, color: Colors.grey),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              decoration: const InputDecoration(
-                                hintText: 'Search upcoming tools...',
-                                border: InputBorder.none,
-                              ),
-                              onChanged: (v) => setState(() => query = v),
-                            ),
-                          ),
-                          if (query.isNotEmpty)
-                            GestureDetector(
-                              onTap: () => setState(() => query = ''),
-                              child: const Icon(Icons.close, size: 18),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // toggle grid/list
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: IconButton(
-                      onPressed: () => setState(() => isGrid = !isGrid),
-                      icon: Icon(isGrid ? Iconsax.grid_1 : Iconsax.menu_1),
-                      color: accentColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Tools area
-            Expanded(
-              child: Container(
-                color: const Color(0xFFF7F7FB),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [bgTop, bgBottom],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              // ── HEADER ────────────────────────────────────────────────
+              Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 12,
+                  vertical: 10,
                 ),
-                child: isGrid ? _buildGrid() : _buildList(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Tools roadmap',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
+                        color: textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Use the tools that are ready today, and see what’s coming next inside Kakiso.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Poppins',
+                        color: textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Progress-like summary row
+                    Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            gradient: const LinearGradient(
+                              colors: [accentColor, accentPurple],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$liveCount live • $comingSoonCount coming soon',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'Poppins',
+                            color: textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              // ── CHIPS ROW ─────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 2,
+                ),
+                child: Row(
+                  children: [
+                    _FilterChip(
+                      label: 'All',
+                      selected: selectedChip == 'All',
+                      onTap: () => setState(() => selectedChip = 'All'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Automation',
+                      selected: selectedChip == 'Automation',
+                      onTap: () => setState(() => selectedChip = 'Automation'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Marketing',
+                      selected: selectedChip == 'Marketing',
+                      onTap: () => setState(() => selectedChip = 'Marketing'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Insights',
+                      selected: selectedChip == 'Insights',
+                      onTap: () => setState(() => selectedChip = 'Insights'),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── SEARCH BAR ────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Container(
+                  height: 46,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: cardBorderColor),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Iconsax.search_normal,
+                        color: textMuted,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          style: const TextStyle(
+                            color: textPrimary,
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Search tools...',
+                            hintStyle: TextStyle(
+                              color: textMuted,
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (v) => setState(() => query = v),
+                        ),
+                      ),
+                      if (query.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(() => query = ''),
+                          child: const Icon(
+                            Icons.close,
+                            size: 18,
+                            color: textMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── TIMELINE LIST ────────────────────────────────────────
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: visibleTools.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          itemCount: visibleTools.length,
+                          itemBuilder: (context, index) {
+                            final tool = visibleTools[index];
+                            final isFirst = index == 0;
+                            final isLast = index == visibleTools.length - 1;
+                            final isLive = _liveToolIds.contains(tool.id);
+
+                            return _TimelineToolCard(
+                              tool: tool,
+                              isFirst: isFirst,
+                              isLast: isLast,
+                              isLive: isLive,
+                              onTap: () {
+                                if (isLive) {
+                                  // Navigate to live tool screen
+                                  Get.to(() => tool.pageBuilder(context));
+                                } else {
+                                  // Show coming soon modal
+                                  _showComingSoonSheet(tool);
+                                }
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildGrid() {
-    final list = filteredTools;
-    if (list.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount = 2;
-        if (constraints.maxWidth > 1000) {
-          crossAxisCount = 4;
-        } else if (constraints.maxWidth > 700) {
-          crossAxisCount = 3;
-        }
-
-        return GridView.builder(
-          itemCount: list.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.15,
-          ),
-          itemBuilder: (context, idx) {
-            final tool = list[idx];
-            return _ComingSoonToolCard(
-              tool: tool,
-              onTap: () => _showComingSoonSheet(tool),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildList() {
-    final list = filteredTools;
-    if (list.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return ListView.separated(
-      itemCount: list.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, idx) {
-        final t = list[idx];
-        return InkWell(
-          onTap: () => _showComingSoonSheet(t),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.09),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(t.iconData, color: accentColor, size: 26),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        t.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        t.subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                          fontFamily: 'Poppins',
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  child: const Text(
-                    'Coming soon',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: accentColor,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Iconsax.arrow_right_3,
-                  size: 18,
-                  color: Colors.grey.shade500,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  // ───────────────────────── EMPTY STATE ─────────────────────────
 
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Iconsax.lamp_on, size: 56, color: Colors.grey.shade400),
-          const SizedBox(height: 12),
-          const Text(
+        children: const [
+          Icon(Iconsax.lamp_on, size: 56, color: Color(0xFFCBD5F5)),
+          SizedBox(height: 12),
+          Text(
             'No tools found',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               fontFamily: 'Poppins',
+              color: textPrimary,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
-            'Try a different keyword to explore upcoming tools.',
+            'Try updating your search or filters.',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
               fontFamily: 'Poppins',
+              color: textSecondary,
             ),
           ),
         ],
@@ -644,105 +695,261 @@ class _ToolsSectionState extends State<ToolsSection> {
   }
 }
 
-/// Grid card for a "Coming soon" tool
-class _ComingSoonToolCard extends StatelessWidget {
-  final Tool tool;
+// ───────────────────────── SUPPORT WIDGETS ───────────────────────
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _ComingSoonToolCard({required this.tool, required this.onTap});
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(
-              colors: [
-                Colors.white,
-                Colors.white,
-                accentColor.withOpacity(0.03),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    final Color bg = selected ? accentColor.withOpacity(0.10) : chipBg;
+    final Color border = selected
+        ? accentColor.withOpacity(0.8)
+        : cardBorderColor;
+    final Color text = selected ? accentColor : textSecondary;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(50),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(Iconsax.verify5, size: 14, color: accentColor),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: text,
+                fontFamily: 'Poppins',
+              ),
             ),
-            border: Border.all(color: accentColor.withOpacity(0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineToolCard extends StatelessWidget {
+  final Tool tool;
+  final VoidCallback onTap;
+  final bool isFirst;
+  final bool isLast;
+  final bool isLive;
+
+  const _TimelineToolCard({
+    required this.tool,
+    required this.onTap,
+    required this.isFirst,
+    required this.isLast,
+    required this.isLive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color dotOuterColor = isLive
+        ? accentColor
+        : accentPurple.withOpacity(0.9);
+    final Color dotGlowColor = isLive
+        ? accentColor.withOpacity(0.40)
+        : accentPurple.withOpacity(0.40);
+
+    final List<Color> cardGradient = [surfaceColor, surfaceColor];
+
+    final List<Color> iconGradient = isLive
+        ? [accentColor.withOpacity(0.10), accentColor.withOpacity(0.30)]
+        : [accentPurple.withOpacity(0.10), accentPurple.withOpacity(0.30)];
+
+    final String badgeText = isLive ? 'Available now' : 'Coming soon';
+    final Color badgeColor = isLive
+        ? accentColor.withOpacity(0.08)
+        : accentPurple.withOpacity(0.08);
+
+    final Color badgeTextColor = isLive ? accentColor : accentPurple;
+
+    return SizedBox(
+      height: 120,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Timeline rail
+          Column(
+            children: [
+              Expanded(
+                child: Container(
+                  width: 2,
+                  color: isFirst ? Colors.transparent : dividerColor,
+                ),
+              ),
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: dotOuterColor,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: dotGlowColor,
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  width: 2,
+                  color: isLast ? Colors.transparent : dividerColor,
+                ),
               ),
             ],
           ),
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Icon + pill
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(tool.iconData, color: accentColor, size: 22),
+          const SizedBox(width: 14),
+
+          // Card
+          Expanded(
+            child: GestureDetector(
+              onTap: onTap,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    colors: cardGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                  border: Border.all(color: cardBorderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 14,
+                      offset: const Offset(0, 8),
                     ),
-                    decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: const Text(
-                      'Coming soon',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: accentColor,
-                        fontFamily: 'Poppins',
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: iconGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        tool.iconData,
+                        color: isLive ? accentColor : accentPurple,
+                        size: 24,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                tool.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Poppins',
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tool.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
+                              color: textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            tool.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontFamily: 'Poppins',
+                              color: textSecondary,
+                              height: 1.3,
+                            ),
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: badgeColor,
+                                  borderRadius: BorderRadius.circular(50),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isLive
+                                          ? Iconsax.tick_circle
+                                          : Iconsax.flash_1,
+                                      size: 14,
+                                      color: badgeTextColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      badgeText,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'Poppins',
+                                        color: badgeTextColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Iconsax.arrow_right_3,
+                      size: 18,
+                      color: textMuted,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                tool.subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade700,
-                  fontFamily: 'Poppins',
-                  height: 1.3,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
