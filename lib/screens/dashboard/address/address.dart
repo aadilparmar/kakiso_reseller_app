@@ -446,7 +446,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
             if (!fromDrawer)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: CheckoutStepHeader(currentStep: 3),
+                child: CheckoutStepHeader(currentStep: 2),
               ),
 
             if (!fromDrawer) _buildInfoBanner(),

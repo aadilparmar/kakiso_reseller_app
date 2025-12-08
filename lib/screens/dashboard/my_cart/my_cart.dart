@@ -676,12 +676,23 @@ class _InventoryPageState extends State<InventoryPage> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        'Amount to collect: ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade700,
-                        ),
+                      Column(
+                        children: [
+                          Text(
+                            'Amount in Invoice: ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          Text(
+                            '(Including GST) ',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
                         '₹${collectTotal.toStringAsFixed(2)}',

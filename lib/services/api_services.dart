@@ -501,8 +501,6 @@ class ApiService {
   }
 
   // 🔥 Leaderboard category IDs (set these to real IDs from WP)
-  // Go to Products > Categories, open the category, and copy the tag_ID from the URL.
-  // Example URL: ...edit-tags.php?action=edit&taxonomy=product_cat&tag_ID=37...
   static const int topRankingCategoryId = 513; // TODO: change to your real ID
   static const int hotRankingCategoryId = 512; // TODO: change to your real ID
 
@@ -560,6 +558,74 @@ class ApiService {
     } catch (e) {
       print('[ApiService.fetchHotRankingProducts] error: $e');
       return fetchTopSellingProducts();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 14. CREATE WOO ORDER AFTER SUCCESSFUL PAYMENT
+  // ---------------------------------------------------------------------------
+  /// Creates a WooCommerce order in `wc/v3/orders`.
+  ///
+  /// You must build:
+  ///  - [lineItems]: list like
+  ///      [{'product_id': 123, 'quantity': 2}, {'product_id': 456, 'quantity': 1}]
+  ///  - [billing] and [shipping]: maps matching WooCommerce billing/shipping schema
+  ///  - [paymentId]: Razorpay payment id
+  ///
+  /// Returns the decoded Woo order JSON on success.
+  static Future<Map<String, dynamic>> createWooOrder({
+    String? userId,
+    required List<Map<String, dynamic>> lineItems,
+    required Map<String, dynamic> billing,
+    required Map<String, dynamic> shipping,
+    required String paymentId,
+    String paymentMethod = 'razorpay',
+    String paymentMethodTitle = 'Razorpay',
+  }) async {
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/orders');
+
+    final int? customerId = int.tryParse((userId ?? '').trim());
+
+    final Map<String, dynamic> payload = {
+      'payment_method': paymentMethod,
+      'payment_method_title': paymentMethodTitle,
+      'set_paid': true,
+      'billing': billing,
+      'shipping': shipping,
+      'line_items': lineItems,
+      'meta_data': [
+        {'key': 'razorpay_payment_id', 'value': paymentId},
+        {'key': 'kakiso_order_source', 'value': 'kakiso_reseller_app'},
+      ],
+    };
+
+    if (customerId != null && customerId > 0) {
+      payload['customer_id'] = customerId;
+    }
+
+    print('==== createWooOrder URL: $url');
+    print('==== createWooOrder PAYLOAD: ${jsonEncode(payload)}');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: _headers,
+        body: jsonEncode(payload),
+      );
+
+      print('==== createWooOrder STATUS: ${response.statusCode}');
+      print('==== createWooOrder BODY: ${response.body}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        throw Exception(
+          'createWooOrder Error: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      print('==== createWooOrder EXCEPTION: $e');
+      rethrow;
     }
   }
 }

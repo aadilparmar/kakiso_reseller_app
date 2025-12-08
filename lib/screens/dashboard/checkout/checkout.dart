@@ -322,7 +322,7 @@ class FinalCheckoutPage extends StatelessWidget {
 
           // SECTION 2: Amount Kakiso collects from customer
           const Text(
-            'Amount Kakiso will collect from your customer',
+            'Amount in Invoice (to collect from customer) (Including GST)',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),

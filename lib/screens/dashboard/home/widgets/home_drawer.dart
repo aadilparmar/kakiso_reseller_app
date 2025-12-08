@@ -8,10 +8,14 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 
+// CONTROLLERS
+import 'package:kakiso_reseller_app/controllers/order_controller.dart';
+
 // SCREENS
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/order_management/orders_page.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 
 // SERVICES & UTILS
@@ -326,6 +330,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   fromDrawer: true,
                 ),
               );
+            } else if (uniqueId == 'Orders') {
+              // ✅ FROM DRAWER → Orders page we created
+              if (!Get.isRegistered<OrderController>()) {
+                Get.put(OrderController(), permanent: true);
+              }
+              Get.to(() => const OrdersPage());
             } else {
               widget.onNavigate(uniqueId);
             }

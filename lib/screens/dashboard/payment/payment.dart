@@ -5,7 +5,16 @@ import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/services/razorpay_service.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
+
+// Orders (local)
+import 'package:kakiso_reseller_app/models/order.dart';
+import 'package:kakiso_reseller_app/controllers/order_controller.dart';
+
+// Navigation
+import 'package:kakiso_reseller_app/navigation_menu.dart';
 
 class PaymentPage extends StatefulWidget {
   final double payableAmount;
@@ -407,57 +416,6 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
 
           const SizedBox(height: 12),
-
-          // COD disabled tile (just to show it's not available)
-          // Container(
-          //   padding: const EdgeInsets.all(12),
-          //   decoration: BoxDecoration(
-          //     borderRadius: BorderRadius.circular(12),
-          //     border: Border.all(color: Colors.grey.shade200),
-          //     color: Colors.grey.shade100,
-          //   ),
-          //   child: Row(
-          //     children: [
-          //       Container(
-          //         padding: const EdgeInsets.all(8),
-          //         decoration: BoxDecoration(
-          //           color: Colors.grey.shade300,
-          //           borderRadius: BorderRadius.circular(10),
-          //         ),
-          //         child: const Icon(
-          //           Iconsax.money_remove,
-          //           size: 18,
-          //           color: Colors.grey,
-          //         ),
-          //       ),
-          //       const SizedBox(width: 12),
-          //       Expanded(
-          //         child: Column(
-          //           crossAxisAlignment: CrossAxisAlignment.start,
-          //           children: [
-          //             Text(
-          //               'Cash on Delivery (Not Available)',
-          //               style: TextStyle(
-          //                 fontSize: 13,
-          //                 fontWeight: FontWeight.w600,
-          //                 color: Colors.grey.shade700,
-          //               ),
-          //             ),
-          //             const SizedBox(height: 2),
-          //             Text(
-          //               'This order can only be paid online.',
-          //               style: TextStyle(
-          //                 fontSize: 11,
-          //                 color: Colors.grey.shade600,
-          //               ),
-          //             ),
-          //           ],
-          //         ),
-          //       ),
-          //       const Icon(Icons.lock, size: 18, color: Colors.grey),
-          //     ],
-          //   ),
-          // ),
         ],
       ),
     );
@@ -560,23 +518,168 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // --- Handle Pay Now tap (hook your gateway here) ---
+  // --- Handle Pay Now tap (call Razorpay service here) ---
   void _onPayNow() {
-    // 👉 This is where you integrate Razorpay / Stripe / any payment SDK
-    // For now, we'll just show a success message.
-    Get.snackbar(
-      'Payment Initiated',
-      'Integrate your payment gateway here.',
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
+    if (_selectedMethod != 'online') return;
+
+    final cartController = Get.find<CartController>();
+
+    // Ensure OrderController is available
+    final OrderController orderController = Get.isRegistered<OrderController>()
+        ? Get.find<OrderController>()
+        : Get.put(OrderController(), permanent: true);
+
+    RazorpayService.openCheckout(
+      amount: widget.payableAmount,
+      name: widget.userData?.name,
+      email: widget.userData?.email,
+      contact: '', // you don't have phone in UserData
+      notes: {
+        'business_address': widget.businessAddressLabel,
+        'customer_address': widget.customerAddressLabel,
+        'user_id': widget.userData?.userId ?? '',
+      },
+      onSuccess: (response) async {
+        final paymentId = response.paymentId ?? '';
+
+        // -------------------------------------------------------------------
+        // 1. Push order to WooCommerce
+        // -------------------------------------------------------------------
+        try {
+          // Build Woo line items from cart
+          final List<Map<String, dynamic>> lineItems = cartController.cartItems
+              .map<Map<String, dynamic>>((item) {
+                // NOTE: adjust `item.product.id` and `item.quantity`
+                // if your CartItem uses different field names
+                return {
+                  'product_id': item.product.id,
+                  'quantity': item.quantity,
+                };
+              })
+              .toList();
+
+          // Minimal billing & shipping. Improve these when you have full address data.
+          final billing = {
+            'first_name': widget.userData?.name ?? '',
+            'email': widget.userData?.email ?? '',
+            'address_1': widget.businessAddressLabel,
+            'city': '',
+            'postcode': '',
+            'country': 'IN',
+            'phone': '',
+          };
+
+          final shipping = {
+            'first_name': widget.userData?.name ?? '',
+            'address_1': widget.customerAddressLabel,
+            'city': '',
+            'postcode': '',
+            'country': 'IN',
+          };
+
+          final Map<String, dynamic> wooOrder = await ApiService.createWooOrder(
+            userId: widget.userData?.userId,
+            lineItems: lineItems,
+            billing: billing,
+            shipping: shipping,
+            paymentId: paymentId,
+          );
+
+          final String wooOrderId = (wooOrder['id'] ?? '').toString();
+
+          // -----------------------------------------------------------------
+          // 2. Create local Order using Woo order ID
+          // -----------------------------------------------------------------
+          final order = Order(
+            id: wooOrderId.isNotEmpty
+                ? wooOrderId
+                : DateTime.now().millisecondsSinceEpoch.toString(),
+            paymentId: paymentId,
+            amount: widget.payableAmount,
+            createdAt: DateTime.now(),
+            businessAddress: widget.businessAddressLabel,
+            customerAddress: widget.customerAddressLabel,
+            userId: widget.userData?.userId ?? '',
+            userEmail: widget.userData?.email ?? '',
+            userName: widget.userData?.name ?? '',
+            isPaid: true,
+            status: OrderStatus.confirmed,
+          );
+
+          orderController.addOrder(order);
+        } catch (e) {
+          // If pushing to Woo fails, still create a local order so the app works
+          print('Failed to create WooCommerce order: $e');
+
+          final order = Order(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            paymentId: paymentId,
+            amount: widget.payableAmount,
+            createdAt: DateTime.now(),
+            businessAddress: widget.businessAddressLabel,
+            customerAddress: widget.customerAddressLabel,
+            userId: widget.userData?.userId ?? '',
+            userEmail: widget.userData?.email ?? '',
+            userName: widget.userData?.name ?? '',
+            isPaid: true,
+            status: OrderStatus.confirmed,
+          );
+
+          orderController.addOrder(order);
+        }
+
+        // -------------------------------------------------------------------
+        // 3. Clear cart
+        // -------------------------------------------------------------------
+        cartController.clearCart();
+
+        // 4. Show success
+        Get.snackbar(
+          'Payment Successful',
+          'Payment ID: $paymentId',
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(16),
+        );
+
+        // 5. Navigate to NavigationMenu Home tab
+        if (widget.userData != null) {
+          Get.offAll(
+            () => NavigationMenu(
+              userData: widget.userData!,
+              initialIndex: 0, // Home
+            ),
+          );
+        } else {
+          Get.offAll(
+            () => NavigationMenu(
+              userData: UserData(
+                name: '',
+                email: '',
+                userId: '',
+                joined: DateTime.now(),
+                profilePicUrl: '',
+              ),
+              initialIndex: 0,
+            ),
+          );
+        }
+      },
+      onError: (response) {
+        Get.snackbar(
+          'Payment Failed',
+          response.message ?? 'Something went wrong. Please try again.',
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(16),
+        );
+      },
+      onExternalWallet: (response) {
+        Get.snackbar(
+          'External Wallet Selected',
+          response.walletName ?? '',
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(16),
+        );
+      },
     );
-
-    // Example (pseudo):
-    // _startRazorpayPayment(amount: widget.payableAmount);
-
-    // After success you may:
-    //  - create order in backend
-    //  - clear cart
-    //  - navigate to an "Order Success" screen
   }
 }
