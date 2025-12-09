@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:kakiso_reseller_app/models/brand.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
+import 'package:kakiso_reseller_app/models/order.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -627,5 +628,123 @@ class ApiService {
       print('==== createWooOrder EXCEPTION: $e');
       rethrow;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 15. FETCH WOO ORDERS FOR CUSTOMER (order history)
+  // ---------------------------------------------------------------------------
+  static Future<List<Order>> fetchWooOrdersForCustomer({
+    required String userId,
+  }) async {
+    final int? customerId = int.tryParse(userId.trim());
+    if (customerId == null || customerId <= 0) {
+      return [];
+    }
+
+    final Uri url = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/orders?customer=$customerId&per_page=50&orderby=date&order=desc',
+    );
+
+    try {
+      final response = await http.get(url, headers: _headers);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'fetchWooOrdersForCustomer Error: ${response.statusCode} ${response.body}',
+        );
+      }
+
+      final List<dynamic> data = json.decode(response.body);
+
+      return data
+          .map<Order>(
+            (jsonOrder) =>
+                _mapWooOrderToLocalOrder(jsonOrder as Map<String, dynamic>),
+          )
+          .toList();
+    } catch (e) {
+      // On any error, just return empty and keep app working
+      return [];
+    }
+  }
+
+  /// Internal helper to convert Woo order JSON → local Order model.
+  static Order _mapWooOrderToLocalOrder(Map<String, dynamic> jsonOrder) {
+    final Map<String, dynamic> billing =
+        (jsonOrder['billing'] ?? {}) as Map<String, dynamic>;
+    final Map<String, dynamic> shipping =
+        (jsonOrder['shipping'] ?? {}) as Map<String, dynamic>;
+    final List<dynamic> meta = (jsonOrder['meta_data'] ?? []) as List<dynamic>;
+
+    // Try to read Razorpay payment id from meta_data
+    String paymentId = '';
+    for (final m in meta) {
+      if (m is Map<String, dynamic> && m['key'] == 'razorpay_payment_id') {
+        paymentId = (m['value'] ?? '').toString();
+        break;
+      }
+    }
+
+    final String wooStatus = (jsonOrder['status'] ?? '').toString();
+
+    OrderStatus status;
+    switch (wooStatus) {
+      case 'processing':
+        status = OrderStatus.packed;
+        break;
+      case 'completed':
+        status = OrderStatus.delivered;
+        break;
+      case 'pending':
+      case 'on-hold':
+      case 'cancelled':
+      case 'refunded':
+      case 'failed':
+      default:
+        status = OrderStatus.confirmed;
+        break;
+    }
+
+    final double amount =
+        double.tryParse((jsonOrder['total'] ?? '0').toString()) ?? 0.0;
+
+    final DateTime createdAt =
+        DateTime.tryParse((jsonOrder['date_created'] ?? '').toString()) ??
+        DateTime.now();
+
+    return Order(
+      id: (jsonOrder['id'] ?? '').toString(),
+      paymentId: paymentId,
+      amount: amount,
+      createdAt: createdAt,
+      businessAddress: _buildWooAddressString(billing),
+      customerAddress: _buildWooAddressString(shipping),
+      userId: (jsonOrder['customer_id'] ?? '').toString(),
+      userEmail: (billing['email'] ?? '').toString(),
+      userName: (billing['first_name'] ?? '').toString(),
+      isPaid: wooStatus == 'processing' || wooStatus == 'completed',
+      status: status,
+    );
+  }
+
+  static String _buildWooAddressString(Map<String, dynamic> data) {
+    final parts = <String>[];
+
+    void add(dynamic v) {
+      if (v == null) return;
+      final s = v.toString().trim();
+      if (s.isNotEmpty) parts.add(s);
+    }
+
+    add(data['company']);
+    add(data['first_name']);
+    add(data['address_1']);
+    add(data['address_2']);
+    add(data['city']);
+    add(data['state']);
+    add(data['country']);
+    add(data['postcode']);
+
+    return parts.join(', ');
   }
 }
