@@ -74,21 +74,13 @@ class _PaymentPageState extends State<PaymentPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildStepHeader(),
-
             const SizedBox(height: 16),
-
             _buildAmountCard(totalItems),
-
             const SizedBox(height: 16),
-
             _buildOrderMetaCard(),
-
             const SizedBox(height: 16),
-
             _buildPaymentMethodsCard(),
-
             const SizedBox(height: 16),
-
             _buildSecureInfo(),
           ],
         ),
@@ -483,9 +475,7 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ),
             ElevatedButton(
-              onPressed: _selectedMethod == 'online'
-                  ? _onPayNow
-                  : null, // but realistically it's always online
+              onPressed: _selectedMethod == 'online' ? _onPayNow : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentColor,
                 padding: const EdgeInsets.symmetric(
@@ -529,28 +519,38 @@ class _PaymentPageState extends State<PaymentPage> {
         ? Get.find<OrderController>()
         : Get.put(OrderController(), permanent: true);
 
+    final user = widget.userData;
+    final String customerName = (user?.name.isNotEmpty ?? false)
+        ? user!.name
+        : 'Reseller Customer';
+
+    final String rawEmail = user?.email ?? '';
+    // 🔴 IMPORTANT: WooCommerce requires a valid, non-empty billing.email
+    final String billingEmail = rawEmail.isNotEmpty
+        ? rawEmail
+        : 'no-reply@kakiso.app';
+
+    final String customerPhone = (user is UserData && user.phone.isNotEmpty)
+        ? user.phone
+        : '';
+
     RazorpayService.openCheckout(
       amount: widget.payableAmount,
-      name: widget.userData?.name,
-      email: widget.userData?.email,
-      contact: '', // you don't have phone in UserData
+      name: customerName,
+      email: rawEmail, // For Razorpay we can keep it raw; empty is allowed
+      contact: customerPhone,
       notes: {
         'business_address': widget.businessAddressLabel,
         'customer_address': widget.customerAddressLabel,
-        'user_id': widget.userData?.userId ?? '',
+        'user_id': user?.userId ?? '',
       },
       onSuccess: (response) async {
         final paymentId = response.paymentId ?? '';
 
-        // -------------------------------------------------------------------
-        // 1. Push order to WooCommerce
-        // -------------------------------------------------------------------
         try {
-          // Build Woo line items from cart
+          // 1. Build Woo line items
           final List<Map<String, dynamic>> lineItems = cartController.cartItems
               .map<Map<String, dynamic>>((item) {
-                // NOTE: adjust `item.product.id` and `item.quantity`
-                // if your CartItem uses different field names
                 return {
                   'product_id': item.product.id,
                   'quantity': item.quantity,
@@ -558,27 +558,43 @@ class _PaymentPageState extends State<PaymentPage> {
               })
               .toList();
 
-          // Minimal billing & shipping. Improve these when you have full address data.
+          // 2. Billing (reseller / app user)
           final billing = {
-            'first_name': widget.userData?.name ?? '',
-            'email': widget.userData?.email ?? '',
+            'first_name': customerName,
+            'last_name': '',
+            'company': widget.businessAddressLabel,
             'address_1': widget.businessAddressLabel,
-            'city': '',
-            'postcode': '',
+            'address_2': '',
+            'city': 'NA',
+            'state': 'NA',
+            'postcode': '000000',
             'country': 'IN',
-            'phone': '',
+            'email': billingEmail,
+            'phone': customerPhone,
           };
 
+          // 3. Shipping (end-customer)
           final shipping = {
-            'first_name': widget.userData?.name ?? '',
+            'first_name': customerName,
+            'last_name': '',
+            'company': '',
             'address_1': widget.customerAddressLabel,
-            'city': '',
-            'postcode': '',
+            'address_2': '',
+            'city': 'NA',
+            'state': 'NA',
+            'postcode': '000000',
             'country': 'IN',
+            'phone': customerPhone,
           };
 
-          final Map<String, dynamic> wooOrder = await ApiService.createWooOrder(
-            userId: widget.userData?.userId,
+          print('===== BILLING SENT TO WOO =====');
+          print(billing);
+          print('===== SHIPPING SENT TO WOO =====');
+          print(shipping);
+
+          // 4. Push order to WooCommerce
+          final wooOrder = await ApiService.createWooOrder(
+            userId: user?.userId,
             lineItems: lineItems,
             billing: billing,
             shipping: shipping,
@@ -587,9 +603,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
           final String wooOrderId = (wooOrder['id'] ?? '').toString();
 
-          // -----------------------------------------------------------------
-          // 2. Create local Order using Woo order ID
-          // -----------------------------------------------------------------
+          // 5. Local order model
           final order = Order(
             id: wooOrderId.isNotEmpty
                 ? wooOrderId
@@ -599,41 +613,22 @@ class _PaymentPageState extends State<PaymentPage> {
             createdAt: DateTime.now(),
             businessAddress: widget.businessAddressLabel,
             customerAddress: widget.customerAddressLabel,
-            userId: widget.userData?.userId ?? '',
-            userEmail: widget.userData?.email ?? '',
-            userName: widget.userData?.name ?? '',
+            userId: user?.userId ?? '',
+            userEmail: billingEmail,
+            userName: customerName,
             isPaid: true,
             status: OrderStatus.confirmed,
           );
 
           orderController.addOrder(order);
         } catch (e) {
-          // If pushing to Woo fails, still create a local order so the app works
           print('Failed to create WooCommerce order: $e');
-
-          final order = Order(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            paymentId: paymentId,
-            amount: widget.payableAmount,
-            createdAt: DateTime.now(),
-            businessAddress: widget.businessAddressLabel,
-            customerAddress: widget.customerAddressLabel,
-            userId: widget.userData?.userId ?? '',
-            userEmail: widget.userData?.email ?? '',
-            userName: widget.userData?.name ?? '',
-            isPaid: true,
-            status: OrderStatus.confirmed,
-          );
-
-          orderController.addOrder(order);
         }
 
-        // -------------------------------------------------------------------
-        // 3. Clear cart
-        // -------------------------------------------------------------------
+        // 6. Clear cart
         cartController.clearCart();
 
-        // 4. Show success
+        // 7. Show success
         Get.snackbar(
           'Payment Successful',
           'Payment ID: $paymentId',
@@ -641,28 +636,19 @@ class _PaymentPageState extends State<PaymentPage> {
           margin: const EdgeInsets.all(16),
         );
 
-        // 5. Navigate to NavigationMenu Home tab
-        if (widget.userData != null) {
-          Get.offAll(
-            () => NavigationMenu(
-              userData: widget.userData!,
-              initialIndex: 0, // Home
-            ),
-          );
-        } else {
-          Get.offAll(
-            () => NavigationMenu(
-              userData: UserData(
-                name: '',
-                email: '',
-                userId: '',
-                joined: DateTime.now(),
-                profilePicUrl: '',
-              ),
-              initialIndex: 0,
-            ),
-          );
-        }
+        // 8. Navigate to NavigationMenu Home tab (null-safe)
+        final UserData navUser =
+            user ??
+            UserData(
+              name: '',
+              email: '',
+              userId: '',
+              joined: DateTime.now(),
+              profilePicUrl: '',
+              phone: '',
+            );
+
+        Get.offAll(() => NavigationMenu(userData: navUser, initialIndex: 0));
       },
       onError: (response) {
         Get.snackbar(

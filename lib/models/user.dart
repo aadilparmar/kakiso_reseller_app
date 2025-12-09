@@ -1,4 +1,5 @@
 // lib/models/user.dart
+
 class UserData {
   final String name;
   final String email;
@@ -6,12 +7,16 @@ class UserData {
   final DateTime joined;
   final String profilePicUrl;
 
+  /// NEW FIELD (optional for backward compatibility)
+  final String phone;
+
   UserData({
     required this.name,
     required this.email,
     required this.userId,
     required this.joined,
     required this.profilePicUrl,
+    this.phone = '', // default empty to avoid breaking old accounts
   });
 
   factory UserData.fromJson(Map<String, dynamic> json) {
@@ -19,8 +24,11 @@ class UserData {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       userId: json['userId'] ?? '',
-      joined: DateTime.parse(json['joined'] as String),
+      joined: DateTime.tryParse(json['joined'] ?? '') ?? DateTime.now(),
       profilePicUrl: json['profilePicUrl'] ?? '',
+
+      /// NEW FIELD — safely read phone from JSON if present
+      phone: json['phone'] ?? '',
     );
   }
 
@@ -31,6 +39,9 @@ class UserData {
       'userId': userId,
       'joined': joined.toIso8601String(),
       'profilePicUrl': profilePicUrl,
+
+      /// NEW FIELD
+      'phone': phone,
     };
   }
 }
