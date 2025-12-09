@@ -528,9 +528,7 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ),
             ElevatedButton(
-              onPressed: _selectedMethod == 'online'
-                  ? _onPayNow
-                  : null, // only online
+              onPressed: _selectedMethod == 'online' ? _onPayNow : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentColor,
                 padding: const EdgeInsets.symmetric(
@@ -564,11 +562,9 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   // --- Handle Pay Now tap (call Razorpay service here) ---
-  // --- Handle Pay Now tap (call Razorpay service here) ---
   void _onPayNow() {
     if (_selectedMethod != 'online') return;
 
-    // Make current user available to the whole method & callbacks
     final UserData? currentUser = widget.userData;
 
     // Ensure OrderController is available
@@ -593,7 +589,7 @@ class _PaymentPageState extends State<PaymentPage> {
     RazorpayService.openCheckout(
       amount: widget.payableAmount,
       name: customerName,
-      email: rawEmail, // Razorpay can accept empty; Woo wants non-empty
+      email: rawEmail,
       contact: customerPhone,
       notes: {
         'business_address': widget.businessAddressLabel,
@@ -680,9 +676,20 @@ class _PaymentPageState extends State<PaymentPage> {
           final String shippingFirstName = caName.isNotEmpty
               ? caName
               : customerName;
-          final String shippingAddress1 = caAddress.isNotEmpty
-              ? caAddress
-              : widget.customerAddressLabel;
+
+          // Build a strong address_1 for Woo: street + city + state + pincode
+          final List<String> shippingAddressParts = [];
+          if (caAddress.isNotEmpty) shippingAddressParts.add(caAddress);
+          if (caCity.isNotEmpty) shippingAddressParts.add(caCity);
+          if (caState.isNotEmpty) shippingAddressParts.add(caState);
+          if (caPincode.isNotEmpty) shippingAddressParts.add(caPincode);
+
+          String shippingAddress1 = shippingAddressParts.join(', ');
+          if (shippingAddress1.isEmpty) {
+            // ultimate fallback – at least send the label
+            shippingAddress1 = widget.customerAddressLabel;
+          }
+
           final String shippingCity = caCity.isNotEmpty ? caCity : 'NA';
           final String shippingState = caState.isNotEmpty ? caState : 'NA';
           final String shippingPostcode = caPincode.isNotEmpty

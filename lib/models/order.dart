@@ -1,7 +1,5 @@
 // lib/models/order.dart
 
-import 'package:flutter/material.dart';
-
 enum OrderStatus { confirmed, packed, shipped, outForDelivery, delivered }
 
 class Order {
@@ -35,7 +33,7 @@ class Order {
   });
 
   // -----------------------------------------------------------
-  // Convert enum to string
+  // Convert enum to string (for local storage)
   // -----------------------------------------------------------
   static String _statusToString(OrderStatus s) {
     switch (s) {
@@ -53,7 +51,7 @@ class Order {
   }
 
   // -----------------------------------------------------------
-  // Convert string back to enum
+  // Convert string back to enum (from local storage)
   // -----------------------------------------------------------
   static OrderStatus _statusFromString(String s) {
     switch (s) {
@@ -70,6 +68,54 @@ class Order {
       default:
         return OrderStatus.confirmed;
     }
+  }
+
+  // -----------------------------------------------------------
+  // Map WooCommerce status → local OrderStatus
+  // -----------------------------------------------------------
+  // -----------------------------------------------------------
+  // Map WooCommerce status → local OrderStatus
+  // -----------------------------------------------------------
+  static OrderStatus _statusFromWooStatus(String rawStatus) {
+    final s = rawStatus.toLowerCase().trim();
+
+    // Debug (optional): see what Woo is actually sending
+    // debugPrint('Woo status: $rawStatus');
+
+    // 1) Delivered / completed
+    if (s == 'completed' || s.contains('delivered')) {
+      return OrderStatus.delivered;
+    }
+
+    // 2) Out for delivery (various spellings)
+    if (s.contains('out') && s.contains('deliver')) {
+      // e.g. "out-for-delivery", "out_for_delivery", "wc-outfordelivery"
+      return OrderStatus.outForDelivery;
+    }
+
+    // 3) Shipped
+    if (s.contains('ship')) {
+      // e.g. "shipped", "order-shipped", "wc-shipped"
+      return OrderStatus.shipped;
+    }
+
+    // 4) Packed
+    if (s.contains('pack')) {
+      // e.g. "packed", "packing", "order-packed"
+      return OrderStatus.packed;
+    }
+
+    // 5) “early” statuses = confirmed
+    if (s == 'pending' ||
+        s == 'processing' ||
+        s == 'on-hold' ||
+        s == 'confirmed' ||
+        s == 'wc-confirmed') {
+      return OrderStatus.confirmed;
+    }
+
+    // 6) Fallback
+    return OrderStatus.confirmed;
   }
 
   // -----------------------------------------------------------
@@ -92,7 +138,7 @@ class Order {
   }
 
   // -----------------------------------------------------------
-  // Convert JSON back to Order
+  // Convert JSON back to Order (from local storage)
   // -----------------------------------------------------------
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
@@ -109,6 +155,115 @@ class Order {
       userName: json["userName"]?.toString() ?? "",
       isPaid: json["isPaid"] == true,
       status: _statusFromString(json["status"]?.toString() ?? "confirmed"),
+    );
+  }
+
+  // -----------------------------------------------------------
+  // NEW: Build Order directly from WooCommerce order JSON
+  // -----------------------------------------------------------
+  factory Order.fromWooJson(Map<String, dynamic> json) {
+    // Raw Woo fields
+    final String wooId = (json['id'] ?? '').toString();
+    final String wooStatus = (json['status'] ?? '').toString();
+    final String wooTotal = (json['total'] ?? '0').toString();
+    final String wooTransactionId = (json['transaction_id'] ?? '')
+        .toString(); // Razorpay id if set
+
+    // Billing & shipping maps (can be null → make safe Map)
+    final billing = (json['billing'] as Map?) ?? {};
+    final shipping = (json['shipping'] as Map?) ?? {};
+
+    // Amount
+    final double parsedAmount = double.tryParse(wooTotal) ?? 0.0;
+
+    // Creation time
+    final DateTime createdAt =
+        DateTime.tryParse(json['date_created']?.toString() ?? '') ??
+        DateTime.now();
+
+    // Business address: primarily from billing
+    final String billingCompany = (billing['company'] ?? '').toString().trim();
+    final String billingFirstName = (billing['first_name'] ?? '')
+        .toString()
+        .trim();
+    final String billingLastName = (billing['last_name'] ?? '')
+        .toString()
+        .trim();
+    final String billingStreet = (billing['address_1'] ?? '').toString().trim();
+    final String billingCity = (billing['city'] ?? '').toString().trim();
+    final String billingState = (billing['state'] ?? '').toString().trim();
+    final String billingPostcode = (billing['postcode'] ?? '')
+        .toString()
+        .trim();
+    final String billingCountry = (billing['country'] ?? '').toString().trim();
+
+    final List<String> businessParts = [];
+    if (billingCompany.isNotEmpty) businessParts.add(billingCompany);
+    if (billingStreet.isNotEmpty) businessParts.add(billingStreet);
+    if (billingCity.isNotEmpty) businessParts.add(billingCity);
+    if (billingState.isNotEmpty) businessParts.add(billingState);
+    if (billingCountry.isNotEmpty) businessParts.add(billingCountry);
+    if (billingPostcode.isNotEmpty) {
+      businessParts.add(billingPostcode);
+    }
+
+    final String businessAddress = businessParts.isEmpty
+        ? billingCompany.isNotEmpty
+              ? billingCompany
+              : 'Business address not available'
+        : businessParts.join(', ');
+
+    // Customer address: from shipping
+    (shipping['first_name'] ?? '').toString().trim();
+    final String shippingStreet = (shipping['address_1'] ?? '')
+        .toString()
+        .trim();
+    final String shippingCity = (shipping['city'] ?? '').toString().trim();
+    final String shippingState = (shipping['state'] ?? '').toString().trim();
+    final String shippingPostcode = (shipping['postcode'] ?? '')
+        .toString()
+        .trim();
+    final String shippingCountry = (shipping['country'] ?? '')
+        .toString()
+        .trim();
+
+    final List<String> customerParts = [];
+    if (shippingStreet.isNotEmpty) customerParts.add(shippingStreet);
+    if (shippingCity.isNotEmpty) customerParts.add(shippingCity);
+    if (shippingState.isNotEmpty) customerParts.add(shippingState);
+    if (shippingCountry.isNotEmpty) customerParts.add(shippingCountry);
+    if (shippingPostcode.isNotEmpty) {
+      customerParts.add(shippingPostcode);
+    }
+
+    final String customerAddress = customerParts.isEmpty
+        ? 'Customer address not available'
+        : customerParts.join(', ');
+
+    // User identity
+    final String customerId = (json['customer_id'] ?? '').toString();
+    final String email = (billing['email'] ?? '').toString();
+    final String fullName = [
+      billingFirstName,
+      billingLastName,
+    ].where((e) => e.isNotEmpty).join(' ').trim();
+
+    // Paid?
+    final OrderStatus localStatus = _statusFromWooStatus(wooStatus);
+    final bool isPaid = (wooStatus == 'processing' || wooStatus == 'completed');
+
+    return Order(
+      id: wooId,
+      paymentId: wooTransactionId,
+      amount: parsedAmount,
+      createdAt: createdAt,
+      businessAddress: businessAddress,
+      customerAddress: customerAddress,
+      userId: customerId,
+      userEmail: email,
+      userName: fullName.isNotEmpty ? fullName : billingFirstName,
+      isPaid: isPaid,
+      status: localStatus,
     );
   }
 }

@@ -747,4 +747,24 @@ class ApiService {
 
     return parts.join(', ');
   }
+
+  static Future<Order> fetchWooOrderById({required String orderId}) async {
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/orders/$orderId');
+
+    try {
+      final response = await http.get(url, headers: _headers);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        // assumes you already have Order.fromWooJson(...)
+        return Order.fromWooJson(data);
+      } else {
+        throw Exception(
+          'fetchWooOrderById Error: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching woo order by id: $e');
+    }
+  }
 }
