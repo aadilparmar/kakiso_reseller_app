@@ -1,7 +1,10 @@
 // lib/screens/dashboard/checkout/payment_page.dart
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
@@ -38,10 +41,60 @@ class _PaymentPageState extends State<PaymentPage> {
   // we only have online payment, so keep it selected
   String _selectedMethod = 'online';
 
+  // Global cart controller for this page (avoids local shadowing issues)
+  final CartController _cartController = Get.find<CartController>();
+
+  // Read saved business + customer address from secure storage
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  static const String _businessStorageKey = 'business_details';
+  static const String _customerStorageKey = 'customer_addresses';
+
+  // ---- helpers to read data for billing/shipping ----
+
+  Future<Map<String, dynamic>?> _loadBusinessDetailsForBilling() async {
+    try {
+      final jsonStr = await _storage.read(key: _businessStorageKey);
+      if (jsonStr == null) return null;
+      return jsonDecode(jsonStr) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Failed to read business_details in PaymentPage: $e');
+      return null;
+    }
+  }
+
+  /// Find the selected customer address by matching name with customerAddressLabel.
+  /// If not found, fallback to the first saved address (if any).
+  Future<Map<String, dynamic>?> _loadCustomerAddressForShipping() async {
+    try {
+      final jsonStr = await _storage.read(key: _customerStorageKey);
+      if (jsonStr == null) return null;
+
+      final List list = jsonDecode(jsonStr) as List;
+      if (list.isEmpty) return null;
+
+      // Try to match by name (label = selected.name)
+      for (final raw in list) {
+        if (raw is Map<String, dynamic>) {
+          final name = (raw['name'] as String?) ?? '';
+          if (name.trim() == widget.customerAddressLabel.trim()) {
+            return raw;
+          }
+        }
+      }
+
+      // Fallback: use first address
+      final first = list.first;
+      if (first is Map<String, dynamic>) return first;
+      return null;
+    } catch (e) {
+      debugPrint('Failed to read customer_addresses in PaymentPage: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final CartController cartController = Get.find<CartController>();
-    final int totalItems = cartController.cartItems.fold(
+    final int totalItems = _cartController.cartItems.fold(
       0,
       (sum, item) => sum + item.quantity,
     );
@@ -475,7 +528,9 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ),
             ElevatedButton(
-              onPressed: _selectedMethod == 'online' ? _onPayNow : null,
+              onPressed: _selectedMethod == 'online'
+                  ? _onPayNow
+                  : null, // only online
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentColor,
                 padding: const EdgeInsets.symmetric(
@@ -509,47 +564,52 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   // --- Handle Pay Now tap (call Razorpay service here) ---
+  // --- Handle Pay Now tap (call Razorpay service here) ---
   void _onPayNow() {
     if (_selectedMethod != 'online') return;
 
-    final cartController = Get.find<CartController>();
+    // Make current user available to the whole method & callbacks
+    final UserData? currentUser = widget.userData;
 
     // Ensure OrderController is available
     final OrderController orderController = Get.isRegistered<OrderController>()
         ? Get.find<OrderController>()
         : Get.put(OrderController(), permanent: true);
 
-    final user = widget.userData;
-    final String customerName = (user?.name.isNotEmpty ?? false)
-        ? user!.name
+    final String customerName = (currentUser?.name.isNotEmpty ?? false)
+        ? currentUser!.name
         : 'Reseller Customer';
 
-    final String rawEmail = user?.email ?? '';
-    // 🔴 IMPORTANT: WooCommerce requires a valid, non-empty billing.email
-    final String billingEmail = rawEmail.isNotEmpty
+    final String rawEmail = currentUser?.email ?? '';
+    // WooCommerce requires non-empty billing.email
+    final String fallbackBillingEmail = rawEmail.isNotEmpty
         ? rawEmail
         : 'no-reply@kakiso.app';
 
-    final String customerPhone = (user is UserData && user.phone.isNotEmpty)
-        ? user.phone
+    final String customerPhone = (currentUser?.phone.isNotEmpty ?? false)
+        ? currentUser!.phone
         : '';
 
     RazorpayService.openCheckout(
       amount: widget.payableAmount,
       name: customerName,
-      email: rawEmail, // For Razorpay we can keep it raw; empty is allowed
+      email: rawEmail, // Razorpay can accept empty; Woo wants non-empty
       contact: customerPhone,
       notes: {
         'business_address': widget.businessAddressLabel,
         'customer_address': widget.customerAddressLabel,
-        'user_id': user?.userId ?? '',
+        'user_id': currentUser?.userId ?? '',
       },
       onSuccess: (response) async {
         final paymentId = response.paymentId ?? '';
 
         try {
-          // 1. Build Woo line items
-          final List<Map<String, dynamic>> lineItems = cartController.cartItems
+          // ---------- 1. Load saved business + customer address ----------
+          final businessData = await _loadBusinessDetailsForBilling();
+          final customerAddress = await _loadCustomerAddressForShipping();
+
+          // ---------- 2. Build Woo line items ----------
+          final List<Map<String, dynamic>> lineItems = _cartController.cartItems
               .map<Map<String, dynamic>>((item) {
                 return {
                   'product_id': item.product.id,
@@ -558,33 +618,91 @@ class _PaymentPageState extends State<PaymentPage> {
               })
               .toList();
 
-          // 2. Billing (reseller / app user)
+          // ---------- 3. Billing from Business Details ----------
+          final ownerName = (businessData?['ownerName'] as String? ?? '')
+              .trim();
+          final businessName = (businessData?['businessName'] as String? ?? '')
+              .trim();
+          final bdAddress = (businessData?['address'] as String? ?? '').trim();
+          final bdCity = (businessData?['city'] as String? ?? '').trim();
+          final bdState = (businessData?['state'] as String? ?? '').trim();
+          final bdPincode = (businessData?['pincode'] as String? ?? '').trim();
+          final bdPhone = (businessData?['phone'] as String? ?? '').trim();
+          final bdEmail = (businessData?['email'] as String? ?? '').trim();
+
+          final String billingFirstName = ownerName.isNotEmpty
+              ? ownerName
+              : customerName;
+          final String billingCompany = businessName.isNotEmpty
+              ? businessName
+              : widget.businessAddressLabel;
+          final String billingAddress1 = bdAddress.isNotEmpty
+              ? bdAddress
+              : widget.businessAddressLabel;
+          final String billingCity = bdCity.isNotEmpty ? bdCity : 'NA';
+          final String billingState = bdState.isNotEmpty ? bdState : 'NA';
+          final String billingPostcode = bdPincode.isNotEmpty
+              ? bdPincode
+              : '000000';
+          final String billingPhone = bdPhone.isNotEmpty
+              ? bdPhone
+              : customerPhone;
+
+          // Final non-empty email for Woo
+          final String billingEmail = bdEmail.isNotEmpty
+              ? bdEmail
+              : fallbackBillingEmail;
+
           final billing = {
-            'first_name': customerName,
+            'first_name': billingFirstName,
             'last_name': '',
-            'company': widget.businessAddressLabel,
-            'address_1': widget.businessAddressLabel,
+            'company': billingCompany,
+            'address_1': billingAddress1,
             'address_2': '',
-            'city': 'NA',
-            'state': 'NA',
-            'postcode': '000000',
+            'city': billingCity,
+            'state': billingState,
+            'postcode': billingPostcode,
             'country': 'IN',
             'email': billingEmail,
-            'phone': customerPhone,
+            'phone': billingPhone,
           };
 
-          // 3. Shipping (end-customer)
+          // ---------- 4. Shipping from selected Customer Address ----------
+          final caName = (customerAddress?['name'] as String? ?? '').trim();
+          final caAddress = (customerAddress?['addressLine'] as String? ?? '')
+              .trim();
+          final caCity = (customerAddress?['city'] as String? ?? '').trim();
+          final caState = (customerAddress?['state'] as String? ?? '').trim();
+          final caPincode = (customerAddress?['pincode'] as String? ?? '')
+              .trim();
+          final caPhone = (customerAddress?['phone'] as String? ?? '').trim();
+
+          final String shippingFirstName = caName.isNotEmpty
+              ? caName
+              : customerName;
+          final String shippingAddress1 = caAddress.isNotEmpty
+              ? caAddress
+              : widget.customerAddressLabel;
+          final String shippingCity = caCity.isNotEmpty ? caCity : 'NA';
+          final String shippingState = caState.isNotEmpty ? caState : 'NA';
+          final String shippingPostcode = caPincode.isNotEmpty
+              ? caPincode
+              : '000000';
+          final String shippingPhone = caPhone.isNotEmpty
+              ? caPhone
+              : billingPhone;
+
           final shipping = {
-            'first_name': customerName,
+            'first_name': shippingFirstName,
             'last_name': '',
             'company': '',
-            'address_1': widget.customerAddressLabel,
+            'address_1': shippingAddress1,
             'address_2': '',
-            'city': 'NA',
-            'state': 'NA',
-            'postcode': '000000',
+            'city': shippingCity,
+            'state': shippingState,
+            'postcode': shippingPostcode,
             'country': 'IN',
-            'phone': customerPhone,
+            'phone': shippingPhone,
           };
 
           print('===== BILLING SENT TO WOO =====');
@@ -592,9 +710,9 @@ class _PaymentPageState extends State<PaymentPage> {
           print('===== SHIPPING SENT TO WOO =====');
           print(shipping);
 
-          // 4. Push order to WooCommerce
+          // ---------- 5. Push order to WooCommerce ----------
           final wooOrder = await ApiService.createWooOrder(
-            userId: user?.userId,
+            userId: currentUser?.userId,
             lineItems: lineItems,
             billing: billing,
             shipping: shipping,
@@ -603,7 +721,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
           final String wooOrderId = (wooOrder['id'] ?? '').toString();
 
-          // 5. Local order model
+          // ---------- 6. Local order ----------
           final order = Order(
             id: wooOrderId.isNotEmpty
                 ? wooOrderId
@@ -613,9 +731,9 @@ class _PaymentPageState extends State<PaymentPage> {
             createdAt: DateTime.now(),
             businessAddress: widget.businessAddressLabel,
             customerAddress: widget.customerAddressLabel,
-            userId: user?.userId ?? '',
+            userId: currentUser?.userId ?? '',
             userEmail: billingEmail,
-            userName: customerName,
+            userName: billingFirstName,
             isPaid: true,
             status: OrderStatus.confirmed,
           );
@@ -623,12 +741,13 @@ class _PaymentPageState extends State<PaymentPage> {
           orderController.addOrder(order);
         } catch (e) {
           print('Failed to create WooCommerce order: $e');
+          // we still let payment succeed in-app; order just not synced
         }
 
-        // 6. Clear cart
-        cartController.clearCart();
+        // ---------- 7. Clear cart ----------
+        _cartController.clearCart();
 
-        // 7. Show success
+        // ---------- 8. Show success ----------
         Get.snackbar(
           'Payment Successful',
           'Payment ID: $paymentId',
@@ -636,9 +755,9 @@ class _PaymentPageState extends State<PaymentPage> {
           margin: const EdgeInsets.all(16),
         );
 
-        // 8. Navigate to NavigationMenu Home tab (null-safe)
+        // ---------- 9. Navigate home ----------
         final UserData navUser =
-            user ??
+            currentUser ??
             UserData(
               name: '',
               email: '',
