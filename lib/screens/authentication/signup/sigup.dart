@@ -61,7 +61,7 @@ class _RegisterPageState extends State<RegisterPage>
   final _referralController = TextEditingController();
 
   // Background animation
-  late AnimationController _bgController;
+  late final AnimationController _bgController;
 
   @override
   void initState() {
@@ -110,15 +110,15 @@ class _RegisterPageState extends State<RegisterPage>
     setState(() => _isLoading = true);
 
     try {
+      // You can plug actual registration logic here.
       // final fullName = _fullNameController.text.trim();
       // final phone = _phoneController.text.trim();
       // final email = _emailController.text.trim();
       // final password = _passwordController.text.trim();
       // final referral = _referralController.text.trim();
-
-      // // Compose full phone with country code
+      //
       // final fullPhoneWithCode = '+91$phone';
-      // Example:
+      //
       // await MyAuthService.registerUser(
       //   name: fullName,
       //   phone: fullPhoneWithCode,
@@ -135,15 +135,14 @@ class _RegisterPageState extends State<RegisterPage>
       // 🎉 Show success & redirect to login
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: const Text(
             'Account created successfully! Please log in to continue.',
-            style: const TextStyle(fontFamily: 'Poppins'),
+            style: TextStyle(fontFamily: 'Poppins'),
           ),
           backgroundColor: Colors.green.shade600,
         ),
       );
 
-      // Go back to Login
       Get.offAll(() => const LoginPage());
     } catch (e) {
       if (!mounted) return;
@@ -180,7 +179,7 @@ class _RegisterPageState extends State<RegisterPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // TOP BACK / LOGO
+                    // TOP LOGO
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -272,7 +271,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                             const SizedBox(height: 14),
 
-                            // Phone (REQUIRED) with +91 prefix (NO OTP)
+                            // Phone (REQUIRED) with +91 prefix
                             TextFormField(
                               controller: _phoneController,
                               decoration:
@@ -302,7 +301,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                             const SizedBox(height: 14),
 
-                            // Email with extra anti-dummy checks
+                            // Email with extra checks
                             TextFormField(
                               controller: _emailController,
                               decoration: _inputDecoration(
@@ -346,7 +345,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                             const SizedBox(height: 14),
 
-                            // Password (strong rules)
+                            // Password
                             TextFormField(
                               controller: _passwordController,
                               obscureText: !_isPasswordVisible,
@@ -384,16 +383,11 @@ class _RegisterPageState extends State<RegisterPage>
                                 if (!RegExp(r'[0-9]').hasMatch(v)) {
                                   return 'Include at least one number.';
                                 }
-                                // Optional: uncomment to enforce special char
-                                // if (!RegExp(r'[!@#\$&*~.,;:?_\-]').hasMatch(v)) {
-                                //   return 'Include at least one special character.';
-                                // }
                                 return null;
                               },
                             ),
                             const SizedBox(height: 10),
 
-                            // Password helper
                             Row(
                               children: const [
                                 Icon(
@@ -482,7 +476,7 @@ class _RegisterPageState extends State<RegisterPage>
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: RichText(
-                                      text: const TextSpan(
+                                      text: TextSpan(
                                         style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 12,
@@ -664,11 +658,11 @@ class _RegisterPageState extends State<RegisterPage>
       prefixIcon: Icon(icon, size: 20, color: kPrimaryDeep),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14.0),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14.0),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+        borderSide: BorderSide(color: Colors.grey.shade300),
       ),
       focusedBorder: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(14.0)),
@@ -685,7 +679,7 @@ class _RegisterPageState extends State<RegisterPage>
 }
 
 // ─────────────────────────────────────────────────────────────
-//  EXTENSION + BOUNCY BUTTON (same as intro/login feel)
+//  EXTENSION + BOUNCY BUTTON
 // ─────────────────────────────────────────────────────────────
 
 extension WidgetBlurExtension on Widget {
@@ -709,17 +703,17 @@ class _BouncyButton extends StatefulWidget {
 
 class _BouncyButtonState extends State<_BouncyButton>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
 
   @override
   void initState() {
+    super.initState();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 120),
     );
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(_controller);
-    super.initState();
   }
 
   @override

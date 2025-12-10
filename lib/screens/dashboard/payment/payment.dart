@@ -567,6 +567,14 @@ class _PaymentPageState extends State<PaymentPage> {
 
     final UserData? currentUser = widget.userData;
 
+    // Compute effective Woo customer id (prefer wooCustomerId, fallback to userId)
+    final String wooId = (currentUser?.wooCustomerId.isNotEmpty ?? false)
+        ? currentUser!.wooCustomerId
+        : '';
+    final String effectiveUserIdForWoo = wooId.isNotEmpty
+        ? wooId
+        : (currentUser?.userId ?? '');
+
     // Ensure OrderController is available
     final OrderController orderController = Get.isRegistered<OrderController>()
         ? Get.find<OrderController>()
@@ -595,6 +603,7 @@ class _PaymentPageState extends State<PaymentPage> {
         'business_address': widget.businessAddressLabel,
         'customer_address': widget.customerAddressLabel,
         'user_id': currentUser?.userId ?? '',
+        'woo_customer_id': wooId, // helpful on Razorpay dashboard
       },
       onSuccess: (response) async {
         final paymentId = response.paymentId ?? '';
@@ -719,7 +728,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
           // ---------- 5. Push order to WooCommerce ----------
           final wooOrder = await ApiService.createWooOrder(
-            userId: currentUser?.userId,
+            userId: effectiveUserIdForWoo,
             lineItems: lineItems,
             billing: billing,
             shipping: shipping,
@@ -738,7 +747,7 @@ class _PaymentPageState extends State<PaymentPage> {
             createdAt: DateTime.now(),
             businessAddress: widget.businessAddressLabel,
             customerAddress: widget.customerAddressLabel,
-            userId: currentUser?.userId ?? '',
+            userId: effectiveUserIdForWoo,
             userEmail: billingEmail,
             userName: billingFirstName,
             isPaid: true,
@@ -769,6 +778,7 @@ class _PaymentPageState extends State<PaymentPage> {
               name: '',
               email: '',
               userId: '',
+              wooCustomerId: '',
               joined: DateTime.now(),
               profilePicUrl: '',
               phone: '',

@@ -21,7 +21,6 @@ class ApiService {
       'cs_5dc571e56332bd0eb6effd7b318f81bb8c6347c7';
 
   // Optional app-only API key header for your custom endpoint (leave empty if unused)
-  // If you set this, ensure your server's permission callback checks it.
   static const String appApiKey = '';
 
   // Helper for Basic Auth Header
@@ -206,15 +205,6 @@ class ApiService {
   // 🔹 BRANDS (with logo)
   // ---------------------------------------------------------------------------
   static Future<List<BrandModel>> fetchBrands() async {
-    // NOTE:
-    // This assumes you're using a WooCommerce Brands plugin that exposes:
-    //   GET /wp-json/wc/v3/brands
-    //
-    // BrandModel.fromJson should read fields like:
-    //   id, name, slug, and image['src'] for logo URL.
-    //
-    // If your plugin uses a different route (e.g. /wp-json/wp/v2/pwb-brand),
-    // just change the URL below but keep the rest of the logic the same.
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/brands?per_page=100');
 
     try {
@@ -260,6 +250,83 @@ class ApiService {
     final file = File(filePath);
     await file.writeAsBytes(response.bodyBytes);
     return XFile(filePath);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 10. ENSURE / GET WOO CUSTOMER BY EMAIL (returns customer_id as String)
+  // ---------------------------------------------------------------------------
+  static Future<String?> ensureWooCustomer({
+    required String email,
+    required String name,
+  }) async {
+    final String trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty) return null;
+
+    try {
+      // 1) Try to find existing customer by email
+      final Uri findUrl = Uri.parse(
+        '$baseUrl/wp-json/wc/v3/customers?email=${Uri.encodeQueryComponent(trimmedEmail)}',
+      );
+
+      final findResp = await http.get(findUrl, headers: _headers);
+
+      if (findResp.statusCode == 200) {
+        final List<dynamic> list = json.decode(findResp.body) as List<dynamic>;
+        if (list.isNotEmpty) {
+          final Map<String, dynamic> first = list.first as Map<String, dynamic>;
+          final dynamic id = first['id'];
+          if (id != null) {
+            final String idStr = id.toString();
+            print('[ensureWooCustomer] Found existing customer: id=$idStr');
+            return idStr;
+          }
+        }
+      } else {
+        print(
+          '[ensureWooCustomer] GET customers?email= failed: '
+          '${findResp.statusCode} ${findResp.body}',
+        );
+      }
+
+      // 2) Not found → create a new customer
+      final Uri createUrl = Uri.parse('$baseUrl/wp-json/wc/v3/customers');
+
+      final String finalName = name.trim().isNotEmpty
+          ? name.trim()
+          : trimmedEmail.split('@').first;
+
+      final Map<String, dynamic> payload = {
+        'email': trimmedEmail,
+        'first_name': finalName,
+        'username': trimmedEmail,
+      };
+
+      final createResp = await http.post(
+        createUrl,
+        headers: _headers,
+        body: jsonEncode(payload),
+      );
+
+      if (createResp.statusCode == 201 || createResp.statusCode == 200) {
+        final Map<String, dynamic> data =
+            json.decode(createResp.body) as Map<String, dynamic>;
+        final dynamic id = data['id'];
+        if (id != null) {
+          final String idStr = id.toString();
+          print('[ensureWooCustomer] Created new customer: id=$idStr');
+          return idStr;
+        }
+      } else {
+        print(
+          '[ensureWooCustomer] POST /customers failed: '
+          '${createResp.statusCode} ${createResp.body}',
+        );
+      }
+    } catch (e) {
+      print('[ensureWooCustomer] exception: $e');
+    }
+
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -468,7 +535,6 @@ class ApiService {
         // success on custom endpoint
         return;
       } else {
-        // Log & fallthrough to fallback attempt
         print(
           '[ApiService.updateResellerBusinessMeta] custom endpoint returned ${response.statusCode}: ${response.body}',
         );
@@ -502,15 +568,14 @@ class ApiService {
   }
 
   // 🔥 Leaderboard category IDs (set these to real IDs from WP)
-  static const int topRankingCategoryId = 513; // TODO: change to your real ID
-  static const int hotRankingCategoryId = 512; // TODO: change to your real ID
+  static const int topRankingCategoryId = 513;
+  static const int hotRankingCategoryId = 512;
 
   /// Products admin marked as "Top Ranking" (WP category)
   static Future<List<ProductModel>> fetchTopRankingProducts() async {
     try {
       final products = await fetchProductsByCategory(
         topRankingCategoryId,
-        // use custom sorting (menu order) if you sort in Woo admin
         orderBy: 'menu_order',
         order: 'asc',
       );
@@ -519,7 +584,6 @@ class ApiService {
         '[ApiService.fetchTopRankingProducts] got ${products.length} items for category $topRankingCategoryId',
       );
 
-      // Fallback so app UI doesn't look empty while you configure WP
       if (products.isEmpty) {
         print(
           '[ApiService.fetchTopRankingProducts] empty, falling back to fetchTopSellingProducts()',
@@ -530,7 +594,6 @@ class ApiService {
       return products;
     } catch (e) {
       print('[ApiService.fetchTopRankingProducts] error: $e');
-      // Fallback on error too
       return fetchTopSellingProducts();
     }
   }
@@ -567,11 +630,9 @@ class ApiService {
   // ---------------------------------------------------------------------------
   /// Creates a WooCommerce order in `wc/v3/orders`.
   ///
-  /// You must build:
-  ///  - [lineItems]: list like
-  ///      [{'product_id': 123, 'quantity': 2}, {'product_id': 456, 'quantity': 1}]
-  ///  - [billing] and [shipping]: maps matching WooCommerce billing/shipping schema
-  ///  - [paymentId]: Razorpay payment id
+  /// - [userId] is expected to be the WooCommerce customer_id (numeric as string).
+  ///   - If numeric → used as Woo `customer_id`.
+  ///   - In all cases it is also stored in meta_data as `app_user_id`.
   ///
   /// Returns the decoded Woo order JSON on success.
   static Future<Map<String, dynamic>> createWooOrder({
@@ -585,7 +646,18 @@ class ApiService {
   }) async {
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/orders');
 
-    final int? customerId = int.tryParse((userId ?? '').trim());
+    final String trimmedUserId = (userId ?? '').trim();
+    final int? customerId = int.tryParse(trimmedUserId);
+
+    final List<Map<String, dynamic>> meta = [
+      {'key': 'razorpay_payment_id', 'value': paymentId},
+      {'key': 'kakiso_order_source', 'value': 'kakiso_reseller_app'},
+    ];
+
+    // Always store the userId in meta so we can match across devices
+    if (trimmedUserId.isNotEmpty) {
+      meta.add({'key': 'app_user_id', 'value': trimmedUserId});
+    }
 
     final Map<String, dynamic> payload = {
       'payment_method': paymentMethod,
@@ -594,10 +666,7 @@ class ApiService {
       'billing': billing,
       'shipping': shipping,
       'line_items': lineItems,
-      'meta_data': [
-        {'key': 'razorpay_payment_id', 'value': paymentId},
-        {'key': 'kakiso_order_source', 'value': 'kakiso_reseller_app'},
-      ],
+      'meta_data': meta,
     };
 
     if (customerId != null && customerId > 0) {
@@ -631,123 +700,91 @@ class ApiService {
   }
 
   // ---------------------------------------------------------------------------
-  // 15. FETCH WOO ORDERS FOR CUSTOMER (order history)
+  // 15. FETCH WOO ORDERS FOR CUSTOMER (by id and/or email)
   // ---------------------------------------------------------------------------
   static Future<List<Order>> fetchWooOrdersForCustomer({
-    required String userId,
+    String? userId,
+    String? userEmail,
   }) async {
-    final int? customerId = int.tryParse(userId.trim());
-    if (customerId == null || customerId <= 0) {
-      return [];
-    }
+    final List<Order> result = [];
+    final Set<String> seenIds = {};
 
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/orders?customer=$customerId&per_page=50&orderby=date&order=desc',
-    );
+    // ---------- 1) Try numeric customer_id ----------
+    final String rawUserId = (userId ?? '').trim();
+    final int? customerId = int.tryParse(rawUserId);
 
-    try {
-      final response = await http.get(url, headers: _headers);
+    if (customerId != null && customerId > 0) {
+      final Uri url = Uri.parse(
+        '$baseUrl/wp-json/wc/v3/orders'
+        '?customer=$customerId&per_page=50&orderby=date&order=desc',
+      );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-          'fetchWooOrdersForCustomer Error: ${response.statusCode} ${response.body}',
-        );
-      }
+      try {
+        final response = await http.get(url, headers: _headers);
 
-      final List<dynamic> data = json.decode(response.body);
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
 
-      return data
-          .map<Order>(
-            (jsonOrder) =>
-                _mapWooOrderToLocalOrder(jsonOrder as Map<String, dynamic>),
-          )
-          .toList();
-    } catch (e) {
-      // On any error, just return empty and keep app working
-      return [];
-    }
-  }
-
-  /// Internal helper to convert Woo order JSON → local Order model.
-  static Order _mapWooOrderToLocalOrder(Map<String, dynamic> jsonOrder) {
-    final Map<String, dynamic> billing =
-        (jsonOrder['billing'] ?? {}) as Map<String, dynamic>;
-    final Map<String, dynamic> shipping =
-        (jsonOrder['shipping'] ?? {}) as Map<String, dynamic>;
-    final List<dynamic> meta = (jsonOrder['meta_data'] ?? []) as List<dynamic>;
-
-    // Try to read Razorpay payment id from meta_data
-    String paymentId = '';
-    for (final m in meta) {
-      if (m is Map<String, dynamic> && m['key'] == 'razorpay_payment_id') {
-        paymentId = (m['value'] ?? '').toString();
-        break;
+          for (final raw in data) {
+            if (raw is Map<String, dynamic>) {
+              final Order order = Order.fromWooJson(raw);
+              if (!seenIds.contains(order.id)) {
+                seenIds.add(order.id);
+                result.add(order);
+              }
+            }
+          }
+        } else {
+          print(
+            'fetchWooOrdersForCustomer (by customer_id) Error: '
+            '${response.statusCode} ${response.body}',
+          );
+        }
+      } catch (e) {
+        print('fetchWooOrdersForCustomer (by customer_id) exception: $e');
       }
     }
 
-    final String wooStatus = (jsonOrder['status'] ?? '').toString();
+    // ---------- 2) Fallback: search by billing email (for customer_id = 0) ----------
+    final String email = (userEmail ?? '').trim();
+    if (email.isNotEmpty) {
+      final Uri url = Uri.parse(
+        '$baseUrl/wp-json/wc/v3/orders'
+        '?search=$email&per_page=50&orderby=date&order=desc',
+      );
 
-    OrderStatus status;
-    switch (wooStatus) {
-      case 'processing':
-        status = OrderStatus.packed;
-        break;
-      case 'completed':
-        status = OrderStatus.delivered;
-        break;
-      case 'pending':
-      case 'on-hold':
-      case 'cancelled':
-      case 'refunded':
-      case 'failed':
-      default:
-        status = OrderStatus.confirmed;
-        break;
+      try {
+        final response = await http.get(url, headers: _headers);
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+
+          for (final raw in data) {
+            if (raw is Map<String, dynamic>) {
+              final Order order = Order.fromWooJson(raw);
+              if (!seenIds.contains(order.id)) {
+                seenIds.add(order.id);
+                result.add(order);
+              }
+            }
+          }
+        } else {
+          print(
+            'fetchWooOrdersForCustomer (by email) Error: '
+            '${response.statusCode} ${response.body}',
+          );
+        }
+      } catch (e) {
+        print('fetchWooOrdersForCustomer (by email) exception: $e');
+      }
     }
 
-    final double amount =
-        double.tryParse((jsonOrder['total'] ?? '0').toString()) ?? 0.0;
-
-    final DateTime createdAt =
-        DateTime.tryParse((jsonOrder['date_created'] ?? '').toString()) ??
-        DateTime.now();
-
-    return Order(
-      id: (jsonOrder['id'] ?? '').toString(),
-      paymentId: paymentId,
-      amount: amount,
-      createdAt: createdAt,
-      businessAddress: _buildWooAddressString(billing),
-      customerAddress: _buildWooAddressString(shipping),
-      userId: (jsonOrder['customer_id'] ?? '').toString(),
-      userEmail: (billing['email'] ?? '').toString(),
-      userName: (billing['first_name'] ?? '').toString(),
-      isPaid: wooStatus == 'processing' || wooStatus == 'completed',
-      status: status,
-    );
+    return result;
   }
 
-  static String _buildWooAddressString(Map<String, dynamic> data) {
-    final parts = <String>[];
-
-    void add(dynamic v) {
-      if (v == null) return;
-      final s = v.toString().trim();
-      if (s.isNotEmpty) parts.add(s);
-    }
-
-    add(data['company']);
-    add(data['first_name']);
-    add(data['address_1']);
-    add(data['address_2']);
-    add(data['city']);
-    add(data['state']);
-    add(data['country']);
-    add(data['postcode']);
-
-    return parts.join(', ');
-  }
-
+  // ---------------------------------------------------------------------------
+  // 16. FETCH SINGLE WOO ORDER BY ID (for detail refresh)
+  // ---------------------------------------------------------------------------
   static Future<Order> fetchWooOrderById({required String orderId}) async {
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/orders/$orderId');
 
@@ -756,7 +793,6 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        // assumes you already have Order.fromWooJson(...)
         return Order.fromWooJson(data);
       } else {
         throw Exception(

@@ -30,18 +30,29 @@ class _OrdersPageState extends State<OrdersPage> {
         ? Get.find<OrderController>()
         : Get.put(OrderController(), permanent: true);
 
-    // Sync Woo orders for this user once page is opened
-    final userId = widget.userData?.userId ?? '';
-    if (userId.trim().isNotEmpty) {
+    final String wooId = widget.userData?.wooCustomerId ?? '';
+    final String appUserId = widget.userData?.userId ?? '';
+    final String userEmail = widget.userData?.email ?? '';
+
+    final String syncUserId = wooId.trim().isNotEmpty
+        ? wooId.trim()
+        : appUserId.trim();
+
+    if (syncUserId.isNotEmpty || userEmail.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        orderController.syncOrdersFromWoo(userId: userId);
+        orderController.syncOrdersFromWoo(
+          userId: syncUserId,
+          userEmail: userEmail,
+        );
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final String userId = widget.userData?.userId ?? '';
+    final String currentWooId = widget.userData?.wooCustomerId ?? '';
+    final String currentAppId = widget.userData?.userId ?? '';
+    final String currentEmail = widget.userData?.email ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -58,15 +69,56 @@ class _OrdersPageState extends State<OrdersPage> {
             tooltip: 'Refresh',
             icon: const Icon(Iconsax.refresh, size: 20),
             onPressed: () {
-              if (userId.trim().isNotEmpty) {
-                orderController.syncOrdersFromWoo(userId: userId);
+              final String syncUserId = currentWooId.trim().isNotEmpty
+                  ? currentWooId.trim()
+                  : currentAppId.trim();
+              final String email = currentEmail.trim();
+
+              if (syncUserId.isNotEmpty || email.isNotEmpty) {
+                orderController.syncOrdersFromWoo(
+                  userId: syncUserId,
+                  userEmail: email,
+                );
               }
             },
           ),
         ],
       ),
       body: Obx(() {
-        final orders = orderController.ordersForUser(userId);
+        final List<Order> all = orderController.orders;
+
+        // Extra safety: filter by Woo customer id OR old app userId OR by email
+        final String uidWoo = currentWooId.trim();
+        final String uidApp = currentAppId.trim();
+        final String email = currentEmail.trim().toLowerCase();
+
+        final List<Order> orders = all.where((o) {
+          bool matchId = false;
+          bool matchEmail = false;
+
+          final String orderUserId = o.userId.trim();
+          final String orderEmail = o.userEmail.trim().toLowerCase();
+
+          if (uidWoo.isNotEmpty && orderUserId.isNotEmpty) {
+            matchId = (orderUserId == uidWoo);
+          }
+
+          // Fallback: match old app userId stored in local orders
+          if (!matchId && uidApp.isNotEmpty && orderUserId.isNotEmpty) {
+            matchId = (orderUserId == uidApp);
+          }
+
+          if (email.isNotEmpty && orderEmail.isNotEmpty) {
+            matchEmail = (orderEmail == email);
+          }
+
+          // If all identifiers are empty (should not happen), show all
+          if (uidWoo.isEmpty && uidApp.isEmpty && email.isEmpty) {
+            return true;
+          }
+
+          return matchId || matchEmail;
+        }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         if (orders.isEmpty) {
           return _buildEmptyState();
@@ -74,7 +126,7 @@ class _OrdersPageState extends State<OrdersPage> {
 
         final double totalRevenue = orders.fold(
           0.0,
-          (sum, o) => sum + (o.amount),
+          (sum, o) => sum + o.amount,
         );
 
         return Column(

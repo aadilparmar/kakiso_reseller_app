@@ -14,6 +14,7 @@ import 'package:kakiso_reseller_app/screens/authentication/forget_password/forge
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // Colors reused from intro
 const Color kPrimaryDeep = Color(0xFF4B3DAF);
@@ -123,15 +124,30 @@ class _LoginPageState extends State<LoginPage>
       final String authToken = loginData['authToken'] as String;
 
       final userData = loginData['user'] as Map<String, dynamic>;
+
+      final String wpEmail = (userData['email'] as String?)?.trim() ?? email;
+      final String firstName = (userData['firstName'] as String?) ?? '';
+      final String lastName = (userData['lastName'] as String?) ?? '';
+      final String fullName = ('$firstName $lastName').trim().isNotEmpty
+          ? ('$firstName $lastName').trim()
+          : wpEmail.split('@').first;
+
+      // 🔹 Ensure Woo customer exists & get Woo customer_id
+      final String? wooCustomerId = await ApiService.ensureWooCustomer(
+        email: wpEmail,
+        name: fullName,
+      );
+
       final user = UserData(
-        name: '${userData['firstName']} ${userData['lastName']}',
-        email: userData['email'] ?? '',
-        userId: userData['databaseId'].toString(),
+        name: fullName,
+        email: wpEmail,
+        userId: userData['databaseId'].toString(), // app-level id (WP user id)
+        wooCustomerId: wooCustomerId ?? '', // ✅ Woo customer_id
         joined: DateTime.parse(userData['registeredDate']),
         profilePicUrl: userData['avatar']?['url'] ?? '',
       );
 
-      // ✅ Persist session so user stays logged in forever (until logout)
+      // ✅ Persist session so user stays logged in
       await SessionService.saveSession(authToken: authToken, user: user);
 
       if (!mounted) return;
@@ -168,10 +184,21 @@ class _LoginPageState extends State<LoginPage>
       final String? accessToken = auth.accessToken;
       final String tokenToStore = idToken ?? accessToken ?? '';
 
+      final String email = account.email;
+      final String displayName =
+          account.displayName ?? account.email.split('@').first;
+
+      // 🔹 Ensure Woo customer exists & get Woo customer_id
+      final String? wooCustomerId = await ApiService.ensureWooCustomer(
+        email: email,
+        name: displayName,
+      );
+
       final user = UserData(
-        name: account.displayName ?? account.email.split('@').first,
-        email: account.email,
-        userId: account.id,
+        name: displayName,
+        email: email,
+        userId: account.id, // Google account id (app-level)
+        wooCustomerId: wooCustomerId ?? '', // ✅ Woo customer_id
         joined: DateTime.now(),
         profilePicUrl: account.photoUrl ?? '',
       );
