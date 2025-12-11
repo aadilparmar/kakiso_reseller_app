@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 
@@ -63,13 +64,21 @@ class _RegisterPageState extends State<RegisterPage>
   // Background animation
   late final AnimationController _bgController;
 
+  // GraphQL client (same endpoint as login)
+  final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
+  late GraphQLClient _client;
+
   @override
   void initState() {
     super.initState();
+
     _bgController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
+
+    final HttpLink httpLink = HttpLink(_graphqlUrl);
+    _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
   }
 
   @override
@@ -85,7 +94,82 @@ class _RegisterPageState extends State<RegisterPage>
   }
 
   // ─────────────────────────────────────────────────────────
-  //  REGISTER HANDLER (PLUG YOUR BACKEND HERE)
+  //  CALL WORDPRESS VIA GRAPHQL → CREATE REAL USER
+  // ─────────────────────────────────────────────────────────
+  Future<void> _registerUserInWordPress({
+    required String fullName,
+    required String email,
+    required String password,
+  }) async {
+    // Split full name into first + last
+    final parts = fullName.trim().split(' ');
+    final String firstName = parts.isNotEmpty ? parts.first : '';
+    final String lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+    // This mutation shape assumes you are using a WPGraphQL "registerUser" mutation.
+    // If your backend uses a different mutation name or input fields,
+    // adjust this string and the "variables" map accordingly.
+    const String mutation = r'''
+      mutation RegisterUser(
+        $username: String!
+        $email: String!
+        $password: String!
+        $firstName: String!
+        $lastName: String!
+      ) {
+        registerUser(
+          input: {
+            username: $username
+            email: $email
+            password: $password
+            firstName: $firstName
+            lastName: $lastName
+          }
+        ) {
+          user {
+            databaseId
+            email
+            firstName
+            lastName
+          }
+        }
+      }
+    ''';
+
+    final variables = <String, dynamic>{
+      'username': email,
+      'email': email,
+      'password': password,
+      'firstName': firstName,
+      'lastName': lastName,
+    };
+
+    final result = await _client.mutate(
+      MutationOptions(document: gql(mutation), variables: variables),
+    );
+
+    if (result.hasException) {
+      String message =
+          'Registration failed. Please check details or try a different email.';
+
+      if (result.exception!.graphqlErrors.isNotEmpty) {
+        message = result.exception!.graphqlErrors.first.message;
+      }
+
+      throw Exception(message);
+    }
+
+    final data = result.data?['registerUser'];
+    if (data == null || data['user'] == null) {
+      throw Exception('Registration failed. Invalid response from server.');
+    }
+
+    // At this point a real WP user exists and can log in using the login screen.
+    return;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  REGISTER HANDLER
   // ─────────────────────────────────────────────────────────
   Future<void> _handleRegister() async {
     if (_isLoading) return;
@@ -110,24 +194,28 @@ class _RegisterPageState extends State<RegisterPage>
     setState(() => _isLoading = true);
 
     try {
-      // You can plug actual registration logic here.
-      // final fullName = _fullNameController.text.trim();
-      // final phone = _phoneController.text.trim();
-      // final email = _emailController.text.trim();
-      // final password = _passwordController.text.trim();
-      // final referral = _referralController.text.trim();
-      //
-      // final fullPhoneWithCode = '+91$phone';
-      //
-      // await MyAuthService.registerUser(
-      //   name: fullName,
-      //   phone: fullPhoneWithCode,
-      //   email: email,
-      //   password: password,
-      //   referralCode: referral.isEmpty ? null : referral,
-      // );
+      final fullName = _fullNameController.text.trim();
+      final phone = _phoneController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+      final referral = _referralController.text.trim();
 
-      await Future.delayed(const Duration(seconds: 1));
+      // 1) Create WP user via GraphQL
+      await _registerUserInWordPress(
+        fullName: fullName,
+        email: email,
+        password: password,
+      );
+
+      // 2) Optional: if you have a custom REST/GraphQL endpoint for storing
+      //    phone + referral in user meta, call it here.
+      //
+      // Example (pseudo-code):
+      // await ApiService.updateResellerProfileMeta(
+      //   email: email,
+      //   phone: '+91$phone',
+      //   referral: referral.isEmpty ? null : referral,
+      // );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -476,7 +564,7 @@ class _RegisterPageState extends State<RegisterPage>
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: RichText(
-                                      text: TextSpan(
+                                      text: const TextSpan(
                                         style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 12,
