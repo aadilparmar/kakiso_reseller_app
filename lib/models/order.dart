@@ -1,330 +1,300 @@
 // lib/models/order.dart
-// Robust Woo order model: tolerant status parsing + solid paid-detection.
 
-enum OrderStatus {
-  confirmed,
-  packed,
-  shipped,
-  outForDelivery,
-  delivered,
-  unknown,
-}
-
-/// Normalize a status string: lower + remove non-alphanum except hyphen/underscore
-String _normalizeStatus(String? s) {
-  if (s == null) return '';
-  final raw = s.toString().trim().toLowerCase();
-  // keep hyphen and underscore for patterns, remove other non-alnum
-  return raw.replaceAll(RegExp(r'[^a-z0-9\-_]'), '');
-}
-
-/// Fuzzy mapping: look for keywords rather than exact equality to support custom statuses.
-OrderStatus _orderStatusFromString(String? s) {
-  final n = _normalizeStatus(s);
-
-  if (n.isEmpty) return OrderStatus.unknown;
-
-  if (n.contains('complete') || n.contains('delivered')) {
-    return OrderStatus.delivered;
-  }
-  if (n.contains('out') &&
-      (n.contains('for') || n.contains('deliver') || n.contains('delivery'))) {
-    return OrderStatus.outForDelivery;
-  }
-  if (n.contains('ship') || n.contains('shipped')) {
-    return OrderStatus.shipped;
-  }
-  if (n.contains('pack') || n.contains('packed')) {
-    return OrderStatus.packed;
-  }
-  if (n.contains('process') ||
-      n.contains('processing') ||
-      n.contains('confirm') ||
-      n.contains('confirmed') ||
-      n.contains('onhold') ||
-      n.contains('on-hold') ||
-      n.contains('on_hold')) {
-    return OrderStatus.confirmed;
-  }
-
-  return OrderStatus.unknown;
-}
-
-/// Helper: read a string value from Woo `meta_data` list by key
-String? _metaValueString(dynamic metaData, String key) {
-  if (metaData == null) return null;
-  if (metaData is List) {
-    for (final m in metaData) {
-      if (m is Map) {
-        final k = m['key'];
-        final v = m['value'];
-        if (k != null && k.toString() == key) {
-          return v?.toString();
-        }
-      }
-    }
-  }
-  return null;
-}
+enum OrderStatus { confirmed, packed, shipped, outForDelivery, delivered }
 
 class Order {
-  final String id; // Woo order id as string (or fallback)
-  final String userId; // customer_id OR app_user_id meta
-  final String userEmail; // billing.email
-  final String userName; // billing/shipping/company
-  final double amount; // total
-  final String paymentId; // transaction_id or meta payment id
+  final String id;
+  final String paymentId;
+  final double amount;
   final DateTime createdAt;
-  final String businessAddress; // billing address string
-  final String customerAddress; // shipping address string
+
+  final String businessAddress;
+  final String customerAddress;
+
+  /// This should be your app's userId (we read it from Woo meta_data.app_user_id if present)
+  final String userId;
+  final String userEmail;
+  final String userName;
+
   final bool isPaid;
   final OrderStatus status;
 
   Order({
     required this.id,
-    required this.userId,
-    required this.userEmail,
-    required this.userName,
-    required this.amount,
     required this.paymentId,
+    required this.amount,
     required this.createdAt,
     required this.businessAddress,
     required this.customerAddress,
+    required this.userId,
+    required this.userEmail,
+    required this.userName,
     required this.isPaid,
     required this.status,
   });
 
-  /// Parse WooCommerce order JSON into Order
-  factory Order.fromWooJson(Map<String, dynamic> json) {
-    // Safe accessors
-    final billing = (json['billing'] as Map?) ?? <String, dynamic>{};
-    final shipping = (json['shipping'] as Map?) ?? <String, dynamic>{};
-
-    // Ids & emails
-    final String idStr = (json['id'] ?? json['order_key'] ?? '').toString();
-    final String customerIdStr = (json['customer_id'] ?? '').toString();
-    final String billingEmail = (billing['email'] ?? '').toString();
-
-    // Names
-    final String billingFirst = (billing['first_name'] ?? '').toString();
-    final String billingLast = (billing['last_name'] ?? '').toString();
-    final String shippingFirst = (shipping['first_name'] ?? '').toString();
-    final String billingCompany = (billing['company'] ?? '').toString();
-
-    // Amount: prefer json['total']
-    double total = 0.0;
-    try {
-      final rawTotal = json['total'] ?? json['total_amount'] ?? '0';
-      total = double.tryParse(rawTotal.toString()) ?? 0.0;
-    } catch (_) {
-      total = 0.0;
+  // -----------------------------------------------------------
+  // Convert enum to string (for local storage)
+  // -----------------------------------------------------------
+  static String _statusToString(OrderStatus s) {
+    switch (s) {
+      case OrderStatus.confirmed:
+        return "confirmed";
+      case OrderStatus.packed:
+        return "packed";
+      case OrderStatus.shipped:
+        return "shipped";
+      case OrderStatus.outForDelivery:
+        return "out_for_delivery";
+      case OrderStatus.delivered:
+        return "delivered";
     }
-
-    // transaction_id
-    final String txId = (json['transaction_id'] ?? json['transaction'] ?? '')
-        .toString()
-        .trim();
-
-    // Try to pick payment id: txId or meta entries
-    String paymentId = '';
-    if (txId.isNotEmpty) {
-      paymentId = txId;
-    } else {
-      final pm =
-          _metaValueString(json['meta_data'], 'razorpay_payment_id') ??
-          _metaValueString(json['meta_data'], 'payment_id') ??
-          _metaValueString(json['meta_data'], 'transaction_id');
-      if (pm != null) paymentId = pm;
-    }
-
-    // userId resolution: prefer numeric customer_id >0 else app_user_id meta
-    String resolvedUserId = '';
-    try {
-      if (customerIdStr.isNotEmpty && customerIdStr != '0') {
-        resolvedUserId = customerIdStr;
-      } else {
-        final appUserMeta = _metaValueString(json['meta_data'], 'app_user_id');
-        if (appUserMeta != null && appUserMeta.trim().isNotEmpty) {
-          resolvedUserId = appUserMeta.trim();
-        }
-      }
-    } catch (_) {
-      resolvedUserId = '';
-    }
-
-    // createdAt: date_created or date_created_gmt
-    DateTime created = DateTime.now();
-    try {
-      final dateStr = json['date_created'] ?? json['date_created_gmt'] ?? '';
-      if (dateStr != null && dateStr.toString().isNotEmpty) {
-        created =
-            DateTime.tryParse(dateStr.toString())?.toLocal() ?? DateTime.now();
-      }
-    } catch (_) {
-      created = DateTime.now();
-    }
-
-    // addresses
-    final String billingAddress = [
-      billing['address_1'] ?? '',
-      billing['city'] ?? '',
-      billing['state'] ?? '',
-      billing['postcode'] ?? '',
-    ].where((s) => s != null && s.toString().trim().isNotEmpty).join(', ');
-
-    final String shippingAddress = [
-      shipping['address_1'] ?? '',
-      shipping['city'] ?? '',
-      shipping['state'] ?? '',
-      shipping['postcode'] ?? '',
-    ].where((s) => s != null && s.toString().trim().isNotEmpty).join(', ');
-
-    // Status mapping (fuzzy)
-    final String rawStatus = (json['status'] ?? '').toString();
-    final OrderStatus mappedStatus = _orderStatusFromString(rawStatus);
-
-    // isPaid detection:
-    // - explicit set_paid bool
-    // - or explicit transaction_id
-    // - or payment_method present & not empty
-    // - or recognized meta payment id present
-    // - fallback: consider processing/completed as paid
-    bool paid = false;
-    try {
-      final dynamic setPaid = json['set_paid'];
-      if (setPaid is bool) {
-        paid = setPaid;
-      } else if (setPaid != null &&
-          setPaid.toString().toLowerCase() == 'true') {
-        paid = true;
-      } else if (txId.isNotEmpty) {
-        paid = true;
-      } else {
-        final pm = (json['payment_method'] ?? '').toString().trim();
-        if (pm.isNotEmpty) paid = true;
-        final metaPayment =
-            _metaValueString(json['meta_data'], 'razorpay_payment_id') ??
-            _metaValueString(json['meta_data'], 'payment_id') ??
-            _metaValueString(json['meta_data'], 'transaction_id');
-        if (!paid && metaPayment != null && metaPayment.trim().isNotEmpty)
-          paid = true;
-      }
-    } catch (_) {
-      paid = false;
-    }
-
-    // Fallback: if status is processing/completed treat as paid
-    if (!paid) {
-      if (mappedStatus == OrderStatus.confirmed ||
-          mappedStatus == OrderStatus.delivered) {
-        paid = true;
-      }
-    }
-
-    // userName resolution preference
-    String resolvedName = '';
-    if ((billingFirst + billingLast).trim().isNotEmpty) {
-      resolvedName = (billingFirst + ' ' + billingLast).trim();
-    } else if (billingCompany.trim().isNotEmpty) {
-      resolvedName = billingCompany.trim();
-    } else if (shippingFirst.trim().isNotEmpty) {
-      resolvedName = shippingFirst.trim();
-    }
-
-    return Order(
-      id: idStr.isNotEmpty
-          ? idStr
-          : DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: resolvedUserId,
-      userEmail: billingEmail,
-      userName: resolvedName,
-      amount: total,
-      paymentId: paymentId,
-      createdAt: created,
-      businessAddress: billingAddress,
-      customerAddress: shippingAddress,
-      isPaid: paid,
-      status: mappedStatus,
-    );
   }
 
-  /// Local persistence serializer
+  // -----------------------------------------------------------
+  // Convert string back to enum (from local storage)
+  // -----------------------------------------------------------
+  static OrderStatus _statusFromString(String s) {
+    switch (s) {
+      case "confirmed":
+        return OrderStatus.confirmed;
+      case "packed":
+        return OrderStatus.packed;
+      case "shipped":
+        return OrderStatus.shipped;
+      case "out_for_delivery":
+        return OrderStatus.outForDelivery;
+      case "delivered":
+        return OrderStatus.delivered;
+      default:
+        return OrderStatus.confirmed;
+    }
+  }
+
+  // -----------------------------------------------------------
+  // Map WooCommerce status → local OrderStatus
+  // -----------------------------------------------------------
+  static OrderStatus _statusFromWooStatus(String rawStatus) {
+    final s = rawStatus.toLowerCase().trim();
+
+    // 1) Delivered / completed
+    if (s == 'completed' || s.contains('delivered')) {
+      return OrderStatus.delivered;
+    }
+
+    // 2) Out for delivery (various spellings)
+    if (s.contains('out') && s.contains('deliver')) {
+      // e.g. "out-for-delivery", "out_for_delivery", "wc-outfordelivery"
+      return OrderStatus.outForDelivery;
+    }
+
+    // 3) Shipped
+    if (s.contains('ship')) {
+      // e.g. "shipped", "order-shipped", "wc-shipped"
+      return OrderStatus.shipped;
+    }
+
+    // 4) Packed
+    if (s.contains('pack')) {
+      // e.g. "packed", "packing", "order-packed"
+      return OrderStatus.packed;
+    }
+
+    // 5) “early” statuses = confirmed
+    if (s == 'pending' ||
+        s == 'processing' ||
+        s == 'on-hold' ||
+        s == 'confirmed' ||
+        s == 'wc-confirmed') {
+      return OrderStatus.confirmed;
+    }
+
+    // 6) Fallback
+    return OrderStatus.confirmed;
+  }
+
+  // -----------------------------------------------------------
+  // Convert Order to JSON (for GetStorage saving)
+  // -----------------------------------------------------------
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'userId': userId,
-      'userEmail': userEmail,
-      'userName': userName,
-      'amount': amount,
-      'paymentId': paymentId,
-      'createdAt': createdAt.toIso8601String(),
-      'businessAddress': businessAddress,
-      'customerAddress': customerAddress,
-      'isPaid': isPaid,
-      'status': status.toString().split('.').last,
+      "id": id,
+      "paymentId": paymentId,
+      "amount": amount,
+      "createdAt": createdAt.toIso8601String(),
+      "businessAddress": businessAddress,
+      "customerAddress": customerAddress,
+      "userId": userId,
+      "userEmail": userEmail,
+      "userName": userName,
+      "isPaid": isPaid,
+      "status": _statusToString(status),
     };
   }
 
-  /// Rehydrate from local storage JSON
-  factory Order.fromJson(Map<String, dynamic> map) {
-    OrderStatus parsedStatus = OrderStatus.unknown;
-    try {
-      final s = (map['status'] ?? '').toString();
-      parsedStatus = _orderStatusFromString(s);
-    } catch (_) {
-      parsedStatus = OrderStatus.unknown;
-    }
-
-    DateTime created = DateTime.now();
-    try {
-      final s = (map['createdAt'] ?? map['created_at'] ?? '').toString();
-      if (s.isNotEmpty) created = DateTime.tryParse(s) ?? DateTime.now();
-    } catch (_) {
-      created = DateTime.now();
-    }
-
-    double amt = 0.0;
-    try {
-      final a = map['amount'] ?? map['total'] ?? 0;
-      if (a is num)
-        amt = a.toDouble();
-      else
-        amt = double.tryParse(a.toString()) ?? 0.0;
-    } catch (_) {
-      amt = 0.0;
-    }
-
-    bool paid = false;
-    try {
-      final p = map['isPaid'] ?? map['paid'] ?? false;
-      if (p is bool)
-        paid = p;
-      else
-        paid = p.toString().toLowerCase() == 'true';
-    } catch (_) {
-      paid = false;
-    }
-
+  // -----------------------------------------------------------
+  // Convert JSON back to Order (from local storage)
+  // -----------------------------------------------------------
+  factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
-      id: (map['id'] ?? '').toString(),
-      userId: (map['userId'] ?? '').toString(),
-      userEmail: (map['userEmail'] ?? '').toString(),
-      userName: (map['userName'] ?? '').toString(),
-      amount: amt,
-      paymentId: (map['paymentId'] ?? '').toString(),
-      createdAt: created,
-      businessAddress: (map['businessAddress'] ?? '').toString(),
-      customerAddress: (map['customerAddress'] ?? '').toString(),
-      isPaid: paid,
-      status: parsedStatus,
+      id: json["id"]?.toString() ?? "",
+      paymentId: json["paymentId"]?.toString() ?? "",
+      amount: (json["amount"] is num)
+          ? (json["amount"] as num).toDouble()
+          : double.tryParse(json["amount"].toString()) ?? 0.0,
+      createdAt: DateTime.tryParse(json["createdAt"] ?? "") ?? DateTime.now(),
+      businessAddress: json["businessAddress"]?.toString() ?? "",
+      customerAddress: json["customerAddress"]?.toString() ?? "",
+      userEmail: json['billing']?['email']?.toString() ?? '',
+      userId: json['customer_id']?.toString() ?? '',
+      userName: json["userName"]?.toString() ?? "",
+      isPaid: json["isPaid"] == true,
+      status: _statusFromString(json["status"]?.toString() ?? "confirmed"),
     );
   }
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Order && runtimeType == other.runtimeType && id == other.id;
+  // -----------------------------------------------------------
+  // Build Order directly from WooCommerce order JSON
+  // -----------------------------------------------------------
+  factory Order.fromWooJson(Map<String, dynamic> json) {
+    // Raw Woo fields
+    final String wooId = (json['id'] ?? '').toString();
+    final String wooStatus = (json['status'] ?? '').toString();
+    final String wooTotal = (json['total'] ?? '0').toString();
+    final String wooTransactionId = (json['transaction_id'] ?? '').toString();
 
-  @override
-  int get hashCode => id.hashCode;
+    // Billing & shipping maps (safe copy to Map<String, dynamic>)
+    final billing = (json['billing'] is Map)
+        ? Map<String, dynamic>.from(json['billing'] as Map)
+        : <String, dynamic>{};
+
+    final shipping = (json['shipping'] is Map)
+        ? Map<String, dynamic>.from(json['shipping'] as Map)
+        : <String, dynamic>{};
+
+    // Amount
+    final double parsedAmount = double.tryParse(wooTotal) ?? 0.0;
+
+    // Creation time (prefer GMT if present)
+    DateTime createdAt;
+    if (json['date_created_gmt'] != null) {
+      createdAt =
+          DateTime.tryParse(json['date_created_gmt'].toString())?.toLocal() ??
+          DateTime.now();
+    } else {
+      createdAt =
+          DateTime.tryParse(json['date_created']?.toString() ?? '') ??
+          DateTime.now();
+    }
+
+    // ---------------- BUSINESS ADDRESS (billing) ----------------
+    final String billingCompany = (billing['company'] ?? '').toString().trim();
+    final String billingFirstName = (billing['first_name'] ?? '')
+        .toString()
+        .trim();
+    final String billingLastName = (billing['last_name'] ?? '')
+        .toString()
+        .trim();
+    final String billingStreet = (billing['address_1'] ?? '').toString().trim();
+    final String billingCity = (billing['city'] ?? '').toString().trim();
+    final String billingState = (billing['state'] ?? '').toString().trim();
+    final String billingPostcode = (billing['postcode'] ?? '')
+        .toString()
+        .trim();
+    final String billingCountry = (billing['country'] ?? '').toString().trim();
+
+    final List<String> businessParts = [];
+    if (billingCompany.isNotEmpty) businessParts.add(billingCompany);
+    if (billingStreet.isNotEmpty) businessParts.add(billingStreet);
+    if (billingCity.isNotEmpty) businessParts.add(billingCity);
+    if (billingState.isNotEmpty) businessParts.add(billingState);
+    if (billingCountry.isNotEmpty) businessParts.add(billingCountry);
+    if (billingPostcode.isNotEmpty) businessParts.add(billingPostcode);
+
+    final String businessAddress;
+    if (businessParts.isNotEmpty) {
+      businessAddress = businessParts.join(', ');
+    } else if (billingCompany.isNotEmpty) {
+      businessAddress = billingCompany;
+    } else {
+      businessAddress = 'Business address not available';
+    }
+
+    // ---------------- CUSTOMER ADDRESS (shipping) ----------------
+    final String shippingStreet = (shipping['address_1'] ?? '')
+        .toString()
+        .trim();
+    final String shippingCity = (shipping['city'] ?? '').toString().trim();
+    final String shippingState = (shipping['state'] ?? '').toString().trim();
+    final String shippingPostcode = (shipping['postcode'] ?? '')
+        .toString()
+        .trim();
+    final String shippingCountry = (shipping['country'] ?? '')
+        .toString()
+        .trim();
+
+    final List<String> customerParts = [];
+    if (shippingStreet.isNotEmpty) customerParts.add(shippingStreet);
+    if (shippingCity.isNotEmpty) customerParts.add(shippingCity);
+    if (shippingState.isNotEmpty) customerParts.add(shippingState);
+    if (shippingCountry.isNotEmpty) customerParts.add(shippingCountry);
+    if (shippingPostcode.isNotEmpty) customerParts.add(shippingPostcode);
+
+    final String customerAddress = customerParts.isEmpty
+        ? 'Customer address not available'
+        : customerParts.join(', ');
+
+    // ---------------- USER IDENTITY ----------------
+    // 1) Try to read your app userId from meta_data.app_user_id
+    String appUserId = '';
+    if (json['meta_data'] is List) {
+      final List meta = json['meta_data'] as List;
+      for (final m in meta) {
+        if (m is Map<String, dynamic>) {
+          if (m['key'] == 'app_user_id' && m['value'] != null) {
+            appUserId = m['value'].toString();
+            break;
+          }
+        }
+      }
+    }
+
+    // 2) Fallback to Woo customer_id (usually 0 for guest)
+    final String wooCustomerId = (json['customer_id'] ?? '').toString();
+
+    // Effective userId we store and later use in ordersForUser(userId)
+    final String effectiveUserId = appUserId.isNotEmpty
+        ? appUserId
+        : wooCustomerId;
+
+    // Email & name
+    final String email = (billing['email'] ?? '').toString().trim();
+    final String fullName = [
+      billingFirstName,
+      billingLastName,
+    ].where((e) => e.isNotEmpty).join(' ').trim();
+
+    // ---------------- PAID? ----------------
+    final String statusLower = wooStatus.toLowerCase();
+    final bool isPaid =
+        statusLower == 'processing' ||
+        statusLower == 'completed' ||
+        statusLower.contains('paid');
+
+    final OrderStatus localStatus = _statusFromWooStatus(wooStatus);
+
+    return Order(
+      id: wooId,
+      paymentId: wooTransactionId,
+      amount: parsedAmount,
+      createdAt: createdAt,
+      businessAddress: businessAddress,
+      customerAddress: customerAddress,
+      userId: effectiveUserId, // ← THIS IS NOW YOUR APP USER ID WHEN AVAILABLE
+      userEmail: email,
+      userName: fullName.isNotEmpty ? fullName : billingFirstName,
+      isPaid: isPaid,
+      status: localStatus,
+    );
+  }
 }

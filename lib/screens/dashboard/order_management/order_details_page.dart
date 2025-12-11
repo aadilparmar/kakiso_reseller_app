@@ -532,9 +532,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         return 'Out for delivery';
       case OrderStatus.delivered:
         return 'Delivered';
-      case OrderStatus.unknown:
-        // TODO: Handle this case.
-        throw UnimplementedError();
     }
   }
 
@@ -550,9 +547,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         return 3;
       case OrderStatus.delivered:
         return 4;
-      case OrderStatus.unknown:
-        // TODO: Handle this case.
-        throw UnimplementedError();
     }
   }
 
@@ -568,9 +562,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         return Colors.teal;
       case OrderStatus.delivered:
         return Colors.green;
-      case OrderStatus.unknown:
-        // TODO: Handle this case.
-        throw UnimplementedError();
     }
   }
 }
