@@ -30,22 +30,52 @@ class _OrdersPageState extends State<OrdersPage> {
         ? Get.find<OrderController>()
         : Get.put(OrderController(), permanent: true);
 
+    // Prefer passing Woo customer id if available, else app userId, else email.
+    _attemptInitialSync();
+  }
+
+  void _attemptInitialSync() {
+    // Read values from widget.userData (may be null)
     final String wooId = widget.userData?.wooCustomerId ?? '';
     final String appUserId = widget.userData?.userId ?? '';
     final String userEmail = widget.userData?.email ?? '';
 
+    // Decide which id to prefer
     final String syncUserId = wooId.trim().isNotEmpty
         ? wooId.trim()
         : appUserId.trim();
+    final String syncEmail = userEmail.trim();
 
-    if (syncUserId.isNotEmpty || userEmail.trim().isNotEmpty) {
+    // Logging for debug
+    debugPrint(
+      '[OrdersPage] init: wooId="$wooId" appUserId="$appUserId" email="$userEmail"',
+    );
+    debugPrint(
+      '[OrdersPage] chosen syncUserId="$syncUserId" syncEmail="$syncEmail"',
+    );
+
+    if (syncUserId.isEmpty && syncEmail.isEmpty) {
+      // Nothing to use for sync — show a visible message so you know why refresh does nothing.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        orderController.syncOrdersFromWoo(
-          userId: syncUserId,
-          userEmail: userEmail,
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No user id or email available to fetch orders.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
         );
       });
+      debugPrint('[OrdersPage] no user id or email to sync with');
+      return;
     }
+
+    // Schedule sync after build frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      orderController.syncOrdersFromWoo(
+        userId: syncUserId,
+        userEmail: syncEmail,
+      );
+    });
   }
 
   @override
@@ -74,10 +104,24 @@ class _OrdersPageState extends State<OrdersPage> {
                   : currentAppId.trim();
               final String email = currentEmail.trim();
 
+              debugPrint(
+                '[OrdersPage] manual refresh tapped. syncUserId="$syncUserId" email="$email"',
+              );
+
               if (syncUserId.isNotEmpty || email.isNotEmpty) {
                 orderController.syncOrdersFromWoo(
                   userId: syncUserId,
                   userEmail: email,
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'No user id or email available to fetch orders.',
+                    ),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 3),
+                  ),
                 );
               }
             },
@@ -87,7 +131,7 @@ class _OrdersPageState extends State<OrdersPage> {
       body: Obx(() {
         final List<Order> all = orderController.orders;
 
-        // Extra safety: filter by Woo customer id OR old app userId OR by email
+        // filter by Woo customer id OR old app userId OR by email
         final String uidWoo = currentWooId.trim();
         final String uidApp = currentAppId.trim();
         final String email = currentEmail.trim().toLowerCase();
@@ -286,6 +330,8 @@ class _OrderCard extends StatelessWidget {
         return 'Out for delivery';
       case OrderStatus.delivered:
         return 'Delivered';
+      case OrderStatus.unknown:
+        return 'Unknown';
     }
   }
 
@@ -301,6 +347,8 @@ class _OrderCard extends StatelessWidget {
         return Colors.indigo;
       case OrderStatus.delivered:
         return Colors.green;
+      case OrderStatus.unknown:
+        return Colors.grey;
     }
   }
 
@@ -316,6 +364,8 @@ class _OrderCard extends StatelessWidget {
         return Iconsax.location;
       case OrderStatus.delivered:
         return Iconsax.tick_circle;
+      case OrderStatus.unknown:
+        return Iconsax.minus;
     }
   }
 

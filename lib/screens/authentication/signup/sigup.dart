@@ -195,10 +195,10 @@ class _RegisterPageState extends State<RegisterPage>
 
     try {
       final fullName = _fullNameController.text.trim();
-      final phone = _phoneController.text.trim();
+      //final phone = _phoneController.text.trim();
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
-      final referral = _referralController.text.trim();
+      //final referral = _referralController.text.trim();
 
       // 1) Create WP user via GraphQL
       await _registerUserInWordPress(

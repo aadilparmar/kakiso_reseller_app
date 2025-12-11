@@ -60,12 +60,17 @@ class OrderController extends GetxController {
     if (stored == null) return;
 
     try {
-      final loaded = stored
-          .map((e) => Order.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-      _orders.assignAll(loaded);
+      // Convert dynamic to Order explicitly
+      final List loaded = stored.map((e) {
+        return Order.fromJson(Map<String, dynamic>.from(e));
+      }).toList();
+
+      _orders.assignAll(
+        loaded as Iterable<Order>,
+      ); // Now correctly typed as List<Order>
       _orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    } catch (_) {
+    } catch (e, st) {
+      print('[OrderController] load error: $e\n$st');
       _orders.clear();
     }
   }
@@ -82,27 +87,40 @@ class OrderController extends GetxController {
   // ---------------------------------------------------------------------------
   // Sync ALL orders for a user from WooCommerce
   // ---------------------------------------------------------------------------
-  ///
-  /// IMPORTANT:
-  /// ApiService.fetchWooOrdersForCustomer(userId: userId)
-  /// should internally query Woo with meta_key = 'app_user_id'
-  /// and meta_value = userId (your app's userId).
-  ///
-  // ---------------------------------------------------------------------------
-  // Sync from WooCommerce (ALL orders for a user, by id and/or email)
-  // ---------------------------------------------------------------------------
-  Future<void> syncOrdersFromWoo({String? userId, String? userEmail}) async {
+  /// Returns true on success, false on failure (useful for UI feedback)
+  Future<bool> syncOrdersFromWoo({String? userId, String? userEmail}) async {
     final String rawUserId = (userId ?? '').trim();
     final String rawEmail = (userEmail ?? '').trim();
 
-    if (rawUserId.isEmpty && rawEmail.isEmpty) return;
+    if (rawUserId.isEmpty && rawEmail.isEmpty) {
+      print(
+        '[OrderController.syncOrdersFromWoo] abort: no userId & no userEmail',
+      );
+      return false;
+    }
+
+    print(
+      '[OrderController.syncOrdersFromWoo] START userId="$rawUserId" userEmail="$rawEmail"',
+    );
 
     try {
-      final remoteOrders = await ApiService.fetchWooOrdersForCustomer(
-        userId: rawUserId,
-        userEmail: rawEmail,
+      // Call ApiService. We pass null for empty strings so the API can choose strategy
+      final List<Order> remoteOrders =
+          await ApiService.fetchWooOrdersForCustomer(
+            userId: rawUserId.isNotEmpty ? rawUserId : null,
+            userEmail: rawEmail.isNotEmpty ? rawEmail : null,
+          );
+
+      print(
+        '[OrderController.syncOrdersFromWoo] fetched remoteOrders count=${remoteOrders.length}',
       );
 
+      if (remoteOrders.isEmpty) {
+        // still merge nothing, but log
+        print('[OrderController.syncOrdersFromWoo] remote returned 0 orders.');
+      }
+
+      // Merge remote orders into local list
       for (final order in remoteOrders) {
         final index = _orders.indexWhere((o) => o.id == order.id);
         if (index >= 0) {
@@ -113,9 +131,15 @@ class OrderController extends GetxController {
       }
 
       _orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    } catch (e) {
-      // optional: log
-      print('syncOrdersFromWoo error: $e');
+      print(
+        '[OrderController.syncOrdersFromWoo] MERGE COMPLETE. localCount=${_orders.length}',
+      );
+      return true;
+    } catch (e, st) {
+      print(
+        '[OrderController.syncOrdersFromWoo] ERROR while syncing orders: $e\nStackTrace:\n$st',
+      );
+      return false;
     }
   }
 

@@ -1,3 +1,4 @@
+// lib/widgets/home_drawer.dart
 import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
 import 'package:get/get.dart'; // Required for Navigation
@@ -331,11 +332,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 ),
               );
             } else if (uniqueId == 'Orders') {
-              // ✅ FROM DRAWER → Orders page we created
+              // ✅ FROM DRAWER → Orders page: PASS userData so OrdersPage can sync
               if (!Get.isRegistered<OrderController>()) {
                 Get.put(OrderController(), permanent: true);
               }
-              Get.to(() => const OrdersPage());
+              // Pass the current userData to OrdersPage
+              Get.to(() => OrdersPage(userData: widget.userData));
             } else {
               widget.onNavigate(uniqueId);
             }

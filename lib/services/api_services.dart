@@ -659,6 +659,15 @@ class ApiService {
       meta.add({'key': 'app_user_id', 'value': trimmedUserId});
     }
 
+    // Also add the billing email lowercased so we can match by email reliably
+    final String billingEmail = (billing['email'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (billingEmail.isNotEmpty) {
+      meta.add({'key': 'app_user_email', 'value': billingEmail});
+    }
+
     final Map<String, dynamic> payload = {
       'payment_method': paymentMethod,
       'payment_method_title': paymentMethodTitle,
@@ -702,6 +711,8 @@ class ApiService {
   // ---------------------------------------------------------------------------
   // 15. FETCH WOO ORDERS FOR CUSTOMER (by id and/or email)
   // ---------------------------------------------------------------------------
+  // replace the existing fetchWooOrdersForCustomer implementation in lib/services/api_services.dart
+
   static Future<List<Order>> fetchWooOrdersForCustomer({
     String? userId,
     String? userEmail,
@@ -709,22 +720,40 @@ class ApiService {
     final List<Order> result = [];
     final Set<String> seenIds = {};
 
-    // ---------- 1) Try numeric customer_id ----------
     final String rawUserId = (userId ?? '').trim();
-    final int? customerId = int.tryParse(rawUserId);
+    final String rawEmail = (userEmail ?? '').trim();
 
+    print(
+      '[ApiService.fetchWooOrdersForCustomer] called userId="$rawUserId" userEmail="$rawEmail"',
+    );
+
+    // ---------- 1) Try numeric customer_id ----------
+    final int? customerId = int.tryParse(rawUserId);
     if (customerId != null && customerId > 0) {
       final Uri url = Uri.parse(
-        '$baseUrl/wp-json/wc/v3/orders'
-        '?customer=$customerId&per_page=50&orderby=date&order=desc',
+        '$baseUrl/wp-json/wc/v3/orders?customer=$customerId&per_page=50&orderby=date&order=desc',
       );
 
       try {
+        print('[ApiService.fetchWooOrdersForCustomer] GET $url');
         final response = await http.get(url, headers: _headers);
+
+        print(
+          '[ApiService.fetchWooOrdersForCustomer] customer_id response status=${response.statusCode}',
+        );
+        // Log a short part of body for debugging (avoid huge logs)
+        if (response.body.length < 2000) {
+          print(
+            '[ApiService.fetchWooOrdersForCustomer] body: ${response.body}',
+          );
+        } else {
+          print(
+            '[ApiService.fetchWooOrdersForCustomer] body (truncated): ${response.body.substring(0, 1200)} ...',
+          );
+        }
 
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
-
           for (final raw in data) {
             if (raw is Map<String, dynamic>) {
               final Order order = Order.fromWooJson(raw);
@@ -736,29 +765,48 @@ class ApiService {
           }
         } else {
           print(
-            'fetchWooOrdersForCustomer (by customer_id) Error: '
-            '${response.statusCode} ${response.body}',
+            '[ApiService.fetchWooOrdersForCustomer] (by customer_id) non-200: ${response.statusCode}',
           );
         }
-      } catch (e) {
-        print('fetchWooOrdersForCustomer (by customer_id) exception: $e');
+      } catch (e, st) {
+        print(
+          '[ApiService.fetchWooOrdersForCustomer] exception while fetching by customer_id: $e\n$st',
+        );
       }
+    } else {
+      print(
+        '[ApiService.fetchWooOrdersForCustomer] skipping customer_id query (invalid or empty): "$rawUserId"',
+      );
     }
 
-    // ---------- 2) Fallback: search by billing email (for customer_id = 0) ----------
-    final String email = (userEmail ?? '').trim();
+    // ---------- 2) Fallback: search by billing email ----------
+    final String email = rawEmail;
     if (email.isNotEmpty) {
       final Uri url = Uri.parse(
-        '$baseUrl/wp-json/wc/v3/orders'
-        '?search=$email&per_page=50&orderby=date&order=desc',
+        '$baseUrl/wp-json/wc/v3/orders?search=${Uri.encodeQueryComponent(email)}&per_page=50&orderby=date&order=desc',
       );
 
       try {
+        print(
+          '[ApiService.fetchWooOrdersForCustomer] GET $url (search by email)',
+        );
         final response = await http.get(url, headers: _headers);
+
+        print(
+          '[ApiService.fetchWooOrdersForCustomer] email search response status=${response.statusCode}',
+        );
+        if (response.body.length < 2000) {
+          print(
+            '[ApiService.fetchWooOrdersForCustomer] body: ${response.body}',
+          );
+        } else {
+          print(
+            '[ApiService.fetchWooOrdersForCustomer] body (truncated): ${response.body.substring(0, 1200)} ...',
+          );
+        }
 
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
-
           for (final raw in data) {
             if (raw is Map<String, dynamic>) {
               final Order order = Order.fromWooJson(raw);
@@ -770,15 +818,23 @@ class ApiService {
           }
         } else {
           print(
-            'fetchWooOrdersForCustomer (by email) Error: '
-            '${response.statusCode} ${response.body}',
+            '[ApiService.fetchWooOrdersForCustomer] (by email) non-200: ${response.statusCode}',
           );
         }
-      } catch (e) {
-        print('fetchWooOrdersForCustomer (by email) exception: $e');
+      } catch (e, st) {
+        print(
+          '[ApiService.fetchWooOrdersForCustomer] exception while fetching by email: $e\n$st',
+        );
       }
+    } else {
+      print(
+        '[ApiService.fetchWooOrdersForCustomer] skipping email search (empty email)',
+      );
     }
 
+    print(
+      '[ApiService.fetchWooOrdersForCustomer] finished. total found=${result.length}',
+    );
     return result;
   }
 
