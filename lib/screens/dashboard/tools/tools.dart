@@ -117,14 +117,6 @@ class _ToolsSectionState extends State<ToolsSection> {
         pageBuilder: (_) => const PriceMarginToolPage(),
       ),
       Tool(
-        id: 'reseller_catalog',
-        title: 'Reseller catalog builder',
-        subtitle: 'Generate curated catalogs for specific resellers.',
-        iconData: Iconsax.folder_2,
-        enabled: true,
-        pageBuilder: (_) => const ResellerCatalogBuilderPage(),
-      ),
-      Tool(
         id: 'ai_caption',
         title: 'AI caption generator',
         subtitle: 'AI-written captions for your product posts.',
@@ -444,17 +436,6 @@ class _ToolsSectionState extends State<ToolsSection> {
             const SizedBox(width: 6),
             Image.asset('assets/logos/login-logo.png', height: 22),
             const Spacer(),
-
-            IconButton(
-              onPressed: () => Get.to(() => const InventoryPage()),
-              icon: const Icon(Iconsax.shopping_cart),
-              color: textPrimary,
-            ),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Iconsax.profile_circle),
-              color: textPrimary,
-            ),
             const SizedBox(width: 8),
           ],
         ),

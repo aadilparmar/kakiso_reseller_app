@@ -1,7 +1,10 @@
+// lib/screens/dashboard/home/home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
 
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
@@ -296,7 +299,11 @@ class _HomePageState extends State<HomePage> {
               icon: const Icon(Iconsax.profile_circle),
               color: accentColor,
               iconSize: 30,
-              onPressed: () {},
+              onPressed: () {
+                // Navigate to ProfilePage using currently stored user data
+                // We use _userData which is initialized in initState from widget.userData
+                Get.to(() => ProfilePage(userData: _userData));
+              },
             ),
             const SizedBox(width: 8),
           ],
