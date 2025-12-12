@@ -486,9 +486,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     if (cat.description.isNotEmpty) {
       buffer.writeln(cat.description);
     }
-    buffer.writeln(
-      "Total items: ${cat.products.length} • Margin: ${marginPercent.toStringAsFixed(0)}%",
-    );
+    buffer.writeln("Total items: ${cat.products.length}");
     buffer.writeln("");
     buffer.writeln("🛍 *Catalog Items*:");
     buffer.writeln("");
@@ -720,12 +718,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               ),
             ),
             const Spacer(),
-            IconButton(
-              icon: const Icon(Iconsax.notification_bing),
-              color: accentColor,
-              iconSize: 30,
-              onPressed: () {},
-            ),
 
             // ✅ CART ICON WITH BADGE (same logic as HomePage)
             Stack(

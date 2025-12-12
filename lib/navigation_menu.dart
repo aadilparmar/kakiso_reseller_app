@@ -2,17 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
-// --- MODEL IMPORT ---
 import 'package:kakiso_reseller_app/models/user.dart';
-
-// --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
+import 'package:kakiso_reseller_app/services/session_service.dart';
 
-// --- CONSTANTS ---
 const Color _activeIconColor = Color(0xFFE91E63);
 final Color _inactiveColor = const Color.fromARGB(255, 0, 0, 0);
 
@@ -33,29 +30,96 @@ class NavigationController extends GetxController {
   ];
 }
 
-class NavigationMenu extends StatelessWidget {
-  final UserData userData;
-
-  /// 🔥 NEW: allow forcing a tab on open (0 = Home, 3 = Catalogue, etc.)
+/// NavigationMenu no longer requires a UserData parameter. It loads the
+/// logged-in user via SessionService.getUser() and initializes the controller.
+class NavigationMenu extends StatefulWidget {
+  /// initial tab index (0 = Home)
   final int initialIndex;
 
   const NavigationMenu({
     super.key,
-    required this.userData,
     this.initialIndex = 0,
+    required UserData userData,
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Create or retrieve the NavigationController
-    final controller = Get.put(NavigationController(userData: userData));
+  State<NavigationMenu> createState() => _NavigationMenuState();
+}
 
-    // Ensure correct tab is selected when this screen is shown
-    controller.selectedIndex.value = initialIndex;
+class _NavigationMenuState extends State<NavigationMenu> {
+  bool _isLoading = true;
+  NavigationController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _initUserAndController();
+  }
+
+  Future<void> _initUserAndController() async {
+    try {
+      // SessionService.getUser() returns Future<UserData?> per your session service
+      final UserData? stored = await SessionService.getUser();
+
+      final UserData navUser =
+          stored ??
+          UserData(
+            name: 'Reseller',
+            email: 'no-reply@kakiso.app',
+            userId: '',
+            wooCustomerId: '',
+            joined: DateTime.now(),
+            profilePicUrl: '',
+            phone: '',
+          );
+
+      // Recreate controller to make sure it contains the fresh userData
+      if (Get.isRegistered<NavigationController>()) {
+        try {
+          Get.delete<NavigationController>();
+        } catch (_) {}
+      }
+      _controller = Get.put(NavigationController(userData: navUser));
+      _controller!.selectedIndex.value = widget.initialIndex;
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e, st) {
+      // Fallback: create fallback user and proceed
+      print('[NavigationMenu] failed to load session user: $e\n$st');
+      final fallback = UserData(
+        name: 'Reseller',
+        email: 'no-reply@kakiso.app',
+        userId: '',
+        wooCustomerId: '',
+        joined: DateTime.now(),
+        profilePicUrl: '',
+        phone: '',
+      );
+      if (Get.isRegistered<NavigationController>()) {
+        try {
+          Get.delete<NavigationController>();
+        } catch (_) {}
+      }
+      _controller = Get.put(NavigationController(userData: fallback));
+      _controller!.selectedIndex.value = widget.initialIndex;
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || _controller == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final controller = _controller!;
 
     return Scaffold(
       body: Obx(() => controller.screens[controller.selectedIndex.value]),
-
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(24.0),

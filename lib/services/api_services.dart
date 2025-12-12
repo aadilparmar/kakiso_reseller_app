@@ -634,6 +634,8 @@ class ApiService {
   ///   - If numeric → used as Woo `customer_id`.
   ///   - In all cases it is also stored in meta_data as `app_user_id`.
   ///
+  /// - [orderTotal] when provided will be set as the order-level `total` in the Woo payload.
+  ///
   /// Returns the decoded Woo order JSON on success.
   static Future<Map<String, dynamic>> createWooOrder({
     String? userId,
@@ -643,6 +645,11 @@ class ApiService {
     required String paymentId,
     String paymentMethod = 'razorpay',
     String paymentMethodTitle = 'Razorpay',
+    // optional aggregated order total to override what Woo would compute.
+    double? orderTotal,
+    // optional shipping/fee lines (not required for your current use-case)
+    List<Map<String, dynamic>>? shippingLines,
+    List<Map<String, dynamic>>? feeLines,
   }) async {
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/orders');
 
@@ -668,6 +675,14 @@ class ApiService {
       meta.add({'key': 'app_user_email', 'value': billingEmail});
     }
 
+    // If an aggregated admin total is provided, add it to meta so it's always visible.
+    if (orderTotal != null) {
+      meta.add({
+        'key': 'kakiso_admin_total',
+        'value': orderTotal.toStringAsFixed(2),
+      });
+    }
+
     final Map<String, dynamic> payload = {
       'payment_method': paymentMethod,
       'payment_method_title': paymentMethodTitle,
@@ -680,6 +695,60 @@ class ApiService {
 
     if (customerId != null && customerId > 0) {
       payload['customer_id'] = customerId;
+    }
+
+    // Include shipping_lines and fee_lines only if passed and non-empty.
+    // These are optional — your current requirement is to send aggregated total,
+    // but we support including them if needed later.
+    if (shippingLines != null && shippingLines.isNotEmpty) {
+      // ensure totals are strings
+      final enriched = shippingLines.map((s) {
+        final Map<String, dynamic> copy = Map<String, dynamic>.from(s);
+        copy['total'] = (copy['total'] ?? '0.00').toString();
+        copy['total_tax'] = (copy['total_tax'] ?? '0.00').toString();
+        copy['taxes'] = copy['taxes'] ?? <Map<String, dynamic>>[];
+        return copy;
+      }).toList();
+      payload['shipping_lines'] = enriched;
+
+      // also set shipping_total (string) if aggregated total not provided
+      if (orderTotal == null) {
+        final double shippingSum = enriched.fold(0.0, (double sum, e) {
+          final val = double.tryParse((e['total'] ?? '0').toString()) ?? 0.0;
+          return sum + val;
+        });
+        payload['shipping_total'] = shippingSum.toStringAsFixed(2);
+      }
+    }
+
+    if (feeLines != null && feeLines.isNotEmpty) {
+      final enriched = feeLines.map((f) {
+        final Map<String, dynamic> copy = Map<String, dynamic>.from(f);
+        copy['total'] = (copy['total'] ?? '0.00').toString();
+        copy['tax_class'] = copy['tax_class'] ?? '';
+        copy['total_tax'] = (copy['total_tax'] ?? '0.00').toString();
+        copy['taxes'] = copy['taxes'] ?? <Map<String, dynamic>>[];
+        return copy;
+      }).toList();
+      payload['fee_lines'] = enriched;
+
+      if (orderTotal == null) {
+        final double feeSum = enriched.fold(0.0, (double sum, e) {
+          final val = double.tryParse((e['total'] ?? '0').toString()) ?? 0.0;
+          return sum + val;
+        });
+        payload['fee_total'] = feeSum.toStringAsFixed(2);
+      }
+    }
+
+    // If aggregated order total is provided, set it as order-level total.
+    // Woo accepts 'total' as a string. We also set shipping_total and fee_total to "0.00"
+    // to avoid ambiguity in admin if no breakdown is sent.
+    if (orderTotal != null) {
+      payload['total'] = orderTotal.toStringAsFixed(2);
+      // If shipping_total / fee_total are not already set above, set them to "0.00"
+      payload['shipping_total'] = payload['shipping_total'] ?? '0.00';
+      payload['fee_total'] = payload['fee_total'] ?? '0.00';
     }
 
     print('==== createWooOrder URL: $url');

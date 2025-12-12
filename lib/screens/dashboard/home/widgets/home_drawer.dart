@@ -1,7 +1,9 @@
 // lib/widgets/home_drawer.dart
-import 'dart:ui'; // Required for BackdropFilter
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // Required for Navigation
+import 'package:flutter/services.dart'; // For Haptic Feedback
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
 // MODELS
@@ -24,7 +26,6 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// --- HOME DRAWER ---
 class HomeDrawer extends StatefulWidget {
   final UserData userData;
   final String selectedTitle;
@@ -58,200 +59,302 @@ class _HomeDrawerState extends State<HomeDrawer> {
       final cats = await ApiService.fetchCategories();
       if (mounted) {
         setState(() {
-          _categories = cats;
+          _categories = cats.take(10).toList();
           _isLoadingCategories = false;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingCategories = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingCategories = false);
     }
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning,';
+    if (hour < 17) return 'Good Afternoon,';
+    return 'Good Evening,';
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool hasProfilePic = widget.userData.profilePicUrl.isNotEmpty;
+    final Color primary = accentColor;
+    // Sophisticated background color
+    const Color backgroundColor = Color(0xFFF2F4F7);
 
     return Drawer(
-      backgroundColor: Colors.transparent,
-      elevation: 10,
+      backgroundColor: Colors.transparent, // Important for custom shapes
+      elevation: 0,
       width: 320,
-      child: Stack(
-        children: [
-          // 1. Glassmorphism Background
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.90),
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-                border: Border(
-                  right: BorderSide(
-                    color: Colors.white.withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withOpacity(0.1),
-                    blurRadius: 30,
-                    spreadRadius: 0,
-                    offset: const Offset(5, 0),
-                  ),
-                ],
-              ),
-            ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.only(
+            topRight: Radius.circular(40),
+            bottomRight: Radius.circular(40),
           ),
-
-          // 2. Content
-          Column(
-            children: [
-              // --- HEADER ---
-              _buildUserHeader(hasProfilePic),
-
-              // --- SCROLLABLE MENU ---
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle("General"),
-                      _buildDrawerItem(
-                        context,
-                        Iconsax.personalcard,
-                        'Business Details',
-                        'BusinessDetails',
-                      ),
-                      _buildDrawerItem(
-                        context,
-                        Iconsax.location,
-                        'Customer Addresses',
-                        'CustomerAddress',
-                      ),
-                      _buildDrawerItem(
-                        context,
-                        Iconsax.wallet_check,
-                        'Orders',
-                        'Orders',
-                      ),
-                      _buildDrawerItem(
-                        context,
-                        Iconsax.book_saved,
-                        'My Catalog',
-                        'MyCatalog',
-                      ),
-                      const SizedBox(height: 20),
-                      _buildSectionTitle("Shop"),
-
-                      // Dynamic Categories Section
-                      _isLoadingCategories
-                          ? const Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Center(
-                                child: SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : _buildCategoryExpansion(context),
+        ),
+        child: Stack(
+          children: [
+            // 1. DECORATIVE BACKGROUND ELEMENTS
+            Positioned(
+              top: -80,
+              right: -60,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      primary.withOpacity(0.15),
+                      primary.withOpacity(0.0),
                     ],
                   ),
                 ),
               ),
+            ),
 
-              // --- FOOTER ---
-              _buildLogoutButton(),
-            ],
-          ),
-        ],
+            // 2. MAIN CONTENT
+            Column(
+              children: [
+                // --- A. THE GREETING HEADER ---
+                _buildGreetingHeader(primary),
+
+                // --- B. THE "FLOATING ISLAND" MENU ---
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 20,
+                          offset: const Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 2. DASHBOARD
+                            _buildSectionTitle("DASHBOARD"),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.personalcard,
+                              activeIcon: Iconsax.personalcard5,
+                              title: "Business Details",
+                              id: "BusinessDetails",
+                              primary: primary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.location,
+                              activeIcon: Iconsax.location5,
+                              title: "Addresses",
+                              id: "CustomerAddress",
+                              primary: primary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.bag_2,
+                              activeIcon: Iconsax.bag_25,
+                              title: "Orders",
+                              id: "Orders",
+                              primary: primary,
+                              // Simple red dot indicator
+                              trailing: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.3),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 25),
+
+                            // 3. INVENTORY
+                            _buildSectionTitle("INVENTORY"),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.book_1,
+                              activeIcon: Iconsax.book_15,
+                              title: "My Catalog",
+                              id: "MyCatalog",
+                              primary: primary,
+                            ),
+                            const SizedBox(height: 8),
+                            _isLoadingCategories
+                                ? Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: CircularProgressIndicator(
+                                        color: primary,
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                : _buildCategoryExpander(context, primary),
+
+                            const SizedBox(height: 25),
+
+                            // 4. SUPPORT & INFO (FAQ / About)
+                            _buildSectionTitle("SUPPORT"),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.message_question,
+                              activeIcon: Iconsax.message_question5,
+                              title: "FAQ",
+                              id: "FAQ",
+                              primary: primary,
+                              isSpecialAction: true,
+                              onSpecialTap: () => _showFAQSheet(context),
+                            ),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.info_circle,
+                              activeIcon: Iconsax.info_circle5,
+                              title: "About KaKiSo",
+                              id: "About",
+                              primary: primary,
+                              isSpecialAction: true,
+                              onSpecialTap: () =>
+                                  _showAboutSheet(context, primary),
+                            ),
+
+                            const SizedBox(height: 50), // Extra scroll space
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // --- C. FOOTER ---
+                _buildFooter(context),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // --- WIDGET HELPERS ---
-
-  Widget _buildUserHeader(bool hasProfilePic) {
+  // ------------------------------------------------------------------
+  // --- A. GREETING & HEADER (Restored Visuals) ---
+  // ------------------------------------------------------------------
+  Widget _buildGreetingHeader(Color primary) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accentColor.withOpacity(0.05), Colors.white],
-        ),
-        borderRadius: const BorderRadius.only(topRight: Radius.circular(30)),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: accentColor.withOpacity(0.5), width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 28,
-              backgroundColor: const Color(0xFFF3F4F6),
-              backgroundImage: hasProfilePic
-                  ? NetworkImage(widget.userData.profilePicUrl)
-                  : null,
-              child: !hasProfilePic
-                  ? const Icon(Icons.person, size: 30, color: Colors.grey)
-                  : null,
+          // The Greeting
+          Text(
+            _getGreeting(),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 4),
+          // User Name (Big & Bold)
+          Text(
+            widget.userData.name.split(' ').first, // First name impact
+            style: const TextStyle(
+              fontSize: 32,
+              color: Colors.black87,
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Profile "Card" Floating on the background
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
               children: [
-                Text(
-                  widget.userData.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    fontFamily: 'Poppins',
-                    color: Colors.black87,
-                    letterSpacing: 0.5,
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: primary.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: primary.withOpacity(0.1),
+                    backgroundImage: widget.userData.profilePicUrl.isNotEmpty
+                        ? NetworkImage(widget.userData.profilePicUrl)
+                        : null,
+                    child: widget.userData.profilePicUrl.isEmpty
+                        ? Icon(Iconsax.user, color: primary, size: 20)
+                        : null,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    widget.userData.email,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Poppins',
-                      color: accentColor,
-                    ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Logged in as",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade400,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      Text(
+                        widget.userData.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -262,14 +365,54 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
+  // ------------------------------------------------------------------
+  // --- B. FLOATING ISLAND CONTENT ---
+  // ------------------------------------------------------------------
+
+  // --- QUICK ACTIONS ROW ---
+  // Widget _buildQuickActionsRow(Color primary) {
+  //   return Row(
+  //     children: [
+  //       Expanded(
+  //         child: _buildQuickActionBtn(
+  //           icon: Iconsax.share,
+  //           label: "Share App",
+  //           color: Colors.blueAccent,
+  //           onTap: () {
+  //             HapticFeedback.lightImpact();
+  //             Get.back();
+  //             Get.snackbar(
+  //               "Share",
+  //               "Sharing link copied!",
+  //               snackPosition: SnackPosition.BOTTOM,
+  //             );
+  //           },
+  //         ),
+  //       ),
+  //       const SizedBox(width: 12),
+  //       Expanded(
+  //         child: _buildQuickActionBtn(
+  //           icon: Iconsax.star_1,
+  //           label: "Rate Us",
+  //           color: Colors.orangeAccent,
+  //           onTap: () {
+  //             HapticFeedback.lightImpact();
+  //             Get.back();
+  //           },
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 12, bottom: 12, top: 4),
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Text(
-        title.toUpperCase(),
+        title,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           color: Colors.grey.shade400,
           letterSpacing: 1.2,
           fontFamily: 'Poppins',
@@ -278,68 +421,38 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // Standard Drawer Item (No Children)
-  Widget _buildDrawerItem(
-    BuildContext context,
-    IconData icon,
-    String title,
-    String uniqueId,
-  ) {
-    final bool isSelected = (widget.selectedTitle == uniqueId);
+  Widget _buildMenuItem(
+    BuildContext context, {
+    required IconData icon,
+    required IconData activeIcon,
+    required String title,
+    required String id,
+    required Color primary,
+    Widget? trailing,
+    bool isSpecialAction = false,
+    VoidCallback? onSpecialTap,
+  }) {
+    final bool isSelected = widget.selectedTitle == id;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: isSelected ? accentColor : Colors.transparent,
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
+        borderRadius: BorderRadius.circular(16),
+        // Active: Subtle primary tint. Inactive: Transparent
+        color: isSelected ? primary.withOpacity(0.08) : Colors.transparent,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           onTap: () {
-            Navigator.pop(context);
-
-            // 🔹 Special routes
-            if (uniqueId == 'MyCatalog') {
-              Get.offAll(
-                () =>
-                    NavigationMenu(userData: widget.userData, initialIndex: 3),
-              );
-            } else if (uniqueId == 'BusinessDetails') {
-              // ✅ FROM DRAWER → pass fromDrawer: true
-              Get.to(
-                () => BusinessDetailsPage(
-                  userData: widget.userData,
-                  fromDrawer: true,
-                ),
-              );
-            } else if (uniqueId == 'CustomerAddress') {
-              // ✅ FROM DRAWER → address settings mode
-              Get.to(
-                () => CustomerAddressPage(
-                  userData: widget.userData,
-                  fromDrawer: true,
-                ),
-              );
-            } else if (uniqueId == 'Orders') {
-              // ✅ FROM DRAWER → Orders page: PASS userData so OrdersPage can sync
-              if (!Get.isRegistered<OrderController>()) {
-                Get.put(OrderController(), permanent: true);
-              }
-              // Pass the current userData to OrdersPage
-              Get.to(() => OrdersPage(userData: widget.userData));
+            HapticFeedback.lightImpact();
+            if (isSpecialAction && onSpecialTap != null) {
+              Navigator.pop(context); // Close drawer first
+              onSpecialTap();
             } else {
-              widget.onNavigate(uniqueId);
+              _handleNavigation(context, id);
             }
           },
           child: Padding(
@@ -347,28 +460,27 @@ class _HomeDrawerState extends State<HomeDrawer> {
             child: Row(
               children: [
                 Icon(
-                  icon,
+                  isSelected ? activeIcon : icon,
                   size: 22,
-                  color: isSelected ? Colors.white : Colors.grey.shade600,
+                  color: isSelected ? primary : Colors.grey.shade500,
                 ),
                 const SizedBox(width: 16),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontFamily: 'Poppins',
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected ? Colors.white : Colors.grey.shade800,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      fontSize: 14,
+                      color: isSelected ? Colors.black87 : Colors.grey.shade700,
+                    ),
                   ),
                 ),
-                if (isSelected) ...[
-                  const Spacer(),
-                  const Icon(
-                    Iconsax.arrow_right_3,
-                    size: 16,
-                    color: Colors.white70,
-                  ),
-                ],
+                if (trailing != null) trailing,
+                if (isSelected && !isSpecialAction)
+                  Icon(Iconsax.arrow_right_3, size: 16, color: primary),
               ],
             ),
           ),
@@ -377,181 +489,212 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // --- DYNAMIC CATEGORY LOGIC ---
+  void _handleNavigation(BuildContext context, String uniqueId) {
+    Navigator.pop(context);
 
-  Widget _buildCategoryExpansion(BuildContext context) {
+    // Safety check
+    if (uniqueId == 'Orders' && !Get.isRegistered<OrderController>()) {
+      Get.put(OrderController(), permanent: true);
+    }
+
+    if (uniqueId == 'MyCatalog') {
+      Get.offAll(
+        () => NavigationMenu(userData: widget.userData, initialIndex: 3),
+      );
+    } else if (uniqueId == 'BusinessDetails') {
+      Get.to(
+        () => BusinessDetailsPage(userData: widget.userData, fromDrawer: true),
+      );
+    } else if (uniqueId == 'CustomerAddress') {
+      Get.to(
+        () => CustomerAddressPage(userData: widget.userData, fromDrawer: true),
+      );
+    } else if (uniqueId == 'Orders') {
+      Get.to(() => OrdersPage(userData: widget.userData));
+    } else {
+      widget.onNavigate(uniqueId);
+    }
+  }
+
+  Widget _buildCategoryExpander(BuildContext context, Color primary) {
     final parentCategories = _categories
         .where((c) => c.parent == 0)
         .take(5)
         .toList();
 
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          backgroundColor: Colors.grey.shade50,
-          collapsedBackgroundColor: Colors.transparent,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
           leading: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.purple.withOpacity(0.1),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Iconsax.category, color: Colors.purple, size: 20),
+            child: Icon(Iconsax.category, size: 18, color: primary),
           ),
           title: const Text(
             'Categories',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
               fontFamily: 'Poppins',
             ),
           ),
           children: parentCategories.map((parent) {
-            final children = _categories
-                .where((c) => c.parent == parent.id)
-                .toList();
-
-            if (children.isNotEmpty) {
-              return _buildNestedGroup(context, parent, children);
-            } else {
-              return _buildSubDrawerItem(
-                context,
+            _categories.where((c) => c.parent == parent.id).toList();
+            return ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 20, right: 16),
+              title: Text(
                 parent.name,
-                parent.id.toString(),
-              );
-            }
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade800,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              trailing: Icon(
+                Iconsax.arrow_right_3,
+                size: 14,
+                color: Colors.grey.shade300,
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Get.to(
+                  () => CategoryDetailsPage(
+                    categoryId: parent.id,
+                    categoryName: parent.name,
+                  ),
+                );
+              },
+            );
           }).toList(),
         ),
       ),
     );
   }
 
-  Widget _buildNestedGroup(
-    BuildContext context,
-    CategoryModel parent,
-    List<CategoryModel> children,
-  ) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.only(left: 20, right: 20),
-        title: Text(
-          parent.name,
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Poppins',
-          ),
-        ),
-        iconColor: accentColor,
-        collapsedIconColor: Colors.grey.shade400,
-        children: children
-            .map(
-              (child) =>
-                  _buildSubDrawerItem(context, child.name, child.id.toString()),
-            )
-            .toList(),
-      ),
-    );
-  }
-
-  // --- CATEGORY ITEM ---
-  Widget _buildSubDrawerItem(
-    BuildContext context,
-    String title,
-    String uniqueId,
-  ) {
-    final bool isSelected = (widget.selectedTitle == uniqueId);
-
+  // ------------------------------------------------------------------
+  // --- C. FOOTER ---
+  // ------------------------------------------------------------------
+  Widget _buildFooter(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(left: 20, right: 10, bottom: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? accentColor.withOpacity(0.08) : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        border: isSelected
-            ? Border.all(color: accentColor.withOpacity(0.2))
-            : Border.all(color: Colors.transparent),
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-        visualDensity: VisualDensity.compact,
-        leading: Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isSelected ? accentColor : Colors.grey.shade300,
-          ),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? accentColor : Colors.grey.shade700,
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            fontFamily: 'Poppins',
-          ),
-        ),
-        onTap: () {
-          Navigator.pop(context);
-
-          int? categoryId = int.tryParse(uniqueId);
-
-          if (categoryId != null) {
-            Get.to(
-              () => CategoryDetailsPage(
-                categoryId: categoryId,
-                categoryName: title,
+      color: Colors.white, // Continues the "Island" white
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(
+        children: [
+          const Divider(height: 1),
+          const SizedBox(height: 15),
+          InkWell(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              _showLogoutConfirmDialog();
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.red.withOpacity(0.1)),
               ),
-              transition: Transition.rightToLeft,
-              duration: const Duration(milliseconds: 300),
-            );
-          } else {
-            widget.onNavigate(uniqueId);
-          }
-        },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.logout, size: 18, color: Colors.redAccent),
+                  SizedBox(width: 8),
+                  Text(
+                    'Log Out',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.redAccent,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "Version 1.0.2 • Made with ❤️",
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade300,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // --- LOGOUT BUTTON WITH CONFIRMATION DIALOG ---
-  Widget _buildLogoutButton() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        borderRadius: const BorderRadius.only(bottomRight: Radius.circular(30)),
+  // ------------------------------------------------------------------
+  // --- D. BOTTOM SHEETS (FAQ & ABOUT) ---
+  // ------------------------------------------------------------------
+
+  void _showFAQSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
-      child: InkWell(
-        onTap: _showLogoutConfirmDialog,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          decoration: BoxDecoration(
-            color: Colors.redAccent.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: ListView(
+            controller: controller,
             children: [
-              Icon(Iconsax.logout, size: 20, color: Colors.redAccent),
-              SizedBox(width: 10),
-              Text(
-                'Log Out',
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Frequently Asked Questions",
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.redAccent,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                   fontFamily: 'Poppins',
                 ),
+              ),
+              const SizedBox(height: 20),
+              _buildFAQItem(
+                "How do I track my order?",
+                "Go to the Orders section. Tap any order to view detailed status tracking.",
+              ),
+              _buildFAQItem(
+                "How do I change my address?",
+                "Navigate to 'Addresses'. You can add, edit, or delete customer addresses.",
+              ),
+              _buildFAQItem(
+                "What is the return policy?",
+                "Returns are accepted within 7 days of delivery for damaged items.",
+              ),
+              _buildFAQItem(
+                "Can I edit my business details?",
+                "Yes! Go to 'Business Details' to update your shop name and logo.",
               ),
             ],
           ),
@@ -560,72 +703,156 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  Future<void> _showLogoutConfirmDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+  Widget _buildFAQItem(String question, String answer) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: ExpansionTile(
+        title: Text(
+          question,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            fontFamily: 'Poppins',
           ),
-          title: const Text(
-            'Log out?',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            answer,
             style: TextStyle(
+              color: Colors.grey.shade700,
+              fontSize: 13,
+              height: 1.5,
               fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
             ),
           ),
-          content: const Text(
-            'Are you sure you want to log out?',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop(false); // cancel
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w500,
-                ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutSheet(BuildContext context, Color primary) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+            const SizedBox(height: 30),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primary.withOpacity(0.1),
               ),
-              onPressed: () {
-                Navigator.of(ctx).pop(true); // confirm
-              },
-              child: const Text(
-                'Yes, log out',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
+              child: Icon(Iconsax.building_3, size: 40, color: primary),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "KaKiSo Reseller",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Poppins',
               ),
             ),
+            const SizedBox(height: 10),
+            Text(
+              "Empowering resellers to grow their business with zero investment. We provide high-quality products at wholesale rates.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(height: 30),
+            const Divider(),
+            const SizedBox(height: 10),
+            const Text(
+              "© 2024 KaKiSo Inc. All rights reserved.",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
           ],
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // --- E. LOGOUT DIALOG ---
+  // ------------------------------------------------------------------
+  Future<void> _showLogoutConfirmDialog() async {
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Log out?',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'Are you sure you want to log out from your account?',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Get.back(result: true),
+            child: const Text(
+              'Yes, Log Out',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
     if (result == true) {
-      // 1️⃣ Parent callback (if you use it for extra cleanup)
       widget.onLogoutPressed();
-
-      // 2️⃣ Clear stored session (but NOT cart)
       await SessionService.clearSession();
-
-      // 3️⃣ Navigate to intro and clear nav stack
       Get.offAll(() => const KakisoIntroScreen());
     }
   }

@@ -726,13 +726,50 @@ class _PaymentPageState extends State<PaymentPage> {
           print('===== SHIPPING SENT TO WOO =====');
           print(shipping);
 
+          // ---------- 4.5 Add shipping + fee lines for admin visibility ----------
+          // These are admin-visible additions to the Woo order.
+          // NOTE: If you want these to be charged to the customer (i.e. included in widget.payableAmount),
+          // ensure the payableAmount includes these values before calling Razorpay.
+          const double _shippingFee = 100.0;
+          const double _platformFee = 15.0;
+          const double _convenienceFee = 12.0;
+
+          final List<Map<String, dynamic>> shippingLines = [
+            {
+              'method_id': 'flat_rate',
+              'method_title': 'Shipping',
+              'total': _shippingFee.toStringAsFixed(2),
+            },
+          ];
+
+          final List<Map<String, dynamic>> feeLines = [
+            {
+              'name': 'Platform Fee',
+              'taxable': false,
+              'total': _platformFee.toStringAsFixed(2),
+            },
+            {
+              'name': 'Convenience Fee',
+              'taxable': false,
+              'total': _convenienceFee.toStringAsFixed(2),
+            },
+          ];
+
+          print('===== SHIPPING LINES SENT TO WOO =====');
+          print(shippingLines);
+          print('===== FEE LINES SENT TO WOO =====');
+          print(feeLines);
+
           // ---------- 5. Push order to WooCommerce ----------
+          // Note: ApiService.createWooOrder should accept optional `shippingLines` and `feeLines`.
           final wooOrder = await ApiService.createWooOrder(
             userId: effectiveUserIdForWoo,
             lineItems: lineItems,
             billing: billing,
             shipping: shipping,
             paymentId: paymentId,
+            shippingLines: shippingLines,
+            feeLines: feeLines,
           );
 
           final String wooOrderId = (wooOrder['id'] ?? '').toString();

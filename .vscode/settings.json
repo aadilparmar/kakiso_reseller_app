@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "F:/kakiso_reseller_app/linux"
+    "cmake.sourceDirectory": "F:/kakiso_reseller_app/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }
