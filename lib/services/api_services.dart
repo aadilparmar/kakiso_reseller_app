@@ -634,7 +634,10 @@ class ApiService {
   ///   - If numeric → used as Woo `customer_id`.
   ///   - In all cases it is also stored in meta_data as `app_user_id`.
   ///
-  /// - [orderTotal] when provided will be set as the order-level `total` in the Woo payload.
+  /// - Note: This implementation will include `shipping_lines` and `fee_lines`
+  ///   when provided, and will set `shipping_total`/`fee_total` accordingly.
+  ///   It intentionally does **not** override the order-level `total` field so
+  ///   Woo can compute totals from items + fees + shipping (and avoid confusion).
   ///
   /// Returns the decoded Woo order JSON on success.
   static Future<Map<String, dynamic>> createWooOrder({
@@ -645,9 +648,7 @@ class ApiService {
     required String paymentId,
     String paymentMethod = 'razorpay',
     String paymentMethodTitle = 'Razorpay',
-    // optional aggregated order total to override what Woo would compute.
-    double? orderTotal,
-    // optional shipping/fee lines (not required for your current use-case)
+    // optional shipping/fee lines (strings/structures expected by Woo)
     List<Map<String, dynamic>>? shippingLines,
     List<Map<String, dynamic>>? feeLines,
   }) async {
@@ -675,14 +676,6 @@ class ApiService {
       meta.add({'key': 'app_user_email', 'value': billingEmail});
     }
 
-    // If an aggregated admin total is provided, add it to meta so it's always visible.
-    if (orderTotal != null) {
-      meta.add({
-        'key': 'kakiso_admin_total',
-        'value': orderTotal.toStringAsFixed(2),
-      });
-    }
-
     final Map<String, dynamic> payload = {
       'payment_method': paymentMethod,
       'payment_method_title': paymentMethodTitle,
@@ -697,13 +690,11 @@ class ApiService {
       payload['customer_id'] = customerId;
     }
 
-    // Include shipping_lines and fee_lines only if passed and non-empty.
-    // These are optional — your current requirement is to send aggregated total,
-    // but we support including them if needed later.
+    // shipping_lines handling
     if (shippingLines != null && shippingLines.isNotEmpty) {
-      // ensure totals are strings
       final enriched = shippingLines.map((s) {
         final Map<String, dynamic> copy = Map<String, dynamic>.from(s);
+        // ensure required string fields exist
         copy['total'] = (copy['total'] ?? '0.00').toString();
         copy['total_tax'] = (copy['total_tax'] ?? '0.00').toString();
         copy['taxes'] = copy['taxes'] ?? <Map<String, dynamic>>[];
@@ -711,16 +702,15 @@ class ApiService {
       }).toList();
       payload['shipping_lines'] = enriched;
 
-      // also set shipping_total (string) if aggregated total not provided
-      if (orderTotal == null) {
-        final double shippingSum = enriched.fold(0.0, (double sum, e) {
-          final val = double.tryParse((e['total'] ?? '0').toString()) ?? 0.0;
-          return sum + val;
-        });
-        payload['shipping_total'] = shippingSum.toStringAsFixed(2);
-      }
+      // compute shipping_total (string)
+      final double shippingSum = enriched.fold(0.0, (double sum, e) {
+        final val = double.tryParse((e['total'] ?? '0').toString()) ?? 0.0;
+        return sum + val;
+      });
+      payload['shipping_total'] = shippingSum.toStringAsFixed(2);
     }
 
+    // fee_lines handling
     if (feeLines != null && feeLines.isNotEmpty) {
       final enriched = feeLines.map((f) {
         final Map<String, dynamic> copy = Map<String, dynamic>.from(f);
@@ -732,24 +722,16 @@ class ApiService {
       }).toList();
       payload['fee_lines'] = enriched;
 
-      if (orderTotal == null) {
-        final double feeSum = enriched.fold(0.0, (double sum, e) {
-          final val = double.tryParse((e['total'] ?? '0').toString()) ?? 0.0;
-          return sum + val;
-        });
-        payload['fee_total'] = feeSum.toStringAsFixed(2);
-      }
+      final double feeSum = enriched.fold(0.0, (double sum, e) {
+        final val = double.tryParse((e['total'] ?? '0').toString()) ?? 0.0;
+        return sum + val;
+      });
+      payload['fee_total'] = feeSum.toStringAsFixed(2);
     }
 
-    // If aggregated order total is provided, set it as order-level total.
-    // Woo accepts 'total' as a string. We also set shipping_total and fee_total to "0.00"
-    // to avoid ambiguity in admin if no breakdown is sent.
-    if (orderTotal != null) {
-      payload['total'] = orderTotal.toStringAsFixed(2);
-      // If shipping_total / fee_total are not already set above, set them to "0.00"
-      payload['shipping_total'] = payload['shipping_total'] ?? '0.00';
-      payload['fee_total'] = payload['fee_total'] ?? '0.00';
-    }
+    // NOTE: intentionally NOT setting payload['total'] here — Woo will compute
+    // the final total on its side. Setting 'total' client-side may confuse
+    // or be ignored depending on Woo setup; you asked to avoid overriding it.
 
     print('==== createWooOrder URL: $url');
     print('==== createWooOrder PAYLOAD: ${jsonEncode(payload)}');
@@ -780,8 +762,6 @@ class ApiService {
   // ---------------------------------------------------------------------------
   // 15. FETCH WOO ORDERS FOR CUSTOMER (by id and/or email)
   // ---------------------------------------------------------------------------
-  // replace the existing fetchWooOrdersForCustomer implementation in lib/services/api_services.dart
-
   static Future<List<Order>> fetchWooOrdersForCustomer({
     String? userId,
     String? userEmail,
@@ -810,7 +790,6 @@ class ApiService {
         print(
           '[ApiService.fetchWooOrdersForCustomer] customer_id response status=${response.statusCode}',
         );
-        // Log a short part of body for debugging (avoid huge logs)
         if (response.body.length < 2000) {
           print(
             '[ApiService.fetchWooOrdersForCustomer] body: ${response.body}',

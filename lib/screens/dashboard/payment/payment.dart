@@ -603,7 +603,7 @@ class _PaymentPageState extends State<PaymentPage> {
         'business_address': widget.businessAddressLabel,
         'customer_address': widget.customerAddressLabel,
         'user_id': currentUser?.userId ?? '',
-        'woo_customer_id': wooId, // helpful on Razorpay dashboard
+        'woo_customer_id': wooId,
       },
       onSuccess: (response) async {
         final paymentId = response.paymentId ?? '';
@@ -727,31 +727,27 @@ class _PaymentPageState extends State<PaymentPage> {
           print(shipping);
 
           // ---------- 4.5 Add shipping + fee lines for admin visibility ----------
-          // These are admin-visible additions to the Woo order.
-          // NOTE: If you want these to be charged to the customer (i.e. included in widget.payableAmount),
-          // ensure the payableAmount includes these values before calling Razorpay.
+          // You chose option A: single fee (Platform + Convenience combined = ₹27)
           const double _shippingFee = 100.0;
-          const double _platformFee = 15.0;
-          const double _convenienceFee = 12.0;
+          const double _combinedFee = 27.0; // single fee line
 
           final List<Map<String, dynamic>> shippingLines = [
             {
               'method_id': 'flat_rate',
               'method_title': 'Shipping',
               'total': _shippingFee.toStringAsFixed(2),
+              'total_tax': '0.00',
+              'taxes': [],
             },
           ];
 
           final List<Map<String, dynamic>> feeLines = [
             {
-              'name': 'Platform Fee',
-              'taxable': false,
-              'total': _platformFee.toStringAsFixed(2),
-            },
-            {
-              'name': 'Convenience Fee',
-              'taxable': false,
-              'total': _convenienceFee.toStringAsFixed(2),
+              'name': 'Platform & Convenience Fee',
+              'tax_class': '',
+              'total': _combinedFee.toStringAsFixed(2),
+              'total_tax': '0.00',
+              'taxes': [],
             },
           ];
 
@@ -761,7 +757,7 @@ class _PaymentPageState extends State<PaymentPage> {
           print(feeLines);
 
           // ---------- 5. Push order to WooCommerce ----------
-          // Note: ApiService.createWooOrder should accept optional `shippingLines` and `feeLines`.
+          // Note: we do NOT pass an explicit order-level 'total' so Woo will compute it.
           final wooOrder = await ApiService.createWooOrder(
             userId: effectiveUserIdForWoo,
             lineItems: lineItems,
