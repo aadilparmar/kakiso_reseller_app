@@ -137,7 +137,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withOpacity(0.6),
+                        Colors.black.withValues(alpha: 0.6),
                       ],
                     ),
                   ),
@@ -191,7 +191,9 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                                 boxShadow: isSelected
                                     ? [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.3),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.3,
+                                          ),
                                           blurRadius: 8,
                                           offset: const Offset(0, 4),
                                         ),
@@ -205,7 +207,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                                   fit: BoxFit.cover,
                                   color: isSelected
                                       ? null
-                                      : Colors.black.withOpacity(0.3),
+                                      : Colors.black.withValues(alpha: 0.3),
                                   colorBlendMode: BlendMode.darken,
                                 ),
                               ),
@@ -239,11 +241,11 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withValues(alpha: 0.95),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

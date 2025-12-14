@@ -130,7 +130,7 @@ class _ProfilePageState extends State<ProfilePage>
       height: 300,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
       ),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
@@ -192,12 +192,12 @@ class _ProfilePageState extends State<ProfilePage>
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 25,
               offset: const Offset(0, 15),
             ),
             BoxShadow(
-              color: const Color(0xFF6A4AE2).withOpacity(0.2),
+              color: const Color(0xFF6A4AE2).withValues(alpha: 0.2),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -214,7 +214,7 @@ class _ProfilePageState extends State<ProfilePage>
                 height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -266,7 +266,7 @@ class _ProfilePageState extends State<ProfilePage>
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
@@ -295,7 +295,7 @@ class _ProfilePageState extends State<ProfilePage>
                         Text(
                           "MEMBER ID",
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             fontSize: 10,
                             letterSpacing: 1.5,
                           ),
@@ -319,7 +319,7 @@ class _ProfilePageState extends State<ProfilePage>
                         Text(
                           "JOINED",
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             fontSize: 10,
                             letterSpacing: 1.5,
                           ),
@@ -402,7 +402,7 @@ class _ProfilePageState extends State<ProfilePage>
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -432,7 +432,10 @@ class _ProfilePageState extends State<ProfilePage>
         color: Colors.white,
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 20),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 20,
+          ),
         ],
       ),
       child: Column(

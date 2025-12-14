@@ -132,7 +132,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: const Color(0xFF4B5563).withOpacity(0.15),
+                color: const Color(0xFF4B5563).withValues(alpha: 0.15),
                 width: 1,
               ),
             ),
@@ -145,7 +145,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
 
                 // Slight dark overlay so content is readable
                 Positioned.fill(
-                  child: Container(color: Colors.black.withOpacity(0.40)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.40)),
                 ),
 
                 // === FOREGROUND CONTENT ===
@@ -210,7 +210,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF22D3EE).withOpacity(0.5),
+                  color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
                   blurRadius: 18,
                   offset: const Offset(0, 6),
                 ),
@@ -272,7 +272,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
             margin: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              color: Colors.white.withOpacity(0.04),
+              color: Colors.white.withValues(alpha: 0.04),
             ),
             child: Column(
               children: [
@@ -284,7 +284,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      color: Colors.white.withOpacity(0.06),
+                      color: Colors.white.withValues(alpha: 0.06),
                     ),
                   ),
                 ),
@@ -295,7 +295,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
                     borderRadius: const BorderRadius.vertical(
                       bottom: Radius.circular(28),
                     ),
-                    color: Colors.white.withOpacity(0.03),
+                    color: Colors.white.withValues(alpha: 0.03),
                   ),
                 ),
               ],
@@ -312,12 +312,12 @@ class _TopRankingSectionState extends State<TopRankingSection>
         margin: const EdgeInsets.symmetric(horizontal: 32),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.55),
+          color: Colors.black.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.40),
+              color: Colors.black.withValues(alpha: 0.40),
               blurRadius: 24,
               offset: const Offset(0, 12),
             ),
@@ -448,8 +448,8 @@ class _SciFiPainter extends CustomPainter {
       end: Alignment.centerRight,
       colors: [
         Colors.transparent,
-        _kAccent.withOpacity(0.35),
-        _kPrimary.withOpacity(0.2),
+        _kAccent.withValues(alpha: 0.35),
+        _kPrimary.withValues(alpha: 0.2),
         Colors.transparent,
       ],
       stops: const [0.0, 0.35, 0.65, 1.0],
@@ -465,7 +465,7 @@ class _SciFiPainter extends CustomPainter {
     final double gridHeight = size.height * 0.55;
 
     final Paint gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.06)
+      ..color = Colors.white.withValues(alpha: 0.06)
       ..strokeWidth = 0.7;
 
     // Horizontal grid lines
@@ -519,7 +519,10 @@ class _SciFiPainter extends CustomPainter {
 
       final Rect orbRect = Rect.fromCircle(center: center, radius: orb.radius);
       final Gradient orbGradient = RadialGradient(
-        colors: [orb.color.withOpacity(0.9), orb.color.withOpacity(0.0)],
+        colors: [
+          orb.color.withValues(alpha: 0.9),
+          orb.color.withValues(alpha: 0.0),
+        ],
       );
       final Paint orbPaint = Paint()
         ..shader = orbGradient.createShader(orbRect);
@@ -528,7 +531,7 @@ class _SciFiPainter extends CustomPainter {
 
     // --- 5. Star particles ---
     final Paint starPaint = Paint()
-      ..color = Colors.white.withOpacity(0.7)
+      ..color = Colors.white.withValues(alpha: 0.7)
       ..style = PaintingStyle.fill;
 
     const int starCount = 40;
@@ -585,9 +588,9 @@ class _SegmentedTabs extends StatelessWidget {
       height: 34,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.20)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Row(
         children: [
@@ -672,8 +675,8 @@ class _CurrentProductStrip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.black.withOpacity(0.60),
-          border: Border.all(color: Colors.white.withOpacity(0.10)),
+          color: Colors.black.withValues(alpha: 0.60),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
         ),
         child: Row(
           children: [
@@ -696,7 +699,7 @@ class _CurrentProductStrip extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha: 0.35),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -891,12 +894,12 @@ class _LeaderboardCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.6),
+              color: Colors.black.withValues(alpha: 0.6),
               blurRadius: 20,
               offset: const Offset(0, 14),
             ),
           ],
-          border: Border.all(color: Colors.white.withOpacity(0.06)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         child: Column(
           children: [
@@ -935,7 +938,7 @@ class _LeaderboardCard extends StatelessWidget {
                             radius: 1.0,
                             colors: [
                               Colors.transparent,
-                              Colors.black.withOpacity(0.6),
+                              Colors.black.withValues(alpha: 0.6),
                             ],
                           ),
                         ),
@@ -956,9 +959,9 @@ class _LeaderboardCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(999),
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.20),
+                            color: Colors.white.withValues(alpha: 0.20),
                           ),
                         ),
                         child: Row(
@@ -1006,7 +1009,7 @@ class _LeaderboardCard extends StatelessWidget {
                               height: 1.2,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withOpacity(0.9),
+                                  color: Colors.black.withValues(alpha: 0.9),
                                   blurRadius: 10,
                                 ),
                               ],
@@ -1033,7 +1036,7 @@ class _LeaderboardCard extends StatelessWidget {
                                     fontFamily: 'Poppins',
                                     fontSize: 11,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                   ),
                                 ),
                               ],
@@ -1056,13 +1059,13 @@ class _LeaderboardCard extends StatelessWidget {
                 ),
                 gradient: LinearGradient(
                   colors: [
-                    Colors.white.withOpacity(0.06),
-                    Colors.white.withOpacity(0.02),
+                    Colors.white.withValues(alpha: 0.06),
+                    Colors.white.withValues(alpha: 0.02),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -1114,7 +1117,7 @@ class _LeaderboardCard extends StatelessWidget {
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 10,
-                              color: Colors.white.withOpacity(0.70),
+                              color: Colors.white.withValues(alpha: 0.70),
                             ),
                           ),
                         ],
@@ -1149,7 +1152,7 @@ class _LeaderboardCard extends StatelessWidget {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: _kAccent.withOpacity(0.55),
+                                color: _kAccent.withValues(alpha: 0.55),
                                 blurRadius: 16,
                                 offset: const Offset(0, 8),
                               ),
@@ -1223,12 +1226,15 @@ class _RankOrb extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
         ],
-        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.5),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
       ),
       child: Center(
         child: Text(

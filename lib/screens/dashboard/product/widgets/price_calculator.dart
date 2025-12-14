@@ -114,7 +114,7 @@ class _PricingCalculatorState extends State<PricingCalculator> {
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -134,7 +134,7 @@ class _PricingCalculatorState extends State<PricingCalculator> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.1),
+                        color: accentColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -166,7 +166,7 @@ class _PricingCalculatorState extends State<PricingCalculator> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -359,9 +359,9 @@ class _PricingCalculatorState extends State<PricingCalculator> {
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: accentColor,
-              inactiveTrackColor: accentColor.withOpacity(0.1),
+              inactiveTrackColor: accentColor.withValues(alpha: 0.1),
               thumbColor: Colors.white,
-              overlayColor: accentColor.withOpacity(0.1),
+              overlayColor: accentColor.withValues(alpha: 0.1),
               trackHeight: 6,
               thumbShape: const RoundSliderThumbShape(
                 enabledThumbRadius: 10,

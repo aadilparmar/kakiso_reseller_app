@@ -1,6 +1,5 @@
 // lib/widgets/home_drawer.dart
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For Haptic Feedback
 import 'package:get/get.dart';
@@ -106,8 +105,8 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      primary.withOpacity(0.15),
-                      primary.withOpacity(0.0),
+                      primary.withValues(alpha: 0.15),
+                      primary.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -132,7 +131,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withValues(alpha: 0.03),
                           blurRadius: 20,
                           offset: const Offset(0, -5),
                         ),
@@ -183,7 +182,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.red.withOpacity(0.3),
+                                      color: Colors.red.withValues(alpha: 0.3),
                                       blurRadius: 4,
                                     ),
                                   ],
@@ -302,7 +301,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -315,13 +314,13 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: primary.withOpacity(0.3),
+                      color: primary.withValues(alpha: 0.3),
                       width: 2,
                     ),
                   ),
                   child: CircleAvatar(
                     radius: 20,
-                    backgroundColor: primary.withOpacity(0.1),
+                    backgroundColor: primary.withValues(alpha: 0.1),
                     backgroundImage: widget.userData.profilePicUrl.isNotEmpty
                         ? NetworkImage(widget.userData.profilePicUrl)
                         : null,
@@ -440,7 +439,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         // Active: Subtle primary tint. Inactive: Transparent
-        color: isSelected ? primary.withOpacity(0.08) : Colors.transparent,
+        color: isSelected
+            ? primary.withValues(alpha: 0.08)
+            : Colors.transparent,
       ),
       child: Material(
         color: Colors.transparent,
@@ -602,9 +603,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.08),
+                color: Colors.red.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.red.withOpacity(0.1)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -757,7 +758,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primary.withOpacity(0.1),
+                color: primary.withValues(alpha: 0.1),
               ),
               child: Icon(Iconsax.building_3, size: 40, color: primary),
             ),

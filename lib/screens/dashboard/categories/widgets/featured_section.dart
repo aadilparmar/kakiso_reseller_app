@@ -61,7 +61,7 @@ class FeaturedCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accentColor.withOpacity(0.12), Colors.white],
+          colors: [accentColor.withValues(alpha: 0.12), Colors.white],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade100),

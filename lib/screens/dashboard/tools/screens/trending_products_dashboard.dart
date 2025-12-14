@@ -166,7 +166,7 @@ class _TrendingProductsDashboardPageState
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.08),
+                color: accentColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Iconsax.trend_up, color: accentColor),
@@ -275,7 +275,7 @@ class _TrendingProductsDashboardPageState
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -292,8 +292,8 @@ class _TrendingProductsDashboardPageState
                   borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
                     colors: [
-                      accentColor.withOpacity(0.9),
-                      accentColor.withOpacity(0.7),
+                      accentColor.withValues(alpha: 0.9),
+                      accentColor.withValues(alpha: 0.7),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -370,9 +370,9 @@ class _TrendingProductsDashboardPageState
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.04),
+          color: color.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.18)),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,13 +453,13 @@ class _TrendingProductsDashboardPageState
             Text(label),
           ],
         ),
-        selectedColor: accentColor.withOpacity(0.12),
+        selectedColor: accentColor.withValues(alpha: 0.12),
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(999),
           side: BorderSide(
             color: selected
-                ? accentColor.withOpacity(0.6)
+                ? accentColor.withValues(alpha: 0.6)
                 : const Color(0xFFE5E7EB),
           ),
         ),
@@ -719,7 +719,7 @@ class _TrendingHeroProductCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -866,7 +866,7 @@ class _TrendingHeroProductCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.08),
+                        color: accentColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -924,7 +924,7 @@ class _TrendingProductTile extends StatelessWidget {
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

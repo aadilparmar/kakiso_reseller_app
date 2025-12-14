@@ -202,7 +202,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
                   height: 300,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kPrimaryLight.withOpacity(0.15),
+                    color: kPrimaryLight.withValues(alpha: 0.15),
                   ),
                 ),
               ).blur(60),
@@ -217,7 +217,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
                   height: 250,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kAccentColor.withOpacity(0.1),
+                    color: kAccentColor.withValues(alpha: 0.1),
                   ),
                 ),
               ).blur(50),
@@ -237,7 +237,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
           // Placeholder Logo
           Row(
             children: [
-              Container(height: 36, width: 36, child: const Center()),
+              SizedBox(height: 36, width: 36, child: const Center()),
               const SizedBox(width: 1),
               Image.asset('assets/logos/login-logo.png', height: 36),
             ],
@@ -300,7 +300,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: kPrimaryDeep.withOpacity(0.3),
+                    color: kPrimaryDeep.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 8),
                   ),
@@ -377,6 +377,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
 // -----------------------------------------------------------------------------
 
 /// Adds a Blur effect to any container easily
+// ignore: camel_case_extensions
 extension widgetExtensions on Widget {
   Widget blur(double sigma) {
     return BackdropFilter(
@@ -474,7 +475,7 @@ class _IntroCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: kPrimaryDeep.withOpacity(0.4),
+            color: kPrimaryDeep.withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 15),
             spreadRadius: -5,
@@ -494,7 +495,7 @@ class _IntroCard extends StatelessWidget {
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -506,7 +507,7 @@ class _IntroCard extends StatelessWidget {
                 height: 150,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -524,10 +525,10 @@ class _IntroCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                           ),
                         ),
                         child: Icon(item.icon, size: 32, color: Colors.white),
@@ -547,7 +548,7 @@ class _IntroCard extends StatelessWidget {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color: Colors.black.withValues(alpha: 0.1),
                                     blurRadius: 10,
                                   ),
                                 ],

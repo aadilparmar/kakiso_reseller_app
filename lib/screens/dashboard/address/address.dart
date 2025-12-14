@@ -476,9 +476,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.06),
+        color: accentColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -488,7 +488,10 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: accentColor.withOpacity(0.15), blurRadius: 8),
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                ),
               ],
             ),
             child: const Icon(Iconsax.location, color: accentColor, size: 18),
@@ -518,7 +521,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -811,7 +814,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? accentColor.withOpacity(0.06)
+                      ? accentColor.withValues(alpha: 0.06)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
@@ -868,7 +871,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.08),
+                                    color: Colors.green.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: const Text(

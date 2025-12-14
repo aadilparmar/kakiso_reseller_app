@@ -39,10 +39,15 @@ class LeftNavigationRail extends StatelessWidget {
               decoration: isSelected
                   ? BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [accentColor.withOpacity(0.12), Colors.white],
+                        colors: [
+                          accentColor.withValues(alpha: 0.12),
+                          Colors.white,
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: accentColor.withOpacity(0.12)),
+                      border: Border.all(
+                        color: accentColor.withValues(alpha: 0.12),
+                      ),
                     )
                   : null,
               child: Column(

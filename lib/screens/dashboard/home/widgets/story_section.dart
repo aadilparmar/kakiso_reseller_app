@@ -138,19 +138,25 @@ class _StorySectionState extends State<StorySection>
                         children: [
                           _movingBlob(
                             t: (t + 0.0) % 1.0,
-                            color: const Color(0xFFFFC4D6).withOpacity(0.7),
+                            color: const Color(
+                              0xFFFFC4D6,
+                            ).withValues(alpha: 0.7),
                             size: 80,
                             yFactor: 0.2,
                           ),
                           _movingBlob(
                             t: (t + 0.35) % 1.0,
-                            color: const Color(0xFFBFDBFE).withOpacity(0.8),
+                            color: const Color(
+                              0xFFBFDBFE,
+                            ).withValues(alpha: 0.8),
                             size: 90,
                             yFactor: 0.7,
                           ),
                           _movingBlob(
                             t: (t + 0.65) % 1.0,
-                            color: const Color(0xFFFDE68A).withOpacity(0.7),
+                            color: const Color(
+                              0xFFFDE68A,
+                            ).withValues(alpha: 0.7),
                             size: 70,
                             yFactor: 0.45,
                           ),
@@ -295,7 +301,7 @@ class _StoryChipState extends State<_StoryChip> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFEC4899).withOpacity(0.25),
+                      color: const Color(0xFFEC4899).withValues(alpha: 0.25),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),

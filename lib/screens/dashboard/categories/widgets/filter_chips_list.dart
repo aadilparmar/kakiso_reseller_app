@@ -29,7 +29,7 @@ class FilterChipsList extends StatelessWidget {
               label: Text(f),
               selected: active,
               onSelected: (v) => onSelected(f, v),
-              selectedColor: accentColor.withOpacity(0.16),
+              selectedColor: accentColor.withValues(alpha: 0.16),
               backgroundColor: Colors.grey.shade100,
             ),
           );

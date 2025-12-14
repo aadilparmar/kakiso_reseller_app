@@ -33,7 +33,7 @@ class EditorialProductCard extends StatelessWidget {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -79,7 +79,7 @@ class EditorialProductCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(child: Text("₹${product.price}")),
+                        Text("₹${product.price}"),
                         GestureDetector(
                           onTap: onAddToCart,
                           child: Container(

@@ -18,6 +18,7 @@ class _AutoInventorySyncPageState extends State<AutoInventorySyncPage> {
     await Future.delayed(const Duration(seconds: 2));
     setState(() => lastSync = DateTime.now().toLocal().toString());
     ScaffoldMessenger.of(
+      // ignore: use_build_context_synchronously
       context,
     ).showSnackBar(const SnackBar(content: Text('Inventory synced')));
   }
@@ -46,8 +47,8 @@ class _AutoInventorySyncPageState extends State<AutoInventorySyncPage> {
               subtitle: Text(lastSync),
               trailing: ElevatedButton(
                 onPressed: _syncNow,
-                child: const Text('Sync now'),
                 style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+                child: const Text('Sync now'),
               ),
             ),
             const SizedBox(height: 12),

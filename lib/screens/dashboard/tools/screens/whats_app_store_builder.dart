@@ -91,8 +91,8 @@ class _WhatsappStoreBuilderPageState extends State<WhatsappStoreBuilderPage> {
               children: [
                 ElevatedButton(
                   onPressed: _addProduct,
-                  child: const Text('Add product'),
                   style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+                  child: const Text('Add product'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton(

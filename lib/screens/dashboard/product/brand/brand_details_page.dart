@@ -179,7 +179,7 @@ class _BrandDetailsPageState extends State<BrandDetailsPage> {
 
       return CircleAvatar(
         radius: 16,
-        backgroundColor: accentColor.withOpacity(0.1),
+        backgroundColor: accentColor.withValues(alpha: 0.1),
         child: Text(
           initial,
           style: const TextStyle(

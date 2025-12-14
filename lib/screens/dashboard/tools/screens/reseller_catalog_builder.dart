@@ -38,10 +38,11 @@ class _ResellerCatalogBuilderPageState
                   subtitle: const Text('Sample description'),
                   onChanged: (v) {
                     setState(() {
-                      if (v == true)
+                      if (v == true) {
                         selectedProducts.add(p);
-                      else
+                      } else {
                         selectedProducts.remove(p);
+                      }
                     });
                   },
                 );
@@ -65,10 +66,10 @@ class _ResellerCatalogBuilderPageState
                               ),
                             );
                           },
-                    child: const Text('Create catalog'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accentColor,
                     ),
+                    child: const Text('Create catalog'),
                   ),
                 ),
               ],

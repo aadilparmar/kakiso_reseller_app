@@ -86,7 +86,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 4),
@@ -95,7 +95,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -150,7 +150,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
       );
     }
 
-    return Container(
+    return SizedBox(
       height: widget.height,
       child: Stack(
         children: [
@@ -204,11 +204,11 @@ class _BannerCarouselState extends State<BannerCarousel> {
       decoration: BoxDecoration(
         color: isActive
             ? Colors.pinkAccent
-            : Colors.pinkAccent.withOpacity(0.5),
+            : Colors.pinkAccent.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(4.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 2,
             offset: Offset(0, 1),
           ),

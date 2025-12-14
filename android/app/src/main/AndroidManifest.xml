@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
     <application
-        android:label="kakiso_reseller_app"
+        android:label="KaKiSo"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

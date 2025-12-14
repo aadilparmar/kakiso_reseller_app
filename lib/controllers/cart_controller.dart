@@ -182,13 +182,13 @@ class CartController extends GetxController {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       borderRadius: 24,
       maxWidth: 400,
-      backgroundColor: Colors.white.withOpacity(0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
       barBlur: 20,
       overlayBlur: 0.0,
       colorText: Colors.black,
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 20,
           spreadRadius: 5,
           offset: const Offset(0, 4),
@@ -246,7 +246,7 @@ class CartController extends GetxController {
       mainButton: TextButton(
         onPressed: () => Get.to(() => const InventoryPage()),
         style: TextButton.styleFrom(
-          backgroundColor: const Color(0xFF4A317E).withOpacity(0.1),
+          backgroundColor: const Color(0xFF4A317E).withValues(alpha: 0.1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

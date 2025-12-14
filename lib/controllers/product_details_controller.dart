@@ -68,12 +68,12 @@ class ProductDetailsController extends GetxController {
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
       padding: const EdgeInsets.all(16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withOpacity(0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
       barBlur: 20,
       colorText: Colors.black,
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 20,
           offset: const Offset(0, 4),
         ),

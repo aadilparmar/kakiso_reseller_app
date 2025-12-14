@@ -319,7 +319,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                   max: _maxFilterLimit,
                   divisions: 20,
                   activeColor: accentColor,
-                  inactiveColor: accentColor.withOpacity(0.2),
+                  inactiveColor: accentColor.withValues(alpha: 0.2),
                   labels: RangeLabels(
                     "₹${tempRange.start.toInt()}",
                     "₹${tempRange.end.toInt()}",
@@ -495,7 +495,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.08),
+                          color: accentColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(

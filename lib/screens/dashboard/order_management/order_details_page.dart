@@ -104,7 +104,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -115,7 +115,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.08),
+              color: accentColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(Iconsax.receipt_1, color: accentColor, size: 24),
@@ -157,7 +157,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.08),
+                  color: statusColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -176,7 +176,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.08),
+                  color: Colors.green.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
@@ -212,7 +212,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -225,7 +225,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.08),
+                  color: accentColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -257,7 +257,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.08),
+                  color: Colors.teal.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -305,7 +305,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -347,7 +347,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           width: 2,
                           height: 30,
                           color: isDone
-                              ? accentColor.withOpacity(0.7)
+                              ? accentColor.withValues(alpha: 0.7)
                               : Colors.grey.shade300,
                         ),
                     ],
@@ -401,7 +401,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -471,7 +471,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -482,7 +482,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.08),
+              color: accentColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Iconsax.document_download, color: accentColor),
@@ -496,7 +496,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           ElevatedButton.icon(
             onPressed: () {
-              // TODO: hook real invoice PDF download
               Get.snackbar(
                 'Invoice',
                 'Invoice download coming soon.',

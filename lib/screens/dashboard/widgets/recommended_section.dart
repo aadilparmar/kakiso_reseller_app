@@ -72,12 +72,12 @@ class _RecommendedSectionState extends State<RecommendedSection>
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
       padding: const EdgeInsets.all(16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withOpacity(0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
       barBlur: 20,
       colorText: Colors.black,
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 20,
           offset: const Offset(0, 4),
         ),
@@ -222,7 +222,9 @@ class _RecommendedSectionState extends State<RecommendedSection>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22d3ee).withOpacity(0.35),
+                          color: const Color(
+                            0xFF22d3ee,
+                          ).withValues(alpha: 0.35),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -256,13 +258,13 @@ class _RecommendedSectionState extends State<RecommendedSection>
                     borderRadius: BorderRadius.circular(999),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
                     border: Border.all(
-                      color: Colors.purpleAccent.withOpacity(0.25),
+                      color: Colors.purpleAccent.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
@@ -404,7 +406,7 @@ class _AuroraWavePainter extends CustomPainter {
     _drawWave(
       canvas,
       size,
-      color: const Color(0xFF22d3ee).withOpacity(0.55),
+      color: const Color(0xFF22d3ee).withValues(alpha: 0.55),
       baseHeightFactor: 0.55,
       amplitude: 24,
       phaseShift: progress * 2 * math.pi,
@@ -413,7 +415,7 @@ class _AuroraWavePainter extends CustomPainter {
     _drawWave(
       canvas,
       size,
-      color: const Color(0xFFa855f7).withOpacity(0.40),
+      color: const Color(0xFFa855f7).withValues(alpha: 0.40),
       baseHeightFactor: 0.68,
       amplitude: 30,
       phaseShift: progress * 2 * math.pi + math.pi / 2,
@@ -422,7 +424,7 @@ class _AuroraWavePainter extends CustomPainter {
     _drawWave(
       canvas,
       size,
-      color: const Color(0xFFf97316).withOpacity(0.28),
+      color: const Color(0xFFf97316).withValues(alpha: 0.28),
       baseHeightFactor: 0.80,
       amplitude: 18,
       phaseShift: progress * 2 * math.pi + math.pi,
@@ -442,7 +444,7 @@ class _AuroraWavePainter extends CustomPainter {
       final double alphaFactor =
           0.4 + 0.6 * (0.5 + 0.5 * math.sin(progress * 6 * math.pi + i));
 
-      dotPaint.color = Colors.white.withOpacity(0.09 * alphaFactor);
+      dotPaint.color = Colors.white.withValues(alpha: 0.09 * alphaFactor);
       canvas.drawCircle(Offset(x, y), 1.6, dotPaint);
     }
 
@@ -451,7 +453,10 @@ class _AuroraWavePainter extends CustomPainter {
       ..shader = RadialGradient(
         center: const Alignment(0.0, -0.9),
         radius: 1.1,
-        colors: [const Color(0xFF22d3ee).withOpacity(0.35), Colors.transparent],
+        colors: [
+          const Color(0xFF22d3ee).withValues(alpha: 0.35),
+          Colors.transparent,
+        ],
       ).createShader(bgRect);
     canvas.drawRect(bgRect, glowPaint);
   }
@@ -491,7 +496,7 @@ class _AuroraWavePainter extends CustomPainter {
           LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [color, color.withOpacity(0.02)],
+            colors: [color, color.withValues(alpha: 0.02)],
           ).createShader(
             Rect.fromLTWH(0, baseY - amplitude * 2, size.width, amplitude * 3),
           );

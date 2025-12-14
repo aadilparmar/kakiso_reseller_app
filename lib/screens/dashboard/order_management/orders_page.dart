@@ -165,8 +165,8 @@ class _OrdersPageState extends State<OrdersPage> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              accentColor.withOpacity(0.9),
-              accentColor.withOpacity(0.7),
+              accentColor.withValues(alpha: 0.9),
+              accentColor.withValues(alpha: 0.7),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -174,7 +174,7 @@ class _OrdersPageState extends State<OrdersPage> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha: 0.25),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -185,7 +185,7 @@ class _OrdersPageState extends State<OrdersPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(
@@ -212,7 +212,7 @@ class _OrdersPageState extends State<OrdersPage> {
                     '$totalOrders orders • ₹${totalRevenue.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                 ],
@@ -239,7 +239,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -351,7 +351,7 @@ class _OrderCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -364,7 +364,7 @@ class _OrderCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.06),
+                color: accentColor.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -455,8 +455,8 @@ class _OrderCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: order.isPaid
-                        ? Colors.green.withOpacity(0.08)
-                        : Colors.green.withOpacity(0.08),
+                        ? Colors.green.withValues(alpha: 0.08)
+                        : Colors.green.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(

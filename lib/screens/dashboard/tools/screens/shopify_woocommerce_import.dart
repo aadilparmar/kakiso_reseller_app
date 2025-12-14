@@ -19,6 +19,7 @@ class _ShopifyWooImportPageState extends State<ShopifyWooImportPage> {
     await Future.delayed(const Duration(seconds: 2));
     setState(() => status = 'Imported 42 products');
     ScaffoldMessenger.of(
+      // ignore: use_build_context_synchronously
       context,
     ).showSnackBar(const SnackBar(content: Text('Import complete')));
   }
@@ -45,8 +46,8 @@ class _ShopifyWooImportPageState extends State<ShopifyWooImportPage> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _importFromStore,
-              child: const Text('Start import'),
               style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+              child: const Text('Start import'),
             ),
             const SizedBox(height: 12),
             Text('Status: $status'),

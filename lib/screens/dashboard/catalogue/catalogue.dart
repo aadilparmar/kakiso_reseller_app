@@ -640,7 +640,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           ? OutlinedButton.icon(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: effectiveColor.withOpacity(0.5)),
+                side: BorderSide(color: effectiveColor.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
@@ -840,7 +840,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -871,7 +871,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
+                                    color: Colors.white.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(

@@ -285,7 +285,7 @@ class _LoginPageState extends State<LoginPage>
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 20,
                             offset: const Offset(0, 12),
                           ),
@@ -364,7 +364,7 @@ class _LoginPageState extends State<LoginPage>
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: kPrimaryDeep.withOpacity(0.35),
+                                    color: kPrimaryDeep.withValues(alpha: 0.35),
                                     blurRadius: 16,
                                     offset: const Offset(0, 10),
                                   ),
@@ -480,7 +480,7 @@ class _LoginPageState extends State<LoginPage>
                   height: 260,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kPrimaryLight.withOpacity(0.18),
+                    color: kPrimaryLight.withValues(alpha: 0.18),
                   ),
                 ),
               ).blur(60),
@@ -494,7 +494,7 @@ class _LoginPageState extends State<LoginPage>
                   height: 220,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kAccentColor.withOpacity(0.14),
+                    color: kAccentColor.withValues(alpha: 0.14),
                   ),
                 ),
               ).blur(55),

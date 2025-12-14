@@ -48,7 +48,7 @@ class VerticalProductCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       borderRadius: 12,
-      backgroundColor: kBlack.withOpacity(0.95),
+      backgroundColor: kBlack.withValues(alpha: 0.95),
       colorText: Colors.white,
       snackStyle: SnackStyle.FLOATING,
       titleText: Row(
@@ -134,14 +134,19 @@ class VerticalProductCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(kRadius),
             border: Border.all(
               color: isSelected
-                  ? const Color.fromARGB(209, 171, 142, 235).withOpacity(0.9)
+                  ? const Color.fromARGB(
+                      209,
+                      171,
+                      142,
+                      235,
+                    ).withValues(alpha: 0.9)
                   : kBorderColor,
               width: isSelected ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
                 color: (isSelected ? kPrimaryColor : const Color(0xFF4A317E))
-                    .withOpacity(isSelected ? 0.18 : 0.06),
+                    .withValues(alpha: isSelected ? 0.18 : 0.06),
                 blurRadius: isSelected ? 22 : 18,
                 offset: const Offset(0, 8),
                 spreadRadius: -4,
@@ -184,7 +189,9 @@ class VerticalProductCard extends StatelessWidget {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: kPrimaryColor.withOpacity(0.3),
+                                      color: kPrimaryColor.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -221,7 +228,7 @@ class VerticalProductCard extends StatelessWidget {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: kAccentColor.withOpacity(0.35),
+                                  color: kAccentColor.withValues(alpha: 0.35),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -304,7 +311,7 @@ class VerticalProductCard extends StatelessWidget {
                                 shape: BoxShape.circle,
                                 color: isSelected
                                     ? kPrimaryColor
-                                    : Colors.white.withOpacity(0.96),
+                                    : Colors.white.withValues(alpha: 0.96),
                                 border: Border.all(
                                   color: isSelected
                                       ? kPrimaryColor
@@ -313,7 +320,7 @@ class VerticalProductCard extends StatelessWidget {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.12),
+                                    color: Colors.black.withValues(alpha: 0.12),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   ),
@@ -647,7 +654,7 @@ class VerticalProductCard extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                             ),
                           ],
@@ -682,7 +689,7 @@ class VerticalProductCard extends StatelessWidget {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: kPrimaryColor.withOpacity(0.08),
+                          color: kPrimaryColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(

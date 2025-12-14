@@ -91,7 +91,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF22D3EE).withOpacity(0.35),
+                    color: const Color(0xFF22D3EE).withValues(alpha: 0.35),
                     blurRadius: 18,
                     offset: const Offset(0, 10),
                   ),
@@ -101,9 +101,9 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                 margin: const EdgeInsets.all(1.4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
-                  color: const Color(0xFF020617).withOpacity(0.92),
+                  color: const Color(0xFF020617).withValues(alpha: 0.92),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     width: 0.8,
                   ),
                 ),
@@ -165,7 +165,9 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.35),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.35,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 3),
                                     ),
@@ -205,9 +207,9 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                               ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(999),
-                                color: Colors.black.withOpacity(0.65),
+                                color: Colors.black.withValues(alpha: 0.65),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.16),
+                                  color: Colors.white.withValues(alpha: 0.16),
                                   width: 0.6,
                                 ),
                               ),
@@ -279,11 +281,11 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                       borderRadius: BorderRadius.circular(999),
                                       color: const Color(
                                         0xFF166534,
-                                      ).withOpacity(0.15),
+                                      ).withValues(alpha: 0.15),
                                       border: Border.all(
                                         color: const Color(
                                           0xFF22C55E,
-                                        ).withOpacity(0.7),
+                                        ).withValues(alpha: 0.7),
                                       ),
                                     ),
                                     child: Row(
@@ -320,9 +322,9 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                               padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(14),
-                                color: Colors.white.withOpacity(0.04),
+                                color: Colors.white.withValues(alpha: 0.04),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.06),
+                                  color: Colors.white.withValues(alpha: 0.06),
                                 ),
                               ),
                               child: Row(
@@ -432,7 +434,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard>
                                             BoxShadow(
                                               color: const Color(
                                                 0xFFEC4899,
-                                              ).withOpacity(0.55),
+                                              ).withValues(alpha: 0.55),
                                               blurRadius: 14,
                                               offset: const Offset(0, 5),
                                             ),

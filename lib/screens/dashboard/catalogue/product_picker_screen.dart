@@ -297,7 +297,9 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
                                 Positioned.fill(
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.55),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.55,
+                                      ),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),

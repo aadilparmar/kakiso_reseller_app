@@ -150,7 +150,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.08),
+                color: accentColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Iconsax.activity, color: accentColor),
@@ -230,7 +230,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -245,8 +245,8 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
               borderRadius: BorderRadius.circular(18),
               gradient: LinearGradient(
                 colors: [
-                  accentColor.withOpacity(0.9),
-                  accentColor.withOpacity(0.7),
+                  accentColor.withValues(alpha: 0.9),
+                  accentColor.withValues(alpha: 0.7),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -307,7 +307,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -487,7 +487,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -564,7 +564,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: chipColor.withOpacity(0.25),
+          color: chipColor.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: chipColor),
         ),
@@ -603,7 +603,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -749,13 +749,13 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     return ChoiceChip(
       selected: selected,
       label: Text('${value.toStringAsFixed(0)}%'),
-      selectedColor: accentColor.withOpacity(0.12),
+      selectedColor: accentColor.withValues(alpha: 0.12),
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
         side: BorderSide(
           color: selected
-              ? accentColor.withOpacity(0.7)
+              ? accentColor.withValues(alpha: 0.7)
               : const Color(0xFFE5E7EB),
         ),
       ),
@@ -773,7 +773,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     return ChoiceChip(
       selected: selected,
       label: Text(digit.toString()),
-      selectedColor: const Color(0xFFF97316).withOpacity(0.12),
+      selectedColor: const Color(0xFFF97316).withValues(alpha: 0.12),
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(999),
@@ -820,7 +820,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -1060,7 +1060,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1156,6 +1156,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
 // ============================================================================
 
 class _ProductPickerSheet extends StatefulWidget {
+  // ignore: use_super_parameters
   const _ProductPickerSheet({Key? key}) : super(key: key);
 
   @override

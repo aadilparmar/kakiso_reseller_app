@@ -25,13 +25,13 @@ class TrendingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withOpacity(0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
       barBlur: 20,
       colorText: Colors.black,
       duration: const Duration(seconds: 3),
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 20,
           offset: const Offset(0, 4),
         ),
@@ -121,7 +121,7 @@ class TrendingCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4A317E).withOpacity(0.1),
+              color: const Color(0xFF4A317E).withValues(alpha: 0.1),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -161,7 +161,7 @@ class TrendingCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontFamily: 'Poppins',
                       shadows: const [
                         Shadow(
@@ -467,7 +467,7 @@ class _BlobBackgroundPainter extends CustomPainter {
         size.height * 0.3,
       ),
       radius: size.width * 0.32,
-      color: const Color(0xFFEC4899).withOpacity(0.24),
+      color: const Color(0xFFEC4899).withValues(alpha: 0.24),
     );
 
     _drawBlob(
@@ -478,7 +478,7 @@ class _BlobBackgroundPainter extends CustomPainter {
         size.height * 0.15,
       ),
       radius: size.width * 0.30,
-      color: const Color(0xFF8B5CF6).withOpacity(0.26),
+      color: const Color(0xFF8B5CF6).withValues(alpha: 0.26),
     );
 
     _drawBlob(
@@ -489,7 +489,7 @@ class _BlobBackgroundPainter extends CustomPainter {
         size.height * 0.45,
       ),
       radius: size.width * 0.28,
-      color: const Color(0xFF22C7D5).withOpacity(0.22),
+      color: const Color(0xFF22C7D5).withValues(alpha: 0.22),
     );
 
     // 3. Tiny floating dots (particles)
@@ -509,7 +509,7 @@ class _BlobBackgroundPainter extends CustomPainter {
       final double alphaFactor =
           0.35 + 0.65 * (0.5 + 0.5 * math.sin(progress * 6 * math.pi + i));
 
-      dotPaint.color = Colors.white.withOpacity(0.10 * alphaFactor);
+      dotPaint.color = Colors.white.withValues(alpha: 0.10 * alphaFactor);
 
       canvas.drawCircle(Offset(x, y), 1.5, dotPaint);
     }
@@ -521,7 +521,7 @@ class _BlobBackgroundPainter extends CustomPainter {
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             colors: [
-              const Color(0xFFEC4899).withOpacity(0.14),
+              const Color(0xFFEC4899).withValues(alpha: 0.14),
               Colors.transparent,
             ],
           ).createShader(
@@ -550,7 +550,7 @@ class _BlobBackgroundPainter extends CustomPainter {
       ..shader = RadialGradient(
         center: Alignment.center,
         radius: 0.9,
-        colors: [color, color.withOpacity(0.0)],
+        colors: [color, color.withValues(alpha: 0.0)],
       ).createShader(rect);
     canvas.drawCircle(center, radius, p);
   }

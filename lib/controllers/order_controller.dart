@@ -69,8 +69,8 @@ class OrderController extends GetxController {
         loaded as Iterable<Order>,
       ); // Now correctly typed as List<Order>
       _orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    } catch (e, st) {
-      print('[OrderController] load error: $e\n$st');
+    } catch (e) {
+      // print('[OrderController] load error: $e\n$st');
       _orders.clear();
     }
   }
@@ -92,16 +92,16 @@ class OrderController extends GetxController {
     final String rawUserId = (userId ?? '').trim();
     final String rawEmail = (userEmail ?? '').trim();
 
-    if (rawUserId.isEmpty && rawEmail.isEmpty) {
-      print(
-        '[OrderController.syncOrdersFromWoo] abort: no userId & no userEmail',
-      );
-      return false;
-    }
+    // if (rawUserId.isEmpty && rawEmail.isEmpty) {
+    //   print(
+    //     '[OrderController.syncOrdersFromWoo] abort: no userId & no userEmail',
+    //   );
+    //   return false;
+    // }
 
-    print(
-      '[OrderController.syncOrdersFromWoo] START userId="$rawUserId" userEmail="$rawEmail"',
-    );
+    // print(
+    //   '[OrderController.syncOrdersFromWoo] START userId="$rawUserId" userEmail="$rawEmail"',
+    // );
 
     try {
       // Call ApiService. We pass null for empty strings so the API can choose strategy
@@ -111,14 +111,14 @@ class OrderController extends GetxController {
             userEmail: rawEmail.isNotEmpty ? rawEmail : null,
           );
 
-      print(
-        '[OrderController.syncOrdersFromWoo] fetched remoteOrders count=${remoteOrders.length}',
-      );
+      // print(
+      //   '[OrderController.syncOrdersFromWoo] fetched remoteOrders count=${remoteOrders.length}',
+      // );
 
-      if (remoteOrders.isEmpty) {
-        // still merge nothing, but log
-        print('[OrderController.syncOrdersFromWoo] remote returned 0 orders.');
-      }
+      // if (remoteOrders.isEmpty) {
+      //   // still merge nothing, but log
+      //   print('[OrderController.syncOrdersFromWoo] remote returned 0 orders.');
+      // }
 
       // Merge remote orders into local list
       for (final order in remoteOrders) {
@@ -131,14 +131,14 @@ class OrderController extends GetxController {
       }
 
       _orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      print(
-        '[OrderController.syncOrdersFromWoo] MERGE COMPLETE. localCount=${_orders.length}',
-      );
+      // print(
+      //   '[OrderController.syncOrdersFromWoo] MERGE COMPLETE. localCount=${_orders.length}',
+      // );
       return true;
-    } catch (e, st) {
-      print(
-        '[OrderController.syncOrdersFromWoo] ERROR while syncing orders: $e\nStackTrace:\n$st',
-      );
+    } catch (e) {
+      // print(
+      //   '[OrderController.syncOrdersFromWoo] ERROR while syncing orders: $e\nStackTrace:\n$st',
+      // );
       return false;
     }
   }

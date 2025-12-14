@@ -85,9 +85,9 @@ class _NavigationMenuState extends State<NavigationMenu> {
       setState(() {
         _isLoading = false;
       });
-    } catch (e, st) {
+    } catch (e) {
       // Fallback: create fallback user and proceed
-      print('[NavigationMenu] failed to load session user: $e\n$st');
+      // print('[NavigationMenu] failed to load session user: $e\n$st');
       final fallback = UserData(
         name: 'Reseller',
         email: 'no-reply@kakiso.app',
@@ -134,7 +134,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
             selectedIndex: controller.selectedIndex.value,
             onDestinationSelected: (index) =>
                 controller.selectedIndex.value = index,
-            labelTextStyle: MaterialStateProperty.all(
+            labelTextStyle: WidgetStateProperty.all(
               const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
             ),
             destinations: [

@@ -111,9 +111,6 @@ class ApiService {
       if (pageItems.length < perPage) break;
       page++;
       if (page > maxPages) {
-        print(
-          "ApiService.fetchAllProductsPaginated: Reached maxPages=$maxPages, stopping.",
-        );
         break;
       }
     }
@@ -277,16 +274,10 @@ class ApiService {
           final dynamic id = first['id'];
           if (id != null) {
             final String idStr = id.toString();
-            print('[ensureWooCustomer] Found existing customer: id=$idStr');
             return idStr;
           }
         }
-      } else {
-        print(
-          '[ensureWooCustomer] GET customers?email= failed: '
-          '${findResp.statusCode} ${findResp.body}',
-        );
-      }
+      } else {}
 
       // 2) Not found → create a new customer
       final Uri createUrl = Uri.parse('$baseUrl/wp-json/wc/v3/customers');
@@ -313,18 +304,11 @@ class ApiService {
         final dynamic id = data['id'];
         if (id != null) {
           final String idStr = id.toString();
-          print('[ensureWooCustomer] Created new customer: id=$idStr');
           return idStr;
         }
-      } else {
-        print(
-          '[ensureWooCustomer] POST /customers failed: '
-          '${createResp.statusCode} ${createResp.body}',
-        );
-      }
-    } catch (e) {
-      print('[ensureWooCustomer] exception: $e');
-    }
+      } else {}
+      // ignore: empty_catches
+    } catch (e) {}
 
     return null;
   }
@@ -338,9 +322,6 @@ class ApiService {
   }) async {
     final int? customerId = int.tryParse((userId ?? '').trim());
     if (customerId == null || customerId <= 0) {
-      print(
-        '[ApiService.updateBusinessDetails] Skipping update: invalid/missing userId="$userId"',
-      );
       return;
     }
 
@@ -428,7 +409,6 @@ class ApiService {
   }) async {
     final int? customerId = int.tryParse(userId.trim());
     if (customerId == null || customerId <= 0) {
-      print('[ApiService.fetchBusinessDetails] invalid userId="$userId"');
       return null;
     }
 
@@ -492,9 +472,6 @@ class ApiService {
   }) async {
     final int? uid = int.tryParse((userId ?? '').trim());
     if (uid == null || uid <= 0) {
-      print(
-        '[ApiService.updateResellerBusinessMeta] Skipping update: invalid/missing userId="$userId"',
-      );
       return;
     }
 
@@ -534,15 +511,8 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         // success on custom endpoint
         return;
-      } else {
-        print(
-          '[ApiService.updateResellerBusinessMeta] custom endpoint returned ${response.statusCode}: ${response.body}',
-        );
-      }
+      } else {}
     } catch (e) {
-      print(
-        '[ApiService.updateResellerBusinessMeta] custom endpoint call failed: $e',
-      );
       // fallthrough to fallback
     }
 
@@ -580,20 +550,12 @@ class ApiService {
         order: 'asc',
       );
 
-      print(
-        '[ApiService.fetchTopRankingProducts] got ${products.length} items for category $topRankingCategoryId',
-      );
-
       if (products.isEmpty) {
-        print(
-          '[ApiService.fetchTopRankingProducts] empty, falling back to fetchTopSellingProducts()',
-        );
         return fetchTopSellingProducts();
       }
 
       return products;
     } catch (e) {
-      print('[ApiService.fetchTopRankingProducts] error: $e');
       return fetchTopSellingProducts();
     }
   }
@@ -607,20 +569,12 @@ class ApiService {
         order: 'asc',
       );
 
-      print(
-        '[ApiService.fetchHotRankingProducts] got ${products.length} items for category $hotRankingCategoryId',
-      );
-
       if (products.isEmpty) {
-        print(
-          '[ApiService.fetchHotRankingProducts] empty, falling back to fetchTopSellingProducts()',
-        );
         return fetchTopSellingProducts();
       }
 
       return products;
     } catch (e) {
-      print('[ApiService.fetchHotRankingProducts] error: $e');
       return fetchTopSellingProducts();
     }
   }
@@ -733,18 +687,12 @@ class ApiService {
     // the final total on its side. Setting 'total' client-side may confuse
     // or be ignored depending on Woo setup; you asked to avoid overriding it.
 
-    print('==== createWooOrder URL: $url');
-    print('==== createWooOrder PAYLOAD: ${jsonEncode(payload)}');
-
     try {
       final response = await http.post(
         url,
         headers: _headers,
         body: jsonEncode(payload),
       );
-
-      print('==== createWooOrder STATUS: ${response.statusCode}');
-      print('==== createWooOrder BODY: ${response.body}');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
@@ -754,7 +702,6 @@ class ApiService {
         );
       }
     } catch (e) {
-      print('==== createWooOrder EXCEPTION: $e');
       rethrow;
     }
   }
@@ -772,10 +719,6 @@ class ApiService {
     final String rawUserId = (userId ?? '').trim();
     final String rawEmail = (userEmail ?? '').trim();
 
-    print(
-      '[ApiService.fetchWooOrdersForCustomer] called userId="$rawUserId" userEmail="$rawEmail"',
-    );
-
     // ---------- 1) Try numeric customer_id ----------
     final int? customerId = int.tryParse(rawUserId);
     if (customerId != null && customerId > 0) {
@@ -784,21 +727,10 @@ class ApiService {
       );
 
       try {
-        print('[ApiService.fetchWooOrdersForCustomer] GET $url');
         final response = await http.get(url, headers: _headers);
 
-        print(
-          '[ApiService.fetchWooOrdersForCustomer] customer_id response status=${response.statusCode}',
-        );
         if (response.body.length < 2000) {
-          print(
-            '[ApiService.fetchWooOrdersForCustomer] body: ${response.body}',
-          );
-        } else {
-          print(
-            '[ApiService.fetchWooOrdersForCustomer] body (truncated): ${response.body.substring(0, 1200)} ...',
-          );
-        }
+        } else {}
 
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
@@ -811,21 +743,10 @@ class ApiService {
               }
             }
           }
-        } else {
-          print(
-            '[ApiService.fetchWooOrdersForCustomer] (by customer_id) non-200: ${response.statusCode}',
-          );
-        }
-      } catch (e, st) {
-        print(
-          '[ApiService.fetchWooOrdersForCustomer] exception while fetching by customer_id: $e\n$st',
-        );
-      }
-    } else {
-      print(
-        '[ApiService.fetchWooOrdersForCustomer] skipping customer_id query (invalid or empty): "$rawUserId"',
-      );
-    }
+        } else {}
+        // ignore: empty_catches
+      } catch (e) {}
+    } else {}
 
     // ---------- 2) Fallback: search by billing email ----------
     final String email = rawEmail;
@@ -835,23 +756,10 @@ class ApiService {
       );
 
       try {
-        print(
-          '[ApiService.fetchWooOrdersForCustomer] GET $url (search by email)',
-        );
         final response = await http.get(url, headers: _headers);
 
-        print(
-          '[ApiService.fetchWooOrdersForCustomer] email search response status=${response.statusCode}',
-        );
         if (response.body.length < 2000) {
-          print(
-            '[ApiService.fetchWooOrdersForCustomer] body: ${response.body}',
-          );
-        } else {
-          print(
-            '[ApiService.fetchWooOrdersForCustomer] body (truncated): ${response.body.substring(0, 1200)} ...',
-          );
-        }
+        } else {}
 
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
@@ -864,25 +772,11 @@ class ApiService {
               }
             }
           }
-        } else {
-          print(
-            '[ApiService.fetchWooOrdersForCustomer] (by email) non-200: ${response.statusCode}',
-          );
-        }
-      } catch (e, st) {
-        print(
-          '[ApiService.fetchWooOrdersForCustomer] exception while fetching by email: $e\n$st',
-        );
-      }
-    } else {
-      print(
-        '[ApiService.fetchWooOrdersForCustomer] skipping email search (empty email)',
-      );
-    }
+        } else {}
+        // ignore: empty_catches
+      } catch (e) {}
+    } else {}
 
-    print(
-      '[ApiService.fetchWooOrdersForCustomer] finished. total found=${result.length}',
-    );
     return result;
   }
 

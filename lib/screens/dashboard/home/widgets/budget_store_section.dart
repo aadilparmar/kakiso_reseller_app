@@ -106,10 +106,10 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
               // Container(
               //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               //   decoration: BoxDecoration(
-              //     color: accentColor.withOpacity(0.06),
+              //     color: accentColor.withValues(alpha:0.06),
               //     borderRadius: BorderRadius.circular(999),
               //     border: Border.all(
-              //       color: accentColor.withOpacity(0.18),
+              //       color: accentColor.withValues(alpha:0.18),
               //       width: 0.7,
               //     ),
               //   ),
@@ -205,7 +205,7 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: accentColor.withOpacity(0.22),
+                                color: accentColor.withValues(alpha: 0.22),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -377,7 +377,7 @@ class _BudgetProductCard extends StatelessWidget {
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4A317E).withOpacity(0.04),
+              color: const Color(0xFF4A317E).withValues(alpha: 0.04),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -413,7 +413,9 @@ class _BudgetProductCard extends StatelessWidget {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: const Color(0xFF4A317E).withOpacity(0.3),
+                                color: const Color(
+                                  0xFF4A317E,
+                                ).withValues(alpha: 0.3),
                               ),
                             ),
                           ),
@@ -484,7 +486,9 @@ class _BudgetProductCard extends StatelessWidget {
                           color: const Color(0xFFE0FBEA),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: const Color(0xFF22C55E).withOpacity(0.4),
+                            color: const Color(
+                              0xFF22C55E,
+                            ).withValues(alpha: 0.4),
                             width: 0.6,
                           ),
                         ),

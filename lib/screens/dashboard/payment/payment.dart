@@ -201,7 +201,7 @@ class _PaymentPageState extends State<PaymentPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -212,7 +212,7 @@ class _PaymentPageState extends State<PaymentPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.08),
+              color: accentColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Iconsax.card, size: 22, color: accentColor),
@@ -256,7 +256,7 @@ class _PaymentPageState extends State<PaymentPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -282,7 +282,7 @@ class _PaymentPageState extends State<PaymentPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.08),
+                  color: Colors.deepPurple.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
@@ -315,7 +315,7 @@ class _PaymentPageState extends State<PaymentPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.08),
+                  color: accentColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
@@ -373,7 +373,7 @@ class _PaymentPageState extends State<PaymentPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -405,7 +405,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   width: _selectedMethod == 'online' ? 1.4 : 1,
                 ),
                 color: _selectedMethod == 'online'
-                    ? accentColor.withOpacity(0.03)
+                    ? accentColor.withValues(alpha: 0.03)
                     : Colors.white,
               ),
               child: Row(
@@ -413,7 +413,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.08),
+                      color: accentColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -473,7 +473,7 @@ class _PaymentPageState extends State<PaymentPage> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.08),
+            color: Colors.green.withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
           child: const Icon(Iconsax.shield_tick, size: 18, color: Colors.green),
@@ -499,7 +499,7 @@ class _PaymentPageState extends State<PaymentPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, -4),
             ),
@@ -721,21 +721,21 @@ class _PaymentPageState extends State<PaymentPage> {
             'phone': shippingPhone,
           };
 
-          print('===== BILLING SENT TO WOO =====');
-          print(billing);
-          print('===== SHIPPING SENT TO WOO =====');
-          print(shipping);
+          // print('===== BILLING SENT TO WOO =====');
+          // print(billing);
+          // print('===== SHIPPING SENT TO WOO =====');
+          // print(shipping);
 
           // ---------- 4.5 Add shipping + fee lines for admin visibility ----------
           // You chose option A: single fee (Platform + Convenience combined = ₹27)
-          const double _shippingFee = 100.0;
-          const double _combinedFee = 27.0; // single fee line
+          const double shippingFee = 100.0;
+          const double combinedFee = 27.0; // single fee line
 
           final List<Map<String, dynamic>> shippingLines = [
             {
               'method_id': 'flat_rate',
               'method_title': 'Shipping',
-              'total': _shippingFee.toStringAsFixed(2),
+              'total': shippingFee.toStringAsFixed(2),
               'total_tax': '0.00',
               'taxes': [],
             },
@@ -745,16 +745,16 @@ class _PaymentPageState extends State<PaymentPage> {
             {
               'name': 'Platform & Convenience Fee',
               'tax_class': '',
-              'total': _combinedFee.toStringAsFixed(2),
+              'total': combinedFee.toStringAsFixed(2),
               'total_tax': '0.00',
               'taxes': [],
             },
           ];
 
-          print('===== SHIPPING LINES SENT TO WOO =====');
-          print(shippingLines);
-          print('===== FEE LINES SENT TO WOO =====');
-          print(feeLines);
+          // print('===== SHIPPING LINES SENT TO WOO =====');
+          // print(shippingLines);
+          // print('===== FEE LINES SENT TO WOO =====');
+          // print(feeLines);
 
           // ---------- 5. Push order to WooCommerce ----------
           // Note: we do NOT pass an explicit order-level 'total' so Woo will compute it.
@@ -789,7 +789,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
           orderController.addOrder(order);
         } catch (e) {
-          print('Failed to create WooCommerce order: $e');
+          // print('Failed to create WooCommerce order: $e');
           // we still let payment succeed in-app; order just not synced
         }
 

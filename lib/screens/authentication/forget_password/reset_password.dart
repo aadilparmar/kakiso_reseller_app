@@ -61,7 +61,7 @@ class PasswordResetConfirmationPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10.0),
                     ),
                     elevation: 5,
-                    shadowColor: const Color(0xFF29B6F6).withOpacity(0.4),
+                    shadowColor: const Color(0xFF29B6F6).withValues(alpha: 0.4),
                   ),
                   child: const Text(
                     'continue',
@@ -105,7 +105,7 @@ class PasswordResetConfirmationPage extends StatelessWidget {
                     shouldIconPulse: false,
                     boxShadows: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         offset: const Offset(0, 3),
                         blurRadius: 5,
                       ),
@@ -117,7 +117,7 @@ class PasswordResetConfirmationPage extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFFE91E63), // Light blue from image
+                    color: Color(0xFFE91E63), // Light blue from image
                   ),
                 ),
               ),

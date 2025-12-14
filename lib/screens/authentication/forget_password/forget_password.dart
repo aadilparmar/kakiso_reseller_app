@@ -174,7 +174,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       borderRadius: BorderRadius.circular(10.0),
                     ),
                     elevation: 5,
-                    shadowColor: const Color(0xFFE91E63).withOpacity(0.4),
+                    shadowColor: const Color(0xFFE91E63).withValues(alpha: 0.4),
                   ),
                   child: _isLoading
                       ? const SizedBox(

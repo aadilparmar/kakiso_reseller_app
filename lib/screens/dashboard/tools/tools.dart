@@ -11,13 +11,11 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 
 // --- SCREEN IMPORTS ---
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 
 // --- TOOLS SCREENS (LIVE TOOLS) ---
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_wp_share/one_click_whatsapp.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/price_margin_tool.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/reseller_catalog_builder.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_products_dashboard.dart';
 
 // --- DRAWER IMPORT ---
@@ -277,8 +275,10 @@ class _ToolsSectionState extends State<ToolsSection> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      accentColor.withOpacity(0.06),
-                      accentPurple.withOpacity(0.06),
+                      // ignore: deprecated_member_use
+                      accentColor.withValues(alpha: 0.06),
+                      // ignore: deprecated_member_use
+                      accentPurple.withValues(alpha: 0.06),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(50),
@@ -309,8 +309,10 @@ class _ToolsSectionState extends State<ToolsSection> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          accentColor.withOpacity(0.18),
-                          accentPurple.withOpacity(0.30),
+                          // ignore: deprecated_member_use
+                          accentColor.withValues(alpha: 0.18),
+                          // ignore: deprecated_member_use
+                          accentPurple.withValues(alpha: 0.30),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -318,7 +320,8 @@ class _ToolsSectionState extends State<ToolsSection> {
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color: accentColor.withOpacity(0.18),
+                          // ignore: deprecated_member_use
+                          color: accentColor.withValues(alpha: 0.18),
                           blurRadius: 18,
                           offset: const Offset(0, 6),
                         ),
@@ -691,9 +694,11 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg = selected ? accentColor.withOpacity(0.10) : chipBg;
+    // ignore: deprecated_member_use
+    final Color bg = selected ? accentColor.withValues(alpha: 0.10) : chipBg;
     final Color border = selected
-        ? accentColor.withOpacity(0.8)
+        // ignore: deprecated_member_use
+        ? accentColor.withValues(alpha: 0.8)
         : cardBorderColor;
     final Color text = selected ? accentColor : textSecondary;
 
@@ -749,21 +754,29 @@ class _TimelineToolCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color dotOuterColor = isLive
         ? accentColor
-        : accentPurple.withOpacity(0.9);
+        // ignore: deprecated_member_use
+        : accentPurple.withValues(alpha: 0.9);
     final Color dotGlowColor = isLive
-        ? accentColor.withOpacity(0.40)
-        : accentPurple.withOpacity(0.40);
+        // ignore: deprecated_member_use
+        ? accentColor.withValues(alpha: 0.40)
+        : accentPurple.withValues(alpha: 0.40);
 
     final List<Color> cardGradient = [surfaceColor, surfaceColor];
 
     final List<Color> iconGradient = isLive
-        ? [accentColor.withOpacity(0.10), accentColor.withOpacity(0.30)]
-        : [accentPurple.withOpacity(0.10), accentPurple.withOpacity(0.30)];
+        ? [
+            accentColor.withValues(alpha: 0.10),
+            accentColor.withValues(alpha: 0.30),
+          ]
+        : [
+            accentPurple.withValues(alpha: 0.10),
+            accentPurple.withValues(alpha: 0.30),
+          ];
 
     final String badgeText = isLive ? 'Available now' : 'Coming soon';
     final Color badgeColor = isLive
-        ? accentColor.withOpacity(0.08)
-        : accentPurple.withOpacity(0.08);
+        ? accentColor.withValues(alpha: 0.08)
+        : accentPurple.withValues(alpha: 0.08);
 
     final Color badgeTextColor = isLive ? accentColor : accentPurple;
 
@@ -822,7 +835,7 @@ class _TimelineToolCard extends StatelessWidget {
                   border: Border.all(color: cardBorderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 14,
                       offset: const Offset(0, 8),
                     ),

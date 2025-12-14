@@ -214,7 +214,7 @@ class ProductDetailsPage extends StatelessWidget {
                             attribute: attr,
                             controller: controller,
                           );
-                        }).toList(),
+                        }),
 
                         // Description
                         DescriptionSection(
@@ -379,7 +379,7 @@ class ProductDetailsPage extends StatelessWidget {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.08),
+                          color: accentColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(

@@ -57,8 +57,8 @@ class _BroadcastMarketingToolsPageState
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _sendBroadcast,
-              child: const Text('Send broadcast'),
               style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+              child: const Text('Send broadcast'),
             ),
           ],
         ),

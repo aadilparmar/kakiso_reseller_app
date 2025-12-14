@@ -56,12 +56,12 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
       padding: const EdgeInsets.all(16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withOpacity(0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
       barBlur: 20,
       colorText: Colors.black,
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 20,
           offset: const Offset(0, 4),
         ),
@@ -264,7 +264,7 @@ class EditorialProductCard extends StatelessWidget {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -302,8 +302,8 @@ class EditorialProductCard extends StatelessWidget {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withOpacity(0.6),
-                        Colors.black.withOpacity(0.9),
+                        Colors.black.withValues(alpha: 0.6),
+                        Colors.black.withValues(alpha: 0.9),
                       ],
                     ),
                   ),
@@ -324,7 +324,7 @@ class EditorialProductCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF00C853).withOpacity(0.4),
+                        color: const Color(0xFF00C853).withValues(alpha: 0.4),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -354,7 +354,7 @@ class EditorialProductCard extends StatelessWidget {
                     Text(
                       "KAKISO EXCLUSIVE",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         fontFamily: 'Poppins',
@@ -387,10 +387,10 @@ class EditorialProductCard extends StatelessWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.1),
                             ),
                           ),
                           child: ClipRRect(

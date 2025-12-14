@@ -35,12 +35,12 @@ class WishlistScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withOpacity(0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
       barBlur: 20,
       colorText: Colors.black,
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha: 0.1),
           blurRadius: 20,
           spreadRadius: 5,
           offset: const Offset(0, 4),
@@ -95,7 +95,7 @@ class WishlistScreen extends StatelessWidget {
       mainButton: TextButton(
         onPressed: () => Get.to(() => const InventoryPage()),
         style: TextButton.styleFrom(
-          backgroundColor: const Color(0xFF4A317E).withOpacity(0.1),
+          backgroundColor: const Color(0xFF4A317E).withValues(alpha: 0.1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -274,7 +274,7 @@ class WishlistScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.12),
+              color: Colors.grey.withValues(alpha: 0.12),
               blurRadius: 10,
               spreadRadius: 2,
               offset: const Offset(0, 3),
@@ -359,7 +359,7 @@ class WishlistScreen extends StatelessWidget {
                             ),
                             backgroundColor: const Color(
                               0xFF4A317E,
-                            ).withOpacity(0.06),
+                            ).withValues(alpha: 0.06),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(999),
                             ),
@@ -451,7 +451,7 @@ class WishlistScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
+              color: Colors.green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(

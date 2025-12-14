@@ -815,9 +815,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.06),
+        color: accentColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -827,7 +827,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
               color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: accentColor.withOpacity(0.15), blurRadius: 8),
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                ),
               ],
             ),
             child: const Icon(Iconsax.shop, color: accentColor, size: 18),
@@ -880,7 +883,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -892,7 +895,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
+              color: accentColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Iconsax.shop, color: accentColor, size: 20),
@@ -923,7 +926,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.08),
+                        color: Colors.green.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: const Text(
@@ -1016,7 +1019,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1045,7 +1048,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.06),
+                    color: Colors.red.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(

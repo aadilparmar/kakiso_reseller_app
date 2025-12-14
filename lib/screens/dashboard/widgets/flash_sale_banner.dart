@@ -131,7 +131,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                     BoxShadow(
                       color: const Color(
                         0xFFEB2A7E,
-                      ).withOpacity(0.35 * bgPulse),
+                      ).withValues(alpha: 0.35 * bgPulse),
                       blurRadius: 28 * bgPulse,
                       spreadRadius: 2 * bgPulse,
                       offset: const Offset(0, 14),
@@ -153,7 +153,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                             colors: [
                               const Color(
                                 0xFFFFD54F,
-                              ).withOpacity(0.28 * bgPulse),
+                              ).withValues(alpha: 0.28 * bgPulse),
                               Colors.transparent,
                             ],
                           ),
@@ -194,8 +194,9 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                           boxShadow: [
                                             BoxShadow(
                                               color: Colors.amberAccent
-                                                  .withOpacity(
-                                                    0.8 *
+                                                  .withValues(
+                                                    alpha:
+                                                        0.8 *
                                                         badgeGlowStrength *
                                                         0.35,
                                                   ),
@@ -214,10 +215,14 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                         vertical: 5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.08),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.08,
+                                        ),
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
-                                          color: Colors.white.withOpacity(0.18),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.18,
+                                          ),
                                         ),
                                       ),
                                       child: Row(
@@ -251,7 +256,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                 Text(
                                   "Limited Time Offer",
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.95),
+                                    color: Colors.white.withValues(alpha: 0.95),
                                     fontSize: 19,
                                     fontWeight: FontWeight.w700,
                                     fontFamily: 'Poppins',
@@ -261,7 +266,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                 Text(
                                   "Grab this best-seller before the timer hits zero.",
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Colors.white.withValues(alpha: 0.7),
                                     fontSize: 11,
                                     height: 1.4,
                                     fontFamily: 'Poppins',
@@ -336,7 +341,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.45),
+                                color: Colors.black.withValues(alpha: 0.45),
                                 blurRadius: 26,
                                 offset: const Offset(-12, 18),
                               ),
@@ -454,7 +459,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFD54F).withOpacity(0.4),
+                  color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -504,8 +509,8 @@ class _DiagonalStreaksPainter extends CustomPainter {
       final double xStart = (t * size.width * 1.5) % (size.width * 1.5);
       final double yStart = size.height * (0.2 + 0.1 * i);
 
-      paint.color = Colors.white.withOpacity(
-        0.06 + 0.06 * math.sin(2 * math.pi * (progress * 2 + i)),
+      paint.color = Colors.white.withValues(
+        alpha: 0.06 + 0.06 * math.sin(2 * math.pi * (progress * 2 + i)),
       );
 
       final Offset p1 = Offset(xStart - 40, yStart);

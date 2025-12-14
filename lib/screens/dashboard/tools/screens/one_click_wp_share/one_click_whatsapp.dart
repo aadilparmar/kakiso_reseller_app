@@ -218,6 +218,7 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
   void _copyToClipboard(String txt, {String? successMsg}) async {
     await Clipboard.setData(ClipboardData(text: txt));
     ScaffoldMessenger.of(
+      // ignore: use_build_context_synchronously
       context,
     ).showSnackBar(SnackBar(content: Text(successMsg ?? 'Copied')));
   }
@@ -436,7 +437,9 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
         .toList();
 
     final combined = StringBuffer();
-    for (var n in sanitized) combined.writeln(n);
+    for (var n in sanitized) {
+      combined.writeln(n);
+    }
     combined.writeln('\n$msg');
 
     _copyToClipboard(
@@ -546,7 +549,7 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: kAccent.withOpacity(0.08),
+                color: kAccent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Iconsax.message, color: kAccent),
@@ -907,7 +910,7 @@ class _SelectedProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.teal.withOpacity(0.25),
+              color: Colors.teal.withValues(alpha: 0.25),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -919,7 +922,7 @@ class _SelectedProductCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: hasProduct && product!.image.isNotEmpty
@@ -961,7 +964,7 @@ class _SelectedProductCard extends StatelessWidget {
                           Text(
                             'Price: ₹${product!.price}',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 13,
                             ),
                           ),
@@ -970,7 +973,7 @@ class _SelectedProductCard extends StatelessWidget {
                             Text(
                               product!.brandName!,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white.withValues(alpha: 0.8),
                                 fontSize: 11,
                               ),
                             ),
@@ -983,7 +986,7 @@ class _SelectedProductCard extends StatelessWidget {
                           Text(
                             'Select product to share',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.95),
+                              color: Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                             ),
@@ -992,7 +995,7 @@ class _SelectedProductCard extends StatelessWidget {
                           Text(
                             'Pick a product and we will auto-fill a WhatsApp message for you.',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 12,
                             ),
                           ),
@@ -1551,7 +1554,7 @@ class _PreviewActions extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: kAccent.withOpacity(0.08),
+                    color: kAccent.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
@@ -1607,7 +1610,7 @@ class _PreviewActions extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFE7F5F4),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kAccent.withOpacity(0.25)),
+                border: Border.all(color: kAccent.withValues(alpha: 0.25)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1730,7 +1733,9 @@ class _PreviewActions extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          side: BorderSide(color: kAccent.withOpacity(0.6)),
+                          side: BorderSide(
+                            color: kAccent.withValues(alpha: 0.6),
+                          ),
                           foregroundColor: kAccent,
                         ),
                       ),
@@ -1786,6 +1791,7 @@ class _PreviewActions extends StatelessWidget {
 // ============================================================================
 
 class _ProductPickerSheet extends StatefulWidget {
+  // ignore: use_super_parameters
   const _ProductPickerSheet({Key? key}) : super(key: key);
 
   @override
@@ -1833,6 +1839,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to load products: $e')));
     }
