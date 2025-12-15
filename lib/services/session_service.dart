@@ -1,55 +1,77 @@
 // lib/services/session_service.dart
 import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import 'package:kakiso_reseller_app/models/user.dart';
 
 class SessionService {
-  // Secure storage instance
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+  // 🔐 Explicit Android configuration (DO NOT change after release)
+  static const FlutterSecureStorage _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
   // Keys
   static const String _tokenKey = 'authToken';
   static const String _userKey = 'userData';
 
-  /// Optional init in case you want to do migrations etc. later.
-  /// Safe to call multiple times, even if it does nothing right now.
   static Future<void> init() async {
-    // No-op for now
+    // no-op (future migrations)
   }
 
-  /// Save token + user profile so we can restore session later
+  /// 💾 Save token + user
   static Future<void> saveSession({
     required String authToken,
     required UserData user,
   }) async {
-    await _storage.write(key: _tokenKey, value: authToken);
-    await _storage.write(key: _userKey, value: jsonEncode(_userToJson(user)));
-  }
-
-  /// Get stored auth token (or null if not logged in)
-  static Future<String?> getAuthToken() async {
-    return _storage.read(key: _tokenKey);
-  }
-
-  /// Get stored UserData (or null if missing/corrupt)
-  static Future<UserData?> getUser() async {
-    final String? jsonStr = await _storage.read(key: _userKey);
-    if (jsonStr == null) return null;
-
     try {
-      final Map<String, dynamic> data = jsonDecode(jsonStr);
-      return _userFromJson(data);
+      await _storage.write(key: _tokenKey, value: authToken);
+      await _storage.write(key: _userKey, value: jsonEncode(_userToJson(user)));
     } catch (e) {
-      // If parsing fails, treat as no user
+      debugPrint('SecureStorage write failed: $e');
+    }
+  }
+
+  /// 🔐 SAFE token read
+  static Future<String?> getAuthToken() async {
+    try {
+      return await _storage.read(key: _tokenKey);
+    } catch (e, st) {
+      debugPrint('SecureStorage token decrypt failed: $e');
+      debugPrintStack(stackTrace: st);
+      await _wipeSession();
       return null;
     }
   }
 
-  /// Clear everything → real logout
+  /// 👤 SAFE user read
+  static Future<UserData?> getUser() async {
+    try {
+      final String? jsonStr = await _storage.read(key: _userKey);
+      if (jsonStr == null || jsonStr.isEmpty) return null;
+
+      final Map<String, dynamic> data = jsonDecode(jsonStr);
+      return _userFromJson(data);
+    } catch (e, st) {
+      debugPrint('SecureStorage user decrypt failed: $e');
+      debugPrintStack(stackTrace: st);
+      await _wipeSession();
+      return null;
+    }
+  }
+
+  /// 🚪 Logout
   static Future<void> clearSession() async {
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _userKey);
+    await _wipeSession();
+  }
+
+  /// 🧹 Internal hard reset
+  static Future<void> _wipeSession() async {
+    try {
+      await _storage.deleteAll();
+    } catch (_) {
+      // Keystore already broken – ignore
+    }
   }
 
   // ----------------- Helpers -----------------

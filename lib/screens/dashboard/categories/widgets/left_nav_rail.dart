@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // For accentColor
+import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // accentColor
 
 class LeftNavigationRail extends StatelessWidget {
   final List<CategoryModel> categories;
@@ -16,68 +16,64 @@ class LeftNavigationRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // --- CHANGE: Use the full list directly, do not filter by parent ---
-    final allCategories = categories;
-
     return Container(
-      width: 96,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      width: 92,
+      color: const Color(0xFFF9F9FB), // soft neutral background
       child: ListView.builder(
-        itemCount: allCategories.length,
-        itemBuilder: (ctx, idx) {
-          final item = allCategories[idx];
-          final bool isSelected = idx == selectedIndex;
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final item = categories[index];
+          final bool isSelected = index == selectedIndex;
 
-          return GestureDetector(
-            // Pass the item.id correctly
-            onTap: () => onCategorySelected(idx, item.name, item.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              padding: const EdgeInsets.all(6),
-              decoration: isSelected
-                  ? BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          accentColor.withValues(alpha: 0.12),
-                          Colors.white,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: accentColor.withValues(alpha: 0.12),
-                      ),
-                    )
-                  : null,
+          return InkWell(
+            onTap: () => onCategorySelected(index, item.name, item.id),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected
+                      ? accentColor.withValues(alpha: 0.35)
+                      : Colors.transparent,
+                ),
+              ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Category Image
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: isSelected
-                        ? accentColor
-                        : Colors.grey.shade100,
-                    backgroundImage: NetworkImage(item.imageUrl),
-                    onBackgroundImageError: (_, __) => const Icon(Icons.error),
+                  // CATEGORY IMAGE
+                  SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        item.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            Container(color: Colors.grey.shade200),
+                      ),
+                    ),
                   ),
+
                   const SizedBox(height: 6),
-                  // Category Name
+
+                  // CATEGORY NAME
                   Text(
                     item.name,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      // Make font bold if selected for better visibility
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.normal,
-                      color: isSelected
-                          ? const Color.fromARGB(255, 132, 42, 235)
-                          : Colors.black87,
-                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.2,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: isSelected ? accentColor : Colors.grey.shade800,
+                    ),
                   ),
                 ],
               ),

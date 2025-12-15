@@ -5,7 +5,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/models/user.dart';
@@ -40,9 +39,9 @@ class _LoginPageState extends State<LoginPage>
   final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
   late GraphQLClient _client;
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: <String>['email', 'profile'],
-  );
+  // final GoogleSignIn _googleSignIn = GoogleSignIn(
+  //   scopes: <String>['email', 'profile'],
+  // );
 
   late AnimationController _bgController;
 
@@ -157,71 +156,99 @@ class _LoginPageState extends State<LoginPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           backgroundColor: Colors.red.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  e.toString().replaceFirst('Exception: ', '').trim(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    if (_isLoading) return;
+  // Future<void> _handleGoogleSignIn() async {
+  //   if (_isLoading) return;
 
-    setState(() => _isLoading = true);
+  //   setState(() => _isLoading = true);
 
-    try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      if (account == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
+  //   try {
+  //     final GoogleSignInAccount? account = await _googleSignIn.signIn();
+  //     if (account == null) {
+  //       if (mounted) setState(() => _isLoading = false);
+  //       return;
+  //     }
 
-      final GoogleSignInAuthentication auth = await account.authentication;
+  //     final GoogleSignInAuthentication auth = await account.authentication;
 
-      final String? idToken = auth.idToken;
-      final String? accessToken = auth.accessToken;
-      final String tokenToStore = idToken ?? accessToken ?? '';
+  //     final String? idToken = auth.idToken;
+  //     final String? accessToken = auth.accessToken;
+  //     final String tokenToStore = idToken ?? accessToken ?? '';
 
-      final String email = account.email;
-      final String displayName =
-          account.displayName ?? account.email.split('@').first;
+  //     final String email = account.email;
+  //     final String displayName =
+  //         account.displayName ?? account.email.split('@').first;
 
-      // 🔹 Ensure Woo customer exists & get Woo customer_id
-      final String? wooCustomerId = await ApiService.ensureWooCustomer(
-        email: email,
-        name: displayName,
-      );
+  //     // 🔹 Ensure Woo customer exists & get Woo customer_id
+  //     final String? wooCustomerId = await ApiService.ensureWooCustomer(
+  //       email: email,
+  //       name: displayName,
+  //     );
 
-      final user = UserData(
-        name: displayName,
-        email: email,
-        userId: account.id, // Google account id (app-level)
-        wooCustomerId: wooCustomerId ?? '', // ✅ Woo customer_id
-        joined: DateTime.now(),
-        profilePicUrl: account.photoUrl ?? '',
-      );
+  //     final user = UserData(
+  //       name: displayName,
+  //       email: email,
+  //       userId: account.id, // Google account id (app-level)
+  //       wooCustomerId: wooCustomerId ?? '', // ✅ Woo customer_id
+  //       joined: DateTime.now(),
+  //       profilePicUrl: account.photoUrl ?? '',
+  //     );
 
-      await SessionService.saveSession(authToken: tokenToStore, user: user);
+  //     await SessionService.saveSession(authToken: tokenToStore, user: user);
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      Get.offAll(() => NavigationMenu(userData: user));
-    } catch (e) {
-      try {
-        await _googleSignIn.signOut();
-      } catch (_) {}
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Google sign-in failed: ${e.toString()}'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    }
-  }
+  //     if (!mounted) return;
+  //     setState(() => _isLoading = false);
+  //     Get.offAll(() => NavigationMenu(userData: user));
+  //   } catch (e) {
+  //     try {
+  //       await _googleSignIn.signOut();
+  //     } catch (_) {}
+  //     if (!mounted) return;
+  //     setState(() => _isLoading = false);
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text('Google sign-in failed: ${e.toString()}'),
+  //         backgroundColor: Colors.red.shade700,
+  //       ),
+  //     );
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -396,35 +423,35 @@ class _LoginPageState extends State<LoginPage>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _handleGoogleSignIn,
-                      icon: Image.network(
-                        'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                        height: 22.0,
-                      ),
-                      label: _isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Sign in with Google',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14.0),
-                        side: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14.0),
-                        ),
-                      ),
-                    ),
+                    // OutlinedButton.icon(
+                    //   onPressed: _isLoading ? null : _handleGoogleSignIn,
+                    //   icon: Image.network(
+                    //     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
+                    //     height: 22.0,
+                    //   ),
+                    //   label: _isLoading
+                    //       ? const SizedBox(
+                    //           width: 18,
+                    //           height: 18,
+                    //           child: CircularProgressIndicator(strokeWidth: 2),
+                    //         )
+                    //       : const Text(
+                    //           'Sign in with Google',
+                    //           style: TextStyle(
+                    //             fontFamily: 'Poppins',
+                    //             fontSize: 15,
+                    //             fontWeight: FontWeight.w600,
+                    //             color: Colors.black87,
+                    //           ),
+                    //         ),
+                    //   style: OutlinedButton.styleFrom(
+                    //     padding: const EdgeInsets.symmetric(vertical: 14.0),
+                    //     side: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                    //     shape: RoundedRectangleBorder(
+                    //       borderRadius: BorderRadius.circular(14.0),
+                    //     ),
+                    //   ),
+                    // ),
                     const SizedBox(height: 28),
                     Column(
                       children: [

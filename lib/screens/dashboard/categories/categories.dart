@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -30,29 +33,28 @@ class CategoriesSection extends StatefulWidget {
   State<CategoriesSection> createState() => _CategoriesPageState();
 }
 
-class _CategoriesPageState extends State<CategoriesSection> {
+class _CategoriesPageState extends State<CategoriesSection>
+    with TickerProviderStateMixin {
   // --- STATE VARIABLES ---
   bool isCategoriesLoading = true;
   bool isProductsLoading = false;
-  bool isGeneratingPdf = false;
+
+  // Animation Controller for "Waterfall" entry
+  late AnimationController _fadeInController;
 
   List<CategoryModel> _allCategories = [];
   List<ProductModel> _categoryProducts = [];
-
-  // This list holds the products after local search filtering
   List<ProductModel> _displayedProducts = [];
-
-  // For selection
   final Set<int> _selectedProductIds = {};
 
   String? errorMessage;
-
   int selectedIndex = 0;
   String selectedCategoryLabel = 'All';
   int selectedCategoryId = 0;
 
   // --- FILTER & SORT STATE ---
   final TextEditingController _searchController = TextEditingController();
+
   String _orderBy = 'popularity';
   String _order = 'desc';
   RangeValues _currentPriceRange = const RangeValues(0, 20000);
@@ -60,17 +62,26 @@ class _CategoriesPageState extends State<CategoriesSection> {
 
   final _storage = const FlutterSecureStorage();
   final catalogueController = Get.put(CatalogueController(), permanent: true);
-
-  // Same CartController used in HomePage
   final CartController cartController = Get.find<CartController>();
 
   @override
   void initState() {
     super.initState();
+    _fadeInController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _loadCategories();
   }
 
-  // 1. Load Categories (Left Rail)
+  @override
+  void dispose() {
+    _fadeInController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 1. Load Categories
   Future<void> _loadCategories() async {
     try {
       final cats = await ApiService.fetchCategories();
@@ -78,8 +89,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
         setState(() {
           _allCategories = cats;
           isCategoriesLoading = false;
-
-          // Auto-select first category
           if (cats.isNotEmpty) {
             selectedCategoryLabel = cats[0].name;
             selectedCategoryId = cats[0].id;
@@ -97,17 +106,16 @@ class _CategoriesPageState extends State<CategoriesSection> {
     }
   }
 
-  // 2. Load Products (Right Side)
+  // 2. Load Products with Waterfall Effect
   Future<void> _loadProductsForCategory(int categoryId) async {
     setState(() {
       isProductsLoading = true;
       _categoryProducts = [];
       _displayedProducts = [];
-      _selectedProductIds.clear(); // reset selection when category changes
+      _selectedProductIds.clear();
     });
 
     try {
-      // Fetch from API with Sort & Filter params
       final products = await ApiService.fetchProductsByCategory(
         categoryId,
         orderBy: _orderBy,
@@ -123,70 +131,586 @@ class _CategoriesPageState extends State<CategoriesSection> {
       if (mounted) {
         setState(() {
           _categoryProducts = products;
-          // Initialize displayed products
           _onSearchChanged();
           isProductsLoading = false;
         });
+        _fadeInController.forward(from: 0); // Restart animation
       }
     } catch (e) {
       if (mounted) {
         setState(() => isProductsLoading = false);
-        debugPrint("Error fetching products: $e");
       }
     }
   }
 
-  // 3. Local Search Logic
   void _onSearchChanged() {
     final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) {
-      setState(() {
-        _displayedProducts = _categoryProducts;
-        _selectedProductIds.removeWhere(
-          (id) => !_displayedProducts.any((p) => p.id == id),
-        );
-      });
-    } else {
-      setState(() {
+    setState(() {
+      if (query.isEmpty) {
+        _displayedProducts = List.from(_categoryProducts);
+      } else {
         _displayedProducts = _categoryProducts.where((p) {
           return p.name.toLowerCase().contains(query);
         }).toList();
-        _selectedProductIds.removeWhere(
-          (id) => !_displayedProducts.any((p) => p.id == id),
-        );
-      });
+      }
+      // Clean up selection
+      _selectedProductIds.removeWhere(
+        (id) => !_displayedProducts.any((p) => p.id == id),
+      );
+    });
+  }
+
+  // --- SELECTION LOGIC ---
+  void _toggleSelectAll() {
+    final bool allSelected =
+        _displayedProducts.isNotEmpty &&
+        _displayedProducts.every((p) => _selectedProductIds.contains(p.id));
+
+    setState(() {
+      if (allSelected) {
+        _selectedProductIds.clear();
+      } else {
+        _selectedProductIds.addAll(_displayedProducts.map((p) => p.id));
+      }
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  // --- QUICK FILTERS ---
+  void _applyQuickFilter(String type) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (type == 'Under500') {
+        _currentPriceRange = const RangeValues(0, 500);
+      } else if (type == 'New') {
+        _orderBy = 'date';
+        _order = 'desc';
+      } else if (type == 'Premium') {
+        _orderBy = 'price';
+        _order = 'desc';
+      }
+    });
+    _loadProductsForCategory(selectedCategoryId);
+  }
+
+  // --- DRAWER & UI HELPERS ---
+  void _handleDrawerNavigation(String pageId) {
+    Navigator.pop(context);
+    if (pageId == 'Home' || pageId == 'BusinessDetails') {
+      Get.off(() => HomePage(userData: widget.userData));
     }
   }
 
-  // --- SELECT ALL / UNSELECT ALL ---
-  bool get _isAllSelected {
-    if (_displayedProducts.isEmpty) return false;
-    return _displayedProducts.every((p) => _selectedProductIds.contains(p.id));
+  Future<void> _showLogoutConfirmation() async {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        title: const Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
+        content: const Text(
+          'Do you want to log out?',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await _storage.delete(key: 'authToken');
+              Get.offAll(() => const LoginPage());
+            },
+            child: const Text('Logout', style: TextStyle(color: accentColor)),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _toggleSelectAll(bool? value) {
-    setState(() {
-      if (value == true) {
-        // Select all visible products
-        for (final p in _displayedProducts) {
-          _selectedProductIds.add(p.id);
-        }
-      } else {
-        // Unselect all visible products
-        for (final p in _displayedProducts) {
-          _selectedProductIds.remove(p.id);
-        }
-      }
-    });
+  @override
+  Widget build(BuildContext context) {
+    final bool isAllSelected =
+        _displayedProducts.isNotEmpty &&
+        _displayedProducts.every((p) => _selectedProductIds.contains(p.id));
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      drawer: HomeDrawer(
+        userData: widget.userData,
+        selectedTitle: 'Categories',
+        onNavigate: _handleDrawerNavigation,
+        onLogoutPressed: _showLogoutConfirmation,
+      ),
+      // --- 1. RESTORED APP BAR (Always Visible) ---
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Iconsax.menu_1, color: Colors.black87),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 4.0),
+              child: Image.asset(
+                'assets/logos/login-logo.png',
+                height: 22,
+                fit: BoxFit.contain,
+              ),
+            ),
+            const Spacer(),
+            // Cart Icon with Badge
+            Obx(() {
+              final count = cartController.itemCount;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Iconsax.shopping_bag,
+                      color: Colors.black87,
+                    ),
+                    onPressed: () => Get.to(() => const InventoryPage()),
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Center(
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            }),
+          ],
+        ),
+      ),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- 2. LEFT NAVIGATION RAIL ---
+          if (!isCategoriesLoading && errorMessage == null)
+            LeftNavigationRail(
+              categories: _allCategories,
+              selectedIndex: selectedIndex,
+              onCategorySelected: (index, label, id) {
+                setState(() {
+                  selectedIndex = index;
+                  selectedCategoryLabel = label;
+                  selectedCategoryId = id;
+                });
+                _loadProductsForCategory(id);
+              },
+            ),
+
+          // --- 3. MAIN CONTENT (Search + Grid) ---
+          Expanded(
+            child: Container(
+              color: const Color(0xFFFAFAFA),
+              child: Stack(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // --- SEARCH & FILTERS (Standard Column, No Slivers) ---
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Column(
+                          children: [
+                            SearchAndFilterBar(
+                              controller: _searchController,
+                              onChanged: _onSearchChanged,
+                              onClear: () {
+                                _searchController.clear();
+                                _onSearchChanged();
+                              },
+                              onFilter: _openFilterSheet,
+                            ),
+                            const SizedBox(height: 12),
+                            // Quick Filter Chips
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  ActionChip(
+                                    avatar: Icon(
+                                      isAllSelected
+                                          ? Iconsax.tick_circle
+                                          : Iconsax.add_circle,
+                                      size: 16,
+                                      color: isAllSelected
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
+                                    label: const Text("Select All"),
+                                    backgroundColor: isAllSelected
+                                        ? accentColor
+                                        : Colors.grey.shade100,
+                                    labelStyle: TextStyle(
+                                      color: isAllSelected
+                                          ? Colors.white
+                                          : Colors.black87,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      side: BorderSide.none,
+                                    ),
+                                    onPressed: _toggleSelectAll,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildQuickFilterChip(
+                                    "Under ₹500",
+                                    () => _applyQuickFilter('Under500'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildQuickFilterChip(
+                                    "New Arrivals",
+                                    () => _applyQuickFilter('New'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildQuickFilterChip(
+                                    "Premium",
+                                    () => _applyQuickFilter('Premium'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // --- PRODUCT GRID ---
+                      Expanded(
+                        child: isProductsLoading
+                            ? _buildShimmerGrid()
+                            : _displayedProducts.isEmpty
+                            ? _buildEmptyState()
+                            : _buildProductGrid(),
+                      ),
+                    ],
+                  ),
+
+                  // --- 4. FLOATING "DYNAMIC ISLAND" ACTION BAR ---
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutBack,
+                    bottom: _selectedProductIds.isNotEmpty ? 30 : -100,
+                    left: 20,
+                    right: 20,
+                    child: Center(
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(40),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Counter Bubble
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${_selectedProductIds.length}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Flexible(
+                              child: Text(
+                                "Selected",
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Container(
+                              height: 20,
+                              width: 1,
+                              color: Colors.white24,
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Clear Button
+                            IconButton(
+                              icon: const Icon(
+                                Iconsax.close_circle,
+                                color: Colors.white54,
+                              ),
+                              onPressed: () {
+                                setState(() => _selectedProductIds.clear());
+                                HapticFeedback.lightImpact();
+                              },
+                            ),
+
+                            // Add Button
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4.0),
+                              child: ElevatedButton(
+                                onPressed: _onAddSelectedToCatalogue,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: accentColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Iconsax.add, size: 18),
+                                    SizedBox(width: 6),
+                                    Text("Catalog"),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _unselectAll() {
-    setState(() {
-      _selectedProductIds.clear();
-    });
+  // --- HELPER WIDGETS ---
+
+  Widget _buildQuickFilterChip(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ),
+    );
   }
 
-  // 4. Filter Bottom Sheet
+  Widget _buildProductGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        120,
+      ), // Bottom padding for floating bar
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.55,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+      ),
+      itemCount: _displayedProducts.length,
+      itemBuilder: (context, index) {
+        final product = _displayedProducts[index];
+        final isSelected = _selectedProductIds.contains(product.id);
+
+        return AnimatedBuilder(
+          animation: _fadeInController,
+          builder: (context, child) {
+            final double delay = (index * 0.05).clamp(0.0, 1.0);
+            final double start = delay;
+            final double end = (delay + 0.3).clamp(0.0, 1.0);
+
+            final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(
+                parent: _fadeInController,
+                curve: Interval(start, end, curve: Curves.easeOut),
+              ),
+            );
+
+            final slideAnimation =
+                Tween<Offset>(
+                  begin: const Offset(0, 0.1),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: _fadeInController,
+                    curve: Interval(start, end, curve: Curves.easeOut),
+                  ),
+                );
+
+            return FadeTransition(
+              opacity: fadeAnimation,
+              child: SlideTransition(position: slideAnimation, child: child),
+            );
+          },
+          child: VerticalProductCard(
+            product: product,
+            availableCatalogues: catalogueController.catalogueNames,
+            isSelected: isSelected,
+            onSelectionToggle: () {
+              HapticFeedback.selectionClick();
+              setState(() {
+                if (isSelected) {
+                  _selectedProductIds.remove(product.id);
+                } else {
+                  _selectedProductIds.add(product.id);
+                }
+              });
+            },
+            onCatalogueSelected: (p, name, isNew) {
+              if (isNew) {
+                catalogueController.createCatalogueAndAddProduct(name, p);
+              } else {
+                catalogueController.addProductToExistingCatalogue(name, p);
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildShimmerGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 6,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.55,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+      ),
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: _ShimmerBlock(borderRadius: 16)),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: _ShimmerBlock(height: 14, width: 100),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: _ShimmerBlock(height: 14, width: 60),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Iconsax.search_status,
+              size: 48,
+              color: Colors.grey.shade300,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "No products found",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Try adjusting your filters",
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- BOTTOM SHEETS (FILTER & CATALOG) ---
   void _openFilterSheet() {
     RangeValues tempRange = _currentPriceRange;
     String tempOrderBy = _orderBy;
@@ -232,8 +756,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // --- SORT OPTIONS ---
                 const Text(
                   "Sort By",
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
@@ -242,7 +764,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    _buildFilterChip(
+                    _buildFilterSheetChip(
                       "Popular",
                       'popularity',
                       'desc',
@@ -254,7 +776,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         tempOrder = o;
                       },
                     ),
-                    _buildFilterChip(
+                    _buildFilterSheetChip(
                       "Newest",
                       'date',
                       'desc',
@@ -266,7 +788,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         tempOrder = o;
                       },
                     ),
-                    _buildFilterChip(
+                    _buildFilterSheetChip(
                       "Price: Low-High",
                       'price',
                       'asc',
@@ -278,7 +800,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         tempOrder = o;
                       },
                     ),
-                    _buildFilterChip(
+                    _buildFilterSheetChip(
                       "Price: High-Low",
                       'price',
                       'desc',
@@ -292,10 +814,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 24),
-
-                // --- PRICE SLIDER ---
                 const Text(
                   "Price Range",
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
@@ -320,17 +839,10 @@ class _CategoriesPageState extends State<CategoriesSection> {
                   divisions: 20,
                   activeColor: accentColor,
                   inactiveColor: accentColor.withValues(alpha: 0.2),
-                  labels: RangeLabels(
-                    "₹${tempRange.start.toInt()}",
-                    "₹${tempRange.end.toInt()}",
-                  ),
                   onChanged: (values) =>
                       setModalState(() => tempRange = values),
                 ),
-
                 const SizedBox(height: 24),
-
-                // --- APPLY BUTTON ---
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -348,10 +860,8 @@ class _CategoriesPageState extends State<CategoriesSection> {
                         _order = tempOrder;
                         _selectedProductIds.clear();
                       });
-                      Get.back(); // Close sheet
-                      _loadProductsForCategory(
-                        selectedCategoryId,
-                      ); // Reload API
+                      Get.back();
+                      _loadProductsForCategory(selectedCategoryId);
                     },
                     child: const Text(
                       "Apply",
@@ -372,14 +882,14 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  Widget _buildFilterChip(
+  Widget _buildFilterSheetChip(
     String label,
     String apiSort,
     String apiOrder,
     String currentSort,
     String currentOrder,
     StateSetter setModalState,
-    void Function(String sort, String order) onTap,
+    Function(String, String) onTap,
   ) {
     final bool isSelected =
         (currentSort == apiSort && currentOrder == apiOrder);
@@ -387,11 +897,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
       label: Text(label),
       selected: isSelected,
       onSelected: (selected) {
-        if (selected) {
-          setModalState(() {
-            onTap(apiSort, apiOrder);
-          });
-        }
+        if (selected) setModalState(() => onTap(apiSort, apiOrder));
       },
       labelStyle: TextStyle(
         color: isSelected ? Colors.white : Colors.black87,
@@ -407,17 +913,8 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  // --- BATCH: ADD SELECTED TO CATALOGUE ---
   void _onAddSelectedToCatalogue() {
-    if (_selectedProductIds.isEmpty) {
-      Get.snackbar(
-        'No products selected',
-        'Please select at least one product.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
+    if (_selectedProductIds.isEmpty) return;
     final selectedProducts = _displayedProducts
         .where((p) => _selectedProductIds.contains(p.id))
         .toList();
@@ -450,7 +947,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                 ),
               ),
               Text(
-                'Add ${selectedProducts.length} products to catalog',
+                'Add ${selectedProducts.length} items to catalog',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -458,7 +955,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
                 ),
               ),
               const SizedBox(height: 16),
-
               if (availableCatalogues.isEmpty)
                 Container(
                   width: double.infinity,
@@ -485,58 +981,50 @@ class _CategoriesPageState extends State<CategoriesSection> {
                 )
               else
                 ...availableCatalogues.map(
-                  (name) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade100),
-                      borderRadius: BorderRadius.circular(12),
+                  (name) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Iconsax.book,
+                        color: accentColor,
+                        size: 18,
+                      ),
                     ),
-                    child: ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Iconsax.book,
-                          color: accentColor,
-                          size: 18,
-                        ),
+                    title: Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
                       ),
-                      title: Text(
-                        name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
-                        ),
-                      ),
-                      trailing: const Icon(
-                        Iconsax.arrow_right_3,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      onTap: () {
-                        for (final p in selectedProducts) {
-                          catalogueController.addProductToExistingCatalogue(
-                            name,
-                            p,
-                          );
-                        }
-                        Navigator.pop(ctx);
-                        Get.snackbar(
-                          'Added to catalog',
-                          '${selectedProducts.length} products added to "$name".',
-                          snackPosition: SnackPosition.BOTTOM,
+                    ),
+                    trailing: const Icon(
+                      Iconsax.add_circle,
+                      color: accentColor,
+                    ),
+                    onTap: () {
+                      for (final p in selectedProducts)
+                        catalogueController.addProductToExistingCatalogue(
+                          name,
+                          p,
                         );
-                      },
-                    ),
+                      Navigator.pop(ctx);
+                      setState(() => _selectedProductIds.clear());
+                      Get.snackbar(
+                        'Added',
+                        'Products added to $name',
+                        backgroundColor: Colors.green.shade50,
+                        colorText: Colors.green.shade800,
+                      );
+                    },
                   ),
                 ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -553,7 +1041,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    elevation: 0,
                   ),
                 ),
               ),
@@ -568,461 +1055,117 @@ class _CategoriesPageState extends State<CategoriesSection> {
     List<ProductModel> selectedProducts,
   ) {
     final TextEditingController nameController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'New Catalog',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          content: TextField(
-            controller: nameController,
-            autofocus: true,
-            style: const TextStyle(fontFamily: 'Poppins'),
-            decoration: InputDecoration(
-              labelText: 'Catalog Name',
-              hintText: 'e.g. Diwali Offers',
-              filled: true,
-              fillColor: const Color.fromARGB(185, 250, 250, 250),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: accentColor),
-              ),
-            ),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: TextButton.styleFrom(foregroundColor: Colors.grey),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isNotEmpty) {
-                  catalogueController.createCatalogueAndAddProduct(
-                    name,
-                    selectedProducts.first,
-                  );
-                  for (int i = 1; i < selectedProducts.length; i++) {
-                    catalogueController.addProductToExistingCatalogue(
-                      name,
-                      selectedProducts[i],
-                    );
-                  }
-                  Navigator.pop(ctx);
-                  Get.snackbar(
-                    'Catalog created',
-                    '${selectedProducts.length} products added to "$name".',
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // --- DRAWER LOGIC ---
-  Future<void> _showLogoutConfirmation() async {
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'New Catalog',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500),
         ),
-        title: const Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
-        content: const Text(
-          'Do you want to log out?',
-          style: TextStyle(fontFamily: 'Poppins'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Catalog Name',
+            filled: true,
+            fillColor: const Color(0xFFFAFAFA),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
           TextButton(
-            onPressed: () async {
-              Get.back();
-              await _storage.delete(key: 'authToken');
-              Get.offAll(() => const LoginPage());
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isNotEmpty) {
+                catalogueController.createCatalogueAndAddProduct(
+                  nameController.text,
+                  selectedProducts.first,
+                );
+                for (int i = 1; i < selectedProducts.length; i++)
+                  catalogueController.addProductToExistingCatalogue(
+                    nameController.text,
+                    selectedProducts[i],
+                  );
+                Navigator.pop(ctx);
+                setState(() => _selectedProductIds.clear());
+                Get.snackbar(
+                  'Created',
+                  'Catalog created successfully',
+                  backgroundColor: Colors.green.shade50,
+                  colorText: Colors.green.shade800,
+                );
+              }
             },
-            child: const Text('Logout', style: TextStyle(color: accentColor)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Create'),
           ),
         ],
       ),
     );
   }
+}
 
-  void _handleDrawerNavigation(String pageId) {
-    Navigator.pop(context);
-    if (pageId == 'Home' || pageId == 'BusinessDetails') {
-      Get.off(() => HomePage(userData: widget.userData));
-    }
+// --- SHIMMER ANIMATION WIDGET ---
+class _ShimmerBlock extends StatefulWidget {
+  final double? height;
+  final double? width;
+  final double borderRadius;
+  const _ShimmerBlock({this.height, this.width, this.borderRadius = 8});
+  @override
+  State<_ShimmerBlock> createState() => _ShimmerBlockState();
+}
+
+class _ShimmerBlockState extends State<_ShimmerBlock>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      drawer: HomeDrawer(
-        userData: widget.userData,
-        selectedTitle: 'Categories',
-        onNavigate: _handleDrawerNavigation,
-        onLogoutPressed: () {
-          Navigator.pop(context);
-          _showLogoutConfirmation();
-        },
-      ),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Icons.menu),
-                color: accentColor,
-                iconSize: 30,
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: Image.asset(
-                'assets/logos/login-logo.png',
-                height: 22,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const Spacer(),
-
-            // CART ICON WITH BADGE
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(Iconsax.shopping_cart),
-                  color: accentColor,
-                  iconSize: 30,
-                  onPressed: () => Get.to(() => const InventoryPage()),
-                ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Obx(() {
-                    final count = cartController.itemCount;
-                    if (count == 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 22,
-                        minHeight: 22,
-                      ),
-                      child: Center(
-                        child: Text(
-                          count > 99 ? '99+' : '$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          height: widget.height,
+          width: widget.width,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            gradient: LinearGradient(
+              colors: [
+                Colors.grey.shade200,
+                Colors.grey.shade100,
+                Colors.grey.shade200,
               ],
+              stops: const [0.1, 0.5, 0.9],
+              begin: Alignment(-1.0 + (_controller.value * 2), -0.3),
+              end: Alignment(1.0 + (_controller.value * 2), 0.3),
             ),
-          ],
-        ),
-      ),
-      body: isCategoriesLoading
-          ? const Center(child: CircularProgressIndicator(color: accentColor))
-          : errorMessage != null
-          ? Center(child: Text("Error: $errorMessage"))
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LeftNavigationRail(
-                  categories: _allCategories,
-                  selectedIndex: selectedIndex,
-                  onCategorySelected: (index, label, id) {
-                    setState(() {
-                      selectedIndex = index;
-                      selectedCategoryLabel = label;
-                      selectedCategoryId = id;
-                    });
-                    _loadProductsForCategory(id);
-                  },
-                ),
-                Expanded(
-                  child: Container(
-                    color: const Color(0xFFF9FAFB),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // --- SEARCH & FILTER BAR ---
-                        SearchAndFilterBar(
-                          controller: _searchController,
-                          onChanged: _onSearchChanged,
-                          onClear: () {
-                            _searchController.clear();
-                            _onSearchChanged();
-                          },
-                          onFilter: _openFilterSheet,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // TITLE + COUNT
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                selectedCategoryLabel,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Poppins',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (!isProductsLoading)
-                              Text(
-                                '${_displayedProducts.length} items',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // --- SELECT ALL / UNSELECT ALL / ADD TO CATALOGUE ---
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    OutlinedButton.icon(
-                                      onPressed: _displayedProducts.isEmpty
-                                          ? null
-                                          : () => _toggleSelectAll(true),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        side: BorderSide(
-                                          color: _isAllSelected
-                                              ? accentColor
-                                              : Colors.grey.shade300,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                      ),
-                                      // icon: Icon(
-                                      //   _isAllSelected
-                                      //       ? Iconsax.tick_circle
-                                      //       : Iconsax.tick_square,
-                                      //   size: 16,
-                                      //   color: _isAllSelected
-                                      //       ? accentColor
-                                      //       : Colors.black87,
-                                      // ),
-                                      label: Text(
-                                        'Select All',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w500,
-                                          color: _isAllSelected
-                                              ? accentColor
-                                              : Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    TextButton(
-                                      onPressed: _selectedProductIds.isEmpty
-                                          ? null
-                                          : _unselectAll,
-                                      child: const Text(
-                                        'Unselect All',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontFamily: 'Poppins',
-                                        ),
-                                      ),
-                                    ),
-                                    if (_selectedProductIds.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 4),
-                                        child: Text(
-                                          '(${_selectedProductIds.length} selected)',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(width: 8),
-
-                            SizedBox(
-                              height: 36,
-                              child: ElevatedButton.icon(
-                                onPressed: _onAddSelectedToCatalogue,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: accentColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                // icon: const Icon(Iconsax.book_saved, size: 16),
-                                label: const Text(
-                                  'Add to Catalog',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        Expanded(
-                          child: isProductsLoading
-                              ? const Center(
-                                  child: CircularProgressIndicator(
-                                    color: accentColor,
-                                  ),
-                                )
-                              : _displayedProducts.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Iconsax.box_remove,
-                                        size: 48,
-                                        color: Colors.grey.shade300,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      const Text(
-                                        "No products found.",
-                                        style: TextStyle(color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : GridView.builder(
-                                  padding: const EdgeInsets.only(bottom: 20),
-                                  itemCount: _displayedProducts.length,
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        childAspectRatio: 0.52,
-                                        mainAxisSpacing: 12,
-                                        crossAxisSpacing: 12,
-                                      ),
-                                  itemBuilder: (context, index) {
-                                    final product = _displayedProducts[index];
-                                    final isSelected = _selectedProductIds
-                                        .contains(product.id);
-
-                                    return VerticalProductCard(
-                                      product: product,
-                                      availableCatalogues:
-                                          catalogueController.catalogueNames,
-                                      isSelected: isSelected,
-                                      onSelectionToggle: () {
-                                        setState(() {
-                                          if (isSelected) {
-                                            _selectedProductIds.remove(
-                                              product.id,
-                                            );
-                                          } else {
-                                            _selectedProductIds.add(product.id);
-                                          }
-                                        });
-                                      },
-                                      onCatalogueSelected:
-                                          (p, catalogueName, isNew) {
-                                            if (isNew) {
-                                              catalogueController
-                                                  .createCatalogueAndAddProduct(
-                                                    catalogueName,
-                                                    p,
-                                                  );
-                                            } else {
-                                              catalogueController
-                                                  .addProductToExistingCatalogue(
-                                                    catalogueName,
-                                                    p,
-                                                  );
-                                            }
-                                          },
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          ),
+        );
+      },
     );
   }
 }

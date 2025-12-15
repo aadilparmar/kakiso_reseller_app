@@ -80,36 +80,49 @@ class PasswordResetConfirmationPage extends StatelessWidget {
                 onPressed: () {
                   // Handle resend email logic (e.g., show a snackbar, call an API)
                   Get.snackbar(
-                    'Email Sent', // Title
-                    'A new password reset email has been sent.', // Message
+                    '',
+                    '',
                     titleText: const Text(
                       'Email Sent',
                       style: TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15.5,
                       ),
                     ),
                     messageText: const Text(
-                      'A new password reset email has been sent.',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
+                      'A password reset email has been sent to your registered email address.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13.5,
+                        height: 1.3,
+                      ),
                     ),
                     snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Color(0xFF4A317E),
-                    borderRadius: 18,
-                    margin: const EdgeInsets.all(15),
+                    backgroundColor: const Color(0xFF4A317E),
+                    borderRadius: 14,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     icon: const Icon(
-                      Icons.check_circle_outline,
+                      Icons.mark_email_read_outlined,
                       color: Colors.white,
+                      size: 26,
                     ),
                     shouldIconPulse: false,
                     boxShadows: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        offset: const Offset(0, 3),
-                        blurRadius: 5,
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(0, 4),
                       ),
                     ],
+                    duration: const Duration(seconds: 3),
                   );
                 },
                 child: const Text(

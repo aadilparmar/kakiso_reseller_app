@@ -180,14 +180,38 @@ class _RegisterPageState extends State<RegisterPage>
     }
 
     if (!_acceptTerms) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'Please accept Terms & Privacy Policy to continue.',
-          ),
+          behavior: SnackBarBehavior.floating,
+          elevation: 0,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: Colors.red.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: const [
+              Icon(Icons.gpp_maybe_rounded, color: Colors.white, size: 26),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Please accept the Terms & Privacy Policy to continue.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: Duration(seconds: 4),
         ),
       );
+
       return;
     }
 
@@ -221,13 +245,36 @@ class _RegisterPageState extends State<RegisterPage>
       setState(() => _isLoading = false);
 
       // 🎉 Show success & redirect to login
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'Account created successfully! Please log in to continue.',
-            style: TextStyle(fontFamily: 'Poppins'),
-          ),
+          behavior: SnackBarBehavior.floating,
+          elevation: 0,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: Colors.green.shade600,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: const [
+              Icon(Icons.verified_rounded, color: Colors.white, size: 26),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Account created successfully!\nPlease log in to continue.',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: Duration(seconds: 4),
         ),
       );
 
@@ -235,13 +282,40 @@ class _RegisterPageState extends State<RegisterPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-            style: const TextStyle(fontFamily: 'Poppins'),
-          ),
+          behavior: SnackBarBehavior.floating,
+          elevation: 0,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: Colors.red.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  e.toString().replaceFirst('Exception: ', '').trim(),
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
