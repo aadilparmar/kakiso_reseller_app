@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -437,7 +436,7 @@ class _CategoriesPageState extends State<CategoriesSection>
                           borderRadius: BorderRadius.circular(40),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
+                              color: Colors.black..withValues(alpha: 0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -1008,11 +1007,12 @@ class _CategoriesPageState extends State<CategoriesSection>
                       color: accentColor,
                     ),
                     onTap: () {
-                      for (final p in selectedProducts)
+                      for (final p in selectedProducts) {
                         catalogueController.addProductToExistingCatalogue(
                           name,
                           p,
                         );
+                      }
                       Navigator.pop(ctx);
                       setState(() => _selectedProductIds.clear());
                       Get.snackbar(
@@ -1088,11 +1088,12 @@ class _CategoriesPageState extends State<CategoriesSection>
                   nameController.text,
                   selectedProducts.first,
                 );
-                for (int i = 1; i < selectedProducts.length; i++)
+                for (int i = 1; i < selectedProducts.length; i++) {
                   catalogueController.addProductToExistingCatalogue(
                     nameController.text,
                     selectedProducts[i],
                   );
+                }
                 Navigator.pop(ctx);
                 setState(() => _selectedProductIds.clear());
                 Get.snackbar(

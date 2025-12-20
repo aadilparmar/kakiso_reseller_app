@@ -337,9 +337,7 @@ class _HomePageState extends State<HomePage> {
               },
             ),
             const SizedBox(height: 8),
-
             HomeVideoBanner(assetPath: 'assets/videos/banner_2.mp4'),
-
             // SECTIONS
             const StorySection(),
             const SizedBox(height: 16),

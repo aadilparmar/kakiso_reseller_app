@@ -2,12 +2,15 @@
 
 import 'dart:ui';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+import 'package:kakiso_reseller_app/screens/authentication/signup/privacy_policy.dart';
+import 'package:kakiso_reseller_app/screens/authentication/signup/terms_and_condition.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  THEME CONSTANTS (MATCHING INTRO & LOGIN)
@@ -65,7 +68,7 @@ class _RegisterPageState extends State<RegisterPage>
   late final AnimationController _bgController;
 
   // GraphQL client (same endpoint as login)
-  final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
+  final String _graphqlUrl = "https://kakiso.com/graphql";
   late GraphQLClient _client;
 
   @override
@@ -638,32 +641,49 @@ class _RegisterPageState extends State<RegisterPage>
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: RichText(
-                                      text: const TextSpan(
-                                        style: TextStyle(
+                                      text: TextSpan(
+                                        style: const TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 12,
                                           color: Colors.black87,
                                         ),
                                         children: [
-                                          TextSpan(
+                                          const TextSpan(
                                             text: 'I agree to Kakiso’s ',
                                           ),
                                           TextSpan(
                                             text: 'Terms of Use',
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               color: kPrimaryDeep,
                                               fontWeight: FontWeight.w600,
+                                              decoration:
+                                                  TextDecoration.underline,
                                             ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () {
+                                                Get.to(
+                                                  () => const TermsOfUsePage(),
+                                                );
+                                              },
                                           ),
-                                          TextSpan(text: ' and '),
+                                          const TextSpan(text: ' and '),
                                           TextSpan(
                                             text: 'Privacy Policy',
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               color: kPrimaryDeep,
                                               fontWeight: FontWeight.w600,
+                                              decoration:
+                                                  TextDecoration.underline,
                                             ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () {
+                                                Get.to(
+                                                  () =>
+                                                      const PrivacyPolicyPage(),
+                                                );
+                                              },
                                           ),
-                                          TextSpan(text: '.'),
+                                          const TextSpan(text: '.'),
                                         ],
                                       ),
                                     ),
