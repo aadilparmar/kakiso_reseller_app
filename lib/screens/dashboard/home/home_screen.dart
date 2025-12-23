@@ -232,19 +232,21 @@ class _HomePageState extends State<HomePage> {
         titleSpacing: 0,
         title: Row(
           children: [
+            SizedBox(width: 6),
             Builder(
               builder: (context) => IconButton(
-                icon: const Icon(Icons.menu),
+                icon: const Icon(Iconsax.menu_1),
                 color: accentColor,
                 iconSize: 30,
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(left: 8.0),
+              padding: const EdgeInsets.only(left: 4.0),
               child: Image.asset(
                 'assets/logos/login-logo.png',
-                height: 22,
+                height: 50,
+                width: 100,
                 fit: BoxFit.contain,
               ),
             ),

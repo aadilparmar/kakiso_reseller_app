@@ -36,12 +36,8 @@ class _LoginPageState extends State<LoginPage>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  final String _graphqlUrl = "https://prod-kakiso.smitpatadiya.me/graphql";
+  final String _graphqlUrl = "https://stage.kakiso.com/graphql";
   late GraphQLClient _client;
-
-  // final GoogleSignIn _googleSignIn = GoogleSignIn(
-  //   scopes: <String>['email', 'profile'],
-  // );
 
   late AnimationController _bgController;
 
@@ -131,7 +127,6 @@ class _LoginPageState extends State<LoginPage>
           ? ('$firstName $lastName').trim()
           : wpEmail.split('@').first;
 
-      // 🔹 Ensure Woo customer exists & get Woo customer_id
       final String? wooCustomerId = await ApiService.ensureWooCustomer(
         email: wpEmail,
         name: fullName,
@@ -140,13 +135,12 @@ class _LoginPageState extends State<LoginPage>
       final user = UserData(
         name: fullName,
         email: wpEmail,
-        userId: userData['databaseId'].toString(), // app-level id (WP user id)
-        wooCustomerId: wooCustomerId ?? '', // ✅ Woo customer_id
+        userId: userData['databaseId'].toString(),
+        wooCustomerId: wooCustomerId ?? '',
         joined: DateTime.parse(userData['registeredDate']),
         profilePicUrl: userData['avatar']?['url'] ?? '',
       );
 
-      // ✅ Persist session so user stays logged in
       await SessionService.saveSession(authToken: authToken, user: user);
 
       if (!mounted) return;
@@ -193,63 +187,6 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
-  // Future<void> _handleGoogleSignIn() async {
-  //   if (_isLoading) return;
-
-  //   setState(() => _isLoading = true);
-
-  //   try {
-  //     final GoogleSignInAccount? account = await _googleSignIn.signIn();
-  //     if (account == null) {
-  //       if (mounted) setState(() => _isLoading = false);
-  //       return;
-  //     }
-
-  //     final GoogleSignInAuthentication auth = await account.authentication;
-
-  //     final String? idToken = auth.idToken;
-  //     final String? accessToken = auth.accessToken;
-  //     final String tokenToStore = idToken ?? accessToken ?? '';
-
-  //     final String email = account.email;
-  //     final String displayName =
-  //         account.displayName ?? account.email.split('@').first;
-
-  //     // 🔹 Ensure Woo customer exists & get Woo customer_id
-  //     final String? wooCustomerId = await ApiService.ensureWooCustomer(
-  //       email: email,
-  //       name: displayName,
-  //     );
-
-  //     final user = UserData(
-  //       name: displayName,
-  //       email: email,
-  //       userId: account.id, // Google account id (app-level)
-  //       wooCustomerId: wooCustomerId ?? '', // ✅ Woo customer_id
-  //       joined: DateTime.now(),
-  //       profilePicUrl: account.photoUrl ?? '',
-  //     );
-
-  //     await SessionService.saveSession(authToken: tokenToStore, user: user);
-
-  //     if (!mounted) return;
-  //     setState(() => _isLoading = false);
-  //     Get.offAll(() => NavigationMenu(userData: user));
-  //   } catch (e) {
-  //     try {
-  //       await _googleSignIn.signOut();
-  //     } catch (_) {}
-  //     if (!mounted) return;
-  //     setState(() => _isLoading = false);
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text('Google sign-in failed: ${e.toString()}'),
-  //         backgroundColor: Colors.red.shade700,
-  //       ),
-  //     );
-  //   }
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -267,6 +204,7 @@ class _LoginPageState extends State<LoginPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Header with back button and logo
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -282,31 +220,35 @@ class _LoginPageState extends State<LoginPage>
                         const SizedBox(width: 40),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
+
+                    // Welcome Text
                     const Text(
-                      'Welcome back, reseller 👋',
+                      'Welcome back 👋',
                       textAlign: TextAlign.left,
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 26,
+                        fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: kPrimaryDeep,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     const Text(
-                      'Log in to manage your catalogues, orders & earnings.',
+                      'Sign in to manage your catalogs, orders & profits.',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 14,
                         color: Colors.black54,
+                        height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
 
-                    // Card
+                    // Login Card
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
@@ -321,6 +263,19 @@ class _LoginPageState extends State<LoginPage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // "Sign In" heading
+                          const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: kPrimaryDeep,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Email Field
                           TextFormField(
                             controller: _emailController,
                             decoration: _inputDecoration(
@@ -331,6 +286,8 @@ class _LoginPageState extends State<LoginPage>
                             enabled: !_isLoading,
                           ),
                           const SizedBox(height: 16),
+
+                          // Password Field
                           TextFormField(
                             controller: _passwordController,
                             obscureText: !_isPasswordVisible,
@@ -357,6 +314,8 @@ class _LoginPageState extends State<LoginPage>
                             enabled: !_isLoading,
                           ),
                           const SizedBox(height: 8),
+
+                          // Forgot Password
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
@@ -377,6 +336,8 @@ class _LoginPageState extends State<LoginPage>
                             ),
                           ),
                           const SizedBox(height: 8),
+
+                          // Sign In Button
                           _BouncyButton(
                             onPressed: _isLoading ? () {} : _handleLogin,
                             child: Container(
@@ -408,7 +369,7 @@ class _LoginPageState extends State<LoginPage>
                                         ),
                                       )
                                     : const Text(
-                                        'Log in',
+                                        'Sign in',
                                         style: TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 16,
@@ -422,66 +383,100 @@ class _LoginPageState extends State<LoginPage>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    // OutlinedButton.icon(
-                    //   onPressed: _isLoading ? null : _handleGoogleSignIn,
-                    //   icon: Image.network(
-                    //     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                    //     height: 22.0,
-                    //   ),
-                    //   label: _isLoading
-                    //       ? const SizedBox(
-                    //           width: 18,
-                    //           height: 18,
-                    //           child: CircularProgressIndicator(strokeWidth: 2),
-                    //         )
-                    //       : const Text(
-                    //           'Sign in with Google',
-                    //           style: TextStyle(
-                    //             fontFamily: 'Poppins',
-                    //             fontSize: 15,
-                    //             fontWeight: FontWeight.w600,
-                    //             color: Colors.black87,
-                    //           ),
-                    //         ),
-                    //   style: OutlinedButton.styleFrom(
-                    //     padding: const EdgeInsets.symmetric(vertical: 14.0),
-                    //     side: BorderSide(color: Colors.grey[300]!, width: 1.5),
-                    //     shape: RoundedRectangleBorder(
-                    //       borderRadius: BorderRadius.circular(14.0),
-                    //     ),
-                    //   ),
-                    // ),
-                    const SizedBox(height: 28),
-                    Column(
-                      children: [
-                        TextButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () => Get.to(() => const RegisterPage()),
-                          child: const Text(
-                            'New to Kakiso? Sign up',
+
+                    const SizedBox(height: 32),
+
+                    // Sign Up Section - Enhanced Design
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: kPrimaryDeep.withValues(alpha: 0.1),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: kAccentColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Iconsax.user_add,
+                                  color: kAccentColor,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'New to KaKiSo?',
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Join the best reselling platform for dropshipping in India.',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: kAccentColor,
-                              decoration: TextDecoration.underline,
-                              decorationColor: kAccentColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.black54,
+                              fontSize: 12,
+                              height: 1.4,
                               fontFamily: 'Poppins',
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Join the largest dropship marketplace in India.',
-                          style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                            fontFamily: 'Poppins',
+                          const SizedBox(height: 16),
+                          _BouncyButton(
+                            onPressed: _isLoading
+                                ? () {}
+                                : () => Get.to(() => const RegisterPage()),
+                            child: Container(
+                              width: double.infinity,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: kAccentColor,
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: kAccentColor.withValues(alpha: 0.15),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'Create Account',
+                                  style: TextStyle(
+                                    color: kAccentColor,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),

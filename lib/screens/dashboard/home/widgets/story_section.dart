@@ -78,6 +78,9 @@ class _StorySectionState extends State<StorySection>
               const SizedBox(width: 8),
               const Text(
                 'Featured',
+                textScaleFactor: 1.0, // Lock font scaling
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -86,13 +89,18 @@ class _StorySectionState extends State<StorySection>
                 ),
               ),
               const SizedBox(width: 6),
-              const Text(
-                'Categories',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  color: Color(0xFFEC4899),
+              const Flexible(
+                child: Text(
+                  'Categories',
+                  textScaleFactor: 1.0, // Lock font scaling
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: Color(0xFFEC4899),
+                  ),
                 ),
               ),
             ],
@@ -181,6 +189,7 @@ class _StorySectionState extends State<StorySection>
                     const Center(
                       child: Text(
                         "No categories yet.",
+                        textScaleFactor: 1.0, // Lock font scaling
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,
@@ -285,7 +294,9 @@ class _StoryChipState extends State<_StoryChip> {
         child: Container(
           margin: const EdgeInsets.only(right: 16),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              // Story Circle with Gradient Border
               Container(
                 padding: const EdgeInsets.all(2.3),
                 decoration: BoxDecoration(
@@ -329,10 +340,13 @@ class _StoryChipState extends State<_StoryChip> {
                 ),
               ),
               const SizedBox(height: 6),
+
+              // Category Name with Fixed Width
               SizedBox(
                 width: 70,
                 child: Text(
                   story.name,
+                  textScaleFactor: 1.0, // Lock font scaling
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,

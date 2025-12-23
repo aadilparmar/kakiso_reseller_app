@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -5,7 +6,7 @@ import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 
-class VerticalProductCard extends StatelessWidget {
+class VerticalProductCard extends StatefulWidget {
   final ProductModel product;
   final List<String> availableCatalogues;
 
@@ -17,11 +18,15 @@ class VerticalProductCard extends StatelessWidget {
   )
   onCatalogueSelected;
 
-  /// whether this product is selected in bulk mode.
+  /// Whether this product is selected (Checkbox state).
   final bool isSelected;
 
-  /// toggles selection when user taps the checkbox / select all.
+  /// Toggles selection when user taps the checkbox OR when added to catalog.
   final VoidCallback? onSelectionToggle;
+
+  // --- SESSION PERSISTENCE ---
+  // Keeps track of added products in memory (by ID) so the state doesn't reset.
+  static final Set<int> _sessionAddedToCatalog = {};
 
   const VerticalProductCard({
     super.key,
@@ -32,6 +37,11 @@ class VerticalProductCard extends StatelessWidget {
     this.onSelectionToggle,
   });
 
+  @override
+  State<VerticalProductCard> createState() => _VerticalProductCardState();
+}
+
+class _VerticalProductCardState extends State<VerticalProductCard> {
   // --- DESIGN TOKENS ---
   static const Color kPrimaryColor = Color(0xFF4A317E);
   static const Color kAccentColor = Color(0xFFEB2A7E);
@@ -39,7 +49,36 @@ class VerticalProductCard extends StatelessWidget {
   static final Color kBorderColor = const Color.fromARGB(255, 255, 255, 255);
   static const double kRadius = 20.0;
 
-  // --- POPUP ---
+  // --- ANIMATION COLORS ---
+  static const Color kSuccessColor = Color(0xFF22C55E); // Green (Cart)
+  static const Color kCatalogSuccessColor = Color(0xFF0D9488); // Teal (Catalog)
+
+  // Initialize CartController
+  final CartController cartController = Get.put(CartController());
+
+  // --- ACTIONS ---
+  void _handleAddToCart() {
+    if (cartController.cartItems.any(
+      (e) => e.product.id == widget.product.id,
+    )) {
+      return;
+    }
+    cartController.addToCart(widget.product);
+    _showAddedToCartPopup();
+  }
+
+  void _triggerCatalogSuccess() {
+    setState(() {
+      // 1. Save to static session cache
+      VerticalProductCard._sessionAddedToCatalog.add(widget.product.id);
+    });
+
+    // // 2. Trigger parent selection to sync Checkbox
+    // if (!widget.isSelected && widget.onSelectionToggle != null) {
+    //   widget.onSelectionToggle!();
+    // }
+  }
+
   void _showAddedToCartPopup() {
     Get.snackbar(
       '',
@@ -62,7 +101,7 @@ class VerticalProductCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(26),
               child: Image.network(
-                product.image,
+                widget.product.image,
                 width: 32,
                 height: 32,
                 fit: BoxFit.cover,
@@ -103,14 +142,21 @@ class VerticalProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final CartController cartController = Get.put(CartController());
+    // --- SCALING LOGIC ---
+    final double textScale = MediaQuery.textScalerOf(context).scale(1);
+    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
+
+    // --- LOGIC: CATALOG / SELECTION STATE ---
+    // Combined State: Parent Selection OR Static Session Cache
+    final bool isVisuallySelected =
+        widget.isSelected ||
+        VerticalProductCard._sessionAddedToCatalog.contains(widget.product.id);
 
     // --- PRICE CALCULATIONS ---
-    final double? basePrice = _parsePrice(product.price);
-    // Resell price = +30% of base price
+    final double? basePrice = _parsePrice(widget.product.price);
     final double? resellPrice = basePrice != null ? (basePrice * 1.3) : null;
-    final double? mrpPrice = product.regularPrice.isNotEmpty
-        ? _parsePrice(product.regularPrice)
+    final double? mrpPrice = widget.product.regularPrice.isNotEmpty
+        ? _parsePrice(widget.product.regularPrice)
         : null;
     final double? profit = (resellPrice != null && basePrice != null)
         ? (resellPrice - basePrice)
@@ -119,12 +165,11 @@ class VerticalProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         Get.to(
-          () => ProductDetailsPage(product: product),
+          () => ProductDetailsPage(product: widget.product),
           transition: Transition.fadeIn,
         );
       },
       child: ClipRRect(
-        // ✅ Whole card (border + content) is clipped to this radius
         borderRadius: BorderRadius.circular(kRadius),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -133,27 +178,25 @@ class VerticalProductCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(kRadius),
             border: Border.all(
-              color: isSelected
-                  ? const Color.fromARGB(
-                      209,
-                      171,
-                      142,
-                      235,
-                    ).withValues(alpha: 0.9)
+              // Border color changes based on Selection
+              color: isVisuallySelected
+                  ? kPrimaryColor.withValues(alpha: 0.6)
                   : kBorderColor,
-              width: isSelected ? 1.5 : 1,
+              width: isVisuallySelected ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isSelected ? kPrimaryColor : const Color(0xFF4A317E))
-                    .withValues(alpha: isSelected ? 0.18 : 0.06),
-                blurRadius: isSelected ? 22 : 18,
+                color:
+                    (isVisuallySelected
+                            ? kPrimaryColor
+                            : const Color(0xFF4A317E))
+                        .withValues(alpha: isVisuallySelected ? 0.18 : 0.06),
+                blurRadius: isVisuallySelected ? 22 : 18,
                 offset: const Offset(0, 8),
                 spreadRadius: -4,
               ),
             ],
           ),
-          // ✅ Inner padding so border is never covered by children
           child: Padding(
             padding: const EdgeInsets.all(0),
             child: Column(
@@ -167,7 +210,7 @@ class VerticalProductCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       Hero(
-                        tag: 'product_${product.id}',
+                        tag: 'product_${widget.product.id}',
                         child: Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
@@ -177,7 +220,7 @@ class VerticalProductCard extends StatelessWidget {
                             ),
                           ),
                           child: Image.network(
-                            product.image,
+                            widget.product.image,
                             fit: BoxFit.cover,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
@@ -211,8 +254,8 @@ class VerticalProductCard extends StatelessWidget {
                       ),
 
                       // Discount Badge
-                      if (product.discountPercentage != null &&
-                          product.discountPercentage! > 0)
+                      if (widget.product.discountPercentage != null &&
+                          widget.product.discountPercentage! > 0)
                         Positioned(
                           top: 8,
                           left: 8,
@@ -244,10 +287,10 @@ class VerticalProductCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  "${product.discountPercentage}% OFF",
+                                  "-${widget.product.discountPercentage}%",
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 10,
+                                    fontSize: 6,
                                     fontWeight: FontWeight.w700,
                                     fontFamily: 'Poppins',
                                   ),
@@ -257,63 +300,33 @@ class VerticalProductCard extends StatelessWidget {
                           ),
                         ),
 
-                      // Profit Chip (bottom-left)
-                      if (profit != null)
-                        Positioned(
-                          left: 8,
-                          bottom: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0FBEA),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Iconsax.trend_up,
-                                  size: 11,
-                                  color: Color(0xFF15803D),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "Profit ~ ₹${profit.toStringAsFixed(0)}",
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF166534),
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
                       // Selection Checkbox (top-right)
-                      if (onSelectionToggle != null)
+                      if (widget.onSelectionToggle != null)
                         Positioned(
                           top: 8,
                           right: 8,
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
-                              onSelectionToggle?.call();
+                              // MODIFIED: If already selected (visually), do nothing.
+                              // This prevents unselecting or clearing state on click.
+                              if (isVisuallySelected) {
+                                return;
+                              }
+                              widget.onSelectionToggle?.call();
                             },
-                            child: Container(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
                               width: 24,
                               height: 24,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isSelected
+                                // Color changes based on selection
+                                color: isVisuallySelected
                                     ? kPrimaryColor
                                     : Colors.white.withValues(alpha: 0.96),
                                 border: Border.all(
-                                  color: isSelected
+                                  color: isVisuallySelected
                                       ? kPrimaryColor
                                       : Colors.grey.shade300,
                                   width: 1.3,
@@ -329,7 +342,7 @@ class VerticalProductCard extends StatelessWidget {
                               child: Icon(
                                 Icons.check,
                                 size: 16,
-                                color: isSelected
+                                color: isVisuallySelected
                                     ? Colors.white
                                     : Colors.grey.shade400,
                               ),
@@ -356,13 +369,13 @@ class VerticalProductCard extends StatelessWidget {
                     children: [
                       if (resellPrice != null) const SizedBox(height: 6),
                       Text(
-                        product.name,
-                        maxLines: 2,
+                        widget.product.name,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.left,
                         style: const TextStyle(
                           fontFamily: 'Poppins',
-                          fontSize: 13,
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: kBlack,
                           height: 1.25,
@@ -393,7 +406,7 @@ class VerticalProductCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               const Text(
-                                "Resell ",
+                                "Buy ",
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
@@ -402,15 +415,50 @@ class VerticalProductCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                "₹${resellPrice.toStringAsFixed(0)}",
+                                "₹${widget.product.price}",
                                 style: const TextStyle(
                                   fontFamily: 'Poppins',
-                                  fontSize: 16,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                   color: kPrimaryColor,
                                   height: 1.1,
                                 ),
                               ),
+                              if (profit != null)
+                                Positioned(
+                                  left: 8,
+                                  bottom: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE0FBEA),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Iconsax.trend_up,
+                                          size: 11,
+                                          color: Color(0xFF15803D),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "Profit ~ ₹${profit.toStringAsFixed(0)}",
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF166534),
+                                            fontFamily: 'Poppins',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         )
@@ -421,12 +469,13 @@ class VerticalProductCard extends StatelessWidget {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (product.regularPrice.isNotEmpty &&
-                                  product.regularPrice != product.price)
+                              if (widget.product.regularPrice.isNotEmpty &&
+                                  widget.product.regularPrice !=
+                                      widget.product.price)
                                 Padding(
                                   padding: const EdgeInsets.only(right: 6.0),
                                   child: Text(
-                                    "₹${product.regularPrice}",
+                                    "₹${widget.product.regularPrice}",
                                     style: TextStyle(
                                       fontSize: 11,
                                       decoration: TextDecoration.lineThrough,
@@ -436,7 +485,7 @@ class VerticalProductCard extends StatelessWidget {
                                   ),
                                 ),
                               Text(
-                                "₹${product.price}",
+                                "₹${widget.product.price}",
                                 style: const TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 15,
@@ -450,14 +499,13 @@ class VerticalProductCard extends StatelessWidget {
 
                       const SizedBox(height: 3),
 
-                      // Buy + MRP inline
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: Row(
                           children: [
                             Text(
-                              "Buy ₹${product.price}",
+                              "Resell ₹${resellPrice?.toStringAsFixed(0)}",
                               style: const TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 11,
@@ -466,8 +514,9 @@ class VerticalProductCard extends StatelessWidget {
                               ),
                             ),
                             if (mrpPrice != null &&
-                                product.regularPrice.isNotEmpty &&
-                                product.regularPrice != product.price) ...[
+                                widget.product.regularPrice.isNotEmpty &&
+                                widget.product.regularPrice !=
+                                    widget.product.price) ...[
                               const SizedBox(width: 6),
                               Text(
                                 "MRP ₹${mrpPrice.toStringAsFixed(0)}",
@@ -488,100 +537,178 @@ class VerticalProductCard extends StatelessWidget {
                 ),
 
                 // ===========================
-                // 4. BUTTONS (Add to Cart / Catalogue)
+                // 4. BUTTONS
                 // ===========================
                 Container(
-                  height: 45,
+                  height: 45 * scaleFactor,
                   decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: kBorderColor)),
                   ),
                   child: Row(
                     children: [
-                      // Add to Cart
+                      // --- ADD TO CART ---
                       Expanded(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              cartController.addToCart(product);
-                              _showAddedToCartPopup();
-                            },
-                            child: Container(
+                        child: GestureDetector(
+                          onTap: _handleAddToCart,
+                          child: Obx(() {
+                            final bool isAddedToCart = cartController.cartItems
+                                .any((e) => e.product.id == widget.product.id);
+
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
                               height: double.infinity,
-                              decoration: const BoxDecoration(
-                                color: kPrimaryColor,
+                              decoration: BoxDecoration(
+                                color: isAddedToCart
+                                    ? kSuccessColor
+                                    : kPrimaryColor,
                               ),
                               child: Center(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Text(
-                                        "Add to",
-                                        style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: isAddedToCart
+                                      ? const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          key: ValueKey('cart_added'),
+                                          children: [
+                                            SizedBox(width: 4),
+                                            Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  "Added",
+                                                  style: TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  "to cart",
+                                                  style: TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        )
+                                      : FittedBox(
+                                          key: const ValueKey('cart_normal'),
+                                          fit: BoxFit.scaleDown,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Text(
+                                                "Add to",
+                                                style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              Text(
+                                                "Cart",
+                                                style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      Text(
-                                        "Cart",
-                                        style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                 ),
                               ),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
                       ),
 
-                      // Add to Catalogue
+                      // --- ADD TO CATALOG ---
                       Expanded(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => _onAddToCataloguePressed(context),
-                            child: Container(
-                              height: double.infinity,
-                              decoration: const BoxDecoration(
-                                color: Color.fromARGB(255, 255, 73, 152),
-                              ),
-                              child: Center(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Text(
-                                        "Add to",
-                                        style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
+                        child: GestureDetector(
+                          // Disable tap if already selected/added
+                          onTap: isVisuallySelected
+                              ? null
+                              : () => _onAddToCataloguePressed(context),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                            height: double.infinity,
+                            decoration: BoxDecoration(
+                              // Change color if selected
+                              color: isVisuallySelected
+                                  ? kCatalogSuccessColor
+                                  : const Color.fromARGB(255, 255, 73, 152),
+                            ),
+                            child: Center(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                child: isVisuallySelected
+                                    ? const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        key: ValueKey('cat_added'),
+                                        children: [
+                                          SizedBox(width: 4),
+                                          Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                "Added to",
+                                                style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              Text(
+                                                "Catalog",
+                                                style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      )
+                                    : FittedBox(
+                                        key: const ValueKey('cat_normal'),
+                                        fit: BoxFit.scaleDown,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: const [
+                                            Text(
+                                              "Add to",
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            Text(
+                                              "Catalog",
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      Text(
-                                        "Catalog",
-                                        style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               ),
                             ),
                           ),
@@ -627,7 +754,7 @@ class VerticalProductCard extends StatelessWidget {
                 ),
               ),
               const Text(
-                'Add to Catalogue',
+                'Add to Catalog',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -636,7 +763,7 @@ class VerticalProductCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              if (availableCatalogues.isEmpty)
+              if (widget.availableCatalogues.isEmpty)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
@@ -674,7 +801,7 @@ class VerticalProductCard extends StatelessWidget {
                   ),
                 )
               else
-                ...availableCatalogues.map(
+                ...widget.availableCatalogues.map(
                   (name) => Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
@@ -712,7 +839,8 @@ class VerticalProductCard extends StatelessWidget {
                         color: Colors.grey,
                       ),
                       onTap: () {
-                        onCatalogueSelected(product, name, false);
+                        widget.onCatalogueSelected(widget.product, name, false);
+                        _triggerCatalogSuccess();
                         Navigator.pop(ctx);
                       },
                     ),
@@ -794,7 +922,8 @@ class VerticalProductCard extends StatelessWidget {
               onPressed: () {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
-                  onCatalogueSelected(product, name, true);
+                  widget.onCatalogueSelected(widget.product, name, true);
+                  _triggerCatalogSuccess();
                   Navigator.pop(ctx);
                 }
               },

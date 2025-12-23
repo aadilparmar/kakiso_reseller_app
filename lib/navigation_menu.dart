@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -30,10 +31,7 @@ class NavigationController extends GetxController {
   ];
 }
 
-/// NavigationMenu no longer requires a UserData parameter. It loads the
-/// logged-in user via SessionService.getUser() and initializes the controller.
 class NavigationMenu extends StatefulWidget {
-  /// initial tab index (0 = Home)
   final int initialIndex;
 
   const NavigationMenu({
@@ -58,7 +56,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
 
   Future<void> _initUserAndController() async {
     try {
-      // SessionService.getUser() returns Future<UserData?> per your session service
       final UserData? stored = await SessionService.getUser();
 
       final UserData navUser =
@@ -73,7 +70,6 @@ class _NavigationMenuState extends State<NavigationMenu> {
             phone: '',
           );
 
-      // Recreate controller to make sure it contains the fresh userData
       if (Get.isRegistered<NavigationController>()) {
         try {
           Get.delete<NavigationController>();
@@ -82,12 +78,12 @@ class _NavigationMenuState extends State<NavigationMenu> {
       _controller = Get.put(NavigationController(userData: navUser));
       _controller!.selectedIndex.value = widget.initialIndex;
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      // Fallback: create fallback user and proceed
-      // print('[NavigationMenu] failed to load session user: $e\n$st');
       final fallback = UserData(
         name: 'Reseller',
         email: 'no-reply@kakiso.app',
@@ -104,9 +100,11 @@ class _NavigationMenuState extends State<NavigationMenu> {
       }
       _controller = Get.put(NavigationController(userData: fallback));
       _controller!.selectedIndex.value = widget.initialIndex;
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -118,6 +116,17 @@ class _NavigationMenuState extends State<NavigationMenu> {
 
     final controller = _controller!;
 
+    // --- SCALING LOGIC ---
+    final double textScale = MediaQuery.textScalerOf(context).scale(1);
+    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
+
+    // Dynamic height calculation
+    final double navBarHeight = 70 * scaleFactor;
+
+    // Calculate max width per item to ensure ellipsis works
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double itemWidth = screenWidth / 5;
+
     return Scaffold(
       body: Obx(() => controller.screens[controller.selectedIndex.value]),
       bottomNavigationBar: ClipRRect(
@@ -127,61 +136,70 @@ class _NavigationMenuState extends State<NavigationMenu> {
         ),
         child: Obx(
           () => NavigationBar(
-            height: 70,
+            height: navBarHeight,
             backgroundColor: const Color.fromARGB(123, 233, 138, 245),
             elevation: 0,
             indicatorColor: Colors.transparent,
+            // HIDE default labels so we can use our custom truncated Text
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
             selectedIndex: controller.selectedIndex.value,
             onDestinationSelected: (index) =>
                 controller.selectedIndex.value = index,
-            labelTextStyle: WidgetStateProperty.all(
-              const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-            ),
             destinations: [
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.house,
                   Iconsax.house_25,
+                  'Home',
                   0,
                   controller.selectedIndex.value,
+                  itemWidth,
                 ),
-                label: 'Home',
+                label: '',
               ),
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.category,
                   Iconsax.category_25,
+                  'Categories',
                   1,
                   controller.selectedIndex.value,
+                  itemWidth,
                 ),
-                label: 'Categories',
+                label: '',
               ),
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.designtools,
                   Iconsax.designtools5,
+                  'Tools',
                   2,
                   controller.selectedIndex.value,
+                  itemWidth,
                 ),
-                label: 'Tools',
+                label: '',
               ),
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.book_saved,
                   Iconsax.book,
+                  'Catalog',
                   3,
                   controller.selectedIndex.value,
+                  itemWidth,
                 ),
-                label: 'Catalog',
+                label: '',
               ),
               NavigationDestination(
                 icon: _buildIcon(
                   Iconsax.heart,
                   Iconsax.heart5,
+                  'Wishlist',
                   4,
                   controller.selectedIndex.value,
+                  itemWidth,
                 ),
-                label: 'Wishlist',
+                label: '',
               ),
             ],
           ),
@@ -193,13 +211,18 @@ class _NavigationMenuState extends State<NavigationMenu> {
   Widget _buildIcon(
     IconData inactiveIcon,
     IconData activeIcon,
+    String label,
     int index,
     int currentIndex,
+    double itemWidth,
   ) {
     bool isActive = index == currentIndex;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // 1. Animated Dot
         AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
@@ -211,9 +234,31 @@ class _NavigationMenuState extends State<NavigationMenu> {
             shape: BoxShape.circle,
           ),
         ),
+
+        // 2. Icon
         Icon(
           isActive ? activeIcon : inactiveIcon,
           color: isActive ? _activeIconColor : _inactiveColor,
+          size: 24,
+        ),
+
+        const SizedBox(height: 4),
+
+        // 3. Text Label (Forced Single Line)
+        // We constrain the width to the tab width to force ellipsis
+        Container(
+          constraints: BoxConstraints(maxWidth: itemWidth - 12),
+          child: Text(
+            label,
+            maxLines: 1, // FORCE single line
+            overflow: TextOverflow.ellipsis, // FORCE dots ...
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: isActive ? _activeIconColor : _inactiveColor,
+            ),
+          ),
         ),
       ],
     );

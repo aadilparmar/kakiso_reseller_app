@@ -24,6 +24,7 @@ class RecommendedSection extends StatefulWidget {
 class _RecommendedSectionState extends State<RecommendedSection>
     with SingleTickerProviderStateMixin {
   final CartController cartController = Get.put(CartController());
+
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
@@ -34,7 +35,7 @@ class _RecommendedSectionState extends State<RecommendedSection>
     super.initState();
     _bgController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 22),
+      duration: const Duration(seconds: 26), // visible, smooth
     )..repeat();
     _fetchProducts();
   }
@@ -58,96 +59,89 @@ class _RecommendedSectionState extends State<RecommendedSection>
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // --- HELPER: Show Premium Popup ---
   void _showPremiumPopup(ProductModel product) {
     Get.snackbar(
       '',
       '',
       snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
+      margin: const EdgeInsets.only(bottom: 20, left: 12, right: 12),
       padding: const EdgeInsets.all(16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withValues(alpha: 0.95),
+      backgroundColor: Colors.white.withValues(alpha: 0.96),
       barBlur: 20,
-      colorText: Colors.black,
       boxShadows: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.1),
-          blurRadius: 20,
-          offset: const Offset(0, 4),
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 24,
+          offset: const Offset(0, 8),
         ),
       ],
       titleText: Row(
         children: [
           Container(
-            width: 45,
-            height: 45,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               image: DecorationImage(
                 image: NetworkImage(product.image),
                 fit: BoxFit.cover,
               ),
-              border: Border.all(color: Colors.grey.shade200),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   "Added to Cart",
+                  textScaleFactor: 1.0, // Lock font scaling
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     fontFamily: 'Poppins',
                     color: _kPrimary,
                   ),
                 ),
                 Text(
                   product.name,
-                  style: const TextStyle(fontSize: 12, fontFamily: 'Poppins'),
+                  textScaleFactor: 1.0, // Lock font scaling
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
                 ),
               ],
             ),
           ),
         ],
       ),
-      messageText: const SizedBox(height: 0),
+      messageText: const SizedBox.shrink(),
       mainButton: TextButton(
         onPressed: () => Get.to(() => const InventoryPage()),
-        child: const Row(
-          children: [
-            Text(
-              "View",
-              style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(width: 4),
-            Icon(Iconsax.arrow_right_3, size: 16, color: _kPrimary),
-          ],
+        child: const Text(
+          "View",
+          textScaleFactor: 1.0, // Lock font scaling
+          style: TextStyle(color: _kPrimary, fontWeight: FontWeight.w700),
         ),
       ),
       duration: const Duration(seconds: 3),
     );
   }
 
-  // --- HELPER: Parse and Calculate RSP (Price + 30%) ---
   String _calculateRsp(String priceString) {
     try {
       final cleaned = priceString.replaceAll(RegExp(r'[^0-9.]'), '');
-      if (cleaned.isEmpty) return '₹0';
-
       final double price = double.parse(cleaned);
-      final double rspValue = price * 1.30;
-      return '₹${rspValue.round()}';
+      return '₹${(price * 1.30).round()}';
     } catch (_) {
       return priceString;
     }
@@ -158,86 +152,38 @@ class _RecommendedSectionState extends State<RecommendedSection>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // --- HEADER ---
+        // HEADER
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  // Soft holo accent bar
-                  Container(
-                    width: 4,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFa855f7), Color(0xFF22d3ee)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
+              Container(
+                width: 4,
+                height: 26,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFc7d2fe), Color(0xFFa5f3fc)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Featured',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                      fontFamily: 'Poppins',
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  ShaderMask(
-                    shaderCallback: (rect) {
-                      return const LinearGradient(
-                        colors: [Color(0xFFa855f7), Color(0xFF22d3ee)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ).createShader(rect);
-                    },
-                    child: const Text(
-                      'Products',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        fontFamily: 'Poppins',
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF22d3ee), Color(0xFFa855f7)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(
-                            0xFF22d3ee,
-                          ).withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Iconsax.heart5,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ],
+                ),
               ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Featured Products',
+                  textScaleFactor: 1.0, // Lock font scaling
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
                   Get.to(
@@ -248,103 +194,56 @@ class _RecommendedSectionState extends State<RecommendedSection>
                     ),
                   );
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text(
+                      'View all',
+                      textScaleFactor: 1.0, // Lock font scaling
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6B7280),
                       ),
-                    ],
-                    border: Border.all(
-                      color: Colors.purpleAccent.withValues(alpha: 0.25),
                     ),
-                  ),
-                  child: Row(
-                    children: const [
-                      Text(
-                        'View All',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF4B5563),
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(
-                        Iconsax.arrow_right_3,
-                        size: 14,
-                        color: Color(0xFF4B5563),
-                      ),
-                    ],
-                  ),
+                    SizedBox(width: 4),
+                    Icon(Iconsax.arrow_right_3, size: 14),
+                  ],
                 ),
               ),
             ],
           ),
         ),
 
-        // --- AURORA / HOLOGRAPHIC BACKGROUND + HORIZONTAL LIST ---
+        // AURORA FLOW BACKGROUND + LIST
         SizedBox(
           height: 190,
           child: AnimatedBuilder(
             animation: _bgController,
-            builder: (context, _) {
-              final progress = _bgController.value;
+            builder: (_, __) {
               return Stack(
                 children: [
-                  // Aurora animated background
                   Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        painter: _AuroraWavePainter(progress: progress),
-                      ),
+                    child: CustomPaint(
+                      painter: LightAuroraFlowPainter(_bgController.value),
                     ),
                   ),
-
-                  // Content
                   if (_isLoading)
-                    const Center(
-                      child: CircularProgressIndicator(color: _kPrimary),
-                    )
-                  else if (_products.isEmpty)
-                    const Center(
-                      child: Text(
-                        "No recommendations found.",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
+                    const Center(child: CircularProgressIndicator())
                   else
                     ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.only(left: 16, right: 12),
+                      padding: const EdgeInsets.only(left: 16),
                       itemCount: _products.length,
-                      itemBuilder: (context, index) {
+                      itemBuilder: (_, index) {
                         final product = _products[index];
-                        final String calculatedRsp = _calculateRsp(
-                          product.price,
-                        );
-
                         return Padding(
-                          padding: const EdgeInsets.only(right: 10.0),
+                          padding: const EdgeInsets.only(right: 12),
                           child: HorizontalProductCard(
                             imageUrl: product.image,
                             title: product.name,
-                            companyName: "Kakiso",
                             price: '₹${product.price}',
-                            rsp: calculatedRsp,
+                            rsp: _calculateRsp(product.price),
                             originalPrice: product.regularPrice.isNotEmpty
                                 ? '₹${product.regularPrice}'
                                 : '',
@@ -357,7 +256,7 @@ class _RecommendedSectionState extends State<RecommendedSection>
                               Get.to(
                                 () => ProductDetailsPage(product: product),
                                 transition: Transition.fadeIn,
-                                duration: const Duration(milliseconds: 300),
+                                duration: const Duration(milliseconds: 280),
                               );
                             },
                           ),
@@ -369,143 +268,85 @@ class _RecommendedSectionState extends State<RecommendedSection>
             },
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
       ],
     );
   }
 }
 
 /// ---------------------------------------------------------------------------
-/// AURORA / HOLOGRAPHIC WAVE BACKGROUND PAINTER
+/// OPTION B — LIGHT AURORA FLOW (VISIBLE, SMOOTH, NON-DARK)
 /// ---------------------------------------------------------------------------
-class _AuroraWavePainter extends CustomPainter {
-  final double progress; // 0 → 1 loop
-
-  _AuroraWavePainter({required this.progress});
+class LightAuroraFlowPainter extends CustomPainter {
+  final double t;
+  LightAuroraFlowPainter(this.t);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint();
-
-    // ---------- 1. BASE BACKGROUND GRADIENT ----------
-    final Rect bgRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    paint.shader = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Color(0xFF020617), // dark navy
-        Color(0xFF111827),
-        Color(0xFF1f2937),
-      ],
-    ).createShader(bgRect);
-    canvas.drawRect(bgRect, paint);
-
-    // ---------- 2. AURORA WAVE RIBBONS ----------
-    // We'll draw 3 layered waves, each with slightly different color & phase.
-
-    _drawWave(
-      canvas,
-      size,
-      color: const Color(0xFF22d3ee).withValues(alpha: 0.55),
-      baseHeightFactor: 0.55,
-      amplitude: 24,
-      phaseShift: progress * 2 * math.pi,
+    // Base light surface
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFFF8FAFC),
     );
 
-    _drawWave(
+    _auroraWave(
       canvas,
       size,
-      color: const Color(0xFFa855f7).withValues(alpha: 0.40),
-      baseHeightFactor: 0.68,
-      amplitude: 30,
-      phaseShift: progress * 2 * math.pi + math.pi / 2,
+      color: const Color(0xFFc7d2fe),
+      heightFactor: 0.55,
+      phase: 0,
     );
 
-    _drawWave(
+    _auroraWave(
       canvas,
       size,
-      color: const Color(0xFFf97316).withValues(alpha: 0.28),
-      baseHeightFactor: 0.80,
-      amplitude: 18,
-      phaseShift: progress * 2 * math.pi + math.pi,
+      color: const Color(0xFFa5f3fc),
+      heightFactor: 0.72,
+      phase: math.pi / 2,
     );
 
-    // ---------- 3. FLOATING PARTICLES ----------
-    final Paint dotPaint = Paint();
-    final int dots = 24;
-
-    for (int i = 0; i < dots; i++) {
-      final t = i / dots;
-      final double x = size.width * t;
-      final double yBase = size.height * (0.25 + 0.5 * t);
-      final double yOffset = math.sin(progress * 4 * math.pi + i * 0.7) * 10;
-      final double y = yBase + yOffset;
-
-      final double alphaFactor =
-          0.4 + 0.6 * (0.5 + 0.5 * math.sin(progress * 6 * math.pi + i));
-
-      dotPaint.color = Colors.white.withValues(alpha: 0.09 * alphaFactor);
-      canvas.drawCircle(Offset(x, y), 1.6, dotPaint);
-    }
-
-    // ---------- 4. TOP SOFT GLOW ----------
-    final Paint glowPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(0.0, -0.9),
-        radius: 1.1,
-        colors: [
-          const Color(0xFF22d3ee).withValues(alpha: 0.35),
-          Colors.transparent,
-        ],
-      ).createShader(bgRect);
-    canvas.drawRect(bgRect, glowPaint);
+    _auroraWave(
+      canvas,
+      size,
+      color: const Color(0xFFfde68a),
+      heightFactor: 0.85,
+      phase: math.pi,
+    );
   }
 
-  void _drawWave(
+  void _auroraWave(
     Canvas canvas,
     Size size, {
     required Color color,
-    required double baseHeightFactor,
-    required double amplitude,
-    required double phaseShift,
+    required double heightFactor,
+    required double phase,
   }) {
-    final Path path = Path();
-    final double baseY = size.height * baseHeightFactor;
+    final path = Path();
+    final baseY = size.height * heightFactor;
 
     path.moveTo(0, baseY);
 
-    const int segments = 40;
+    const int segments = 48;
     for (int i = 0; i <= segments; i++) {
-      final double t = i / segments;
-      final double x = size.width * t;
+      final tX = i / segments;
+      final x = size.width * tX;
 
-      // nice smooth sine-based wave
-      final double wave = math.sin((t * 3 * math.pi) + phaseShift) * amplitude;
-      final double y = baseY + wave;
+      final y =
+          baseY + math.sin((t * 2 * math.pi) + tX * math.pi * 2 + phase) * 22;
 
       path.lineTo(x, y);
     }
 
-    // Close wave to bottom
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
+    path
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
 
-    final Paint p = Paint()
-      ..shader =
-          LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [color, color.withValues(alpha: 0.02)],
-          ).createShader(
-            Rect.fromLTWH(0, baseY - amplitude * 2, size.width, amplitude * 3),
-          );
-
-    canvas.drawPath(path, p);
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: 0.30));
   }
 
   @override
-  bool shouldRepaint(covariant _AuroraWavePainter oldDelegate) {
-    return oldDelegate.progress != progress;
+  bool shouldRepaint(covariant LightAuroraFlowPainter oldDelegate) {
+    return oldDelegate.t != t;
   }
 }

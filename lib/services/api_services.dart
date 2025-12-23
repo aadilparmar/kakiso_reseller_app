@@ -12,13 +12,13 @@ import 'package:share_plus/share_plus.dart';
 
 class ApiService {
   // Your Domain
-  static const String baseUrl = 'https://kakiso.com';
+  static const String baseUrl = 'https://stage.kakiso.com';
 
   // Your Keys (WooCommerce consumer key/secret used for wc/v3 endpoints)
   static const String consumerKey =
-      'ck_000f2d30bd3f681b450c4f4f7c3a3ed4e0065047';
+      'ck_a821068196cf8a1153635a362fdec04d4e881051';
   static const String consumerSecret =
-      'cs_9caf422132df22d0e2da835a3a4c13d4749ebabe';
+      'cs_389ffd5342045eb06ac641085e7885fc3f0db010';
 
   // Optional app-only API key header for your custom endpoint (leave empty if unused)
   static const String appApiKey = '';

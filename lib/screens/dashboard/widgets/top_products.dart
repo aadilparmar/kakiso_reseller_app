@@ -109,6 +109,16 @@ class _TopRankingSectionState extends State<TopRankingSection>
 
   @override
   Widget build(BuildContext context) {
+    // --- SCALING LOGIC FOR ACCESSIBILITY ---
+    // Calculate a scaler based on text size, capped at 1.4x to prevent breaking layout entirely
+    final double textScale = MediaQuery.textScalerOf(context).scale(1);
+    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
+
+    // Base heights that scale
+    final double totalHeight = 420 * scaleFactor;
+    final double carouselHeight = 260 * scaleFactor;
+    // ---------------------------------------
+
     final ProductModel? focusedProduct =
         (_products.isNotEmpty && _currentIndex < _products.length)
         ? _products[_currentIndex]
@@ -121,9 +131,8 @@ class _TopRankingSectionState extends State<TopRankingSection>
         ? basePrice * 1.3
         : null; // +30%
 
-    // IMPORTANT: Fixed height so PageView & Stack are bounded
     return SizedBox(
-      height: 420, // tweak if you want more/less height
+      height: totalHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 0),
         child: ClipRRect(
@@ -155,7 +164,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(),
+                        _buildHeader(context),
                         const SizedBox(height: 8),
 
                         // SMALL STATS + CURRENT PRODUCT SNAPSHOT
@@ -172,7 +181,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
 
                         // MAIN 3D FEEL CAROUSEL
                         SizedBox(
-                          height: 260,
+                          height: carouselHeight,
                           child: _isLoading
                               ? _buildLoading()
                               : _products.isEmpty
@@ -193,7 +202,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
 
   // ---------- HEADER (TITLE + TABS) ----------
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Row(
@@ -219,12 +228,15 @@ class _TopRankingSectionState extends State<TopRankingSection>
             child: const Icon(Iconsax.cup, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 12),
+          // Wrapped in Expanded so text doesn't push tabs off screen
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "Galaxy Leaderboard",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 11,
@@ -235,6 +247,7 @@ class _TopRankingSectionState extends State<TopRankingSection>
                 SizedBox(height: 2),
                 Text(
                   "Top Ranking Resell Picks",
+                  maxLines: 2,
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 18,
@@ -250,9 +263,12 @@ class _TopRankingSectionState extends State<TopRankingSection>
           const SizedBox(width: 8),
 
           // Segment Control
-          _SegmentedTabs(
-            selected: _selectedTab,
-            onChanged: (tab) => _fetchProductsForTab(tab),
+          // Wrapped in FittedBox to shrink slightly if header text is massive
+          FittedBox(
+            child: _SegmentedTabs(
+              selected: _selectedTab,
+              onChanged: (tab) => _fetchProductsForTab(tab),
+            ),
           ),
         ],
       ),
@@ -593,6 +609,7 @@ class _SegmentedTabs extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min, // shrink to fit
         children: [
           _buildTab('Top', Iconsax.crown),
           _buildTab('Hot', Iconsax.flash_15),
@@ -736,7 +753,10 @@ class _CurrentProductStrip extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Row(
+                  // Changed from Row to Wrap to handle large text sizes prevents overflow
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
                     children: [
                       if (resellPrice != null)
                         Text(
@@ -748,8 +768,7 @@ class _CurrentProductStrip extends StatelessWidget {
                             color: _kAccent,
                           ),
                         ),
-                      if (basePrice != null) ...[
-                        const SizedBox(width: 6),
+                      if (basePrice != null)
                         Text(
                           "Buy ₹${basePrice!.toStringAsFixed(0)}",
                           style: const TextStyle(
@@ -758,7 +777,6 @@ class _CurrentProductStrip extends StatelessWidget {
                             color: Color(0xFFCBD5F5),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -768,67 +786,71 @@ class _CurrentProductStrip extends StatelessWidget {
             const SizedBox(width: 8),
 
             if (profit != null)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: const Color(0xFF064E3B),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Iconsax.trend_up,
-                      size: 12,
-                      color: Color(0xFF22C55E),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "+₹${profit.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFBBF7D0),
+              FittedBox(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: const Color(0xFF064E3B),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Iconsax.trend_up,
+                        size: 12,
+                        color: Color(0xFF22C55E),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        "+₹${profit.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFBBF7D0),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: isHotTab
-                      ? const Color(0xFF7C2D12)
-                      : const Color(0xFF1D3557),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isHotTab ? Iconsax.flash_1 : Iconsax.star1,
-                      size: 12,
-                      color: isHotTab
-                          ? const Color(0xFFF97316)
-                          : const Color(0xFFFACC15),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isHotTab ? "Hot pick" : "Top pick",
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+              FittedBox(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: isHotTab
+                        ? const Color(0xFF7C2D12)
+                        : const Color(0xFF1D3557),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isHotTab ? Iconsax.flash_1 : Iconsax.star1,
+                        size: 12,
+                        color: isHotTab
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFFFACC15),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        isHotTab ? "Hot pick" : "Top pick",
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -988,71 +1010,14 @@ class _LeaderboardCard extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // Bottom text over image
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 14,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.2,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.9),
-                                  blurRadius: 10,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              if (resellPrice != null)
-                                Text(
-                                  "Resell ₹${resellPrice.toStringAsFixed(0)}",
-                                  style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _kAccent,
-                                  ),
-                                ),
-                              if (basePrice != null) ...[
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Buy ₹${basePrice.toStringAsFixed(0)}",
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
 
             // GLASSY BOTTOM INFO
+            // REMOVED FIXED HEIGHT HERE to prevent crumbling
             Container(
-              height: 78,
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(28),
@@ -1080,7 +1045,8 @@ class _LeaderboardCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (profit != null)
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 const Icon(
                                   Iconsax.trend_up,

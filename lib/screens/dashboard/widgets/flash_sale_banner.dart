@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
 class FlashSaleBanner extends StatefulWidget {
@@ -102,7 +103,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
         final double discountScale =
             0.9 + 0.2 * (0.5 + 0.5 * math.sin(2 * math.pi * t * 2));
 
-        // Glow “strength” behind FLASH SALE badge
+        // Glow "strength" behind FLASH SALE badge
         final double badgeGlowStrength =
             0.4 + 0.6 * (0.5 + 0.5 * math.sin(2 * math.pi * t * 1.5));
 
@@ -180,11 +181,12 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 // Badge with glow ring
                                 Stack(
                                   children: [
-                                    // Glow behind badge – NO Opacity widget now
+                                    // Glow behind badge
                                     Positioned.fill(
                                       child: Container(
                                         decoration: BoxDecoration(
@@ -236,6 +238,8 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                           SizedBox(width: 6),
                                           Text(
                                             "FLASH SALE",
+                                            textScaleFactor:
+                                                1.0, // Lock font scaling
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -255,6 +259,9 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                 // Title
                                 Text(
                                   "Limited Time Offer",
+                                  textScaleFactor: 1.0, // Lock font scaling
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.95),
                                     fontSize: 19,
@@ -265,6 +272,9 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                 const SizedBox(height: 4),
                                 Text(
                                   "Grab this best-seller before the timer hits zero.",
+                                  textScaleFactor: 1.0, // Lock font scaling
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.7),
                                     fontSize: 11,
@@ -285,6 +295,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                     ),
                                     const Text(
                                       " : ",
+                                      textScaleFactor: 1.0, // Lock font scaling
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -298,6 +309,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                                     ),
                                     const Text(
                                       " : ",
+                                      textScaleFactor: 1.0, // Lock font scaling
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -386,9 +398,11 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             "${_flashProduct!.discountPercentage}%",
+                            textScaleFactor: 1.0, // Lock font scaling
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -397,6 +411,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                           ),
                           const Text(
                             "OFF",
+                            textScaleFactor: 1.0, // Lock font scaling
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 8,
@@ -408,7 +423,6 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                     ),
                   ),
                 ),
-
               // --- 4. CLICK ACTION ---
               Positioned.fill(
                 child: Material(
@@ -416,25 +430,90 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
                   child: InkWell(
                     borderRadius: BorderRadius.circular(24),
                     onTap: () {
-                      final CartController controller =
-                          Get.find<CartController>();
-                      controller.addToCart(_flashProduct!);
-
-                      try {
-                        // ignore: invalid_use_of_protected_member
-                        controller.showCustomCartSnackbar(_flashProduct!);
-                      } catch (_) {
-                        // fallback simple snackbar if method doesn't exist
-                        Get.snackbar(
-                          "Added to Cart",
-                          _flashProduct!.name,
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.black87,
-                          colorText: Colors.white,
-                        );
-                      }
+                      Get.to(
+                        () => ProductDetailsPage(product: _flashProduct!),
+                        transition: Transition.rightToLeft,
+                        duration: const Duration(milliseconds: 300),
+                      );
                     },
                   ),
+                ),
+              ),
+              // --- ADD TO CART (GLASS CTA – MATCHES FLASH UI) ---
+              Positioned(
+                left: 200,
+                bottom: 18,
+                child: AnimatedBuilder(
+                  animation: _animController,
+                  builder: (context, _) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        final CartController controller =
+                            Get.find<CartController>();
+                        controller.addToCart(_flashProduct!);
+
+                        try {
+                          // ignore: invalid_use_of_protected_member
+                          controller.showCustomCartSnackbar(_flashProduct!);
+                        } catch (_) {
+                          Get.snackbar(
+                            "Added to Cart",
+                            _flashProduct!.name,
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.black87,
+                            colorText: Colors.white,
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: Colors.white.withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: const Color(
+                              0xFFFFD54F,
+                            ).withValues(alpha: 0.45),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFFFFD54F,
+                              ).withValues(alpha: 0.25 + 0.15 * bgPulse),
+                              blurRadius: 14 + 6 * bgPulse,
+                              spreadRadius: 0.5,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Iconsax.shopping_cart,
+                              size: 16,
+                              color: Color(0xFFFFD54F),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              "Add to Cart",
+                              textScaleFactor: 1.0, // Lock font scaling
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -451,6 +530,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
     return Transform.translate(
       offset: Offset(0, jitterY),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -467,6 +547,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
             ),
             child: Text(
               value.toString().padLeft(2, '0'),
+              textScaleFactor: 1.0, // Lock font scaling
               style: const TextStyle(
                 color: Color(0xFF4A317E),
                 fontWeight: FontWeight.bold,
@@ -478,6 +559,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
           const SizedBox(height: 2),
           Text(
             label,
+            textScaleFactor: 1.0, // Lock font scaling
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 8,

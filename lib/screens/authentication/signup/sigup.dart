@@ -1,5 +1,6 @@
 // lib/screens/authentication/signup/sigup.dart
 
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
@@ -68,7 +69,7 @@ class _RegisterPageState extends State<RegisterPage>
   late final AnimationController _bgController;
 
   // GraphQL client (same endpoint as login)
-  final String _graphqlUrl = "https://kakiso.com/graphql";
+  final String _graphqlUrl = "https://stage.kakiso.com/graphql";
   late GraphQLClient _client;
 
   @override
@@ -84,8 +85,14 @@ class _RegisterPageState extends State<RegisterPage>
     _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
   }
 
+  Timer? _passwordHideTimer;
+  Timer? _confirmPasswordHideTimer;
+
+  @override
   @override
   void dispose() {
+    _passwordHideTimer?.cancel();
+    _confirmPasswordHideTimer?.cancel();
     _bgController.dispose();
     _fullNameController.dispose();
     _phoneController.dispose();
@@ -306,7 +313,7 @@ class _RegisterPageState extends State<RegisterPage>
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  e.toString().replaceFirst('Exception: ', '').trim(),
+                  "Account Already exists or an error occurred.\nPlease try again with different details.",
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     color: Colors.white,
@@ -355,7 +362,7 @@ class _RegisterPageState extends State<RegisterPage>
                     const SizedBox(height: 24),
 
                     const Text(
-                      'Create your Kakiso account',
+                      'Create your KaKiSo account',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 24,
@@ -521,23 +528,40 @@ class _RegisterPageState extends State<RegisterPage>
                                   ).copyWith(
                                     suffixIcon: IconButton(
                                       icon: Icon(
-                                        _isPasswordVisible
+                                        _isConfirmPasswordVisible
                                             ? Icons.visibility_outlined
                                             : Icons.visibility_off_outlined,
                                         color: kAccentColor,
                                       ),
                                       onPressed: () {
-                                        setState(() {
-                                          _isPasswordVisible =
-                                              !_isPasswordVisible;
-                                        });
+                                        setState(
+                                          () =>
+                                              _isConfirmPasswordVisible = true,
+                                        );
+
+                                        _confirmPasswordHideTimer?.cancel();
+                                        _confirmPasswordHideTimer = Timer(
+                                          const Duration(seconds: 3),
+                                          () {
+                                            if (mounted) {
+                                              setState(
+                                                () =>
+                                                    _isConfirmPasswordVisible =
+                                                        false,
+                                              );
+                                            }
+                                          },
+                                        );
                                       },
                                     ),
                                   ),
                               validator: (value) {
                                 final v = value ?? '';
-                                if (v.length < 9) {
-                                  return 'Password must be more than 8 characters.';
+                                if (v.isEmpty) {
+                                  return 'Password is required.';
+                                }
+                                if (v.length < 6 || v.length > 20) {
+                                  return 'Password must be 6–20 characters.';
                                 }
                                 if (!RegExp(r'[A-Z]').hasMatch(v)) {
                                   return 'Include at least one uppercase letter.';
@@ -552,7 +576,6 @@ class _RegisterPageState extends State<RegisterPage>
                               },
                             ),
                             const SizedBox(height: 10),
-
                             Row(
                               children: const [
                                 Icon(
@@ -563,7 +586,7 @@ class _RegisterPageState extends State<RegisterPage>
                                 SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'Use 9+ characters with uppercase, lowercase letters & numbers.',
+                                    'Use 6–20 characters with uppercase, lowercase letters & numbers.',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 11,
@@ -586,16 +609,28 @@ class _RegisterPageState extends State<RegisterPage>
                                   ).copyWith(
                                     suffixIcon: IconButton(
                                       icon: Icon(
-                                        _isConfirmPasswordVisible
+                                        _isPasswordVisible
                                             ? Icons.visibility_outlined
                                             : Icons.visibility_off_outlined,
                                         color: kAccentColor,
                                       ),
                                       onPressed: () {
-                                        setState(() {
-                                          _isConfirmPasswordVisible =
-                                              !_isConfirmPasswordVisible;
-                                        });
+                                        setState(
+                                          () => _isPasswordVisible = true,
+                                        );
+
+                                        _passwordHideTimer?.cancel();
+                                        _passwordHideTimer = Timer(
+                                          const Duration(seconds: 3),
+                                          () {
+                                            if (mounted) {
+                                              setState(
+                                                () =>
+                                                    _isPasswordVisible = false,
+                                              );
+                                            }
+                                          },
+                                        );
                                       },
                                     ),
                                   ),
@@ -652,7 +687,7 @@ class _RegisterPageState extends State<RegisterPage>
                                             text: 'I agree to Kakiso’s ',
                                           ),
                                           TextSpan(
-                                            text: 'Terms of Use',
+                                            text: 'Terms & Conditions of Use',
                                             style: const TextStyle(
                                               color: kPrimaryDeep,
                                               fontWeight: FontWeight.w600,
@@ -668,7 +703,7 @@ class _RegisterPageState extends State<RegisterPage>
                                           ),
                                           const TextSpan(text: ' and '),
                                           TextSpan(
-                                            text: 'Privacy Policy',
+                                            text: 'Privacy Notice',
                                             style: const TextStyle(
                                               color: kPrimaryDeep,
                                               fontWeight: FontWeight.w600,
@@ -766,7 +801,7 @@ class _RegisterPageState extends State<RegisterPage>
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'It takes less than a minute to start selling with Kakiso.',
+                          'It takes less than a minute to start selling with KaKiSo',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Poppins',

@@ -1,3 +1,4 @@
+import 'dart:math' as math; // Added for max/min clamping
 import 'dart:ui'; // Required for ImageFilter
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -12,7 +13,6 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // --- SCREENS ---
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-// IMPORTANT: Import your Product Details Page
 
 class NewArrivalSection extends StatefulWidget {
   const NewArrivalSection({super.key});
@@ -128,7 +128,15 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
 
   @override
   Widget build(BuildContext context) {
-    const double sectionHeight = 320.0;
+    // --- SCALING LOGIC ---
+    // Calculate a scaler based on text size, capped at 1.4x to prevent breaking layout entirely
+    final double textScale = MediaQuery.textScalerOf(context).scale(1);
+    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
+
+    // Base heights that scale
+    final double sectionHeight = 320.0 * scaleFactor;
+    final double cardHeight = 300.0 * scaleFactor;
+    // ---------------------
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,29 +147,34 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEB2A7E),
-                      borderRadius: BorderRadius.circular(4),
+              Flexible(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEB2A7E),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Fresh Drops',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                      fontFamily: 'Poppins',
+                    const SizedBox(width: 8),
+                    const Flexible(
+                      child: Text(
+                        'Fresh Drops',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text('🔥', style: TextStyle(fontSize: 20)),
-                ],
+                    const SizedBox(width: 6),
+                    const Text('🔥', style: TextStyle(fontSize: 20)),
+                  ],
+                ),
               ),
               GestureDetector(
                 onTap: () {
@@ -205,16 +218,17 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
                     final product = _products[index];
                     return EditorialProductCard(
                       product: product,
-                      width: 200,
-                      height: 300,
-
+                      width:
+                          200, // Width is generally fine fixed, but height needs to breathe
+                      height: cardHeight,
+                      scaleFactor: scaleFactor, // Pass scaler down
                       // 1. ADD TO CART
                       onAddToCart: () {
                         cartController.addToCart(product);
                         _showPremiumPopup(product);
                       },
 
-                      // 2. NAVIGATION ACTION (The Fix)
+                      // 2. NAVIGATION ACTION
                       onPressed: () {
                         Get.to(
                           () => ProductDetailsPage(product: product),
@@ -233,13 +247,13 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
 }
 
 // --- WORLD CLASS CARD WIDGET ---
-// (Kept here for ease of copy-paste, you can move this to a separate file later)
 class EditorialProductCard extends StatelessWidget {
   final ProductModel product;
   final double width;
   final double height;
+  final double scaleFactor; // Received from parent
   final VoidCallback onAddToCart;
-  final VoidCallback? onPressed; // Added navigation callback
+  final VoidCallback? onPressed;
 
   const EditorialProductCard({
     super.key,
@@ -247,14 +261,17 @@ class EditorialProductCard extends StatelessWidget {
     required this.onAddToCart,
     this.width = 180.0,
     this.height = 280.0,
-    this.onPressed, // Added to constructor
+    this.scaleFactor = 1.0,
+    this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    // 3. Wrap the Container in GestureDetector
+    // Dynamically scale the gradient height so it covers larger text
+    final double gradientHeight = 140 * scaleFactor;
+
     return GestureDetector(
-      onTap: onPressed, // Trigger navigation
+      onTap: onPressed,
       child: Container(
         width: width,
         height: height,
@@ -289,12 +306,12 @@ class EditorialProductCard extends StatelessWidget {
                 ),
               ),
 
-              // --- B. GRADIENT OVERLAY ---
+              // --- B. GRADIENT OVERLAY (Dynamic Height) ---
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: 140,
+                height: gradientHeight,
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -349,6 +366,7 @@ class EditorialProductCard extends StatelessWidget {
                 left: 12,
                 right: 12,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min, // Pack tightly
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -380,35 +398,43 @@ class EditorialProductCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Price Pill
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.1),
+                        // Price Pill (Flexible to prevent overflow)
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
                             ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                              child: Text(
-                                "₹${product.price}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                  fontFamily: 'Poppins',
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    "BUY ₹${product.price}",
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
+
+                        const SizedBox(width: 8),
 
                         // --- ACTIVE ADD BUTTON (Separate Gesture) ---
                         GestureDetector(

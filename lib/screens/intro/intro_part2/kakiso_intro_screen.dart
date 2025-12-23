@@ -43,7 +43,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
     _IntroItem(
       title: "Share catalogues, earn big",
       subtitle:
-          "Share Kakiso catalogues directly to WhatsApp. You set the price, you keep the entire profit margin.",
+          "Share KaKiSo catalogues directly to WhatsApp. You set the price, you keep the entire profit margin.",
       icon: Iconsax.share,
       accentIcon: Iconsax.money_3,
     ),
@@ -107,6 +107,10 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
   Widget build(BuildContext context) {
     // Determine which page is currently active (int)
     final int activeIndex = _currentPageValue.round();
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Calculate dynamic card height based on screen size (responsive)
+    final cardHeight = (screenHeight * 0.5).clamp(380.0, 480.0);
 
     return Scaffold(
       backgroundColor: kBgColor,
@@ -121,14 +125,14 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
               children: [
                 const SizedBox(height: 16),
 
-                // --- HEADER: Logo & Skip ---
-                _buildHeader(),
+                // --- HEADER: Logo & Skip/Get Started ---
+                _buildHeader(activeIndex),
 
                 const Spacer(flex: 1),
 
                 // --- CAROUSEL (The Hero) ---
                 SizedBox(
-                  height: 420, // Fixed height for consistency
+                  height: cardHeight,
                   child: PageView.builder(
                     controller: _pageController,
                     itemCount: _pages.length,
@@ -228,7 +232,9 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(int activeIndex) {
+    final bool isLastPage = activeIndex == _pages.length - 1;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Row(
@@ -243,17 +249,29 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
             ],
           ),
 
-          TextButton(
-            onPressed: _goToLogin,
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.black54,
-              splashFactory: NoSplash.splashFactory, // cleaner look
-            ),
-            child: const Text(
-              "Skip",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w500,
+          // Animated Button that changes from "Skip" to "Get Started"
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(scale: animation, child: child),
+              );
+            },
+            child: TextButton(
+              key: ValueKey<bool>(isLastPage),
+              onPressed: _goToLogin,
+              style: TextButton.styleFrom(
+                foregroundColor: isLastPage ? kPrimaryDeep : Colors.black54,
+                splashFactory: NoSplash.splashFactory,
+              ),
+              child: Text(
+                isLastPage ? "Get Started" : "Skip",
+                textScaleFactor: 1.0, // Lock font scaling
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: isLastPage ? FontWeight.w600 : FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -310,6 +328,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
                 child: activeIndex == _pages.length - 1
                     ? const Text(
                         "Get Started",
+                        textScaleFactor: 1.0, // Lock font scaling
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 16,
@@ -322,6 +341,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
                         children: const [
                           Text(
                             "Next Step",
+                            textScaleFactor: 1.0, // Lock font scaling
                             style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 16,
@@ -347,6 +367,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
           GestureDetector(
             onTap: _goToLogin,
             child: RichText(
+              textScaleFactor: 1.0, // Lock font scaling
               text: const TextSpan(
                 text: "Already have an account? ",
                 style: TextStyle(
@@ -512,93 +533,106 @@ class _IntroCard extends StatelessWidget {
               ),
             ),
 
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Icon Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
-                          ),
-                        ),
-                        child: Icon(item.icon, size: 32, color: Colors.white),
-                      ),
-                      // Animated Accent Icon
-                      TweenAnimationBuilder(
-                        tween: Tween<double>(begin: 0, end: isActive ? 1 : 0),
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.elasticOut,
-                        builder: (context, double value, child) {
-                          return Transform.scale(
-                            scale: value,
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                item.accentIcon,
-                                size: 20,
-                                color: kAccentColor,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const Spacer(),
-
-                  // Text Content with subtle animation on Active state
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 400),
-                    opacity: isActive ? 1.0 : 0.6,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            // Content with ScrollView for overflow protection
+            SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            height: 1.1,
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                            ),
                           ),
+                          child: Icon(item.icon, size: 32, color: Colors.white),
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          item.subtitle,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 15,
-                            height: 1.5,
-                            color: Color(0xFFE9E6FF),
-                          ),
+                        // Animated Accent Icon
+                        TweenAnimationBuilder(
+                          tween: Tween<double>(begin: 0, end: isActive ? 1 : 0),
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.elasticOut,
+                          builder: (context, double value, child) {
+                            return Transform.scale(
+                              scale: value,
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  item.accentIcon,
+                                  size: 20,
+                                  color: kAccentColor,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
+
+                    const SizedBox(height: 32),
+
+                    // Text Content with subtle animation on Active state
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 400),
+                      opacity: isActive ? 1.0 : 0.6,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            item.title,
+                            textScaleFactor: 1.0, // Lock font scaling
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            item.subtitle,
+                            textScaleFactor: 1.0, // Lock font scaling
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 15,
+                              height: 1.5,
+                              color: Color(0xFFE9E6FF),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           ],

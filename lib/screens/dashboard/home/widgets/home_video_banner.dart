@@ -67,7 +67,7 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
   void _openAllProducts() {
     Get.to(
       () => const AllProductsScreen(
-        title: 'All Products',
+        title: 'Christmas Specials',
         initialOrderBy: 'date',
         initialOrder: 'desc',
       ),

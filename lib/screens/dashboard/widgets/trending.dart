@@ -15,7 +15,14 @@ import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 class TrendingCard extends StatelessWidget {
   final ProductModel product;
   final int index;
-  const TrendingCard({super.key, required this.product, required this.index});
+  final double scaleFactor; // Added for dynamic scaling
+
+  const TrendingCard({
+    super.key,
+    required this.product,
+    required this.index,
+    this.scaleFactor = 1.0,
+  });
 
   void _showPremiumPopup(ProductModel product) {
     Get.snackbar(
@@ -104,9 +111,12 @@ class TrendingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final CartController cartController = Get.put(CartController());
 
+    // Calculate dynamic dimensions
+    final double cardWidth = 160 * scaleFactor;
+    final double imageHeight = 160 * scaleFactor;
+
     return GestureDetector(
       onTap: () {
-        // Navigate to Product Details
         Get.to(
           () => ProductDetailsPage(product: product),
           transition: Transition.fadeIn,
@@ -114,7 +124,7 @@ class TrendingCard extends StatelessWidget {
         );
       },
       child: Container(
-        width: 160,
+        width: cardWidth,
         margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -129,11 +139,12 @@ class TrendingCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Pack tightly
           children: [
             Stack(
               children: [
                 Container(
-                  height: 160,
+                  height: imageHeight,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(
@@ -159,7 +170,7 @@ class TrendingCard extends StatelessWidget {
                   child: Text(
                     "${index + 1}".padLeft(2, '0'),
                     style: TextStyle(
-                      fontSize: 40,
+                      fontSize: 40 * scaleFactor, // Scale the rank number too
                       fontWeight: FontWeight.w900,
                       color: Colors.white.withValues(alpha: 0.8),
                       fontFamily: 'Poppins',
@@ -200,15 +211,24 @@ class TrendingCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "₹${product.price}",
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF4A317E), // Brand Color
-                          fontFamily: 'Poppins',
+                      // Flexible wrapper prevents price from pushing button off-screen
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Buy ₹${product.price}",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF4A317E),
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
                         ),
                       ),
+
+                      const SizedBox(width: 8),
 
                       // --- ADD BUTTON ---
                       Material(
@@ -217,18 +237,19 @@ class TrendingCard extends StatelessWidget {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
                           onTap: () {
-                            // Cart Logic
                             cartController.addToCart(product);
                             _showPremiumPopup(product);
                           },
                           child: Container(
-                            width: 28,
-                            height: 28,
+                            width:
+                                28 *
+                                scaleFactor, // Slightly larger button touch area
+                            height: 28 * scaleFactor,
                             alignment: Alignment.center,
-                            child: const Icon(
+                            child: Icon(
                               Icons.add,
                               color: Colors.white,
-                              size: 18,
+                              size: 18 * scaleFactor,
                             ),
                           ),
                         ),
@@ -266,7 +287,6 @@ class _TrendingProductsState extends State<TrendingProducts>
     super.initState();
     _scrollController = ScrollController();
 
-    // Background animation controller (soft, slow motion)
     _bgController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 20),
@@ -299,6 +319,14 @@ class _TrendingProductsState extends State<TrendingProducts>
 
   @override
   Widget build(BuildContext context) {
+    // --- SCALING LOGIC ---
+    // Calculate scaler, capped at 1.4x for safety
+    final double textScale = MediaQuery.textScalerOf(context).scale(1);
+    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
+
+    // Base height (was 270) scaled up
+    final double sectionHeight = 280.0 * scaleFactor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -308,55 +336,61 @@ class _TrendingProductsState extends State<TrendingProducts>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Text(
-                    'Trending on',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  ShaderMask(
-                    shaderCallback: (rect) {
-                      return const LinearGradient(
-                        colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ).createShader(rect);
-                    },
-                    child: const Text(
-                      'KakiSo',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        fontFamily: 'Poppins',
+              // Use Flexible to prevent overlap with "View All"
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Flexible(
+                      child: Text(
+                        'Trending on',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                          fontFamily: 'Poppins',
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEDD5),
-                      borderRadius: BorderRadius.circular(8),
+                    const SizedBox(width: 6),
+                    ShaderMask(
+                      shaderCallback: (rect) {
+                        return const LinearGradient(
+                          colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ).createShader(rect);
+                      },
+                      child: const Text(
+                        'KakiSo',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
                     ),
-                    child: const Icon(
-                      Iconsax.trend_up,
-                      color: Color(0xFFFB923C),
-                      size: 20,
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEDD5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Iconsax.trend_up,
+                        color: Color(0xFFFB923C),
+                        size: 20,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               // --- VIEW ALL BUTTON ---
               GestureDetector(
                 onTap: () {
-                  // Navigate to AllProductsScreen using the Trending API function
                   Get.to(
                     () => const AllProductsScreen(
                       title: "Trending Now",
@@ -381,7 +415,7 @@ class _TrendingProductsState extends State<TrendingProducts>
 
         // --- HORIZONTAL LIST + ANIMATED BLOB BACKGROUND ---
         SizedBox(
-          height: 270,
+          height: sectionHeight, // Dynamic height
           child: AnimatedBuilder(
             animation: _bgController,
             builder: (context, _) {
@@ -389,7 +423,7 @@ class _TrendingProductsState extends State<TrendingProducts>
 
               return Stack(
                 children: [
-                  // Background – soft blurry blobs & tiny particles
+                  // Background
                   Positioned.fill(
                     child: IgnorePointer(
                       child: CustomPaint(
@@ -424,7 +458,11 @@ class _TrendingProductsState extends State<TrendingProducts>
                       itemCount: _products.length,
                       itemBuilder: (context, index) {
                         final product = _products[index];
-                        return TrendingCard(product: product, index: index);
+                        return TrendingCard(
+                          product: product,
+                          index: index,
+                          scaleFactor: scaleFactor, // Pass scaler to card
+                        );
                       },
                     ),
                 ],
@@ -438,7 +476,7 @@ class _TrendingProductsState extends State<TrendingProducts>
 }
 
 /// ------------------------------------------------------------
-/// Soft Blurry Color Blobs Background (Myntra / Nykaa-esque)
+/// Soft Blurry Color Blobs Background
 /// ------------------------------------------------------------
 class _BlobBackgroundPainter extends CustomPainter {
   final double progress; // 0 → 1 loop
@@ -458,7 +496,7 @@ class _BlobBackgroundPainter extends CustomPainter {
     ).createShader(bgRect);
     canvas.drawRect(bgRect, paint);
 
-    // 2. Soft color blobs (3 main blobs)
+    // 2. Soft color blobs
     _drawBlob(
       canvas,
       size,
@@ -492,7 +530,7 @@ class _BlobBackgroundPainter extends CustomPainter {
       color: const Color(0xFF22C7D5).withValues(alpha: 0.22),
     );
 
-    // 3. Tiny floating dots (particles)
+    // 3. Tiny floating dots
     final int dots = 26;
     final Paint dotPaint = Paint();
     for (int i = 0; i < dots; i++) {
@@ -514,7 +552,7 @@ class _BlobBackgroundPainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), 1.5, dotPaint);
     }
 
-    // 4. Soft glow strip at bottom (behind cards)
+    // 4. Soft glow strip at bottom
     final Paint glowPaint = Paint()
       ..shader =
           LinearGradient(

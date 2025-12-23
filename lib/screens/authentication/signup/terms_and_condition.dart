@@ -8,7 +8,7 @@ class TermsOfUsePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Terms of Use',
+          'Terms & Conditions of Use',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
       ),
