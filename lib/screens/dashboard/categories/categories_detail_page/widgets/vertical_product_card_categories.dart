@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -53,8 +52,10 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
   static const Color kSuccessColor = Color(0xFF22C55E); // Green (Cart)
   static const Color kCatalogSuccessColor = Color(0xFF0D9488); // Teal (Catalog)
 
-  // Initialize CartController
-  final CartController cartController = Get.put(CartController());
+  // --- SAFER CONTROLLER ACCESS ---
+  final CartController cartController = Get.isRegistered<CartController>()
+      ? Get.find<CartController>()
+      : Get.put(CartController());
 
   // --- ACTIONS ---
   void _handleAddToCart() {
@@ -69,65 +70,62 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
 
   void _triggerCatalogSuccess() {
     setState(() {
-      // 1. Save to static session cache
       VerticalProductCard._sessionAddedToCatalog.add(widget.product.id);
     });
-
-    // // 2. Trigger parent selection to sync Checkbox
-    // if (!widget.isSelected && widget.onSelectionToggle != null) {
-    //   widget.onSelectionToggle!();
-    // }
   }
 
   void _showAddedToCartPopup() {
-    Get.snackbar(
-      '',
-      '',
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      borderRadius: 12,
-      backgroundColor: kBlack.withValues(alpha: 0.95),
-      colorText: Colors.white,
-      snackStyle: SnackStyle.FLOATING,
-      titleText: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(26),
-              child: Image.network(
-                widget.product.image,
-                width: 32,
-                height: 32,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.broken_image, size: 20),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              "Added to Cart successfully!",
-              style: TextStyle(
+    if (Get.context != null) {
+      Get.snackbar(
+        '',
+        '',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        borderRadius: 12,
+        backgroundColor: kBlack.withValues(alpha: 0.95),
+        colorText: Colors.white,
+        snackStyle: SnackStyle.FLOATING,
+        titleText: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
                 color: Colors.white,
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Image.network(
+                  widget.product.image,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image, size: 20),
+                ),
               ),
             ),
-          ),
-          const Icon(Iconsax.tick_circle, color: Color(0xFF4ADE80), size: 22),
-        ],
-      ),
-      messageText: const SizedBox.shrink(),
-      duration: const Duration(seconds: 2),
-    );
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                "Added to Cart successfully!",
+                textScaleFactor: 1.0, // Lock font scaling
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            const Icon(Iconsax.tick_circle, color: Color(0xFF4ADE80), size: 22),
+          ],
+        ),
+        messageText: const SizedBox.shrink(),
+        duration: const Duration(seconds: 2),
+      );
+    }
   }
 
   double? _parsePrice(String value) {
@@ -142,12 +140,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
 
   @override
   Widget build(BuildContext context) {
-    // --- SCALING LOGIC ---
-    final double textScale = MediaQuery.textScalerOf(context).scale(1);
-    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
-
     // --- LOGIC: CATALOG / SELECTION STATE ---
-    // Combined State: Parent Selection OR Static Session Cache
     final bool isVisuallySelected =
         widget.isSelected ||
         VerticalProductCard._sessionAddedToCatalog.contains(widget.product.id);
@@ -178,7 +171,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(kRadius),
             border: Border.all(
-              // Border color changes based on Selection
               color: isVisuallySelected
                   ? kPrimaryColor.withValues(alpha: 0.6)
                   : kBorderColor,
@@ -288,6 +280,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                 const SizedBox(width: 4),
                                 Text(
                                   "-${widget.product.discountPercentage}%",
+                                  textScaleFactor: 1.0, // Lock font scaling
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 6,
@@ -300,7 +293,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           ),
                         ),
 
-                      // Selection Checkbox (top-right)
+                      // Selection Checkbox
                       if (widget.onSelectionToggle != null)
                         Positioned(
                           top: 8,
@@ -308,11 +301,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
-                              // MODIFIED: If already selected (visually), do nothing.
-                              // This prevents unselecting or clearing state on click.
-                              if (isVisuallySelected) {
-                                return;
-                              }
+                              if (isVisuallySelected) return;
                               widget.onSelectionToggle?.call();
                             },
                             child: AnimatedContainer(
@@ -321,7 +310,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                               height: 24,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                // Color changes based on selection
                                 color: isVisuallySelected
                                     ? kPrimaryColor
                                     : Colors.white.withValues(alpha: 0.96),
@@ -354,172 +342,147 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                 ),
 
                 // ===========================
-                // 2. HEADING
+                // 2. PRODUCT NAME
                 // ===========================
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: kBorderColor)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (resellPrice != null) const SizedBox(height: 6),
-                      Text(
-                        widget.product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.left,
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: kBlack,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    widget.product.name,
+                    textScaleFactor: 1.0, // Lock font scaling
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.left,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: kBlack,
+                      height: 1.25,
+                    ),
                   ),
                 ),
 
                 // ===========================
-                // 3. PRICE (RESELL + BUY + MRP)
+                // 3. PRICE SECTION
                 // ===========================
                 Container(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+                  padding: const EdgeInsets.fromLTRB(5, 6, 10, 2),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
                     border: Border(top: BorderSide(color: kBorderColor)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Resell price (hero)
-                      if (resellPrice != null)
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text(
-                                "Buy ",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF6B7280),
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                              Text(
-                                "₹${widget.product.price}",
-                                style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: kPrimaryColor,
-                                  height: 1.1,
-                                ),
-                              ),
-                              if (profit != null)
-                                Positioned(
-                                  left: 8,
-                                  bottom: 8,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE0FBEA),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Iconsax.trend_up,
-                                          size: 11,
-                                          color: Color(0xFF15803D),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          "Profit ~ ₹${profit.toStringAsFixed(0)}",
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF166534),
-                                            fontFamily: 'Poppins',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
+                      // Buy Price + Profit
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            "Buy ",
+                            textScaleFactor: 1.0, // Lock font scaling
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF6B7280),
+                              fontFamily: 'Poppins',
+                            ),
                           ),
-                        )
-                      else
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
+                          Flexible(
+                            child: Text(
+                              "₹${widget.product.price}",
+                              textScaleFactor: 1.0, // Lock font scaling
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: kPrimaryColor,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Profit Badge (if applicable)
+                      if (profit != null) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE0FBEA),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (widget.product.regularPrice.isNotEmpty &&
-                                  widget.product.regularPrice !=
-                                      widget.product.price)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 6.0),
-                                  child: Text(
-                                    "₹${widget.product.regularPrice}",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      decoration: TextDecoration.lineThrough,
-                                      color: Colors.grey.shade500,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                              const Icon(
+                                Iconsax.trend_up,
+                                size: 11,
+                                color: Color(0xFF15803D),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  "Profit ~ ₹${profit.toStringAsFixed(0)}",
+                                  textScaleFactor: 1.0, // Lock font scaling
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF166534),
+                                    fontFamily: 'Poppins',
                                   ),
-                                ),
-                              Text(
-                                "₹${widget.product.price}",
-                                style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: kPrimaryColor,
                                 ),
                               ),
                             ],
                           ),
                         ),
-
+                      ],
                       const SizedBox(height: 3),
 
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Row(
-                          children: [
-                            Text(
-                              "Resell ₹${resellPrice?.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                      // Resell + MRP
+                      Row(
+                        children: [
+                          if (resellPrice != null)
+                            Flexible(
+                              child: Text(
+                                "Resell ₹${resellPrice.toStringAsFixed(0)}",
+                                textScaleFactor: 1.0, // Lock font scaling
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
                               ),
                             ),
-                            if (mrpPrice != null &&
-                                widget.product.regularPrice.isNotEmpty &&
-                                widget.product.regularPrice !=
-                                    widget.product.price) ...[
-                              const SizedBox(width: 6),
-                              Text(
+                          if (mrpPrice != null &&
+                              widget.product.regularPrice.isNotEmpty &&
+                              widget.product.regularPrice !=
+                                  widget.product.price) ...[
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
                                 "MRP ₹${mrpPrice.toStringAsFixed(0)}",
+                                textScaleFactor: 1.0, // Lock font scaling
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 10,
                                   decoration: TextDecoration.lineThrough,
@@ -528,19 +491,19 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                   fontFamily: 'Poppins',
                                 ),
                               ),
-                            ],
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ],
                   ),
                 ),
 
                 // ===========================
-                // 4. BUTTONS
+                // 4. ACTION BUTTONS
                 // ===========================
                 Container(
-                  height: 45 * scaleFactor,
+                  height: 45,
                   decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: kBorderColor)),
                   ),
@@ -567,62 +530,61 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 300),
                                   child: isAddedToCart
-                                      ? const Row(
-                                          mainAxisSize: MainAxisSize.min,
+                                      ? const Column(
                                           key: ValueKey('cart_added'),
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            SizedBox(width: 4),
-                                            Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  "Added",
-                                                  style: TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  "to cart",
-                                                  style: TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ],
+                                            Text(
+                                              "Added",
+                                              textScaleFactor:
+                                                  1.0, // Lock font scaling
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            Text(
+                                              "to cart",
+                                              textScaleFactor:
+                                                  1.0, // Lock font scaling
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
                                             ),
                                           ],
                                         )
-                                      : FittedBox(
-                                          key: const ValueKey('cart_normal'),
-                                          fit: BoxFit.scaleDown,
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: const [
-                                              Text(
-                                                "Add to",
-                                                style: TextStyle(
-                                                  fontFamily: 'Poppins',
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                ),
+                                      : const Column(
+                                          key: ValueKey('cart_normal'),
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              "Add to",
+                                              textScaleFactor:
+                                                  1.0, // Lock font scaling
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
                                               ),
-                                              Text(
-                                                "Cart",
-                                                style: TextStyle(
-                                                  fontFamily: 'Poppins',
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
+                                            ),
+                                            Text(
+                                              "Cart",
+                                              textScaleFactor:
+                                                  1.0, // Lock font scaling
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                 ),
                               ),
@@ -634,7 +596,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                       // --- ADD TO CATALOG ---
                       Expanded(
                         child: GestureDetector(
-                          // Disable tap if already selected/added
                           onTap: isVisuallySelected
                               ? null
                               : () => _onAddToCataloguePressed(context),
@@ -643,7 +604,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                             curve: Curves.easeInOut,
                             height: double.infinity,
                             decoration: BoxDecoration(
-                              // Change color if selected
                               color: isVisuallySelected
                                   ? kCatalogSuccessColor
                                   : const Color.fromARGB(255, 255, 73, 152),
@@ -652,62 +612,61 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 300),
                                 child: isVisuallySelected
-                                    ? const Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                    ? const Column(
                                         key: ValueKey('cat_added'),
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          SizedBox(width: 4),
-                                          Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                "Added to",
-                                                style: TextStyle(
-                                                  fontFamily: 'Poppins',
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              Text(
-                                                "Catalog",
-                                                style: TextStyle(
-                                                  fontFamily: 'Poppins',
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ],
+                                          Text(
+                                            "Added to",
+                                            textScaleFactor:
+                                                1.0, // Lock font scaling
+                                            style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          Text(
+                                            "Catalog",
+                                            textScaleFactor:
+                                                1.0, // Lock font scaling
+                                            style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ],
                                       )
-                                    : FittedBox(
-                                        key: const ValueKey('cat_normal'),
-                                        fit: BoxFit.scaleDown,
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: const [
-                                            Text(
-                                              "Add to",
-                                              style: TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
+                                    : const Column(
+                                        key: ValueKey('cat_normal'),
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            "Add to",
+                                            textScaleFactor:
+                                                1.0, // Lock font scaling
+                                            style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
                                             ),
-                                            Text(
-                                              "Catalog",
-                                              style: TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                              ),
+                                          ),
+                                          Text(
+                                            "Catalog",
+                                            textScaleFactor:
+                                                1.0, // Lock font scaling
+                                            style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
                               ),
                             ),
@@ -755,6 +714,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
               ),
               const Text(
                 'Add to Catalog',
+                textScaleFactor: 1.0, // Lock font scaling
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -795,6 +755,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                       const SizedBox(height: 12),
                       const Text(
                         "No catalogues found",
+                        textScaleFactor: 1.0, // Lock font scaling
                         style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
                     ],
@@ -827,6 +788,9 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                       ),
                       title: Text(
                         name,
+                        textScaleFactor: 1.0, // Lock font scaling
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Poppins',
@@ -855,7 +819,10 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                     _showCreateNewCatalogueDialog(context);
                   },
                   icon: const Icon(Iconsax.add_circle, size: 20),
-                  label: const Text('Create New Catalogue'),
+                  label: const Text(
+                    'Create New Catalogue',
+                    textScaleFactor: 1.0, // Lock font scaling
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimaryColor,
                     foregroundColor: Colors.white,
@@ -887,6 +854,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
           ),
           title: const Text(
             'New Catalogue',
+            textScaleFactor: 1.0, // Lock font scaling
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w500,

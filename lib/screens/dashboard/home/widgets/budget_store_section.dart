@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -29,13 +28,18 @@ class BudgetStoreSection extends StatefulWidget {
 }
 
 class _BudgetStoreSectionState extends State<BudgetStoreSection> {
-  final CartController cartController = Get.find<CartController>();
+  // Use safe lookup: Find if registered, otherwise put.
+  final CartController cartController = Get.isRegistered<CartController>()
+      ? Get.find<CartController>()
+      : Get.put(CartController());
+
   final CatalogueController catalogueController =
-      Get.find<CatalogueController>();
+      Get.isRegistered<CatalogueController>()
+      ? Get.find<CatalogueController>()
+      : Get.put(CatalogueController());
 
   int _selectedFilterIndex = 0;
 
-  // 🔥 RANGES:
   final List<_PriceFilter> _filters = const [
     _PriceFilter(label: "₹0 – ₹99", minPrice: 0, maxPrice: 99),
     _PriceFilter(label: "₹99 – ₹199", minPrice: 99, maxPrice: 199),
@@ -45,6 +49,8 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
   ];
 
   void _openAddToCatalogueSheet(ProductModel product) {
+    // FIX: Removed fetchCatalogues() call as it doesn't exist in your controller.
+    // The controller loads data automatically on init.
     final availableCatalogues = catalogueController.catalogueNames;
 
     showModalBottomSheet(
@@ -82,7 +88,6 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
                     ),
                   ),
                 ),
-
                 const Text(
                   'Add product to catalog',
                   style: TextStyle(
@@ -92,7 +97,6 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 if (availableCatalogues.isEmpty)
                   Container(
                     width: double.infinity,
@@ -139,9 +143,7 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
                       },
                     ),
                   ),
-
                 const SizedBox(height: 20),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -255,19 +257,6 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
   Widget build(BuildContext context) {
     final products = _visibleProducts;
 
-    // --- SCALING LOGIC ---
-    final double textScale = MediaQuery.textScalerOf(context).scale(1);
-    final double scaleFactor = math.max(1.0, math.min(textScale, 1.4));
-
-    // Dynamic Aspect Ratio:
-    // As text gets bigger (scaleFactor increases), the ratio gets smaller
-    // (making cards taller) to fit the content.
-    final double dynamicAspectRatio = 0.64 / scaleFactor;
-
-    // Scale filter height
-    final double filterListHeight = 48 * scaleFactor;
-    // ---------------------
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
@@ -336,10 +325,9 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
 
           const SizedBox(height: 12),
 
-          // FILTER CHIPS (tabs style)
-          // Scaled height for accessibility
+          // FILTER CHIPS
           SizedBox(
-            height: filterListHeight,
+            height: 48,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -454,19 +442,17 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
               itemCount: products.length,
               physics: const NeverScrollableScrollPhysics(),
               shrinkWrap: true,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                // DYNAMIC ASPECT RATIO FIX:
-                childAspectRatio: dynamicAspectRatio,
+                childAspectRatio: 0.64,
               ),
               itemBuilder: (context, index) {
                 final product = products[index];
                 return _BudgetProductCard(
                   product: product,
                   parsePrice: _parsePrice,
-                  scaleFactor: scaleFactor, // Pass scaler down
                   onAddToCart: () {
                     cartController.addToCart(product);
                     widget.onProductAddedToCart?.call(product);
@@ -482,7 +468,7 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                height: 44 * scaleFactor, // Scaled button height
+                height: 44,
                 child: OutlinedButton(
                   onPressed: () {
                     Get.to(
@@ -538,14 +524,12 @@ class _BudgetProductCard extends StatelessWidget {
   final double? Function(String) parsePrice;
   final VoidCallback onAddToCart;
   final VoidCallback onAddToCatalogue;
-  final double scaleFactor; // Received from parent
 
   const _BudgetProductCard({
     required this.product,
     required this.parsePrice,
     required this.onAddToCart,
     required this.onAddToCatalogue,
-    this.scaleFactor = 1.0,
   });
 
   static const Color kPrimaryColor = Color(0xFF4A317E);
@@ -563,9 +547,6 @@ class _BudgetProductCard extends StatelessWidget {
     final double? profit = (resellPrice != null && basePrice != null)
         ? (resellPrice - basePrice)
         : null;
-
-    // Dynamically scale the bottom button height
-    final double buttonHeight = 36 * scaleFactor;
 
     return GestureDetector(
       onTap: () {
@@ -591,8 +572,9 @@ class _BudgetProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // IMAGE (Expanded ensures it takes remaining space)
-            Expanded(
+            // IMAGE SECTION - FIXED: Replaced Expanded with AspectRatio
+            AspectRatio(
+              aspectRatio: 1.0, // Ensures square image without crashing
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -636,7 +618,6 @@ class _BudgetProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Discount badge
                   if (product.discountPercentage != null &&
                       product.discountPercentage! > 0)
                     Positioned(
@@ -675,12 +656,53 @@ class _BudgetProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
+
+                  if (profit != null)
+                    Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0FBEA),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF22C55E,
+                            ).withValues(alpha: 0.4),
+                            width: 0.6,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Iconsax.trend_up,
+                              size: 11,
+                              color: Color(0xFF16A34A),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              "You earn ~₹${profit.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF166534),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
 
-            // DETAILS SECTION
-            // Using flexible/column logic to prevent overflow
+            // DETAILS
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 8, 9, 2),
               child: Text(
@@ -710,7 +732,7 @@ class _BudgetProductCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           const Text(
-                            "Buy at ",
+                            "Resell ",
                             style: TextStyle(
                               fontSize: 9.5,
                               fontWeight: FontWeight.w500,
@@ -719,7 +741,7 @@ class _BudgetProductCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            "₹${product.price}",
+                            "₹${resellPrice.toStringAsFixed(0)}",
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 15,
@@ -728,48 +750,6 @@ class _BudgetProductCard extends StatelessWidget {
                               height: 1.1,
                             ),
                           ),
-                          // Profit chip
-                          if (profit != null)
-                            Positioned(
-                              left: 8,
-                              bottom: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE0FBEA),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: const Color(
-                                      0xFF22C55E,
-                                    ).withValues(alpha: 0.4),
-                                    width: 0.6,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Iconsax.trend_up,
-                                      size: 11,
-                                      color: Color(0xFF16A34A),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      "You earn ~₹${profit.toStringAsFixed(0)}",
-                                      style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF166534),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -780,7 +760,7 @@ class _BudgetProductCard extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          "Resell ₹${resellPrice!.toStringAsFixed(0)}",
+                          "Buy ₹${product.price}",
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 10.5,
@@ -810,23 +790,22 @@ class _BudgetProductCard extends StatelessWidget {
               ),
             ),
 
-            // BUTTON ROW (SCALED HEIGHT)
+            // BUTTON ROW
             SizedBox(
-              height: buttonHeight,
+              height: 30,
               child: Row(
                 children: [
-                  // Add to cart
                   Expanded(
                     child: Material(
                       color: kPrimaryColor,
                       child: InkWell(
                         onTap: onAddToCart,
-                        child: Center(
+                        child: const Center(
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
+                              children: [
                                 Text(
                                   "Add to",
                                   style: TextStyle(
@@ -852,8 +831,6 @@ class _BudgetProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // Share / future catalogue
                   Expanded(
                     child: Material(
                       color: Colors.white,
@@ -861,12 +838,12 @@ class _BudgetProductCard extends StatelessWidget {
                         onTap: onAddToCatalogue,
                         child: Container(
                           decoration: BoxDecoration(color: kAccentColor),
-                          child: Center(
+                          child: const Center(
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
-                                children: const [
+                                children: [
                                   Text(
                                     "Add to",
                                     style: TextStyle(
