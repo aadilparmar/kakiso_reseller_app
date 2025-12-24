@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui'; // Required for ImageFilter
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -17,7 +18,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.d
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/categories/widgets/search_and_filter_bar.dart';
 
 class CategoriesSection extends StatefulWidget {
   final UserData userData;
@@ -28,7 +28,8 @@ class CategoriesSection extends StatefulWidget {
   State<CategoriesSection> createState() => _CategoriesPageState();
 }
 
-class _CategoriesPageState extends State<CategoriesSection> {
+class _CategoriesPageState extends State<CategoriesSection>
+    with TickerProviderStateMixin {
   // --- STATE ---
   bool isCategoriesLoading = true;
   String? errorMessage;
@@ -52,11 +53,13 @@ class _CategoriesPageState extends State<CategoriesSection> {
   final TextEditingController _searchController = TextEditingController();
   final catalogueController = Get.put(CatalogueController(), permanent: true);
   final CartController cartController = Get.find<CartController>();
-  final ScrollController _rightSideScrollController = ScrollController();
+
+  final ScrollController _rightScrollController = ScrollController();
 
   // Design Constants
-  final Color _bgRight = const Color(0xFFF4F6F9);
+  final Color _bgRight = const Color(0xFFFAFAFA);
   final Color _bgLeft = Colors.white;
+  final Color _textDark = const Color(0xFF1A1A1A);
 
   @override
   void initState() {
@@ -67,14 +70,15 @@ class _CategoriesPageState extends State<CategoriesSection> {
   @override
   void dispose() {
     _searchController.dispose();
-    _rightSideScrollController.dispose();
+    _rightScrollController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
 
-  // --- PREMIUM SNACKBAR HELPERS ---
+  // --- SNACKBAR HELPERS ---
   void _showSuccessSnackbar(String title, String message) {
     HapticFeedback.mediumImpact();
+    if (Get.isSnackbarOpen) Get.closeAllSnackbars();
     Get.snackbar(
       title,
       message,
@@ -83,106 +87,19 @@ class _CategoriesPageState extends State<CategoriesSection> {
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w700,
-          fontSize: 16,
-          fontFamily: 'Poppins',
+          fontSize: 15,
         ),
       ),
       messageText: Text(
         message,
-        style: const TextStyle(
-          color: Color(0xFFE0E0E0),
-          fontSize: 13,
-          fontFamily: 'Poppins',
-        ),
+        style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
       ),
       snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
-      borderRadius: 20,
-      backgroundColor: const Color(0xFF1F1F1F), // Premium Dark
-      icon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: accentColor.withValues(alpha: 0.2),
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Iconsax.tick_circle, color: accentColor, size: 24),
-      ),
-      shouldIconPulse: true,
-      barBlur: 10,
-      overlayBlur: 0,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      borderRadius: 12,
+      backgroundColor: const Color(0xFF2C2C2C),
+      icon: const Icon(Iconsax.tick_circle, color: accentColor, size: 24),
       duration: const Duration(seconds: 3),
-      boxShadows: [
-        BoxShadow(
-          color: accentColor.withValues(alpha: 0.2),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-          spreadRadius: 2,
-        ),
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.4),
-          blurRadius: 15,
-          offset: const Offset(0, 10),
-        ),
-      ],
-      isDismissible: true,
-      forwardAnimationCurve: Curves.easeOutBack,
-      borderColor: accentColor.withValues(alpha: 0.3),
-      borderWidth: 1.5,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-    );
-  }
-
-  void _showErrorSnackbar(String title, String message) {
-    HapticFeedback.heavyImpact();
-    Get.snackbar(
-      title,
-      message,
-      titleText: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: 16,
-          fontFamily: 'Poppins',
-        ),
-      ),
-      messageText: Text(
-        message,
-        style: const TextStyle(
-          color: Color(0xFFE0E0E0),
-          fontSize: 13,
-          fontFamily: 'Poppins',
-        ),
-      ),
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
-      borderRadius: 20,
-      backgroundColor: const Color(0xFF1F1F1F),
-      icon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.redAccent.withValues(alpha: 0.2),
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Iconsax.warning_2, color: Colors.redAccent, size: 24),
-      ),
-      duration: const Duration(seconds: 4),
-      boxShadows: [
-        BoxShadow(
-          color: Colors.redAccent.withValues(alpha: 0.2),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-          spreadRadius: 2,
-        ),
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.4),
-          blurRadius: 15,
-          offset: const Offset(0, 10),
-        ),
-      ],
-      borderColor: Colors.redAccent.withValues(alpha: 0.3),
-      borderWidth: 1.5,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
     );
   }
 
@@ -208,8 +125,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
       if (mounted) {
         setState(() {
           isCategoriesLoading = false;
-          errorMessage =
-              "Failed to load categories. Please check your connection.";
+          errorMessage = "Failed to load categories.";
         });
       }
     }
@@ -218,11 +134,11 @@ class _CategoriesPageState extends State<CategoriesSection> {
   // --- SEARCH LOGIC ---
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
+    _debounce = Timer(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() {
           _searchQuery = query;
-          _selectedChildId = null;
+          _selectedChildId = null; // Reset sub-cat selection on search
         });
       }
     });
@@ -241,175 +157,89 @@ class _CategoriesPageState extends State<CategoriesSection> {
     return double.tryParse(cleaned) ?? 0.0;
   }
 
-  // --- BULK ACTION SHEETS ---
+  // --- BULK ACTIONS ---
   void _openBulkAddToCatalogueSheet() {
     if (_selectedProductIds.isEmpty) return;
 
     final List<ProductModel> selectedProducts = _selectedProductIds
         .map((id) => _productCache[id])
         .whereType<ProductModel>()
-        .toList(growable: false);
-
-    if (selectedProducts.isEmpty) {
-      _showErrorSnackbar("Action Failed", "No products selected.");
-      return;
-    }
+        .toList();
 
     final availableCatalogues = catalogueController.catalogueNames;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [BoxShadow(blurRadius: 20, color: Colors.black12)],
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  const Icon(Iconsax.copy_success, color: accentColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Add ${selectedProducts.length} Items',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              if (availableCatalogues.isEmpty)
-                _buildNoCataloguesView()
-              else
-                ...availableCatalogues.map(
-                  (name) =>
-                      _buildCatalogueListTile(ctx, name, selectedProducts),
-                ),
-
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showCreateNewCatalogueDialogForBulk(selectedProducts);
-                  },
-                  icon: const Icon(Iconsax.add_circle, size: 20),
-                  label: const Text('Create New Catalog'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildNoCataloguesView() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        children: [
-          Icon(Iconsax.folder_open, size: 30, color: Colors.grey.shade400),
-          const SizedBox(height: 12),
-          Text(
-            "No catalogs found",
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 13,
-              fontFamily: 'Poppins',
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          children: [
+            Container(height: 4, width: 40, color: Colors.grey.shade300),
+            const SizedBox(height: 20),
+            Text(
+              "Add ${selectedProducts.length} items to...",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCatalogueListTile(
-    BuildContext ctx,
-    String name,
-    List<ProductModel> products,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade100),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: accentColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Iconsax.book, color: accentColor, size: 18),
+            const SizedBox(height: 20),
+            Expanded(
+              child: availableCatalogues.isEmpty
+                  ? Center(
+                      child: Text(
+                        "No catalogues found.",
+                        style: TextStyle(color: Colors.grey.shade500),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: availableCatalogues.length,
+                      itemBuilder: (context, index) {
+                        final name = availableCatalogues[index];
+                        return ListTile(
+                          leading: const Icon(Iconsax.folder),
+                          title: Text(name),
+                          trailing: const Icon(
+                            Iconsax.add_circle,
+                            color: accentColor,
+                          ),
+                          onTap: () {
+                            for (var p in selectedProducts) {
+                              catalogueController.addProductToExistingCatalogue(
+                                name,
+                                p,
+                              );
+                            }
+                            Navigator.pop(ctx);
+                            _showSuccessSnackbar("Success", "Added to $name");
+                            setState(() => _selectedProductIds.clear());
+                          },
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _showCreateNewCatalogueDialogForBulk(selectedProducts);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _textDark,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text("Create New Catalogue"),
+            ),
+          ],
         ),
-        title: Text(
-          name,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Poppins',
-            fontSize: 14,
-          ),
-        ),
-        trailing: const Icon(
-          Iconsax.arrow_right_3,
-          size: 16,
-          color: Colors.grey,
-        ),
-        onTap: () {
-          for (final p in products) {
-            catalogueController.addProductToExistingCatalogue(name, p);
-          }
-          Navigator.pop(ctx);
-
-          // ✨ USE PREMIUM SNACKBAR
-          _showSuccessSnackbar(
-            'Success!',
-            '${products.length} products added to "$name".',
-          );
-
-          setState(() => _selectedProductIds.clear());
-        },
       ),
     );
   }
@@ -419,61 +249,35 @@ class _CategoriesPageState extends State<CategoriesSection> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'New Catalog',
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
-        ),
+        title: const Text("New Catalog"),
         content: TextField(
           controller: nameController,
-          autofocus: true,
-          style: const TextStyle(fontFamily: 'Poppins'),
-          decoration: InputDecoration(
-            labelText: 'Catalog Name',
-            hintText: 'e.g. Summer Collection',
-            filled: true,
-            fillColor: Colors.grey.shade50,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
+          decoration: const InputDecoration(hintText: "Catalog Name"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: const Text("Cancel"),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isNotEmpty && products.isNotEmpty) {
+              if (nameController.text.isNotEmpty) {
                 catalogueController.createCatalogueAndAddProduct(
-                  name,
+                  nameController.text,
                   products.first,
                 );
-                for (final p in products.skip(1)) {
-                  catalogueController.addProductToExistingCatalogue(name, p);
+                for (var p in products.skip(1)) {
+                  catalogueController.addProductToExistingCatalogue(
+                    nameController.text,
+                    p,
+                  );
                 }
                 Navigator.pop(ctx);
-
-                // ✨ USE PREMIUM SNACKBAR
-                _showSuccessSnackbar(
-                  'Catalog Created',
-                  'Catalog "$name" has been created successfully.',
-                );
-
+                _showSuccessSnackbar("Success", "Catalog Created");
                 setState(() => _selectedProductIds.clear());
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Create'),
+            child: const Text("Create"),
           ),
         ],
       ),
@@ -499,100 +303,84 @@ class _CategoriesPageState extends State<CategoriesSection> {
       ),
       appBar: _buildModernAppBar(),
       body: isCategoriesLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: accentColor))
           : errorMessage != null
           ? _buildErrorState()
           : SafeArea(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  // 1. IMPROVED LEFT RAIL
-                  _buildLeftRail(textScaler),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // LEFT RAIL
+                      _buildLeftRail(textScaler),
 
-                  // 2. MAIN CONTENT AREA
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _bgRight,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(-2, 0),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          Column(
-                            children: [
-                              // Header Area
-                              Container(
-                                color: Colors.white,
-                                padding: const EdgeInsets.only(
-                                  left: 16,
-                                  right: 16,
-                                  top: 12,
-                                  bottom: 8,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SearchAndFilterBar(
-                                      controller: _searchController,
-                                      onChanged: () => _onSearchChanged(
-                                        _searchController.text,
-                                      ),
-                                      onClear: () {
-                                        _searchController.clear();
-                                        _onSearchChanged('');
-                                      },
-                                      onFilter: () async {
-                                        final result =
-                                            await ModernFilterBottomSheet.show(
-                                              context: context,
-                                              currentFilter: _activeFilter,
-                                              accentColor: accentColor,
-                                            );
-                                        if (result != null && mounted)
-                                          setState(
-                                            () => _activeFilter = result,
-                                          );
-                                      },
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildDynamicHeader(),
-                                  ],
-                                ),
-                              ),
-
-                              // Content Area
-                              Expanded(
-                                child: RefreshIndicator(
-                                  onRefresh: () async {
-                                    _productFutureCache.clear();
-                                    await _loadCategories();
-                                  },
-                                  color: accentColor,
-                                  child: _buildRightSideContent(textScaler),
-                                ),
+                      // RIGHT CONTENT
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _bgRight,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(-4, 0),
                               ),
                             ],
                           ),
+                          child: RefreshIndicator(
+                            color: accentColor,
+                            onRefresh: () async {
+                              _productFutureCache.clear();
+                              await _loadCategories();
+                            },
+                            child: CustomScrollView(
+                              controller: _rightScrollController,
+                              physics: const BouncingScrollPhysics(),
+                              slivers: [
+                                // FIX: Title acts as a normal scrollable item
+                                _buildTitleSliver(),
 
-                          // Animated Floating Selection Bar
-                          _buildAnimatedFloatingBar(),
-                        ],
+                                // FIX: Sticky Header only contains the Search Bar now (Fixed Height)
+                                SliverPersistentHeader(
+                                  pinned: true,
+                                  delegate: _StickySearchDelegate(
+                                    height:
+                                        74, // Fixed height prevents overflow
+                                    child: _buildStickySearchBar(),
+                                  ),
+                                ),
+
+                                if (_searchQuery.isEmpty &&
+                                    _getChildren(_selectedParentId).isNotEmpty)
+                                  SliverPersistentHeader(
+                                    pinned: true,
+                                    delegate: _StickyFilterDelegate(
+                                      height: 60,
+                                      child: _buildSubCategoryTabs(
+                                        _getChildren(_selectedParentId),
+                                      ),
+                                    ),
+                                  ),
+                                _buildRightSideBody(),
+                                const SliverPadding(
+                                  padding: EdgeInsets.only(bottom: 100),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+                  _buildAnimatedFloatingBar(),
                 ],
               ),
             ),
     );
   }
 
-  // --- 1. LEFT RAIL ---
+  // --- LEFT RAIL ---
   Widget _buildLeftRail(TextScaler textScaler) {
     final parents = _getParents();
     final double railWidth = (85 * textScaler.scale(1)).clamp(85, 110);
@@ -600,7 +388,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
     return SizedBox(
       width: railWidth,
       child: ListView.builder(
-        padding: const EdgeInsets.only(top: 10, bottom: 80),
+        padding: const EdgeInsets.only(top: 20, bottom: 80),
         itemCount: parents.length,
         itemBuilder: (context, index) {
           final cat = parents[index];
@@ -608,112 +396,74 @@ class _CategoriesPageState extends State<CategoriesSection> {
 
           return GestureDetector(
             onTap: () {
+              HapticFeedback.selectionClick();
               if (_searchQuery.isNotEmpty) {
                 _searchController.clear();
-                _searchQuery = "";
+                _onSearchChanged("");
               }
               setState(() {
                 _selectedParentId = cat.id;
                 _selectedChildId = null;
-                if (_rightSideScrollController.hasClients) {
-                  _rightSideScrollController.jumpTo(0);
-                }
               });
+              if (_rightScrollController.hasClients) {
+                _rightScrollController.jumpTo(0);
+              }
             },
             child: Container(
-              height: 100,
-              margin: const EdgeInsets.only(bottom: 0),
-              child: Stack(
+              color: Colors.transparent,
+              child: Row(
                 children: [
-                  // Active Indicator (Vertical Bar)
-                  AnimatedPositioned(
+                  AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    left: 0,
-                    top: isSelected ? 15 : 40,
-                    bottom: isSelected ? 15 : 40,
+                    height: isSelected ? 36 : 0,
                     width: 4,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected ? accentColor : Colors.transparent,
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(4),
-                          bottomRight: Radius.circular(4),
-                        ),
+                    decoration: const BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(4),
+                        bottomRight: Radius.circular(4),
                       ),
                     ),
                   ),
-
-                  // Main Content
-                  Center(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: isSelected ? railWidth - 10 : railWidth - 20,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? accentColor.withValues(alpha: 0.05)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 4,
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          AnimatedScale(
-                            scale: isSelected ? 1.05 : 1.0,
+                          AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            child: Container(
-                              height: 44,
-                              width: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                                border: Border.all(
-                                  color: isSelected
-                                      ? accentColor.withValues(alpha: 0.2)
-                                      : Colors.grey.shade100,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: accentColor.withValues(
-                                            alpha: 0.15,
-                                          ),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ]
-                                    : [],
-                              ),
-                              padding: const EdgeInsets.all(8),
-                              child: Image.network(
-                                cat.imageUrl,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Iconsax.category,
-                                  size: 20,
-                                  color: isSelected ? accentColor : Colors.grey,
-                                ),
+                            height: 48,
+                            width: 48,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? accentColor.withOpacity(0.1)
+                                  : Colors.grey.shade50,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Image.network(
+                              cat.imageUrl,
+                              errorBuilder: (_, __, ___) => Icon(
+                                Iconsax.category,
+                                color: isSelected ? accentColor : Colors.grey,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            child: Text(
-                              cat.name,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: isSelected
-                                    ? accentColor
-                                    : Colors.grey.shade600,
-                                fontFamily: 'Poppins',
-                              ),
+                          const SizedBox(height: 6),
+                          Text(
+                            cat.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: isSelected ? _textDark : Colors.grey,
                             ),
                           ),
                         ],
@@ -729,79 +479,66 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  // --- 2. RIGHT SIDE HEADER ---
-  Widget _buildDynamicHeader() {
-    if (_searchQuery.isNotEmpty) {
-      return Text(
-        "Found results for \"$_searchQuery\"",
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          fontFamily: 'Poppins',
-          color: Colors.black87,
-        ),
-      );
-    }
+  // --- RIGHT HEADER COMPONENTS ---
+
+  // 1. Scrollable Title (New)
+  Widget _buildTitleSliver() {
     final parent = _getSelectedParent();
-    return Text(
-      parent?.name ?? "Categories",
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'Poppins',
-        color: Colors.black87,
+    if (_searchQuery.isNotEmpty)
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+    return SliverToBoxAdapter(
+      child: Container(
+        color: _bgRight,
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+        child: Text(
+          parent?.name ?? "Categories",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: _textDark,
+            letterSpacing: -0.5,
+          ),
+        ),
       ),
     );
   }
 
-  // --- 3. RIGHT SIDE CONTENT LOGIC ---
-  Widget _buildRightSideContent(TextScaler textScaler) {
-    if (_searchQuery.isNotEmpty) {
-      return _buildSearchResultsGrid(key: ValueKey("search_$_searchQuery"));
-    }
-
-    final children = _getChildren(_selectedParentId);
-
-    if (children.isEmpty) {
-      // Direct Parent -> Products
-      return _buildProductGrid(
-        categoryId: _selectedParentId,
-        key: ValueKey(_selectedParentId),
-      );
-    }
-
-    return Column(
-      children: [
-        _buildSubCategoryTabs(children, textScaler),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: _selectedChildId != null
-                ? _buildProductGrid(
-                    categoryId: _selectedChildId!,
-                    key: ValueKey(_selectedChildId),
-                  )
-                : _buildOverviewOrDirectory(children),
-          ),
-        ),
-      ],
+  // 2. Sticky Search Bar (Updated)
+  Widget _buildStickySearchBar() {
+    return Container(
+      color:
+          _bgRight, // Background ensures content doesn't show behind when sticky
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      alignment: Alignment.center,
+      child: SearchAndFilterBar(
+        controller: _searchController,
+        onChanged: (String val) => _onSearchChanged(val),
+        onClear: () {
+          _searchController.clear();
+          _onSearchChanged('');
+        },
+        onFilter: () async {
+          final result = await ModernFilterBottomSheet.show(
+            context: context,
+            currentFilter: _activeFilter,
+            accentColor: accentColor,
+          );
+          if (result != null && mounted) setState(() => _activeFilter = result);
+        },
+      ),
     );
   }
 
-  // --- TABS (Sub-Categories) ---
-  Widget _buildSubCategoryTabs(
-    List<CategoryModel> children,
-    TextScaler textScaler,
-  ) {
+  // --- SUB TABS ---
+  Widget _buildSubCategoryTabs(List<CategoryModel> children) {
     return Container(
-      height: 60,
-      width: double.infinity,
-      color: Colors.white,
+      color: _bgRight,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         scrollDirection: Axis.horizontal,
         itemCount: children.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final isOverview = index == 0;
           final cat = isOverview ? null : children[index - 1];
@@ -814,31 +551,21 @@ class _CategoriesPageState extends State<CategoriesSection> {
                 setState(() => _selectedChildId = isOverview ? null : cat!.id),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? Colors.black87 : Colors.white,
-                borderRadius: BorderRadius.circular(30),
+                color: isSelected ? _textDark : Colors.white,
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected ? Colors.transparent : Colors.grey.shade300,
                 ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : [],
               ),
               child: Text(
                 isOverview ? "All" : cat!.name,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey.shade700,
+                  color: isSelected ? Colors.white : Colors.grey.shade600,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   fontSize: 13,
-                  fontFamily: 'Poppins',
                 ),
               ),
             ),
@@ -848,97 +575,54 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  // --- OVERVIEW / DIRECTORY ---
-  Widget _buildOverviewOrDirectory(List<CategoryModel> children) {
-    if (children.length < 6) {
-      return ListView.builder(
-        controller: _rightSideScrollController,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        itemCount: children.length,
-        itemBuilder: (context, index) {
+  // --- BODY ---
+  Widget _buildRightSideBody() {
+    if (_searchQuery.isNotEmpty) return _buildSearchResultsGrid();
+
+    final children = _getChildren(_selectedParentId);
+
+    if (children.isEmpty) {
+      return _buildProductGrid(
+        categoryId: _selectedParentId,
+        key: ValueKey("p_$_selectedParentId"),
+      );
+    }
+
+    if (_selectedChildId != null) {
+      return _buildProductGrid(
+        categoryId: _selectedChildId!,
+        key: ValueKey("c_$_selectedChildId"),
+      );
+    } else {
+      return _buildOverviewSliver(children);
+    }
+  }
+
+  Widget _buildOverviewSliver(List<CategoryModel> children) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final cat = children[index];
           return _ModernCategorySection(
-            key: ValueKey(children[index].id),
-            category: children[index],
+            key: ValueKey("sec_${cat.id}"),
+            category: cat,
             onSeeAll: () => Get.to(
               () => CategoryDetailsPage(
-                categoryId: children[index].id,
-                categoryName: children[index].name,
+                categoryId: cat.id,
+                categoryName: cat.name,
               ),
             ),
             catalogueController: catalogueController,
             selectedProductIds: _selectedProductIds,
             onToggleSelection: _toggleProductSelection,
-            onSuccess: _showSuccessSnackbar, // Pass snackbar ref
+            onSuccess: _showSuccessSnackbar,
           );
-        },
-      );
-    } else {
-      return GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.1,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-        ),
-        itemCount: children.length,
-        itemBuilder: (context, index) {
-          final cat = children[index];
-          return InkWell(
-            onTap: () => setState(() => _selectedChildId = cat.id),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade100),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.shade200,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.08),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Iconsax.folder_open,
-                      color: accentColor,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    cat.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    "${cat.count} Items",
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    }
+        }, childCount: children.length),
+      ),
+    );
   }
 
-  // --- PRODUCT GRIDS ---
   Widget _buildProductGrid({required int categoryId, Key? key}) {
     return FutureBuilder<List<ProductModel>>(
       key: key,
@@ -948,35 +632,31 @@ class _CategoriesPageState extends State<CategoriesSection> {
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting)
-          return _buildSkeletonGrid();
-        if (snapshot.hasError)
-          return _buildErrorInline(snapshot.error.toString());
+          return const SliverToBoxAdapter(child: _SliverSkeletonGrid());
         if (!snapshot.hasData || snapshot.data!.isEmpty)
-          return _buildEmptyState();
-        return _buildResponsiveGrid(snapshot.data!);
+          return const SliverFillRemaining(child: _EmptyState("No products."));
+        return _buildSliverGridProducts(snapshot.data!);
       },
     );
   }
 
-  Widget _buildSearchResultsGrid({Key? key}) {
+  Widget _buildSearchResultsGrid() {
     return FutureBuilder<List<ProductModel>>(
-      key: key,
       future: ApiService.searchProducts(_searchQuery),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting)
-          return _buildSkeletonGrid();
-        if (snapshot.hasError)
-          return _buildErrorInline(snapshot.error.toString());
+          return const SliverToBoxAdapter(child: _SliverSkeletonGrid());
         if (!snapshot.hasData || snapshot.data!.isEmpty)
-          return _buildEmptyState();
-        return _buildResponsiveGrid(snapshot.data!);
+          return const SliverFillRemaining(child: _EmptyState("No results."));
+        return _buildSliverGridProducts(snapshot.data!);
       },
     );
   }
 
-  Widget _buildResponsiveGrid(List<ProductModel> rawProducts) {
+  Widget _buildSliverGridProducts(List<ProductModel> rawProducts) {
     List<ProductModel> products = List.from(rawProducts);
 
+    // Filter & Sort Logic
     if (_activeFilter.minPrice != null)
       products = products
           .where((p) => _parsePrice(p.price) >= _activeFilter.minPrice!)
@@ -985,275 +665,166 @@ class _CategoriesPageState extends State<CategoriesSection> {
       products = products
           .where((p) => _parsePrice(p.price) <= _activeFilter.maxPrice!)
           .toList();
+    if (_activeFilter.sortType == SortType.priceLowToHigh)
+      products.sort(
+        (a, b) => _parsePrice(a.price).compareTo(_parsePrice(b.price)),
+      );
+    else if (_activeFilter.sortType == SortType.priceHighToLow)
+      products.sort(
+        (a, b) => _parsePrice(b.price).compareTo(_parsePrice(a.price)),
+      );
 
-    switch (_activeFilter.sortType) {
-      case SortType.priceLowToHigh:
-        products.sort(
-          (a, b) => _parsePrice(a.price).compareTo(_parsePrice(b.price)),
-        );
-        break;
-      case SortType.priceHighToLow:
-        products.sort(
-          (a, b) => _parsePrice(b.price).compareTo(_parsePrice(a.price)),
-        );
-        break;
-      case SortType.newest:
-        products.sort((a, b) => b.id.compareTo(a.id));
-        break;
-      case SortType.relevance:
-        break;
-    }
+    for (final p in products) _productCache[p.id] = p;
 
-    for (final p in products) {
-      _productCache[p.id] = p;
-    }
-
-    if (products.isEmpty)
-      return _buildEmptyState("No products match your filters.");
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        double cardWidth = (constraints.maxWidth - 16) / 2;
-        double desiredHeight = 280;
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: cardWidth / desiredHeight,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-          ),
-          itemCount: products.length,
-          itemBuilder: (context, index) {
-            return VerticalProductCard(
-              product: products[index],
-              availableCatalogues: catalogueController.catalogueNames,
-              isSelected: _selectedProductIds.contains(products[index].id),
-              onCatalogueSelected: (product, catalogueName, isNew) {
-                if (isNew) {
-                  catalogueController.createCatalogueAndAddProduct(
-                    catalogueName,
-                    product,
-                  );
-                } else {
-                  catalogueController.addProductToExistingCatalogue(
-                    catalogueName,
-                    product,
-                  );
-                }
-
-                // ✨ USE PREMIUM SNACKBAR
-                _showSuccessSnackbar(
-                  'Success',
-                  '"${product.name}" added to "$catalogueName".',
+    return SliverPadding(
+      padding: const EdgeInsets.all(12),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.56,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final p = products[index];
+          return VerticalProductCard(
+            product: p,
+            availableCatalogues: catalogueController.catalogueNames,
+            isSelected: _selectedProductIds.contains(p.id),
+            onSelectionToggle: () => _toggleProductSelection(p.id),
+            onCatalogueSelected: (product, catalogueName, isNew) {
+              if (isNew)
+                catalogueController.createCatalogueAndAddProduct(
+                  catalogueName,
+                  product,
                 );
-              },
-            );
-          },
-        );
-      },
+              else
+                catalogueController.addProductToExistingCatalogue(
+                  catalogueName,
+                  product,
+                );
+              _showSuccessSnackbar('Success', 'Added to $catalogueName');
+            },
+          );
+        }, childCount: products.length),
+      ),
     );
   }
 
-  // --- 4. FLOATING ACTION BAR ---
+  // --- FLOATING BAR ---
   Widget _buildAnimatedFloatingBar() {
     return AnimatedPositioned(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOutBack,
-      bottom: _selectedProductIds.isEmpty ? -100 : 30,
-      left: 16,
-      right: 16,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.elasticOut,
+      bottom: _selectedProductIds.isEmpty ? -120 : 30,
+      left: 20,
+      right: 20,
       child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 500),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF222222),
-            borderRadius: BorderRadius.circular(50),
-            boxShadow: [
-              BoxShadow(
-                color: accentColor.withValues(alpha: 0.3),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E).withOpacity(0.9),
+                borderRadius: BorderRadius.circular(32),
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Left side: Count + "Selected"
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: accentColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        "${_selectedProductIds.length}",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Flexible(
-                      child: Text(
-                        "Selected",
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Right side: Actions
-              Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Add to Catalog Button
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      "${_selectedProductIds.length}",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "Selected",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
                   InkWell(
                     onTap: _openBulkAddToCatalogueSheet,
-                    borderRadius: BorderRadius.circular(30),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
+                        horizontal: 16,
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
-                        children: const [
-                          Text(
-                            "Add to Catalog",
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(Iconsax.add, color: Colors.black, size: 16),
-                        ],
+                      child: const Text(
+                        "Add to Catalog",
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
-                  // Close Button
                   InkWell(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      setState(() {
-                        _selectedProductIds.clear();
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
+                    onTap: () => setState(() => _selectedProductIds.clear()),
+                    child: const Icon(Icons.close, color: Colors.white),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // --- STATES & LOADING ---
-  Widget _buildSkeletonGrid() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: 6,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.65,
-      ),
-      itemBuilder: (_, __) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              flex: 3,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 10,
-                      width: 80,
-                      color: Colors.grey.shade100,
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 10,
-                      width: 40,
-                      color: Colors.grey.shade100,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _toggleProductSelection(int id) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedProductIds.contains(id))
+        _selectedProductIds.remove(id);
+      else
+        _selectedProductIds.add(id);
+    });
   }
 
-  Widget _buildEmptyState([String msg = "No products found."]) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  AppBar _buildModernAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      title: Row(
         children: [
-          Icon(Iconsax.box_search, size: 60, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            msg,
-            style: TextStyle(
-              color: Colors.grey.shade400,
-              fontSize: 16,
-              fontFamily: 'Poppins',
-            ),
+          IconButton(
+            icon: const Icon(Iconsax.menu_1),
+            color: _textDark,
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+          Image.asset(
+            'assets/logos/login-logo.png',
+            height: 28,
+            width: 80,
+            fit: BoxFit.contain,
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Iconsax.shopping_bag),
+            color: _textDark,
+            onPressed: () => Get.to(() => const InventoryPage()),
+          ),
+          IconButton(
+            icon: const Icon(Iconsax.profile_circle),
+            color: _textDark,
+            onPressed: () {},
           ),
         ],
       ),
@@ -1265,142 +836,92 @@ class _CategoriesPageState extends State<CategoriesSection> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Iconsax.wifi, size: 60, color: Colors.redAccent),
-          const SizedBox(height: 16),
-          const Text(
-            "Connection Issue",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            errorMessage ?? "Something went wrong.",
-            style: const TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loadCategories,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text("Retry"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorInline(String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text(
-          "Error: $error",
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.red),
-        ),
-      ),
-    );
-  }
-
-  // --- UTILS ---
-  void _toggleProductSelection(int id) {
-    HapticFeedback.lightImpact();
-    setState(() {
-      if (_selectedProductIds.contains(id)) {
-        _selectedProductIds.remove(id);
-      } else {
-        _selectedProductIds.add(id);
-      }
-    });
-  }
-
-  AppBar _buildModernAppBar() {
-    return AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      titleSpacing: 0,
-      title: Row(
-        children: [
-          const SizedBox(width: 8),
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Iconsax.menu_1),
-              color: accentColor,
-              iconSize: 28,
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
-          Image.asset(
-            'assets/logos/login-logo.png',
-            height: 40,
-            width: 90,
-            fit: BoxFit.contain,
-          ),
-          const Spacer(),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(Iconsax.shopping_cart),
-                color: accentColor,
-                iconSize: 28,
-                onPressed: () => Get.to(() => const InventoryPage()),
-              ),
-              Positioned(
-                right: 6,
-                top: 6,
-                child: Obx(() {
-                  final count = cartController.itemCount;
-                  if (count == 0) return const SizedBox.shrink();
-                  return Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 20,
-                      minHeight: 20,
-                    ),
-                    child: Center(
-                      child: Text(
-                        count > 99 ? '99+' : '$count',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Iconsax.profile_circle),
-            color: accentColor,
-            iconSize: 28,
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
+          const Icon(Iconsax.wifi, size: 40, color: Colors.red),
+          const SizedBox(height: 10),
+          const Text("Connection Failed"),
+          TextButton(onPressed: _loadCategories, child: const Text("Retry")),
         ],
       ),
     );
   }
 }
 
-// --- CHILD WIDGET: Modern Category Section ---
+// --- DELEGATES ---
+
+class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Widget child;
+  _StickySearchDelegate({required this.height, required this.child});
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => SizedBox.expand(child: child);
+  @override
+  double get maxExtent => height;
+  @override
+  double get minExtent => height;
+  @override
+  bool shouldRebuild(_StickySearchDelegate oldDelegate) => true;
+}
+
+class _StickyFilterDelegate extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Widget child;
+  _StickyFilterDelegate({required this.height, required this.child});
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => SizedBox.expand(child: child);
+  @override
+  double get maxExtent => height;
+  @override
+  double get minExtent => height;
+  @override
+  bool shouldRebuild(_StickyFilterDelegate oldDelegate) => true;
+}
+
+// --- WIDGETS ---
+
+class _EmptyState extends StatelessWidget {
+  final String msg;
+  const _EmptyState(this.msg);
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Text(msg, style: TextStyle(color: Colors.grey.shade400)),
+  );
+}
+
+class _SliverSkeletonGrid extends StatelessWidget {
+  const _SliverSkeletonGrid();
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 6,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.6,
+      ),
+      itemBuilder: (_, __) => Container(color: Colors.grey.shade100),
+    );
+  }
+}
+
 class _ModernCategorySection extends StatefulWidget {
   final CategoryModel category;
   final VoidCallback onSeeAll;
   final CatalogueController catalogueController;
   final Set<int> selectedProductIds;
   final Function(int) onToggleSelection;
-  final Function(String, String) onSuccess; // Passed helper
+  final Function(String, String) onSuccess;
 
   const _ModernCategorySection({
     Key? key,
@@ -1429,19 +950,12 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
   void _fetch() async {
     try {
       final res = await ApiService.fetchProductsByCategory(widget.category.id);
-      if (mounted) {
+      if (mounted)
         setState(() {
           products = res.take(4).toList();
           loading = false;
         });
-
-        final parentState = context
-            .findAncestorStateOfType<_CategoriesPageState>();
-        if (parentState != null) {
-          for (final p in products) parentState._productCache[p.id] = p;
-        }
-      }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => loading = false);
     }
   }
@@ -1449,36 +963,22 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
   @override
   Widget build(BuildContext context) {
     if (!loading && products.isEmpty) return const SizedBox();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade100,
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 widget.category.name,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  fontFamily: 'Poppins',
                 ),
               ),
-              TextButton(
-                onPressed: widget.onSeeAll,
+              InkWell(
+                onTap: widget.onSeeAll,
                 child: const Text(
                   "See All",
                   style: TextStyle(
@@ -1489,80 +989,123 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
               ),
             ],
           ),
-          loading
-              ? _buildShimmer()
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    double width = (constraints.maxWidth - 12) / 2;
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: width / 260,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                      ),
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        final p = products[index];
-                        return VerticalProductCard(
-                          product: p,
-                          availableCatalogues:
-                              widget.catalogueController.catalogueNames,
-                          isSelected: widget.selectedProductIds.contains(p.id),
-                          onSelectionToggle: () =>
-                              widget.onToggleSelection(p.id),
-                          onCatalogueSelected: (product, catalogueName, isNew) {
-                            if (isNew) {
-                              widget.catalogueController
-                                  .createCatalogueAndAddProduct(
-                                    catalogueName,
-                                    product,
-                                  );
-                            } else {
-                              widget.catalogueController
-                                  .addProductToExistingCatalogue(
-                                    catalogueName,
-                                    product,
-                                  );
-                            }
-
-                            // ✨ USE PREMIUM SNACKBAR
-                            widget.onSuccess(
-                              'Success',
-                              '"${product.name}" added to "$catalogueName".',
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
+        ),
+        loading
+            ? const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.56,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
                 ),
-        ],
-      ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final p = products[index];
+                  return VerticalProductCard(
+                    product: p,
+                    availableCatalogues:
+                        widget.catalogueController.catalogueNames,
+                    isSelected: widget.selectedProductIds.contains(p.id),
+                    onSelectionToggle: () => widget.onToggleSelection(p.id),
+                    onCatalogueSelected: (product, catalogueName, isNew) {
+                      if (isNew)
+                        widget.catalogueController.createCatalogueAndAddProduct(
+                          catalogueName,
+                          product,
+                        );
+                      else
+                        widget.catalogueController
+                            .addProductToExistingCatalogue(
+                              catalogueName,
+                              product,
+                            );
+                      widget.onSuccess('Success', 'Added to $catalogueName');
+                    },
+                  );
+                },
+              ),
+        const SizedBox(height: 24),
+      ],
     );
   }
+}
 
-  Widget _buildShimmer() {
-    return SizedBox(
-      height: 200,
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.all(4),
-              color: Colors.grey.shade100,
+class SearchAndFilterBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final VoidCallback onFilter;
+
+  const SearchAndFilterBar({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+    required this.onFilter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                prefixIcon: const Icon(
+                  Iconsax.search_normal,
+                  size: 20,
+                  color: Colors.grey,
+                ),
+                suffixIcon: controller.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: onClear,
+                        color: Colors.grey,
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
             ),
           ),
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.all(4),
-              color: Colors.grey.shade100,
+        ),
+        const SizedBox(width: 12),
+        InkWell(
+          onTap: onFilter,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 48,
+            width: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
             ),
+            child: const Icon(Iconsax.setting_4, color: Colors.black, size: 22),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
