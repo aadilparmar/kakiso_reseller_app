@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/filter/filter.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -32,11 +33,12 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   String _selectedSortLabel = 'Popular'; // For Display
   String _orderBy = 'popularity'; // For API
   String _order = 'desc'; // For API
+  FilterOptions _activeFilter = FilterOptions();
 
   // Catalogue controller
   final catalogueController = Get.put(CatalogueController(), permanent: true);
 
-  // Price Filter Range (Default 0 to 10,000)
+  // // Price Filter Range (Default 0 to 10,000)
   RangeValues _currentPriceRange = const RangeValues(0, 10000);
   final double _maxFilterLimit = 20000;
 
@@ -78,6 +80,29 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       debugPrint("Error loading products: $e");
+    }
+  }
+
+  void _applySortFromFilter() {
+    switch (_activeFilter.sortType) {
+      case SortType.priceLowToHigh:
+        _orderBy = 'price';
+        _order = 'asc';
+        break;
+
+      case SortType.priceHighToLow:
+        _orderBy = 'price';
+        _order = 'desc';
+        break;
+
+      case SortType.newest:
+        _orderBy = 'date';
+        _order = 'desc';
+        break;
+
+      case SortType.relevance:
+        _orderBy = 'popularity';
+        _order = 'desc';
     }
   }
 
@@ -140,125 +165,21 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   }
 
   // --- 2. FILTER BOTTOM SHEET ---
-  void _openFilterSheet() {
-    RangeValues tempRange = _currentPriceRange;
-
-    Get.bottomSheet(
-      StatefulBuilder(
-        builder: (context, setModalState) {
-          return Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Filter",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(
-                          () => tempRange = const RangeValues(0, 10000),
-                        );
-                      },
-                      child: const Text(
-                        "Reset",
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  "Price Range",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "₹${tempRange.start.toInt()}",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                    Text(
-                      "₹${tempRange.end.toInt()}+",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                  ],
-                ),
-                RangeSlider(
-                  values: tempRange,
-                  min: 0,
-                  max: _maxFilterLimit,
-                  divisions: 20,
-                  activeColor: accentColor,
-                  inactiveColor: accentColor.withValues(alpha: 0.2),
-                  labels: RangeLabels(
-                    "₹${tempRange.start.toInt()}",
-                    "₹${tempRange.end.toInt()}",
-                  ),
-                  onChanged: (values) {
-                    setModalState(() => tempRange = values);
-                  },
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _currentPriceRange = tempRange;
-                      });
-                      Get.back();
-                      _fetchCategoryProducts();
-                    },
-                    child: const Text(
-                      "Apply Filter",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+  Future<void> _openModernFilter() async {
+    final result = await ModernFilterBottomSheet.show(
+      context: context,
+      currentFilter: _activeFilter,
+      accentColor: accentColor,
     );
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _activeFilter = result;
+      _applySortFromFilter();
+    });
+
+    _fetchCategoryProducts();
   }
 
   // --- 3. BULK ADD TO CATALOGUE SHEET ---
@@ -609,7 +530,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     // Filter
                     Expanded(
                       child: GestureDetector(
-                        onTap: _openFilterSheet,
+                        onTap: _openModernFilter,
                         child: Container(
                           color: Colors.transparent,
                           child: Row(

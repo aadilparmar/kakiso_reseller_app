@@ -13,6 +13,7 @@ import 'package:kakiso_reseller_app/models/categories.dart';
 
 // WIDGETS
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/filter/filter.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 // SERVICES & UTILS
@@ -45,8 +46,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   String _selectedSortLabel = 'Newest';
 
   // --- FILTER RANGE ---
-  RangeValues _currentPriceRange = const RangeValues(0, 20000);
-  final double _maxFilterLimit = 20000;
+  FilterOptions _activeFilter = FilterOptions();
 
   // --- CATEGORY FILTER STATE ---
   int? _selectedCategoryId;
@@ -94,24 +94,16 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           _selectedCategoryId!,
           orderBy: _orderBy,
           order: _order,
-          minPrice: _currentPriceRange.start == 0
-              ? null
-              : _currentPriceRange.start,
-          maxPrice: _currentPriceRange.end == _maxFilterLimit
-              ? null
-              : _currentPriceRange.end,
+          minPrice: _activeFilter.minPrice,
+          maxPrice: _activeFilter.maxPrice,
         );
       } else {
         // Otherwise global product listing
         products = await ApiService.fetchProducts(
           orderBy: _orderBy,
           order: _order,
-          minPrice: _currentPriceRange.start == 0
-              ? null
-              : _currentPriceRange.start,
-          maxPrice: _currentPriceRange.end == _maxFilterLimit
-              ? null
-              : _currentPriceRange.end,
+          minPrice: _activeFilter.minPrice,
+          maxPrice: _activeFilter.maxPrice,
         );
       }
 
@@ -360,108 +352,50 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   }
 
   // --- FILTER SHEET ---
-  void _openFilterSheet() {
-    RangeValues tempRange = _currentPriceRange;
-
-    Get.bottomSheet(
-      StatefulBuilder(
-        builder: (context, setModalState) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            // SafeArea wrapper
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Filter",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setModalState(
-                              () => tempRange = const RangeValues(0, 20000),
-                            );
-                          },
-                          child: const Text(
-                            "Reset",
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Price Range",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    RangeSlider(
-                      values: tempRange,
-                      min: 0,
-                      max: _maxFilterLimit,
-                      activeColor: accentColor,
-                      labels: RangeLabels(
-                        "₹${tempRange.start.toInt()}",
-                        "₹${tempRange.end.toInt()}",
-                      ),
-                      onChanged: (values) {
-                        setModalState(() => tempRange = values);
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _currentPriceRange = tempRange;
-                        });
-                        Get.back();
-                        _loadData();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: accentColor,
-                        minimumSize: const Size(double.infinity, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        "Apply Filter",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-      isScrollControlled: true,
+  Future<void> _openModernFilter() async {
+    final result = await ModernFilterBottomSheet.show(
+      context: context,
+      currentFilter: _activeFilter,
+      accentColor: accentColor,
     );
+
+    if (!mounted) return;
+
+    if (result != null) {
+      setState(() {
+        _activeFilter = result;
+        _applySortFromFilter(); // ✅ THIS LINE FIXES THE WARNING
+      });
+      _loadData();
+    }
+  }
+
+  void _applySortFromFilter() {
+    switch (_activeFilter.sortType) {
+      case SortType.priceLowToHigh:
+        _orderBy = 'price';
+        _order = 'asc';
+        _selectedSortLabel = 'Price: Low to High';
+        break;
+
+      case SortType.priceHighToLow:
+        _orderBy = 'price';
+        _order = 'desc';
+        _selectedSortLabel = 'Price: High to Low';
+        break;
+
+      case SortType.newest:
+        _orderBy = 'date';
+        _order = 'desc';
+        _selectedSortLabel = 'Newest';
+        break;
+
+      case SortType.relevance:
+        _orderBy = widget.initialOrderBy;
+        _order = widget.initialOrder;
+        _selectedSortLabel = 'Relevance';
+        break;
+    }
   }
 
   // --- BULK ADD TO CATALOGUE SHEET ---
@@ -928,7 +862,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                         // FILTER
                         Expanded(
                           child: GestureDetector(
-                            onTap: _openFilterSheet,
+                            onTap: _openModernFilter,
                             behavior: HitTestBehavior.opaque,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -943,8 +877,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                     fontSize: 13,
                                   ),
                                 ),
-                                if (_currentPriceRange.start > 0 ||
-                                    _currentPriceRange.end < _maxFilterLimit)
+                                if (_activeFilter.hasActiveFilters)
                                   Container(
                                     margin: const EdgeInsets.only(left: 4),
                                     width: 6,
