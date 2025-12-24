@@ -72,6 +72,120 @@ class _CategoriesPageState extends State<CategoriesSection> {
     super.dispose();
   }
 
+  // --- PREMIUM SNACKBAR HELPERS ---
+  void _showSuccessSnackbar(String title, String message) {
+    HapticFeedback.mediumImpact();
+    Get.snackbar(
+      title,
+      message,
+      titleText: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          fontFamily: 'Poppins',
+        ),
+      ),
+      messageText: Text(
+        message,
+        style: const TextStyle(
+          color: Color(0xFFE0E0E0),
+          fontSize: 13,
+          fontFamily: 'Poppins',
+        ),
+      ),
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 20,
+      backgroundColor: const Color(0xFF1F1F1F), // Premium Dark
+      icon: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: accentColor.withValues(alpha: 0.2),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Iconsax.tick_circle, color: accentColor, size: 24),
+      ),
+      shouldIconPulse: true,
+      barBlur: 10,
+      overlayBlur: 0,
+      duration: const Duration(seconds: 3),
+      boxShadows: [
+        BoxShadow(
+          color: accentColor.withValues(alpha: 0.2),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+          spreadRadius: 2,
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.4),
+          blurRadius: 15,
+          offset: const Offset(0, 10),
+        ),
+      ],
+      isDismissible: true,
+      forwardAnimationCurve: Curves.easeOutBack,
+      borderColor: accentColor.withValues(alpha: 0.3),
+      borderWidth: 1.5,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    );
+  }
+
+  void _showErrorSnackbar(String title, String message) {
+    HapticFeedback.heavyImpact();
+    Get.snackbar(
+      title,
+      message,
+      titleText: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
+          fontFamily: 'Poppins',
+        ),
+      ),
+      messageText: Text(
+        message,
+        style: const TextStyle(
+          color: Color(0xFFE0E0E0),
+          fontSize: 13,
+          fontFamily: 'Poppins',
+        ),
+      ),
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 20,
+      backgroundColor: const Color(0xFF1F1F1F),
+      icon: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withValues(alpha: 0.2),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Iconsax.warning_2, color: Colors.redAccent, size: 24),
+      ),
+      duration: const Duration(seconds: 4),
+      boxShadows: [
+        BoxShadow(
+          color: Colors.redAccent.withValues(alpha: 0.2),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+          spreadRadius: 2,
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.4),
+          blurRadius: 15,
+          offset: const Offset(0, 10),
+        ),
+      ],
+      borderColor: Colors.redAccent.withValues(alpha: 0.3),
+      borderWidth: 1.5,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    );
+  }
+
   Future<void> _loadCategories() async {
     setState(() {
       isCategoriesLoading = true;
@@ -108,7 +222,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
       if (mounted) {
         setState(() {
           _searchQuery = query;
-          _selectedChildId = null; // Reset sub-cat selection on search
+          _selectedChildId = null;
         });
       }
     });
@@ -136,7 +250,10 @@ class _CategoriesPageState extends State<CategoriesSection> {
         .whereType<ProductModel>()
         .toList(growable: false);
 
-    if (selectedProducts.isEmpty) return;
+    if (selectedProducts.isEmpty) {
+      _showErrorSnackbar("Action Failed", "No products selected.");
+      return;
+    }
 
     final availableCatalogues = catalogueController.catalogueNames;
 
@@ -284,11 +401,13 @@ class _CategoriesPageState extends State<CategoriesSection> {
             catalogueController.addProductToExistingCatalogue(name, p);
           }
           Navigator.pop(ctx);
-          Get.snackbar(
-            'Success',
+
+          // ✨ USE PREMIUM SNACKBAR
+          _showSuccessSnackbar(
+            'Success!',
             '${products.length} products added to "$name".',
-            snackPosition: SnackPosition.BOTTOM,
           );
+
           setState(() => _selectedProductIds.clear());
         },
       ),
@@ -337,11 +456,13 @@ class _CategoriesPageState extends State<CategoriesSection> {
                   catalogueController.addProductToExistingCatalogue(name, p);
                 }
                 Navigator.pop(ctx);
-                Get.snackbar(
-                  'Success',
-                  'Catalog "$name" created.',
-                  snackPosition: SnackPosition.BOTTOM,
+
+                // ✨ USE PREMIUM SNACKBAR
+                _showSuccessSnackbar(
+                  'Catalog Created',
+                  'Catalog "$name" has been created successfully.',
                 );
+
                 setState(() => _selectedProductIds.clear());
               }
             },
@@ -735,7 +856,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: children.length,
         itemBuilder: (context, index) {
-          // KEY FIX: Unique key forces rebuild on parent change
           return _ModernCategorySection(
             key: ValueKey(children[index].id),
             category: children[index],
@@ -748,6 +868,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
             catalogueController: catalogueController,
             selectedProductIds: _selectedProductIds,
             onToggleSelection: _toggleProductSelection,
+            onSuccess: _showSuccessSnackbar, // Pass snackbar ref
           );
         },
       );
@@ -920,10 +1041,11 @@ class _CategoriesPageState extends State<CategoriesSection> {
                     product,
                   );
                 }
-                Get.snackbar(
+
+                // ✨ USE PREMIUM SNACKBAR
+                _showSuccessSnackbar(
                   'Success',
-                  'Added to "$catalogueName".',
-                  snackPosition: SnackPosition.BOTTOM,
+                  '"${product.name}" added to "$catalogueName".',
                 );
               },
             );
@@ -933,7 +1055,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  // --- 4. FLOATING ACTION BAR (FIXED) ---
+  // --- 4. FLOATING ACTION BAR ---
   Widget _buildAnimatedFloatingBar() {
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 400),
@@ -1030,7 +1152,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
 
                   const SizedBox(width: 12),
 
-                  // Close Button (The Cross)
+                  // Close Button
                   InkWell(
                     onTap: () {
                       HapticFeedback.lightImpact();
@@ -1278,6 +1400,7 @@ class _ModernCategorySection extends StatefulWidget {
   final CatalogueController catalogueController;
   final Set<int> selectedProductIds;
   final Function(int) onToggleSelection;
+  final Function(String, String) onSuccess; // Passed helper
 
   const _ModernCategorySection({
     Key? key,
@@ -1286,6 +1409,7 @@ class _ModernCategorySection extends StatefulWidget {
     required this.catalogueController,
     required this.selectedProductIds,
     required this.onToggleSelection,
+    required this.onSuccess,
   }) : super(key: key);
 
   @override
@@ -1403,6 +1527,12 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
                                     product,
                                   );
                             }
+
+                            // ✨ USE PREMIUM SNACKBAR
+                            widget.onSuccess(
+                              'Success',
+                              '"${product.name}" added to "$catalogueName".',
+                            );
                           },
                         );
                       },
