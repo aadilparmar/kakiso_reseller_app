@@ -707,12 +707,12 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                 )
               : GridView.builder(
                   // Add extra padding at bottom so items aren't hidden behind the sticky bottom bar
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 100),
                   itemCount: _products.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 3,
+                    crossAxisSpacing: 3,
                     childAspectRatio: 0.58,
                   ),
                   itemBuilder: (_, i) {

@@ -484,8 +484,9 @@ class _CategoriesPageState extends State<CategoriesSection>
   // 1. Scrollable Title (New)
   Widget _buildTitleSliver() {
     final parent = _getSelectedParent();
-    if (_searchQuery.isNotEmpty)
+    if (_searchQuery.isNotEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
 
     return SliverToBoxAdapter(
       child: Container(
@@ -495,7 +496,7 @@ class _CategoriesPageState extends State<CategoriesSection>
           parent?.name ?? "Categories",
           style: TextStyle(
             fontSize: 24,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             color: _textDark,
             letterSpacing: -0.5,
           ),
@@ -631,10 +632,12 @@ class _CategoriesPageState extends State<CategoriesSection>
         () => ApiService.fetchProductsByCategory(categoryId),
       ),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const SliverToBoxAdapter(child: _SliverSkeletonGrid());
-        if (!snapshot.hasData || snapshot.data!.isEmpty)
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SliverFillRemaining(child: _EmptyState("No products."));
+        }
         return _buildSliverGridProducts(snapshot.data!);
       },
     );
@@ -644,10 +647,12 @@ class _CategoriesPageState extends State<CategoriesSection>
     return FutureBuilder<List<ProductModel>>(
       future: ApiService.searchProducts(_searchQuery),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const SliverToBoxAdapter(child: _SliverSkeletonGrid());
-        if (!snapshot.hasData || snapshot.data!.isEmpty)
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SliverFillRemaining(child: _EmptyState("No results."));
+        }
         return _buildSliverGridProducts(snapshot.data!);
       },
     );
@@ -657,19 +662,22 @@ class _CategoriesPageState extends State<CategoriesSection>
     List<ProductModel> products = List.from(rawProducts);
 
     // Filter & Sort Logic
-    if (_activeFilter.minPrice != null)
+    if (_activeFilter.minPrice != null) {
       products = products
           .where((p) => _parsePrice(p.price) >= _activeFilter.minPrice!)
           .toList();
-    if (_activeFilter.maxPrice != null)
+    }
+    if (_activeFilter.maxPrice != null) {
       products = products
           .where((p) => _parsePrice(p.price) <= _activeFilter.maxPrice!)
           .toList();
-    if (_activeFilter.sortType == SortType.priceLowToHigh)
+    }
+    if (_activeFilter.sortType == SortType.priceLowToHigh) {
       products.sort(
         (a, b) => _parsePrice(a.price).compareTo(_parsePrice(b.price)),
       );
-    else if (_activeFilter.sortType == SortType.priceHighToLow)
+    } else if (_activeFilter.sortType == SortType.priceHighToLow)
+      // ignore: curly_braces_in_flow_control_structures
       products.sort(
         (a, b) => _parsePrice(b.price).compareTo(_parsePrice(a.price)),
       );
@@ -693,16 +701,17 @@ class _CategoriesPageState extends State<CategoriesSection>
             isSelected: _selectedProductIds.contains(p.id),
             onSelectionToggle: () => _toggleProductSelection(p.id),
             onCatalogueSelected: (product, catalogueName, isNew) {
-              if (isNew)
+              if (isNew) {
                 catalogueController.createCatalogueAndAddProduct(
                   catalogueName,
                   product,
                 );
-              else
+              } else {
                 catalogueController.addProductToExistingCatalogue(
                   catalogueName,
                   product,
                 );
+              }
               _showSuccessSnackbar('Success', 'Added to $catalogueName');
             },
           );
@@ -790,10 +799,11 @@ class _CategoriesPageState extends State<CategoriesSection>
   void _toggleProductSelection(int id) {
     HapticFeedback.selectionClick();
     setState(() {
-      if (_selectedProductIds.contains(id))
+      if (_selectedProductIds.contains(id)) {
         _selectedProductIds.remove(id);
-      else
+      } else {
         _selectedProductIds.add(id);
+      }
     });
   }
 
@@ -950,11 +960,12 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
   void _fetch() async {
     try {
       final res = await ApiService.fetchProductsByCategory(widget.category.id);
-      if (mounted)
+      if (mounted) {
         setState(() {
           products = res.take(4).toList();
           loading = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => loading = false);
     }
@@ -980,7 +991,7 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
               InkWell(
                 onTap: widget.onSeeAll,
                 child: const Text(
-                  "See All",
+                  "View All",
                   style: TextStyle(
                     color: accentColor,
                     fontWeight: FontWeight.w600,
@@ -1014,17 +1025,18 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
                     isSelected: widget.selectedProductIds.contains(p.id),
                     onSelectionToggle: () => widget.onToggleSelection(p.id),
                     onCatalogueSelected: (product, catalogueName, isNew) {
-                      if (isNew)
+                      if (isNew) {
                         widget.catalogueController.createCatalogueAndAddProduct(
                           catalogueName,
                           product,
                         );
-                      else
+                      } else {
                         widget.catalogueController
                             .addProductToExistingCatalogue(
                               catalogueName,
                               product,
                             );
+                      }
                       widget.onSuccess('Success', 'Added to $catalogueName');
                     },
                   );

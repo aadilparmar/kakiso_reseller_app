@@ -218,7 +218,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard> {
                                     children: [
                                       // RSP
                                       Text(
-                                        'Buy ${widget.rsp}',
+                                        'Buy ${widget.price}',
                                         textScaleFactor:
                                             1.0, // Lock font scaling
                                         maxLines: 1,
@@ -236,7 +236,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard> {
                                         children: [
                                           Flexible(
                                             child: Text(
-                                              'Resell${widget.price}',
+                                              'Resell${widget.rsp}',
                                               textScaleFactor:
                                                   1.0, // Lock font scaling
                                               maxLines: 1,

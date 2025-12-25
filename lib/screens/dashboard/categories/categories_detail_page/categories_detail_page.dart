@@ -581,14 +581,14 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     : _products.isEmpty
                     ? _buildEmptyState()
                     : GridView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(10),
                         itemCount: _products.length,
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               childAspectRatio: 0.58,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 3,
+                              crossAxisSpacing: 3,
                             ),
                         itemBuilder: (context, index) {
                           final product = _products[index];

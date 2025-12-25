@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
@@ -7,14 +8,19 @@ import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/all_product_screen.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart';
 
-/// Budget Store section showing products in bands:
-/// 0–99, 99–199, 199–299, 299–499, 499–999.
+// --- THEME CONSTANTS ---
+class _BudgetTheme {
+  static const Color primary = Color(0xFF4A317E);
+  static const Color accent = Color(0xFFEB2A7E);
+  static const Color green = Color(0xFF059669);
+  static const Color bgLight = Color(0xFFF9FAFB);
+  static const Color textDark = Color(0xFF1F2937);
+  static const Color textGrey = Color(0xFF6B7280);
+}
+
 class BudgetStoreSection extends StatefulWidget {
   final List<ProductModel> products;
-
-  /// Optional: parent can show a custom snackbar when added to cart.
   final void Function(ProductModel product)? onProductAddedToCart;
 
   const BudgetStoreSection({
@@ -28,204 +34,32 @@ class BudgetStoreSection extends StatefulWidget {
 }
 
 class _BudgetStoreSectionState extends State<BudgetStoreSection> {
-  // Use safe lookup: Find if registered, otherwise put.
-  final CartController cartController = Get.isRegistered<CartController>()
-      ? Get.find<CartController>()
-      : Get.put(CartController());
-
-  final CatalogueController catalogueController =
-      Get.isRegistered<CatalogueController>()
-      ? Get.find<CatalogueController>()
-      : Get.put(CatalogueController());
+  late final CartController _cartController;
+  late final CatalogueController _catalogueController;
 
   int _selectedFilterIndex = 0;
 
   final List<_PriceFilter> _filters = const [
-    _PriceFilter(label: "₹0 – ₹99", minPrice: 0, maxPrice: 99),
-    _PriceFilter(label: "₹99 – ₹199", minPrice: 99, maxPrice: 199),
-    _PriceFilter(label: "₹199 – ₹299", minPrice: 199, maxPrice: 299),
-    _PriceFilter(label: "₹299 – ₹499", minPrice: 299, maxPrice: 499),
-    _PriceFilter(label: "₹499 – ₹999", minPrice: 499, maxPrice: 999),
+    _PriceFilter(label: "Under ₹99", minPrice: 0, maxPrice: 99),
+    _PriceFilter(label: "₹99 - ₹199", minPrice: 99, maxPrice: 199),
+    _PriceFilter(label: "₹199 - ₹299", minPrice: 199, maxPrice: 299),
+    _PriceFilter(label: "₹299 - ₹499", minPrice: 299, maxPrice: 499),
+    _PriceFilter(label: "₹499 - ₹999", minPrice: 499, maxPrice: 999),
   ];
 
-  void _openAddToCatalogueSheet(ProductModel product) {
-    // FIX: Removed fetchCatalogues() call as it doesn't exist in your controller.
-    // The controller loads data automatically on init.
-    final availableCatalogues = catalogueController.catalogueNames;
+  @override
+  void initState() {
+    super.initState();
+    _cartController = Get.isRegistered<CartController>()
+        ? Get.find<CartController>()
+        : Get.put(CartController());
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              MediaQuery.of(ctx).padding.bottom + 20,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const Text(
-                  'Add product to catalog',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (availableCatalogues.isEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text(
-                      'No catalogs found. Create one to continue.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  )
-                else
-                  ...availableCatalogues.map(
-                    (name) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Iconsax.book, size: 18),
-                      title: Text(
-                        name,
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      trailing: const Icon(Iconsax.arrow_right_3, size: 16),
-                      onTap: () {
-                        catalogueController.addProductToExistingCatalogue(
-                          name,
-                          product,
-                        );
-                        Navigator.pop(ctx);
-
-                        Get.snackbar(
-                          'Added to catalog',
-                          '"${product.name}" added to "$name".',
-                          snackPosition: SnackPosition.BOTTOM,
-                        );
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _showCreateNewCatalogueDialog(product);
-                    },
-                    icon: const Icon(Iconsax.add_circle, size: 20),
-                    label: const Text('Create New Catalog'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    _catalogueController = Get.isRegistered<CatalogueController>()
+        ? Get.find<CatalogueController>()
+        : Get.put(CatalogueController());
   }
 
-  void _showCreateNewCatalogueDialog(ProductModel product) {
-    final TextEditingController nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'New Catalog',
-            style: TextStyle(fontFamily: 'Poppins'),
-          ),
-          content: TextField(
-            controller: nameController,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'e.g. Budget Deals',
-              filled: true,
-              fillColor: Colors.grey.shade100,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
-
-                catalogueController.createCatalogueAndAddProduct(name, product);
-
-                Navigator.pop(ctx);
-
-                Get.snackbar(
-                  'Catalog created',
-                  '"${product.name}" added to "$name".',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: accentColor),
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  // --- LOGIC HELPERS ---
 
   double? _parsePrice(String value) {
     try {
@@ -248,259 +82,754 @@ class _BudgetStoreSectionState extends State<BudgetStoreSection> {
     }).toList();
   }
 
-  bool get _hasMoreThan20 => _filteredProducts.length > 20;
+  // --- ACTIONS ---
 
-  List<ProductModel> get _visibleProducts =>
-      _hasMoreThan20 ? _filteredProducts.take(20).toList() : _filteredProducts;
+  void _openAddToCatalogueSheet(ProductModel product) {
+    HapticFeedback.lightImpact();
+    final availableCatalogues = _catalogueController.catalogueNames;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _CatalogueBottomSheet(
+        catalogueNames: availableCatalogues,
+        onAddToExisting: (name) {
+          _catalogueController.addProductToExistingCatalogue(name, product);
+          Navigator.pop(ctx);
+          _showSuccessSnackbar(
+            'Added to Catalog',
+            '"${product.name}" added to "$name".',
+          );
+        },
+        onCreateNew: () {
+          Navigator.pop(ctx);
+          _showCreateNewCatalogueDialog(product);
+        },
+      ),
+    );
+  }
+
+  void _showCreateNewCatalogueDialog(ProductModel product) {
+    final TextEditingController nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'New Catalog',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        ),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'e.g., Festival Sale',
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isEmpty) return;
+              _catalogueController.createCatalogueAndAddProduct(name, product);
+              Navigator.pop(ctx);
+              _showSuccessSnackbar(
+                'Catalog Created',
+                '"${product.name}" added to "$name".',
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _BudgetTheme.accent,
+              shape: const StadiumBorder(),
+            ),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessSnackbar(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.black87,
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 12,
+      duration: const Duration(seconds: 2),
+      icon: const Icon(Iconsax.tick_circle, color: Colors.greenAccent),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final products = _visibleProducts;
+    final products = _filteredProducts;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // HEADER
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+    // LOGIC: Check if count > 20
+    final bool hasMoreThan20 = products.length > 20;
+
+    // If > 20, take only the first 20 for the grid
+    final visibleProducts = hasMoreThan20
+        ? products.take(20).toList()
+        : products;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Header Section
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
             children: [
-              Flexible(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       "Budget Store",
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
+                        color: _BudgetTheme.textDark,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      "Handpicked deals under ₹999",
+                      "High margin deals for you",
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4FF),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(
-                      Iconsax.discount_shape,
-                      size: 11,
-                      color: Color(0xFF4A317E),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      "Best value",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF4A317E),
+                        color: _BudgetTheme.textGrey,
                       ),
                     ),
                   ],
                 ),
               ),
+              _buildBestValueBadge(),
             ],
           ),
+        ),
 
-          const SizedBox(height: 12),
+        // 2. Filter Tabs
+        SizedBox(
+          height: 56,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _filters.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              return _FilterTab(
+                filter: _filters[index],
+                isSelected: index == _selectedFilterIndex,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedFilterIndex = index);
+                },
+              );
+            },
+          ),
+        ),
 
-          // FILTER CHIPS
-          SizedBox(
-            height: 48,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: _filters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final filter = _filters[index];
-                final bool isSelected = index == _selectedFilterIndex;
+        const SizedBox(height: 10),
 
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedFilterIndex = index;
-                    });
-                  },
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 88),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: isSelected ? accentColor : Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isSelected
-                            ? accentColor
-                            : const Color(0xFFD1D5DB),
-                        width: 1.2,
+        // 3. Product Grid with Animation
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: widget.products.isEmpty
+                ? _buildEmptyState(
+                    icon: Iconsax.box,
+                    message: "No products loaded yet.",
+                  )
+                : visibleProducts.isEmpty
+                ? _buildEmptyState(
+                    key: ValueKey('empty_$_selectedFilterIndex'),
+                    icon: Iconsax.filter_remove,
+                    message: "No deals in this range.",
+                  )
+                : Column(
+                    key: ValueKey('grid_$_selectedFilterIndex'),
+                    children: [
+                      GridView.builder(
+                        itemCount: visibleProducts.length,
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 0.60,
+                            ),
+                        itemBuilder: (context, index) {
+                          final product = visibleProducts[index];
+                          return _ResellerProductCard(
+                            product: product,
+                            parsePrice: _parsePrice,
+                            onAddToCart: () {
+                              HapticFeedback.lightImpact();
+                              _cartController.addToCart(product);
+                              widget.onProductAddedToCart?.call(product);
+                            },
+                            onAddToCatalogue: () =>
+                                _openAddToCatalogueSheet(product),
+                          );
+                        },
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: accentColor.withValues(alpha: 0.35),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : [],
-                    ),
-                    child: Center(
-                      child: Text(
-                        filter.label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF111827),
-                        ),
-                      ),
-                    ),
+
+                      // 4. "VIEW ALL" BUTTON (Only if > 20 products)
+                      if (hasMoreThan20) ...[
+                        const SizedBox(height: 24),
+                        _buildViewAllButton(),
+                      ],
+                    ],
                   ),
-                );
-              },
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildBestValueBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3E8FF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE9D5FF)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(
+            Iconsax.percentage_circle,
+            size: 14,
+            color: _BudgetTheme.primary,
+          ),
+          SizedBox(width: 4),
+          Text(
+            "Best Value",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _BudgetTheme.primary,
             ),
           ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 14),
+  Widget _buildEmptyState({
+    Key? key,
+    required IconData icon,
+    required String message,
+  }) {
+    return Container(
+      key: key,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      decoration: BoxDecoration(
+        color: _BudgetTheme.bgLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 32, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-          // BODY
-          if (widget.products.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 26),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+  Widget _buildViewAllButton() {
+    final currentLabel = _filters[_selectedFilterIndex].label;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: OutlinedButton(
+        onPressed: () {
+          Get.to(
+            () => AllProductsScreen(
+              // Pass the specific price range name as the title
+              title: 'Budget Store ($currentLabel)',
+              initialOrderBy: 'price',
+              initialOrder: 'asc',
+            ),
+            transition: Transition.cupertino,
+          );
+        },
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: _BudgetTheme.primary, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          foregroundColor: _BudgetTheme.primary,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "VIEW ALL $currentLabel DEALS".toUpperCase(),
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
               ),
-              child: Column(
-                children: const [
-                  Icon(Iconsax.box, size: 26, color: Color(0xFF9CA3AF)),
-                  SizedBox(height: 8),
-                  Text(
-                    "No products loaded yet.",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: Color(0xFF6B7280),
-                    ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Iconsax.arrow_right_1, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- SUB-WIDGETS ---
+
+class _FilterTab extends StatelessWidget {
+  final _PriceFilter filter;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterTab({
+    required this.filter,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? _BudgetTheme.primary : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected ? _BudgetTheme.primary : Colors.grey.shade300,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: _BudgetTheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
+                ]
+              : null,
+        ),
+        child: Text(
+          filter.label,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : _BudgetTheme.textDark,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResellerProductCard extends StatelessWidget {
+  final ProductModel product;
+  final double? Function(String) parsePrice;
+  final VoidCallback onAddToCart;
+  final VoidCallback onAddToCatalogue;
+
+  const _ResellerProductCard({
+    required this.product,
+    required this.parsePrice,
+    required this.onAddToCart,
+    required this.onAddToCatalogue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final double? buyPrice = parsePrice(product.price);
+    final double? resellPrice = buyPrice != null ? (buyPrice * 1.3) : null;
+    final double? profit = (resellPrice != null && buyPrice != null)
+        ? (resellPrice - buyPrice)
+        : null;
+
+    return GestureDetector(
+      onTap: () => Get.to(
+        () => ProductDetailsPage(product: product),
+        transition: Transition.fadeIn,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Image
+            Expanded(
+              flex: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _buildProductImage(),
+                  if (profit != null) _buildProfitBadge(profit),
+                  // if (product.discountPercentage != null &&
+                  //     product.discountPercentage! > 0)
+                  //   // _buildDiscountBadge(product.discountPercentage!),
                 ],
               ),
-            )
-          else if (products.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 26),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Column(
-                children: const [
-                  Icon(Iconsax.info_circle, size: 26, color: Color(0xFF9CA3AF)),
-                  SizedBox(height: 8),
-                  Text(
-                    "No products in this price band yet.",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else ...[
-            GridView.builder(
-              itemCount: products.length,
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.64,
-              ),
-              itemBuilder: (context, index) {
-                final product = products[index];
-                return _BudgetProductCard(
-                  product: product,
-                  parsePrice: _parsePrice,
-                  onAddToCart: () {
-                    cartController.addToCart(product);
-                    widget.onProductAddedToCart?.call(product);
-                  },
-                  onAddToCatalogue: () {
-                    _openAddToCatalogueSheet(product);
-                  },
-                );
-              },
             ),
 
-            if (_hasMoreThan20) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Get.to(
-                      () => const AllProductsScreen(
-                        title: 'Budget Store Deals',
-                        initialOrderBy: 'price',
-                        initialOrder: 'asc',
+            // Info
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _BudgetTheme.textDark,
+                        height: 1.2,
                       ),
-                      transition: Transition.rightToLeft,
-                      duration: const Duration(milliseconds: 300),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: accentColor, width: 1.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ),
-                  child: const Text(
-                    "VIEW ALL DEALS",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: accentColor,
-                      letterSpacing: 0.6,
+
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (resellPrice != null)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                "Resell ",
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              Text(
+                                "₹${resellPrice.toStringAsFixed(0)}",
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: _BudgetTheme.primary,
+                                  height: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 2),
+                        Text(
+                          "Buy for ₹${product.price}",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: Iconsax.book_1,
+                            color: _BudgetTheme.accent,
+                            label: "CATALOG",
+                            onTap: onAddToCatalogue,
+                            isOutlined: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildActionButton(
+                            icon: Iconsax.shopping_cart,
+                            color: _BudgetTheme.primary,
+                            label: "ADD",
+                            onTap: onAddToCart,
+                            isOutlined: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductImage() {
+    return Container(
+      color: Colors.grey.shade50,
+      child: Image.network(
+        product.image,
+        fit: BoxFit.cover,
+        loadingBuilder: (ctx, child, progress) {
+          if (progress == null) return child;
+          return Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _BudgetTheme.primary.withOpacity(0.3),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) =>
+            const Center(child: Icon(Iconsax.image, color: Colors.grey)),
+      ),
+    );
+  }
+
+  Widget _buildProfitBadge(double profit) {
+    return Positioned(
+      top: 8,
+      left: 8,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: _BudgetTheme.green,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        ),
+        child: Row(
+          children: [
+            const Icon(Iconsax.trend_up, size: 10, color: Colors.white),
+            const SizedBox(width: 4),
+            Text(
+              "Profit ₹${profit.toStringAsFixed(0)}",
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget _buildDiscountBadge(int percentage) {
+  //   return Positioned(
+  //     top: 8,
+  //     right: 8,
+  //     child: Container(
+  //       padding: const EdgeInsets.all(5),
+  //       decoration: const BoxDecoration(
+  //         color: Colors.black87,
+  //         shape: BoxShape.circle,
+  //       ),
+  //       child: Text(
+  //         "$percentage% off",
+  //         style: const TextStyle(
+  //           color: Colors.white,
+  //           fontSize: 9,
+  //           fontWeight: FontWeight.bold,
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+    required bool isOutlined,
+  }) {
+    // FIXED MATERIAL ERROR HERE
+    return Material(
+      color: isOutlined ? Colors.transparent : color,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: isOutlined ? BorderSide(color: color) : BorderSide.none,
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 32,
+          alignment: Alignment.center,
+          child: Icon(icon, size: 18, color: isOutlined ? color : Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogueBottomSheet extends StatelessWidget {
+  final List<String> catalogueNames;
+  final Function(String) onAddToExisting;
+  final VoidCallback onCreateNew;
+
+  const _CatalogueBottomSheet({
+    required this.catalogueNames,
+    required this.onAddToExisting,
+    required this.onCreateNew,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const Text(
+            'Select Catalog',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (catalogueNames.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                "No active catalogs found.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: catalogueNames.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final name = catalogueNames[i];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      name,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Iconsax.add_circle,
+                      color: _BudgetTheme.primary,
+                    ),
+                    onTap: () => onAddToExisting(name),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onCreateNew,
+              icon: const Icon(Iconsax.add, size: 20),
+              label: const Text('Create New Catalog'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _BudgetTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -516,366 +845,4 @@ class _PriceFilter {
     required this.minPrice,
     required this.maxPrice,
   });
-}
-
-/// Small vertical card used only in this section.
-class _BudgetProductCard extends StatelessWidget {
-  final ProductModel product;
-  final double? Function(String) parsePrice;
-  final VoidCallback onAddToCart;
-  final VoidCallback onAddToCatalogue;
-
-  const _BudgetProductCard({
-    required this.product,
-    required this.parsePrice,
-    required this.onAddToCart,
-    required this.onAddToCatalogue,
-  });
-
-  static const Color kPrimaryColor = Color(0xFF4A317E);
-  static const Color kAccentColor = Color(0xFFEB2A7E);
-
-  @override
-  Widget build(BuildContext context) {
-    final double? basePrice = parsePrice(product.price);
-    final double? resellPrice = basePrice != null
-        ? (basePrice * 1.3)
-        : null; // +30% resell
-    final double? mrpPrice = product.regularPrice.isNotEmpty
-        ? parsePrice(product.regularPrice)
-        : null;
-    final double? profit = (resellPrice != null && basePrice != null)
-        ? (resellPrice - basePrice)
-        : null;
-
-    return GestureDetector(
-      onTap: () {
-        Get.to(
-          () => ProductDetailsPage(product: product),
-          transition: Transition.fadeIn,
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A317E).withValues(alpha: 0.04),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // IMAGE SECTION - FIXED: Replaced Expanded with AspectRatio
-            AspectRatio(
-              aspectRatio: 1.0, // Ensures square image without crashing
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFF5F3FF), Color(0xFFFDF2FF)],
-                      ),
-                    ),
-                    child: Image.network(
-                      product.image,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          color: Colors.grey.shade50,
-                          child: Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: const Color(
-                                  0xFF4A317E,
-                                ).withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey.shade100,
-                        child: Icon(
-                          Iconsax.image,
-                          color: Colors.grey.shade300,
-                          size: 30,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  if (product.discountPercentage != null &&
-                      product.discountPercentage! > 0)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          gradient: const LinearGradient(
-                            colors: [Colors.black87, Colors.black54],
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Iconsax.flash_1,
-                              size: 10,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "-${product.discountPercentage}%",
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  if (profit != null)
-                    Positioned(
-                      left: 8,
-                      bottom: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0FBEA),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF22C55E,
-                            ).withValues(alpha: 0.4),
-                            width: 0.6,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Iconsax.trend_up,
-                              size: 11,
-                              color: Color(0xFF16A34A),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "You earn ~₹${profit.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF166534),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // DETAILS
-            Padding(
-              padding: const EdgeInsets.fromLTRB(9, 8, 9, 2),
-              child: Text(
-                product.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
-                  height: 1.28,
-                ),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(9, 0, 9, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (resellPrice != null)
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text(
-                            "Resell ",
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Poppins',
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                          Text(
-                            "₹${resellPrice.toStringAsFixed(0)}",
-                            style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: accentColor,
-                              height: 1.1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 2),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      children: [
-                        Text(
-                          "Buy ₹${product.price}",
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        if (mrpPrice != null &&
-                            product.regularPrice.isNotEmpty &&
-                            product.regularPrice != product.price) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            "MRP ₹${mrpPrice.toStringAsFixed(0)}",
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              decoration: TextDecoration.lineThrough,
-                              color: Colors.grey.shade500,
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // BUTTON ROW
-            SizedBox(
-              height: 30,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Material(
-                      color: kPrimaryColor,
-                      child: InkWell(
-                        onTap: onAddToCart,
-                        child: const Center(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  "Add to",
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Text(
-                                  "Cart",
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Material(
-                      color: Colors.white,
-                      child: InkWell(
-                        onTap: onAddToCatalogue,
-                        child: Container(
-                          decoration: BoxDecoration(color: kAccentColor),
-                          child: const Center(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    "Add to",
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color.fromARGB(255, 249, 249, 249),
-                                    ),
-                                  ),
-                                  Text(
-                                    "Catalog",
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color.fromARGB(255, 255, 255, 255),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
