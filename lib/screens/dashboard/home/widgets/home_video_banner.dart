@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui'; // Required for ImageFilter
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:get/get.dart';
@@ -12,7 +13,6 @@ class VideoBannerCarousel extends StatefulWidget {
 }
 
 class _VideoBannerCarouselState extends State<VideoBannerCarousel> {
-  // 1. Define your 3 video paths here
   final List<String> _videoPaths = [
     'assets/videos/kakiso_banner1.mp4',
     'assets/videos/kakiso_banner5.mp4',
@@ -27,8 +27,6 @@ class _VideoBannerCarouselState extends State<VideoBannerCarousel> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
-
-    // 2. Start the 10-second auto-scroll timer
     _startAutoScroll();
   }
 
@@ -37,14 +35,16 @@ class _VideoBannerCarouselState extends State<VideoBannerCarousel> {
       if (_currentPage < _videoPaths.length - 1) {
         _currentPage++;
       } else {
-        _currentPage = 0; // Loop back to start
+        _currentPage = 0;
       }
 
       if (_pageController.hasClients) {
         _pageController.animateToPage(
           _currentPage,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeIn,
+          duration: const Duration(
+            milliseconds: 600,
+          ), // Slower, smoother scroll
+          curve: Curves.fastOutSlowIn, // More premium feel
         );
       }
     });
@@ -59,13 +59,14 @@ class _VideoBannerCarouselState extends State<VideoBannerCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    // 3. Container height. Adjust this based on your video aspect ratio
-    return Column(
-      children: [
-        SizedBox(
-          height: 220, // Set a fixed height for the banner area
-          width: double.infinity,
-          child: PageView.builder(
+    return SizedBox(
+      height: 220,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          // 1. VIDEO PAGE VIEW
+          PageView.builder(
             controller: _pageController,
             itemCount: _videoPaths.length,
             onPageChanged: (int index) {
@@ -74,46 +75,87 @@ class _VideoBannerCarouselState extends State<VideoBannerCarousel> {
               });
             },
             itemBuilder: (context, index) {
-              // We pass 'isVisible' so only the active video plays
               return HomeVideoBanner(
                 assetPath: _videoPaths[index],
                 isVisible: index == _currentPage,
               );
             },
           ),
-        ),
-        // const SizedBox(height: 8),
-        // 4. Optional: Dots Indicator
-        // Row(
-        //   mainAxisAlignment: MainAxisAlignment.center,
-        //   children: List.generate(
-        //     _videoPaths.length,
-        //     (index) => AnimatedContainer(
-        //       duration: const Duration(milliseconds: 300),
-        //       margin: const EdgeInsets.symmetric(horizontal: 4),
-        //       height: 8,
-        //       width: _currentPage == index ? 24 : 8,
-        //       decoration: BoxDecoration(
-        //         color: _currentPage == index
-        //             ? Colors.blue
-        //             : Colors.grey.shade300,
-        //         borderRadius: BorderRadius.circular(4),
-        //       ),
-        //     ),
-        //   ),
-        // ),
-      ],
+
+          // 2. CRAZY GLASSMORPHIC INDICATOR
+          Positioned(
+            bottom: 12,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  height: 24,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(_videoPaths.length, (index) {
+                      final bool isActive = _currentPage == index;
+                      return GestureDetector(
+                        onTap: () {
+                          _pageController.animateToPage(
+                            index,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOutBack,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          height: 6,
+                          // If active -> Wide pill (24), if inactive -> Small dot (6)
+                          width: isActive ? 24 : 6,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 // ---------------------------------------------------------
-// REFACTORED CHILD WIDGET
+// REFACTORED CHILD WIDGET (Unchanged logic, just cleaner)
 // ---------------------------------------------------------
 
 class HomeVideoBanner extends StatefulWidget {
   final String assetPath;
-  final bool isVisible; // Added to control playback based on scroll position
+  final bool isVisible;
 
   const HomeVideoBanner({
     super.key,
@@ -137,7 +179,6 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
     _initVideo();
   }
 
-  // Handle updates when the user swipes (isVisible changes)
   @override
   void didUpdateWidget(HomeVideoBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -161,7 +202,6 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
         ..setLooping(true)
         ..setVolume(0.0);
 
-      // Only play immediately if this is the FIRST slide
       if (widget.isVisible) {
         controller.play();
       }
@@ -188,7 +228,6 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
     if (state == AppLifecycleState.paused) {
       controller.pause();
     } else if (state == AppLifecycleState.resumed) {
-      // Only resume if this is the currently visible page
       if (widget.isVisible) {
         controller.play();
       }
@@ -215,10 +254,15 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized || _controller == null) {
-      // Show a loading placeholder or shimmer here if desired
       return Container(
         color: Colors.grey[200],
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: Icon(
+            Icons.video_camera_back,
+            color: Colors.grey.shade400,
+            size: 40,
+          ),
+        ),
       );
     }
 
@@ -226,7 +270,6 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
       onTap: _openAllProducts,
       child: SizedBox(
         width: double.infinity,
-        // FittedBox ensures the video covers the space without distortion
         child: FittedBox(
           fit: BoxFit.cover,
           child: SizedBox(

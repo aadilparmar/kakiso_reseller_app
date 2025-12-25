@@ -13,6 +13,8 @@ import 'package:kakiso_reseller_app/screens/dashboard/order_management/orders_pa
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/controllers/order_controller.dart';
+// IMPORT THE INTRO SCREEN
+import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   final UserData userData;
@@ -373,7 +375,7 @@ class _ProfilePageState extends State<ProfilePage>
         _buildActionButton(
           Iconsax.logout,
           "Logout",
-          _confirmLogout,
+          _confirmLogout, // <--- Calls the new logic
           Colors.redAccent,
         ),
       ],
@@ -508,7 +510,6 @@ class _ProfilePageState extends State<ProfilePage>
             ],
           ),
         ),
-        // No edit icon here anymore
       ],
     );
   }
@@ -536,88 +537,64 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  void _confirmLogout() {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+  // --- REPLACED LOGIC TO MATCH HOME_DRAWER ---
+  Future<void> _confirmLogout() async {
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Log out?',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+        content: const Text(
+          'Are you sure you want to log out from your account?',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
               ),
             ),
-            const SizedBox(height: 24),
-            const Icon(Iconsax.logout, size: 48, color: Colors.redAccent),
-            const SizedBox(height: 16),
-            const Text(
-              "Log Out?",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "Are you sure you want to log out from your account?",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+            onPressed: () => Get.back(result: true),
+            child: const Text(
+              'Yes, Log Out',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Get.back(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      side: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    child: const Text(
-                      "Cancel",
-                      style: TextStyle(color: Colors.black),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await SessionService.clearSession();
-                      Get.offAllNamed(
-                        '/login',
-                      ); // Replace with your login route
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      "Log Out",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+
+    if (result == true) {
+      await SessionService.clearSession();
+      // Navigate to Intro screen to maintain flow consistency
+      Get.offAll(() => const KakisoIntroScreen());
+    }
   }
 }

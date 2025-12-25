@@ -764,15 +764,14 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                               mainAxisAlignment:
                                                   MainAxisAlignment.center,
                                               children: [
-                                                const Icon(
-                                                  Iconsax.tick_circle,
-                                                  size: 14,
-                                                  color: Colors.white,
-                                                ),
+                                                // const Icon(
+                                                //   Iconsax.tick_circle,
+                                                //   size: 14,
+                                                //   color: Colors.white,
+                                                // ),
                                                 const SizedBox(width: 4),
                                                 Text(
                                                   "In Catalog #$addedCatalogName",
-                                                  maxLines: 5,
                                                   overflow:
                                                       TextOverflow.ellipsis,
                                                   style: const TextStyle(
