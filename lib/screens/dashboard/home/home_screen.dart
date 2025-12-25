@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
 
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 
 // --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
@@ -298,13 +298,13 @@ class _HomePageState extends State<HomePage> {
 
             const SizedBox(width: 4),
             IconButton(
-              icon: const Icon(Iconsax.profile_circle),
+              icon: const Icon(Iconsax.heart),
               color: accentColor,
               iconSize: 30,
               onPressed: () {
                 // Navigate to ProfilePage using currently stored user data
                 // We use _userData which is initialized in initState from widget.userData
-                Get.to(() => ProfilePage(userData: _userData));
+                Get.to(() => WishlistScreen());
               },
             ),
             const SizedBox(width: 8),

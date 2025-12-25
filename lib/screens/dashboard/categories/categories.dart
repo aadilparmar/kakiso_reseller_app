@@ -16,6 +16,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_deta
 import 'package:kakiso_reseller_app/screens/dashboard/filter/filter.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -812,30 +813,85 @@ class _CategoriesPageState extends State<CategoriesSection>
       backgroundColor: Colors.white,
       elevation: 0,
       automaticallyImplyLeading: false,
+      titleSpacing: 0,
       title: Row(
         children: [
-          IconButton(
-            icon: const Icon(Iconsax.menu_1),
-            color: _textDark,
-            onPressed: () => Scaffold.of(context).openDrawer(),
+          SizedBox(width: 6),
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Iconsax.menu_1),
+              color: accentColor,
+              iconSize: 30,
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
           ),
-          Image.asset(
-            'assets/logos/login-logo.png',
-            height: 28,
-            width: 80,
-            fit: BoxFit.contain,
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0),
+            child: Image.asset(
+              'assets/logos/login-logo.png',
+              height: 50,
+              width: 100,
+              fit: BoxFit.contain,
+            ),
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Iconsax.shopping_bag),
-            color: _textDark,
-            onPressed: () => Get.to(() => const InventoryPage()),
+
+          // --- CART ICON WITH BADGE ---
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Iconsax.shopping_cart),
+                color: accentColor,
+                iconSize: 30,
+                onPressed: () => Get.to(() => const InventoryPage()),
+              ),
+              Positioned(
+                right: 5,
+                top: 5,
+                child: Obx(() {
+                  final count = cartController.itemCount;
+                  if (count == 0) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 22,
+                      minHeight: 22,
+                    ),
+                    child: Center(
+                      child: Text(
+                        count > 99 ? '99+' : '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
           ),
+
+          const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Iconsax.profile_circle),
-            color: _textDark,
-            onPressed: () {},
+            icon: const Icon(Iconsax.heart),
+            color: accentColor,
+            iconSize: 30,
+            onPressed: () {
+              // Navigate to ProfilePage using currently stored user data
+              // We use _userData which is initialized in initState from widget.userData
+              Get.to(() => WishlistScreen());
+            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
     );

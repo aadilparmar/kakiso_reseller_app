@@ -1,3 +1,4 @@
+import 'dart:ui'; // Required for ImageFilter
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -43,20 +44,27 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
   static const Color kGreen = Color(0xFF16A34A);
   static const double kRadius = 16.0;
 
-  // --- LOCAL STATE ---
-  // bool isLiked = false;
-
   final CartController cartController = Get.isRegistered<CartController>()
       ? Get.find<CartController>()
       : Get.put(CartController());
 
-  // Add this line to access your Wishlist logic
   final WishlistController wishlistController =
       Get.isRegistered<WishlistController>()
       ? Get.find<WishlistController>()
       : Get.put(WishlistController());
 
-  final GlobalKey _heartKey = GlobalKey(); // Add this key
+  final GlobalKey _heartKey = GlobalKey();
+
+  // --- SNACKBAR STATE ---
+  static OverlayEntry? _currentSnackbar;
+
+  @override
+  void dispose() {
+    // Clean up snackbar if this widget is disposed while one is showing
+    _removeSnackbar();
+    super.dispose();
+  }
+
   // --- ACTIONS ---
   void _handleAddToCart() {
     HapticFeedback.lightImpact();
@@ -66,7 +74,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
       return;
     }
     cartController.addToCart(widget.product);
-    _showAddedToCartPopup();
+    _showPremiumSnackbar();
   }
 
   void _triggerCatalogSuccess(String catalogName) {
@@ -78,28 +86,19 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
 
   void _toggleHeart() {
     HapticFeedback.selectionClick();
-
-    // Check status BEFORE toggling to know if we are adding or removing
     bool isAlreadyLiked = wishlistController.isInWishlist(widget.product.id);
-
-    // Toggle the actual data
     wishlistController.toggleWishlist(widget.product);
-
-    // If we just ADDED it (it wasn't liked before), play the animation
     if (!isAlreadyLiked) {
       _triggerFlyingHeartAnimation();
     }
   }
 
   void _triggerFlyingHeartAnimation() {
-    // 1. Find the position of the heart button on the screen
     final RenderBox? box =
         _heartKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
 
     final Offset position = box.localToGlobal(Offset.zero);
-
-    // 2. Insert the floating animation into the Overlay
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
 
@@ -107,7 +106,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
       builder: (context) => _FlyingHeartAnimation(
         startPosition: position,
         onComplete: () {
-          entry.remove(); // Remove from memory when animation finishes
+          entry.remove();
         },
       ),
     );
@@ -115,59 +114,161 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     overlay.insert(entry);
   }
 
-  void _showAddedToCartPopup() {
-    if (Get.context != null) {
-      Get.snackbar(
-        '',
-        '',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        borderRadius: 12,
-        backgroundColor: kBlack.withValues(alpha: 0.95),
-        colorText: Colors.white,
-        snackStyle: SnackStyle.FLOATING,
-        titleText: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(26),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(26),
-                child: Image.network(
-                  widget.product.image,
-                  width: 32,
-                  height: 32,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      const Icon(Icons.broken_image, size: 20),
-                ),
+  // --- PREMIUM SNACKBAR LOGIC ---
+  void _removeSnackbar() {
+    _currentSnackbar?.remove();
+    _currentSnackbar = null;
+  }
+
+  void _showPremiumSnackbar() {
+    // 1. Remove existing snackbar if any
+    _removeSnackbar();
+
+    final overlay = Overlay.of(context);
+
+    // 2. Create the new entry
+    _currentSnackbar = OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          // A. TOUCH LISTENER (The "Invisible Blanket")
+          // This covers the screen but lets touches pass through (translucent).
+          // It detects a tap anywhere to dismiss the snackbar.
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (event) {
+                // Dismiss when user touches anywhere
+                _removeSnackbar();
+              },
+            ),
+          ),
+
+          // B. THE VISUAL SNACKBAR
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.elasticOut,
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(0, 50 * (1 - value)), // Slide up effect
+                    child: Opacity(
+                      opacity: value.clamp(0.0, 1.0),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildPremiumSnackbarContent(),
               ),
             ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                "Added to Cart successfully!",
-                // ignore: deprecated_member_use
-                textScaleFactor: 1.0,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
+          ),
+        ],
+      ),
+    );
+
+    overlay.insert(_currentSnackbar!);
+  }
+
+  Widget _buildPremiumSnackbarContent() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1F2937).withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+              // Subtle Inner Glow
+              BoxShadow(
+                color: kPrimaryColor.withValues(alpha: 0.3),
+                blurRadius: 20,
+                spreadRadius: -10,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Product Image Preview
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    widget.product.image,
+                    width: 45,
+                    height: 45,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.broken_image,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const Icon(Iconsax.tick_circle, color: Color(0xFF4ADE80), size: 22),
-          ],
+              const SizedBox(width: 16),
+              // Text Content
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Added to Cart",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Ready for checkout",
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Success Icon
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kGreen.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Iconsax.tick_circle, color: kGreen, size: 24),
+              ),
+            ],
+          ),
         ),
-        messageText: const SizedBox.shrink(),
-        duration: const Duration(seconds: 2),
-      );
-    }
+      ),
+    );
   }
 
   double? _parsePrice(String value) {
@@ -186,7 +287,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     final bool isAddedToCatalog = VerticalProductCard._sessionAddedToCatalog
         .containsKey(widget.product.id);
     final bool isVisuallySelected = widget.isSelected || isAddedToCatalog;
-    // Get the stored catalog name (e.g., "Diwali Offers")
     final String? addedCatalogName =
         VerticalProductCard._sessionAddedToCatalog[widget.product.id];
     // --- PRICE CALCULATIONS ---
@@ -240,7 +340,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Main Image
                     Hero(
                       tag: 'product_${widget.product.id}',
                       child: Image.network(
@@ -264,8 +363,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         ),
                       ),
                     ),
-
-                    // Gradient Overlay
                     Positioned(
                       bottom: 0,
                       left: 0,
@@ -284,8 +381,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         ),
                       ),
                     ),
-
-                    // Discount Badge
                     if (widget.product.discountPercentage != null &&
                         widget.product.discountPercentage! > 0)
                       Positioned(
@@ -317,8 +412,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           ),
                         ),
                       ),
-
-                    // Checkbox
                     if (widget.onSelectionToggle != null)
                       Positioned(
                         top: 8,
@@ -350,9 +443,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           ),
                         ),
                       ),
-
-                    // Wishlist Heart
-                    // Wishlist Heart
                     Positioned(
                       bottom: 8,
                       right: 8,
@@ -362,9 +452,8 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           final bool isLiked = wishlistController.isInWishlist(
                             widget.product.id,
                           );
-
                           return Container(
-                            key: _heartKey, // <--- ATTACH THE KEY HERE
+                            key: _heartKey,
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -400,12 +489,9 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                     vertical: 4,
                   ),
                   child: Column(
-                    // FORCE FULL WIDTH ALIGNMENT
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // --- A. TEXT CONTENT (Flexible) ---
-                      // This section takes all available space above buttons
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
@@ -418,7 +504,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Name
                                     Text(
                                       widget.product.name,
                                       maxLines: 1,
@@ -431,8 +516,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                       ),
                                     ),
                                     const SizedBox(height: 2),
-
-                                    // Pricing
                                     Row(
                                       children: [
                                         Text(
@@ -470,7 +553,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                             "MRP",
                                             style: TextStyle(
                                               fontSize: 13,
-
                                               color: Colors.grey.shade400,
                                             ),
                                           ),
@@ -478,8 +560,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                       ],
                                     ),
                                     const SizedBox(height: 2),
-
-                                    // Resell + Profit
                                     Row(
                                       children: [
                                         if (resellPrice != null)
@@ -558,16 +638,12 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           },
                         ),
                       ),
-
-                      // --- B. BUTTONS (Fixed Height, Full Width) ---
-                      // We use a fixed height container here so buttons never shrink to 0
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: SizedBox(
                           height: 32,
                           child: Row(
                             children: [
-                              // Add to Cart
                               Expanded(
                                 child: Obx(() {
                                   final bool isAdded = cartController.cartItems
@@ -599,7 +675,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                       ),
                                     ),
                                     child: FittedBox(
-                                      // Only scale content, not the button
                                       fit: BoxFit.scaleDown,
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
@@ -607,7 +682,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                         ),
                                         child: isAdded
                                             ? const Row(
-                                                // UPDATED: Now shows "Added" text
                                                 mainAxisAlignment:
                                                     MainAxisAlignment.center,
                                                 children: [
@@ -655,7 +729,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                 }),
                               ),
                               const SizedBox(width: 6),
-                              // Catalog Button
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () =>
@@ -681,7 +754,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                     ),
                                   ),
                                   child: FittedBox(
-                                    // Only scale content, not the button
                                     fit: BoxFit.scaleDown,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
@@ -699,7 +771,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                 ),
                                                 const SizedBox(width: 4),
                                                 Text(
-                                                  "Added to $addedCatalogName",
+                                                  "In Catalog #$addedCatalogName",
                                                   maxLines: 5,
                                                   overflow:
                                                       TextOverflow.ellipsis,
@@ -750,7 +822,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     );
   }
 
-  // --- CATALOGUE BOTTOM SHEET (UNCHANGED) ---
+  // --- CATALOGUE BOTTOM SHEET ---
   void _onAddToCataloguePressed(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -907,7 +979,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     );
   }
 
-  // --- CREATE CATALOGUE DIALOG (UNCHANGED) ---
   void _showCreateNewCatalogueDialog(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
 
@@ -957,7 +1028,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
                   widget.onCatalogueSelected(widget.product, name, true);
-                  _triggerCatalogSuccess(name); // Pass 'name' here
+                  _triggerCatalogSuccess(name);
                   Navigator.pop(ctx);
                 }
               },
@@ -1013,20 +1084,16 @@ class _FlyingHeartAnimationState extends State<_FlyingHeartAnimation>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        _buildHeart(0, -100, 0), // Center heart (goes straight up)
-        _buildHeart(200, -80, -20), // Left heart (slight angle)
-        _buildHeart(400, -80, 20), // Right heart (slight angle)
+        _buildHeart(0, -100, 0),
+        _buildHeart(200, -80, -20),
+        _buildHeart(400, -80, 20),
       ],
     );
   }
 
   Widget _buildHeart(int delay, double dropHeight, double offsetX) {
-    // Delayed animation for a "trail" effect
     final Animation<double> positionAnimation =
-        Tween<double>(
-          begin: 0,
-          end: dropHeight, // Moves UP (negative Y)
-        ).animate(
+        Tween<double>(begin: 0, end: dropHeight).animate(
           CurvedAnimation(
             parent: _controller,
             curve: Interval(delay / 1000, 1.0, curve: Curves.easeOutQuad),
@@ -1044,17 +1111,16 @@ class _FlyingHeartAnimationState extends State<_FlyingHeartAnimation>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        // If animation hasn't started for this particle, hide it
         if (_controller.value < delay / 1000) return const SizedBox.shrink();
 
         return Positioned(
-          left: widget.startPosition.dx + offsetX, // Adjust X
-          top: widget.startPosition.dy + positionAnimation.value, // Move Y
+          left: widget.startPosition.dx + offsetX,
+          top: widget.startPosition.dy + positionAnimation.value,
           child: Opacity(
             opacity: opacityAnimation.value,
             child: const Icon(
               Iconsax.heart5,
-              color: Color(0xFFEB2A7E), // kAccentColor
+              color: Color(0xFFEB2A7E),
               size: 20,
             ),
           ),

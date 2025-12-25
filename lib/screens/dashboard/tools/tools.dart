@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 
 // --- MODEL IMPORTS ---
 import 'package:kakiso_reseller_app/models/tools.dart';
@@ -12,6 +13,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 // --- TOOLS SCREENS (LIVE TOOLS) ---
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_wp_share/one_click_whatsapp.dart';
@@ -20,6 +22,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_pro
 
 // --- DRAWER IMPORT ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 
 // ───────────────────── THEME COLORS (LIGHT MODE) ─────────────────────
 
@@ -43,6 +46,8 @@ const Color textMuted = Color(0xFF9CA3AF);
 // Others
 const Color chipBg = Color(0xFFF3F4F6);
 const Color dividerColor = Color(0xFFE5E7EB);
+
+final CartController cartController = Get.put(CartController());
 
 class ToolsSection extends StatefulWidget {
   final UserData userData;
@@ -422,23 +427,87 @@ class _ToolsSectionState extends State<ToolsSection> {
       ),
       backgroundColor: bgTop,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
-        titleSpacing: 0,
         automaticallyImplyLeading: false,
+        titleSpacing: 0,
         title: Row(
           children: [
+            SizedBox(width: 6),
             Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.menu),
-                color: textPrimary,
-                iconSize: 24,
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              builder: (context) => IconButton(
+                icon: const Icon(Iconsax.menu_1),
+                color: accentColor,
+                iconSize: 30,
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
-            const SizedBox(width: 6),
-            Image.asset('assets/logos/login-logo.png', height: 22),
+            Padding(
+              padding: const EdgeInsets.only(left: 4.0),
+              child: Image.asset(
+                'assets/logos/login-logo.png',
+                height: 50,
+                width: 100,
+                fit: BoxFit.contain,
+              ),
+            ),
             const Spacer(),
+
+            // --- CART ICON WITH BADGE ---
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.shopping_cart),
+                  color: accentColor,
+                  iconSize: 30,
+                  onPressed: () => Get.to(() => const InventoryPage()),
+                ),
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: Obx(() {
+                    final count = cartController.itemCount;
+                    if (count == 0) return const SizedBox.shrink();
+                    return Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 22,
+                        minHeight: 22,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Iconsax.heart),
+              color: accentColor,
+              iconSize: 30,
+              onPressed: () {
+                // Navigate to ProfilePage using currently stored user data
+                // We use _userData which is initialized in initState from widget.userData
+                Get.to(() => WishlistScreen());
+              },
+            ),
             const SizedBox(width: 8),
           ],
         ),

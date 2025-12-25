@@ -7,6 +7,7 @@ import 'package:flutter/services.dart'; // ✅ Clipboard
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http; // ✅ for downloading images
 import 'package:path_provider/path_provider.dart'; // ✅ for temp dir
@@ -55,7 +56,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isGeneratingPdf = false;
-
   // --- LOGOUT DIALOG ---
   Future<void> _showLogoutConfirmation() async {
     Get.dialog(
@@ -697,29 +697,31 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        titleSpacing: 0,
         automaticallyImplyLeading: false,
+        titleSpacing: 0,
         title: Row(
           children: [
+            SizedBox(width: 6),
             Builder(
               builder: (context) => IconButton(
-                icon: const Icon(Icons.menu),
+                icon: const Icon(Iconsax.menu_1),
                 color: accentColor,
                 iconSize: 30,
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(left: 8.0),
+              padding: const EdgeInsets.only(left: 4.0),
               child: Image.asset(
                 'assets/logos/login-logo.png',
-                height: 22,
+                height: 50,
+                width: 100,
                 fit: BoxFit.contain,
               ),
             ),
             const Spacer(),
 
-            // ✅ CART ICON WITH BADGE (same logic as HomePage)
+            // --- CART ICON WITH BADGE ---
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -768,7 +770,11 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               icon: const Icon(Iconsax.profile_circle),
               color: accentColor,
               iconSize: 30,
-              onPressed: () {},
+              onPressed: () {
+                // Navigate to ProfilePage using currently stored user data
+                // We use _userData which is initialized in initState from widget.userData
+                Get.to(() => ProfilePage(userData: widget.userData));
+              },
             ),
             const SizedBox(width: 8),
           ],

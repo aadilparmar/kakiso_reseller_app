@@ -6,9 +6,9 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 
 const Color _activeIconColor = Color(0xFFE91E63);
@@ -27,7 +27,7 @@ class NavigationController extends GetxController {
     CategoriesSection(userData: userData),
     ToolsSection(userData: userData),
     CatalogueSection(userData: userData),
-    WishlistScreen(),
+    ProfilePage(userData: userData),
   ];
 }
 
@@ -192,9 +192,9 @@ class _NavigationMenuState extends State<NavigationMenu> {
               ),
               NavigationDestination(
                 icon: _buildIcon(
-                  Iconsax.heart,
-                  Iconsax.heart5,
-                  'Wishlist',
+                  Iconsax.profile_circle,
+                  Iconsax.tag_user,
+                  'Profile',
                   4,
                   controller.selectedIndex.value,
                   itemWidth,

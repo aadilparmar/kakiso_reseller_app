@@ -1,5 +1,6 @@
 // lib/screens/dashboard/categories/categories_detail_page/category_details_page.dart
 
+import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -38,17 +39,26 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   // Catalogue controller
   final catalogueController = Get.put(CatalogueController(), permanent: true);
 
-  // // Price Filter Range (Default 0 to 10,000)
+  // Price Filter Range (Default 0 to 10,000)
   RangeValues _currentPriceRange = const RangeValues(0, 10000);
   final double _maxFilterLimit = 20000;
 
   // Selected product IDs for checkbox state in cards (bulk)
   final Set<int> _selectedProductIds = {};
 
+  // --- SNACKBAR STATE ---
+  OverlayEntry? _currentSnackbar;
+
   @override
   void initState() {
     super.initState();
     _fetchCategoryProducts();
+  }
+
+  @override
+  void dispose() {
+    _removeSnackbar();
+    super.dispose();
   }
 
   Future<void> _fetchCategoryProducts() async {
@@ -81,6 +91,203 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
       if (mounted) setState(() => _isLoading = false);
       debugPrint("Error loading products: $e");
     }
+  }
+
+  // --- PREMIUM SNACKBAR LOGIC ---
+  void _removeSnackbar() {
+    _currentSnackbar?.remove();
+    _currentSnackbar = null;
+  }
+
+  void _showPremiumSnackbar({
+    required String title,
+    required String subtitle,
+    String? imageUrl,
+  }) {
+    // 1. Remove existing snackbar if any
+    _removeSnackbar();
+
+    final overlay = Overlay.of(context);
+
+    // 2. Create the new entry
+    _currentSnackbar = OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          // A. TOUCH LISTENER (The "Invisible Blanket")
+          // Detects taps anywhere else to dismiss
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (event) {
+                _removeSnackbar();
+              },
+            ),
+          ),
+
+          // B. THE VISUAL SNACKBAR
+          Positioned(
+            bottom: 30,
+            left: 20,
+            right: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.elasticOut,
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(0, 50 * (1 - value)), // Slide up effect
+                    child: Opacity(
+                      opacity: value.clamp(0.0, 1.0),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildPremiumSnackbarContent(title, subtitle, imageUrl),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    overlay.insert(_currentSnackbar!);
+
+    // Auto dismiss after 3 seconds if not touched
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_currentSnackbar != null && mounted) {
+        _removeSnackbar();
+      }
+    });
+  }
+
+  Widget _buildPremiumSnackbarContent(
+    String title,
+    String subtitle,
+    String? imageUrl,
+  ) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1F2937).withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+              // Subtle Inner Glow
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.3),
+                blurRadius: 20,
+                spreadRadius: -10,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Left Visual (Product Image OR Catalog Icon)
+              if (imageUrl != null)
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      imageUrl,
+                      width: 45,
+                      height: 45,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: const Icon(
+                    Iconsax.folder_open,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+
+              const SizedBox(width: 16),
+
+              // Text Content
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Success Icon
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Iconsax.tick_circle,
+                  color: Color(0xFF16A34A),
+                  size: 24,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _applySortFromFilter() {
@@ -319,10 +526,12 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
                         Navigator.pop(ctx);
 
-                        Get.snackbar(
-                          'Added to catalog',
-                          '${selectedProducts.length} products added to "$name".',
-                          snackPosition: SnackPosition.BOTTOM,
+                        // --- CHANGED TO PREMIUM SNACKBAR ---
+                        _showPremiumSnackbar(
+                          title: 'Added to catalog',
+                          subtitle:
+                              '${selectedProducts.length} products added to "$name".',
+                          imageUrl: null, // Shows folder icon
                         );
 
                         setState(() {
@@ -421,10 +630,11 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
                   Navigator.pop(ctx);
 
-                  Get.snackbar(
-                    'Catalog created',
-                    '${products.length} products added to "$name".',
-                    snackPosition: SnackPosition.BOTTOM,
+                  // --- CHANGED TO PREMIUM SNACKBAR ---
+                  _showPremiumSnackbar(
+                    title: 'Catalog Created',
+                    subtitle: '${products.length} products added to "$name".',
+                    imageUrl: null, // Shows folder icon
                   );
 
                   setState(() {
@@ -624,10 +834,12 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                                     );
                               }
 
-                              Get.snackbar(
-                                'Added to catalog',
-                                '"${product.name}" added to "$catalogueName".',
-                                snackPosition: SnackPosition.BOTTOM,
+                              // --- CHANGED TO PREMIUM SNACKBAR ---
+                              _showPremiumSnackbar(
+                                title: 'Added to catalog',
+                                subtitle:
+                                    '"${product.name}" added to "$catalogueName".',
+                                imageUrl: product.image, // Show actual image
                               );
                             },
                           );
