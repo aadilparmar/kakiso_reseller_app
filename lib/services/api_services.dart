@@ -1,4 +1,5 @@
 // lib/services/api_services.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -374,30 +375,64 @@ class ApiService {
   // ---------------------------------------------------------------------------
   // 12. REQUEST PASSWORD RESET
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // 12. REQUEST PASSWORD RESET
+  // ---------------------------------------------------------------------------
   static Future<void> requestPasswordReset(String email) async {
-    final Uri url = Uri.parse('$baseUrl/wp-login.php?action=lostpassword');
+    final String trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty) {
+      throw Exception('Email address is required');
+    }
+
+    final Uri url = Uri.parse('$baseUrl/wp-json/kakiso/v1/password-reset');
 
     try {
       final response = await http.post(
         url,
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/json",
           "User-Agent": "KakisoResellerApp/1.0",
         },
-        body: {
-          'user_login': email,
-          'wp-submit': 'Get New Password',
-          'redirect_to': baseUrl,
-        },
+        body: jsonEncode({'email': trimmedEmail}),
       );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Password reset request failed (${response.statusCode}).',
-        );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          // Success - password has been sent to email
+          return;
+        } else {
+          throw Exception(data['message'] ?? 'Failed to send new password');
+        }
+      } else if (response.statusCode == 400) {
+        // Bad request - invalid email format
+        final data = json.decode(response.body);
+        throw Exception(data['message'] ?? 'Invalid email address');
+      } else if (response.statusCode == 500) {
+        // Server error - email sending failed
+        throw Exception('Failed to send email. Please try again later.');
+      } else {
+        // Other errors
+        try {
+          final data = json.decode(response.body);
+          throw Exception(
+            data['message'] ?? 'Failed to request password reset',
+          );
+        } catch (e) {
+          throw Exception('Network error. Please check your connection.');
+        }
       }
+    } on SocketException {
+      throw Exception('No internet connection. Please check your network.');
+    } on TimeoutException {
+      throw Exception('Request timeout. Please try again.');
+    } on FormatException {
+      throw Exception('Invalid response from server.');
     } catch (e) {
-      throw Exception('Error requesting password reset: $e');
+      if (e.toString().contains('Exception:')) {
+        rethrow;
+      }
+      throw Exception('An unexpected error occurred. Please try again.');
     }
   }
 

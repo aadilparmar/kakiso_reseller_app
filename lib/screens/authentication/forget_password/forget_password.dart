@@ -74,6 +74,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (!mounted) return;
 
       // ✅ Show success message
+      // ✅ Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -84,11 +85,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           ),
           content: Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white, size: 22),
+              const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 22,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'If an account exists for $email, you will receive a reset link shortly.',
+                  'New password sent to $email. Please check your email inbox (and spam folder).',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -98,7 +103,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
             ],
           ),
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 5),
         ),
       );
 
