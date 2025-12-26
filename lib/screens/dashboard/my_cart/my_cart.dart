@@ -377,11 +377,8 @@ class _InventoryPageState extends State<InventoryPage> {
   // ---------------------------------------------------------------------------
   Widget _buildMeeshoCard(CartItem item) {
     final double basePrice = double.tryParse(item.product.price) ?? 0;
+    final double mrp = double.tryParse(item.product.regularPrice) ?? 0;
 
-    // --- FETCH MRP & DISCOUNT LOGIC ---
-    final double mrp = double.tryParse(item.product.regularPrice ?? '0') ?? 0;
-
-    // Calculate Discount %
     int discountPercent = 0;
     if (mrp > basePrice) {
       discountPercent = ((mrp - basePrice) / mrp * 100).round();
@@ -462,11 +459,9 @@ class _InventoryPageState extends State<InventoryPage> {
                         ),
                       const SizedBox(height: 8),
 
-                      // --- PRICE ROW WITH MRP & DISCOUNT ---
                       Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          // 1. Buy Price
                           Text(
                             "₹${basePrice.toStringAsFixed(0)}",
                             style: const TextStyle(
@@ -475,8 +470,6 @@ class _InventoryPageState extends State<InventoryPage> {
                               color: Colors.black87,
                             ),
                           ),
-
-                          // 2. MRP (Only if valid and greater than Buy Price)
                           if (mrp > basePrice) ...[
                             const SizedBox(width: 6),
                             Text(
@@ -489,7 +482,6 @@ class _InventoryPageState extends State<InventoryPage> {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            // 3. Discount Badge
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
@@ -577,7 +569,6 @@ class _InventoryPageState extends State<InventoryPage> {
               ),
               const Spacer(),
 
-              // WISHLIST TOGGLE
               Obx(() {
                 final bool isInWishlist = wishlistController.isInWishlist(
                   item.product.id,
@@ -649,7 +640,7 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  // --- RESPONSIVE PRICE INPUT DESIGN ---
+  // --- PREMIUM WHITE CARD WITH INTEGRATED FOOTER ---
   Widget _buildCustomerPriceInput(
     CartItem item,
     TextEditingController marginCtrl,
@@ -667,281 +658,288 @@ class _InventoryPageState extends State<InventoryPage> {
         double customerPrice = basePrice + marginAmount;
         double totalItemProfit = marginAmount * item.quantity;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    "Reselling this product",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 200),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _marginTag("50%", 50, item, basePrice),
-                        const SizedBox(width: 6),
-                        _marginTag("70%", 70, item, basePrice),
-                        const SizedBox(width: 6),
-                        _marginTag("100%", 100, item, basePrice),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
+        // WHITE CARD CONTAINER with SHADOW
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+            ],
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. TOP SECTION: Title + Chips + Input
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: _buildPriceBlock(
-                        label: "Buy Price",
-                        value: "₹${basePrice.toStringAsFixed(0)}",
-                        isEditable: false,
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(
-                        Icons.add,
-                        size: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Your Margin",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.black54,
-                              fontWeight: FontWeight.w500,
-                            ),
+                    // Header Row
+                    Row(
+                      children: [
+                        const Text(
+                          "Reselling this product",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: isValid
-                                    ? Colors.grey.shade300
-                                    : Colors.red.shade300,
-                                width: 1.5,
-                              ),
-                            ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 8, right: 2),
-                                  child: Text(
-                                    "₹",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: TextField(
-                                    controller: marginCtrl,
-                                    keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.only(
-                                        bottom: 2,
-                                      ),
-                                    ),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                      color: isValid
-                                          ? Colors.black87
-                                          : Colors.red,
-                                    ),
-                                    onChanged: (v) {
-                                      final val = double.tryParse(v);
-                                      if (val != null) {
-                                        cartController.setSellingPrice(
-                                          item.product.id,
-                                          basePrice + val,
-                                        );
-                                      }
-                                      setState(() {});
-                                    },
-                                  ),
-                                ),
+                                _marginTag("20%", 20, item, basePrice),
+                                const SizedBox(width: 6),
+                                _marginTag("50%", 50, item, basePrice),
+                                const SizedBox(width: 6),
+                                _marginTag("70%", 70, item, basePrice),
+                                const SizedBox(width: 6),
+                                _marginTag("100%", 100, item, basePrice),
                               ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(
-                        Iconsax.arrow_right_1,
-                        size: 14,
-                        color: Colors.grey.shade500,
+                    const SizedBox(height: 12),
+
+                    // CENTERED EQUATION ROW
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Buy Price
+                        Expanded(
+                          flex: 3,
+                          child: _buildValueBox(
+                            label: "Buy Price",
+                            content: Text(
+                              "₹${basePrice.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Plus Icon
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            Icons.add,
+                            size: 16,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+
+                        // Margin Input (Center Stage)
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Your Margin",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isValid
+                                        ? Colors.grey.shade300
+                                        : Colors.red.shade300,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        left: 10,
+                                        right: 4,
+                                      ),
+                                      child: Text(
+                                        "₹",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: marginCtrl,
+                                        keyboardType: TextInputType.number,
+                                        textAlignVertical:
+                                            TextAlignVertical.center,
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.only(
+                                            bottom: 2,
+                                          ),
+                                        ),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: isValid
+                                              ? Colors.black87
+                                              : Colors.red,
+                                        ),
+                                        onChanged: (v) {
+                                          final val = double.tryParse(v);
+                                          if (val != null) {
+                                            cartController.setSellingPrice(
+                                              item.product.id,
+                                              basePrice + val,
+                                            );
+                                          }
+                                          setState(() {});
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Arrow Icon
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            Iconsax.arrow_right_1,
+                            size: 16,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+
+                        // Customer Price
+                        Expanded(
+                          flex: 4,
+                          child: _buildValueBox(
+                            label: "Customer Price",
+                            content: Text(
+                              "₹${customerPrice.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4A317E),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // 2. BOTTOM SECTION: INTEGRATED PROFIT FOOTER
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isValid ? Colors.green.shade50 : Colors.red.shade50,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                  border: Border(
+                    top: BorderSide(
+                      color: isValid
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.red.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        isValid
+                            ? "Your estimated profit for this item"
+                            : "Margin too low (Min 20% required)",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isValid
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                        ),
                       ),
                     ),
-
-                    Expanded(
-                      flex: 4,
-                      child: _buildPriceBlock(
-                        label: "Customer Price",
-                        value: "₹${customerPrice.toStringAsFixed(0)}",
-                        isEditable: false,
-                        valueColor: const Color(0xFF4A317E),
-                        isBold: true,
+                    Text(
+                      "₹${totalItemProfit.toStringAsFixed(0)}",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isValid
+                            ? Colors.green.shade800
+                            : Colors.red.shade800,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-
-            const SizedBox(height: 8),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: isValid
-                      ? const SizedBox()
-                      : const Text(
-                          "Min 20% margin required",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.redAccent,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                ),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.green.shade100),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Your Profit: ",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green.shade800,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Flexible(
-                        child: Text(
-                          "₹${totalItemProfit.toStringAsFixed(0)}",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildPriceBlock({
-    required String label,
-    required String value,
-    required bool isEditable,
-    Color valueColor = Colors.black87,
-    bool isBold = false,
-  }) {
+  // HELPER FOR UNIFORM HEIGHT BLOCKS
+  Widget _buildValueBox({required String label, required Widget content}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.black54,
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 4),
         Container(
           height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          width: double.infinity,
           alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: isEditable ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
-            border: isEditable ? Border.all(color: Colors.grey.shade300) : null,
+            color: Colors.grey.withValues(alpha: 0.03), // Very subtle grey bg
+            borderRadius: BorderRadius.circular(6),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-                color: valueColor,
-              ),
-            ),
-          ),
+          child: content,
         ),
       ],
     );
@@ -959,9 +957,9 @@ class _InventoryPageState extends State<InventoryPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
+          color: Colors.white,
           border: Border.all(color: Colors.blue.shade100),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           "+$label",
@@ -991,30 +989,25 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // PRICE DETAILS SECTION (UPDATED)
+  // PRICE DETAILS SECTION
   // ---------------------------------------------------------------------------
   Widget _buildPriceDetailsSection() {
-    // 1. Calculate base values
-    double supplierTotal = cartController.totalPrice; // Sum of Buy Price * Qty
+    double supplierTotal = cartController.totalPrice;
     double netMargin = _computeNetMargin();
     double totalFees = _computeTotalFees();
     double totalCollect = _computeAmountToCollect();
     double resellerPayable = supplierTotal + totalFees;
 
-    // 2. Calculate Total Items & Total Discount
     int totalItems = cartController.cartItems.fold(
       0,
       (sum, item) => sum + item.quantity,
     );
     double totalDiscount = 0;
-    double totalMRP = 0;
 
     for (var item in cartController.cartItems) {
       final double basePrice = double.tryParse(item.product.price) ?? 0;
-      final double mrp = double.tryParse(item.product.regularPrice ?? '0') ?? 0;
-      final double effectiveMRP = mrp > basePrice ? mrp : basePrice;
+      final double mrp = double.tryParse(item.product.regularPrice) ?? 0;
 
-      totalMRP += effectiveMRP * item.quantity;
       if (mrp > basePrice) {
         totalDiscount += (mrp - basePrice) * item.quantity;
       }
@@ -1032,13 +1025,13 @@ class _InventoryPageState extends State<InventoryPage> {
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
-          // Total Discount (Highlighted)
           if (totalDiscount > 0)
             _priceRow(
               "Total Discount",
               "-₹${totalDiscount.toStringAsFixed(0)}",
               color: Colors.green,
               isBold: false,
+              tooltip: "Discount is Mrp - Products price",
             ),
 
           const SizedBox(height: 4),
@@ -1075,7 +1068,6 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
           const Divider(height: 24),
 
-          // AMOUNT TO BE PAID (Highlighted)
           _priceRow(
             "Amount to be Paid by you",
             "₹${resellerPayable.toStringAsFixed(0)}",
@@ -1083,7 +1075,6 @@ class _InventoryPageState extends State<InventoryPage> {
             fontSize: 16,
           ),
 
-          // Net Profit
           _priceRow(
             "Your Net Profit",
             netMargin >= 0
@@ -1188,6 +1179,7 @@ class _InventoryPageState extends State<InventoryPage> {
     bool isBold = false,
     double fontSize = 13,
     bool hideValue = false,
+    String? tooltip,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1195,15 +1187,44 @@ class _InventoryPageState extends State<InventoryPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-                color: isBold ? Colors.black87 : Colors.grey.shade700,
-              ),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                      color: isBold ? Colors.black87 : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                if (tooltip != null) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: tooltip,
+                    triggerMode: TooltipTriggerMode.tap,
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    showDuration: const Duration(seconds: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade800,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    textStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           if (!hideValue)
