@@ -34,7 +34,6 @@ class _InventoryPageState extends State<InventoryPage> {
       : Get.put(WishlistController());
 
   // Controllers
-  // NOTE: This now stores the MARGIN amount, not the total selling price
   final Map<int, TextEditingController> _marginControllers = {};
   final Map<int, TextEditingController> _quantityControllers = {};
 
@@ -182,7 +181,6 @@ class _InventoryPageState extends State<InventoryPage> {
 
   // --- LOGIC HELPERS ---
 
-  /// Returns a controller populated with the MARGIN amount (Selling - Base)
   TextEditingController _getMarginControllerForItem(
     int productId,
     double basePrice,
@@ -194,15 +192,12 @@ class _InventoryPageState extends State<InventoryPage> {
     final savedTotal = cartController.getSellingPrice(productId);
     String initialText = '';
 
-    // Calculate margin if a price is already saved
     if (savedTotal != null && savedTotal > basePrice) {
       double margin = savedTotal - basePrice;
       initialText = margin.toStringAsFixed(0);
     } else if (basePrice > 0) {
-      // Default to 20% margin
       double defaultMargin = basePrice * 0.20;
       initialText = defaultMargin.toStringAsFixed(0);
-      // Update cart with total
       cartController.setSellingPrice(productId, basePrice + defaultMargin);
     }
 
@@ -252,11 +247,9 @@ class _InventoryPageState extends State<InventoryPage> {
 
   double _computeNetMargin() {
     double totalCollect = _computeAmountToCollect();
-    double totalProductCost =
-        cartController.totalPrice; // This is sum of (BasePrice * Qty)
+    double totalProductCost = cartController.totalPrice;
     double totalFees = _computeTotalFees();
 
-    // Net Margin = (Collected Amount) - (Product Cost + Fees)
     return totalCollect - (totalProductCost + totalFees);
   }
 
@@ -264,20 +257,16 @@ class _InventoryPageState extends State<InventoryPage> {
     final items = cartController.cartItems;
     if (items.isEmpty) return false;
 
-    // 1. Per Product Validation (Gross Margin > 20%)
     for (final item in items) {
       final basePrice = double.tryParse(item.product.price) ?? 0;
       final ctrl = _getMarginControllerForItem(item.product.id, basePrice);
       final margin = double.tryParse(ctrl.text) ?? 0;
 
-      // Calculate percentage based on Margin directly
       final marginPercent = basePrice > 0 ? (margin / basePrice) * 100 : 0;
 
-      if (marginPercent < 19.9)
-        return false; // Strict 20% rule on product level
+      if (marginPercent < 19.9) return false;
     }
 
-    // 2. Net Profit Validation (Must cover fees)
     if (_computeNetMargin() < 0) return false;
 
     return true;
@@ -287,17 +276,14 @@ class _InventoryPageState extends State<InventoryPage> {
   void _applyMarginTag(int productId, double basePrice, double percentage) {
     HapticFeedback.lightImpact();
 
-    // Calculate margin amount
     final marginAmount = basePrice * (percentage / 100);
 
-    // Update Controller Text (Show Margin Amount)
     if (_marginControllers[productId] != null) {
       _marginControllers[productId]!.text = marginAmount.ceil().toStringAsFixed(
         0,
       );
     }
 
-    // Update Cart Controller (Store Total Price)
     final totalSellingPrice = basePrice + marginAmount;
     cartController.setSellingPrice(productId, totalSellingPrice.ceilToDouble());
 
@@ -326,7 +312,7 @@ class _InventoryPageState extends State<InventoryPage> {
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-        resizeToAvoidBottomInset: true, // Vital for keyboard handling
+        resizeToAvoidBottomInset: true,
         backgroundColor: kBgColor,
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -359,7 +345,6 @@ class _InventoryPageState extends State<InventoryPage> {
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 20),
                   children: [
-                    // 1. Stepper
                     Container(
                       color: Colors.white,
                       padding: const EdgeInsets.symmetric(
@@ -370,18 +355,15 @@ class _InventoryPageState extends State<InventoryPage> {
                       child: const CheckoutStepHeader(currentStep: 1),
                     ),
 
-                    // 2. Cart Items
                     ...cartController.cartItems.map((item) {
                       return _buildMeeshoCard(item);
                     }),
 
-                    // 3. Price Details
                     _buildPriceDetailsSection(),
                   ],
                 ),
               ),
 
-              // 4. Bottom Sticky Bar
               _buildBottomBar(actionColor),
             ],
           );
@@ -395,7 +377,16 @@ class _InventoryPageState extends State<InventoryPage> {
   // ---------------------------------------------------------------------------
   Widget _buildMeeshoCard(CartItem item) {
     final double basePrice = double.tryParse(item.product.price) ?? 0;
-    // Get Controller for MARGIN
+
+    // --- FETCH MRP & DISCOUNT LOGIC ---
+    final double mrp = double.tryParse(item.product.regularPrice ?? '0') ?? 0;
+
+    // Calculate Discount %
+    int discountPercent = 0;
+    if (mrp > basePrice) {
+      discountPercent = ((mrp - basePrice) / mrp * 100).round();
+    }
+
     final TextEditingController marginCtrl = _getMarginControllerForItem(
       item.product.id,
       basePrice,
@@ -411,7 +402,7 @@ class _InventoryPageState extends State<InventoryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // PRODUCT INFO - NAVIGATION ENABLED
+          // PRODUCT INFO
           GestureDetector(
             onTap: () {
               Get.to(
@@ -469,16 +460,55 @@ class _InventoryPageState extends State<InventoryPage> {
                             color: Colors.grey.shade600,
                           ),
                         ),
-                      const SizedBox(height: 6),
-                      Row(
+                      const SizedBox(height: 8),
+
+                      // --- PRICE ROW WITH MRP & DISCOUNT ---
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          // 1. Buy Price
                           Text(
-                            "Buy Price: ₹${basePrice.toStringAsFixed(0)}",
+                            "₹${basePrice.toStringAsFixed(0)}",
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
                           ),
+
+                          // 2. MRP (Only if valid and greater than Buy Price)
+                          if (mrp > basePrice) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              "₹${mrp.toStringAsFixed(0)}",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade500,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: Colors.grey.shade500,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // 3. Discount Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                "$discountPercent% off",
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -547,7 +577,7 @@ class _InventoryPageState extends State<InventoryPage> {
               ),
               const Spacer(),
 
-              // WISHLIST TOGGLE (Updated)
+              // WISHLIST TOGGLE
               Obx(() {
                 final bool isInWishlist = wishlistController.isInWishlist(
                   item.product.id,
@@ -622,30 +652,24 @@ class _InventoryPageState extends State<InventoryPage> {
   // --- RESPONSIVE PRICE INPUT DESIGN ---
   Widget _buildCustomerPriceInput(
     CartItem item,
-    TextEditingController marginCtrl, // Stores MARGIN amount
+    TextEditingController marginCtrl,
     double basePrice,
   ) {
     return AnimatedBuilder(
       animation: marginCtrl,
       builder: (context, _) {
         double marginAmount = double.tryParse(marginCtrl.text) ?? 0;
-
-        // Validation: Margin must be >= 20% of Base Price
         double marginPercent = basePrice > 0
             ? (marginAmount / basePrice) * 100
             : 0;
         bool isValid = marginPercent >= 19.9;
 
-        // Calculate Customer Final Price
         double customerPrice = basePrice + marginAmount;
-
-        // Gross Margin Calculation (Margin * Quantity)
         double totalItemProfit = marginAmount * item.quantity;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Row with Tags
             Row(
               children: [
                 const Expanded(
@@ -660,7 +684,6 @@ class _InventoryPageState extends State<InventoryPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // SCROLLABLE CHIPS to prevent overflow on small screens
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 200),
                   child: SingleChildScrollView(
@@ -668,8 +691,6 @@ class _InventoryPageState extends State<InventoryPage> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _marginTag("30%", 30, item, basePrice),
-                        const SizedBox(width: 6),
                         _marginTag("50%", 50, item, basePrice),
                         const SizedBox(width: 6),
                         _marginTag("70%", 70, item, basePrice),
@@ -684,8 +705,6 @@ class _InventoryPageState extends State<InventoryPage> {
 
             const SizedBox(height: 12),
 
-            // Equation Layout: Buy Price + Margin = Total
-            // RESPONSIVE: Uses Flex to ensure fields shrink/grow properly
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               decoration: BoxDecoration(
@@ -697,7 +716,6 @@ class _InventoryPageState extends State<InventoryPage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 1. Buy Price (Static)
                     Expanded(
                       flex: 3,
                       child: _buildPriceBlock(
@@ -707,7 +725,6 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                     ),
 
-                    // Plus Icon
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Icon(
@@ -717,7 +734,6 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                     ),
 
-                    // 2. Your Margin (Editable)
                     Expanded(
                       flex: 4,
                       child: Column(
@@ -795,7 +811,6 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                     ),
 
-                    // Equals Icon
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Icon(
@@ -805,7 +820,6 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                     ),
 
-                    // 3. Customer Price (Calculated Result)
                     Expanded(
                       flex: 4,
                       child: _buildPriceBlock(
@@ -823,11 +837,9 @@ class _InventoryPageState extends State<InventoryPage> {
 
             const SizedBox(height: 8),
 
-            // SHOW GROSS MARGIN (PROFIT) FOR PRODUCT
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Error / Minimum Margin Message
                 Flexible(
                   child: isValid
                       ? const SizedBox()
@@ -843,7 +855,6 @@ class _InventoryPageState extends State<InventoryPage> {
                         ),
                 ),
 
-                // Gross Margin Display
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -858,7 +869,7 @@ class _InventoryPageState extends State<InventoryPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        "Gross Margin: ",
+                        "Your Profit: ",
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.green.shade800,
@@ -873,7 +884,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.green.shade800,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -898,7 +909,6 @@ class _InventoryPageState extends State<InventoryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Label Text needs to handle overflow on small screens
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
@@ -981,13 +991,34 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // PRICE DETAILS SECTION (With Added Fees)
+  // PRICE DETAILS SECTION (UPDATED)
   // ---------------------------------------------------------------------------
   Widget _buildPriceDetailsSection() {
-    double totalCollect = _computeAmountToCollect();
-    double supplierTotal = cartController.totalPrice;
+    // 1. Calculate base values
+    double supplierTotal = cartController.totalPrice; // Sum of Buy Price * Qty
     double netMargin = _computeNetMargin();
     double totalFees = _computeTotalFees();
+    double totalCollect = _computeAmountToCollect();
+    double resellerPayable = supplierTotal + totalFees;
+
+    // 2. Calculate Total Items & Total Discount
+    int totalItems = cartController.cartItems.fold(
+      0,
+      (sum, item) => sum + item.quantity,
+    );
+    double totalDiscount = 0;
+    double totalMRP = 0;
+
+    for (var item in cartController.cartItems) {
+      final double basePrice = double.tryParse(item.product.price) ?? 0;
+      final double mrp = double.tryParse(item.product.regularPrice ?? '0') ?? 0;
+      final double effectiveMRP = mrp > basePrice ? mrp : basePrice;
+
+      totalMRP += effectiveMRP * item.quantity;
+      if (mrp > basePrice) {
+        totalDiscount += (mrp - basePrice) * item.quantity;
+      }
+    }
 
     return Container(
       color: Colors.white,
@@ -996,23 +1027,33 @@ class _InventoryPageState extends State<InventoryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Price Details",
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          Text(
+            "Price Details ($totalItems ${totalItems > 1 ? 'items' : 'item'})",
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
+          // Total Discount (Highlighted)
+          if (totalDiscount > 0)
+            _priceRow(
+              "Total Discount",
+              "-₹${totalDiscount.toStringAsFixed(0)}",
+              color: Colors.green,
+              isBold: false,
+            ),
+
+          const SizedBox(height: 4),
           _priceRow(
-            "Total Product Cost (Buy Price)",
+            "Order Price (Buy Price)",
             "₹${supplierTotal.toStringAsFixed(0)}",
           ),
           const SizedBox(height: 8),
+          const Divider(height: 24),
 
-          // FEES SECTION
           const Text(
             "Charges & Fees",
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
               color: Colors.grey,
             ),
           ),
@@ -1034,17 +1075,26 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
           const Divider(height: 24),
 
-          // NET PROFIT CALCULATION
+          // AMOUNT TO BE PAID (Highlighted)
+          _priceRow(
+            "Amount to be Paid by you",
+            "₹${resellerPayable.toStringAsFixed(0)}",
+            isBold: false,
+            fontSize: 16,
+          ),
+
+          // Net Profit
           _priceRow(
             "Your Net Profit",
             netMargin >= 0
                 ? "+₹${netMargin.toStringAsFixed(0)}"
                 : "-₹${netMargin.abs().toStringAsFixed(0)}",
             color: netMargin >= 0 ? Colors.green : Colors.red,
-            isBold: true,
+            isBold: false,
           ),
-
           const Divider(height: 24),
+
+          const SizedBox(height: 8),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1054,7 +1104,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "Order Total (Amount in Invoice)",
+                      "Amount In Invoice",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1063,7 +1113,7 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                     ),
                     const Text(
-                      "These price will be printed on the invoice",
+                      "Amount to collect from customer",
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w400,
@@ -1089,7 +1139,6 @@ class _InventoryPageState extends State<InventoryPage> {
 
           const SizedBox(height: 12),
 
-          // WARNING / SUCCESS MESSAGE
           Container(
             padding: const EdgeInsets.all(10),
             width: double.infinity,
@@ -1137,6 +1186,8 @@ class _InventoryPageState extends State<InventoryPage> {
     String value, {
     Color color = Colors.black87,
     bool isBold = false,
+    double fontSize = 13,
+    bool hideValue = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1148,17 +1199,22 @@ class _InventoryPageState extends State<InventoryPage> {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, color: Colors.grey),
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                color: isBold ? Colors.black87 : Colors.grey.shade700,
+              ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              color: color,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+          if (!hideValue)
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: fontSize,
+                color: color,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1183,20 +1239,18 @@ class _InventoryPageState extends State<InventoryPage> {
         ],
       ),
       child: SafeArea(
-        top: false, // Only care about bottom safe area (home indicator)
+        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // PRICE SECTION
               Expanded(
                 flex: 4,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // FITTED BOX prevents text cut-off for large numbers
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
@@ -1213,7 +1267,7 @@ class _InventoryPageState extends State<InventoryPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      "Amount to be paid by you",
+                      "Amount Payable",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1229,7 +1283,6 @@ class _InventoryPageState extends State<InventoryPage> {
 
               const SizedBox(width: 16),
 
-              // BUTTON SECTION
               Expanded(
                 flex: 5,
                 child: SizedBox(
@@ -1237,7 +1290,6 @@ class _InventoryPageState extends State<InventoryPage> {
                   child: ElevatedButton(
                     onPressed: () {
                       if (!isValid) {
-                        // Check why it's invalid to show correct message
                         if (_computeNetMargin() < 0) {
                           _showPremiumSnackbar(
                             "Net Loss Alert",
