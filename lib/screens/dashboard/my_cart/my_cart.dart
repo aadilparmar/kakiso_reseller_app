@@ -34,7 +34,8 @@ class _InventoryPageState extends State<InventoryPage> {
       : Get.put(WishlistController());
 
   // Controllers
-  final Map<int, TextEditingController> _sellingPriceControllers = {};
+  // NOTE: This now stores the MARGIN amount, not the total selling price
+  final Map<int, TextEditingController> _marginControllers = {};
   final Map<int, TextEditingController> _quantityControllers = {};
 
   // --- FEES CONSTANTS ---
@@ -47,7 +48,7 @@ class _InventoryPageState extends State<InventoryPage> {
 
   @override
   void dispose() {
-    for (final c in _sellingPriceControllers.values) {
+    for (final c in _marginControllers.values) {
       c.dispose();
     }
     for (final c in _quantityControllers.values) {
@@ -181,24 +182,32 @@ class _InventoryPageState extends State<InventoryPage> {
 
   // --- LOGIC HELPERS ---
 
-  TextEditingController _getControllerForItem(int productId, double basePrice) {
-    if (_sellingPriceControllers[productId] != null) {
-      return _sellingPriceControllers[productId]!;
+  /// Returns a controller populated with the MARGIN amount (Selling - Base)
+  TextEditingController _getMarginControllerForItem(
+    int productId,
+    double basePrice,
+  ) {
+    if (_marginControllers[productId] != null) {
+      return _marginControllers[productId]!;
     }
-    final saved = cartController.getSellingPrice(productId);
+
+    final savedTotal = cartController.getSellingPrice(productId);
     String initialText = '';
 
-    // Default to 20% margin
-    if (saved != null && saved > 0) {
-      initialText = saved.toStringAsFixed(0);
+    // Calculate margin if a price is already saved
+    if (savedTotal != null && savedTotal > basePrice) {
+      double margin = savedTotal - basePrice;
+      initialText = margin.toStringAsFixed(0);
     } else if (basePrice > 0) {
-      final defaultPrice = basePrice * 1.20;
-      initialText = defaultPrice.toStringAsFixed(0);
-      cartController.setSellingPrice(productId, defaultPrice);
+      // Default to 20% margin
+      double defaultMargin = basePrice * 0.20;
+      initialText = defaultMargin.toStringAsFixed(0);
+      // Update cart with total
+      cartController.setSellingPrice(productId, basePrice + defaultMargin);
     }
 
     final controller = TextEditingController(text: initialText);
-    _sellingPriceControllers[productId] = controller;
+    _marginControllers[productId] = controller;
     return controller;
   }
 
@@ -223,9 +232,6 @@ class _InventoryPageState extends State<InventoryPage> {
   // --- CALCULATION HELPERS ---
 
   double _computeTotalFees() {
-    // Fees are applied once per order (usually) or per item?
-    // Based on typical reseller apps (Meesho), shipping might be per item or order.
-    // Assuming flat fee structure per order for simplicity as per prompt "shipping fee is 100 rs".
     if (cartController.cartItems.isEmpty) return 0.0;
     return kShippingFee + kPlatformFee + kConvenienceFee;
   }
@@ -235,16 +241,19 @@ class _InventoryPageState extends State<InventoryPage> {
     final items = cartController.cartItems;
     for (final item in items) {
       final basePrice = double.tryParse(item.product.price) ?? 0;
-      final ctrl = _getControllerForItem(item.product.id, basePrice);
-      final selling = double.tryParse(ctrl.text) ?? 0;
-      if (selling > 0) total += selling * item.quantity;
+      final ctrl = _getMarginControllerForItem(item.product.id, basePrice);
+      final margin = double.tryParse(ctrl.text) ?? 0;
+      final sellingPrice = basePrice + margin;
+
+      if (sellingPrice > 0) total += sellingPrice * item.quantity;
     }
     return total;
   }
 
   double _computeNetMargin() {
     double totalCollect = _computeAmountToCollect();
-    double totalProductCost = cartController.totalPrice;
+    double totalProductCost =
+        cartController.totalPrice; // This is sum of (BasePrice * Qty)
     double totalFees = _computeTotalFees();
 
     // Net Margin = (Collected Amount) - (Product Cost + Fees)
@@ -258,16 +267,17 @@ class _InventoryPageState extends State<InventoryPage> {
     // 1. Per Product Validation (Gross Margin > 20%)
     for (final item in items) {
       final basePrice = double.tryParse(item.product.price) ?? 0;
-      final ctrl = _getControllerForItem(item.product.id, basePrice);
-      final selling = double.tryParse(ctrl.text) ?? 0;
+      final ctrl = _getMarginControllerForItem(item.product.id, basePrice);
+      final margin = double.tryParse(ctrl.text) ?? 0;
 
-      final marginPercent = ((selling - basePrice) / basePrice) * 100;
+      // Calculate percentage based on Margin directly
+      final marginPercent = basePrice > 0 ? (margin / basePrice) * 100 : 0;
+
       if (marginPercent < 19.9)
         return false; // Strict 20% rule on product level
     }
 
     // 2. Net Profit Validation (Must cover fees)
-    // Reseller shouldn't suffer a loss after paying shipping/platform fees
     if (_computeNetMargin() < 0) return false;
 
     return true;
@@ -276,14 +286,21 @@ class _InventoryPageState extends State<InventoryPage> {
   // --- ACTIONS ---
   void _applyMarginTag(int productId, double basePrice, double percentage) {
     HapticFeedback.lightImpact();
-    final newSellingPrice = basePrice + (basePrice * (percentage / 100));
 
-    if (_sellingPriceControllers[productId] != null) {
-      _sellingPriceControllers[productId]!.text = newSellingPrice
-          .ceil()
-          .toStringAsFixed(0);
+    // Calculate margin amount
+    final marginAmount = basePrice * (percentage / 100);
+
+    // Update Controller Text (Show Margin Amount)
+    if (_marginControllers[productId] != null) {
+      _marginControllers[productId]!.text = marginAmount.ceil().toStringAsFixed(
+        0,
+      );
     }
-    cartController.setSellingPrice(productId, newSellingPrice.ceilToDouble());
+
+    // Update Cart Controller (Store Total Price)
+    final totalSellingPrice = basePrice + marginAmount;
+    cartController.setSellingPrice(productId, totalSellingPrice.ceilToDouble());
+
     setState(() {});
   }
 
@@ -309,6 +326,7 @@ class _InventoryPageState extends State<InventoryPage> {
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
+        resizeToAvoidBottomInset: true, // Vital for keyboard handling
         backgroundColor: kBgColor,
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -338,6 +356,7 @@ class _InventoryPageState extends State<InventoryPage> {
             children: [
               Expanded(
                 child: ListView(
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.only(bottom: 20),
                   children: [
                     // 1. Stepper
@@ -376,7 +395,8 @@ class _InventoryPageState extends State<InventoryPage> {
   // ---------------------------------------------------------------------------
   Widget _buildMeeshoCard(CartItem item) {
     final double basePrice = double.tryParse(item.product.price) ?? 0;
-    final TextEditingController priceCtrl = _getControllerForItem(
+    // Get Controller for MARGIN
+    final TextEditingController marginCtrl = _getMarginControllerForItem(
       item.product.id,
       basePrice,
     );
@@ -442,6 +462,8 @@ class _InventoryPageState extends State<InventoryPage> {
                       if (item.selectedAttributes.isNotEmpty)
                         Text(
                           item.selectedAttributes.values.join(", "),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade600,
@@ -457,8 +479,6 @@ class _InventoryPageState extends State<InventoryPage> {
                               color: Colors.black87,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          // No "Free Delivery" tag here since we charge shipping below
                         ],
                       ),
                     ],
@@ -593,143 +613,327 @@ class _InventoryPageState extends State<InventoryPage> {
           const Divider(height: 24, thickness: 1, color: Color(0xFFF5F5F5)),
 
           // PRICE INPUT
-          _buildCustomerPriceInput(item, priceCtrl, basePrice),
+          _buildCustomerPriceInput(item, marginCtrl, basePrice),
         ],
       ),
     );
   }
 
+  // --- RESPONSIVE PRICE INPUT DESIGN ---
   Widget _buildCustomerPriceInput(
     CartItem item,
-    TextEditingController ctrl,
+    TextEditingController marginCtrl, // Stores MARGIN amount
     double basePrice,
   ) {
     return AnimatedBuilder(
-      animation: ctrl,
+      animation: marginCtrl,
       builder: (context, _) {
-        double selling = double.tryParse(ctrl.text) ?? 0;
-        double margin = (selling - basePrice) * item.quantity;
+        double marginAmount = double.tryParse(marginCtrl.text) ?? 0;
+
+        // Validation: Margin must be >= 20% of Base Price
         double marginPercent = basePrice > 0
-            ? ((selling - basePrice) / basePrice) * 100
+            ? (marginAmount / basePrice) * 100
             : 0;
         bool isValid = marginPercent >= 19.9;
+
+        // Calculate Customer Final Price
+        double customerPrice = basePrice + marginAmount;
+
+        // Gross Margin Calculation (Margin * Quantity)
+        double totalItemProfit = marginAmount * item.quantity;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header Row with Tags
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Add your Margin (%)",
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black54,
+                const Expanded(
+                  child: Text(
+                    "Reselling this product",
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Row(
-                  children: [
-                    _marginTag("20%", 20, item, basePrice),
-                    const SizedBox(width: 6),
-                    _marginTag("50%", 50, item, basePrice),
-                    const SizedBox(width: 6),
-                    _marginTag("100%", 100, item, basePrice),
-                  ],
+                // SCROLLABLE CHIPS to prevent overflow on small screens
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _marginTag("30%", 30, item, basePrice),
+                        const SizedBox(width: 6),
+                        _marginTag("50%", 50, item, basePrice),
+                        const SizedBox(width: 6),
+                        _marginTag("70%", 70, item, basePrice),
+                        const SizedBox(width: 6),
+                        _marginTag("100%", 100, item, basePrice),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 140,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: isValid
-                          ? Colors.grey.shade300
-                          : Colors.red.shade300,
-                      width: isValid ? 1 : 1.5,
+
+            const SizedBox(height: 12),
+
+            // Equation Layout: Buy Price + Margin = Total
+            // RESPONSIVE: Uses Flex to ensure fields shrink/grow properly
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // 1. Buy Price (Static)
+                    Expanded(
+                      flex: 3,
+                      child: _buildPriceBlock(
+                        label: "Buy Price",
+                        value: "₹${basePrice.toStringAsFixed(0)}",
+                        isEditable: false,
+                      ),
                     ),
+
+                    // Plus Icon
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        Icons.add,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+
+                    // 2. Your Margin (Editable)
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Your Margin",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: isValid
+                                    ? Colors.grey.shade300
+                                    : Colors.red.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 8, right: 2),
+                                  child: Text(
+                                    "₹",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    controller: marginCtrl,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.only(
+                                        bottom: 2,
+                                      ),
+                                    ),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      color: isValid
+                                          ? Colors.black87
+                                          : Colors.red,
+                                    ),
+                                    onChanged: (v) {
+                                      final val = double.tryParse(v);
+                                      if (val != null) {
+                                        cartController.setSellingPrice(
+                                          item.product.id,
+                                          basePrice + val,
+                                        );
+                                      }
+                                      setState(() {});
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Equals Icon
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        Iconsax.arrow_right_1,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+
+                    // 3. Customer Price (Calculated Result)
+                    Expanded(
+                      flex: 4,
+                      child: _buildPriceBlock(
+                        label: "Customer Price",
+                        value: "₹${customerPrice.toStringAsFixed(0)}",
+                        isEditable: false,
+                        valueColor: const Color(0xFF4A317E),
+                        isBold: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // SHOW GROSS MARGIN (PROFIT) FOR PRODUCT
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Error / Minimum Margin Message
+                Flexible(
+                  child: isValid
+                      ? const SizedBox()
+                      : const Text(
+                          "Min 20% margin required",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                ),
+
+                // Gross Margin Display
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.green.shade100),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        "₹",
+                      Text(
+                        "Gross Margin: ",
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
+                          fontSize: 12,
+                          color: Colors.green.shade800,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: TextField(
-                          controller: ctrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
+                      Flexible(
+                        child: Text(
+                          "₹${totalItemProfit.toStringAsFixed(0)}",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.green.shade800,
                             fontWeight: FontWeight.w500,
-                            fontSize: 15,
-                            color: isValid ? Colors.black87 : Colors.red,
                           ),
-                          onChanged: (v) {
-                            final val = double.tryParse(v);
-                            if (val != null) {
-                              cartController.setSellingPrice(
-                                item.product.id,
-                                val,
-                              );
-                            }
-                            setState(() {});
-                          },
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: isValid
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Gross Margin (Product)",
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.green,
-                              ),
-                            ),
-                            Text(
-                              "₹${margin.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ],
-                        )
-                      : const Text(
-                          "Min 20% margin required",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.redAccent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                 ),
               ],
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildPriceBlock({
+    required String label,
+    required String value,
+    required bool isEditable,
+    Color valueColor = Colors.black87,
+    bool isBold = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label Text needs to handle overflow on small screens
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black54,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          alignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+            color: isEditable ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+            border: isEditable ? Border.all(color: Colors.grey.shade300) : null,
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+                color: valueColor,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -743,7 +947,7 @@ class _InventoryPageState extends State<InventoryPage> {
       onTap: () => _applyMarginTag(item.product.id, basePrice, percent),
       borderRadius: BorderRadius.circular(4),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.blue.shade50,
           border: Border.all(color: Colors.blue.shade100),
@@ -752,7 +956,7 @@ class _InventoryPageState extends State<InventoryPage> {
         child: Text(
           "+$label",
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             color: Colors.blue.shade700,
             fontWeight: FontWeight.w600,
           ),
@@ -798,7 +1002,7 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
           const SizedBox(height: 16),
           _priceRow(
-            "Total Product Price",
+            "Total Product Cost (Buy Price)",
             "₹${supplierTotal.toStringAsFixed(0)}",
           ),
           const SizedBox(height: 8),
@@ -845,28 +1049,39 @@ class _InventoryPageState extends State<InventoryPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                children: [
-                  const Text(
-                    "Order Total (Amount in Invoice)",
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  const Text(
-                    "These price will be Printed in Invoice",
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                      color: Color.fromARGB(255, 190, 14, 175),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Order Total (Amount in Invoice)",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                    const Text(
+                      "These price will be printed on the invoice",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w400,
+                        color: Color.fromARGB(255, 190, 14, 175),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Text(
-                "₹${totalCollect.toStringAsFixed(0)}",
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF4A317E),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "₹${totalCollect.toStringAsFixed(0)}",
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF4A317E),
+                  ),
                 ),
               ),
             ],
@@ -928,7 +1143,14 @@ class _InventoryPageState extends State<InventoryPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
@@ -944,10 +1166,10 @@ class _InventoryPageState extends State<InventoryPage> {
 
   Widget _buildBottomBar(Color actionColor) {
     bool isValid = _isOrderValid();
-    double totalCollect = _computeAmountToCollect();
-    double supplierTotal = cartController.totalPrice;
     double totalFees = _computeTotalFees();
+    double supplierTotal = cartController.totalPrice;
     double resellerPayable = supplierTotal + totalFees;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -961,6 +1183,7 @@ class _InventoryPageState extends State<InventoryPage> {
         ],
       ),
       child: SafeArea(
+        top: false, // Only care about bottom safe area (home indicator)
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
           child: Row(
@@ -973,19 +1196,26 @@ class _InventoryPageState extends State<InventoryPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "₹${resellerPayable.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                        fontFamily: 'Poppins',
-                        height: 1.1,
+                    // FITTED BOX prevents text cut-off for large numbers
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "₹${resellerPayable.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                          fontFamily: 'Poppins',
+                          height: 1.1,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       "Amount to be paid by you",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey.shade600,
@@ -996,6 +1226,8 @@ class _InventoryPageState extends State<InventoryPage> {
                   ],
                 ),
               ),
+
+              const SizedBox(width: 16),
 
               // BUTTON SECTION
               Expanded(
@@ -1043,15 +1275,18 @@ class _InventoryPageState extends State<InventoryPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          "Continue",
-                          style: TextStyle(
-                            color: isValid
-                                ? Colors.white
-                                : Colors.grey.shade600,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
+                        Flexible(
+                          child: Text(
+                            "Continue",
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isValid
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                         if (isValid) ...[
