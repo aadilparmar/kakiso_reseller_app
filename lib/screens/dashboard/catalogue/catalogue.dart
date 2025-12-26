@@ -7,7 +7,7 @@ import 'package:flutter/services.dart'; // ✅ Clipboard
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http; // ✅ for downloading images
 import 'package:path_provider/path_provider.dart'; // ✅ for temp dir
@@ -767,13 +767,13 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
             const SizedBox(width: 4),
             IconButton(
-              icon: const Icon(Iconsax.profile_circle),
+              icon: const Icon(Iconsax.heart),
               color: accentColor,
               iconSize: 30,
               onPressed: () {
                 // Navigate to ProfilePage using currently stored user data
                 // We use _userData which is initialized in initState from widget.userData
-                Get.to(() => ProfilePage(userData: widget.userData));
+                Get.to(() => WishlistScreen());
               },
             ),
             const SizedBox(width: 8),

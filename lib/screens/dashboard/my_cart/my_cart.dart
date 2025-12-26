@@ -1,15 +1,21 @@
 // lib/screens/dashboard/my_cart/inventory_page.dart
+
+import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/controllers/wishlist_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
+// IMPORT PRODUCT DETAILS PAGE
+import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// 🔹 Checkout step: CART (Step 1)
 class InventoryPage extends StatefulWidget {
   final UserData? userData;
   const InventoryPage({super.key, this.userData});
@@ -20,40 +26,174 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   final CartController cartController = Get.find<CartController>();
-  String _searchQuery = '';
 
-  /// Local text controllers for selling price per productId
+  // Inject WishlistController
+  final WishlistController wishlistController =
+      Get.isRegistered<WishlistController>()
+      ? Get.find<WishlistController>()
+      : Get.put(WishlistController());
+
+  // Controllers
   final Map<int, TextEditingController> _sellingPriceControllers = {};
+  final Map<int, TextEditingController> _quantityControllers = {};
+
+  // --- FEES CONSTANTS ---
+  static const double kShippingFee = 100.0;
+  static const double kPlatformFee = 15.0;
+  static const double kConvenienceFee = 15.0;
+
+  // Snackbar State
+  OverlayEntry? _currentSnackbar;
 
   @override
   void dispose() {
     for (final c in _sellingPriceControllers.values) {
       c.dispose();
     }
+    for (final c in _quantityControllers.values) {
+      c.dispose();
+    }
+    _removeSnackbar();
     super.dispose();
   }
 
-  /// Get / create controller for a product's selling price.
-  /// Prefers:
-  ///   1. Existing TextEditingController (if already created)
-  ///   2. Saved selling price in CartController (persisted)
-  ///   3. Default = basePrice * 1.2 (20% margin)
+  // --- PREMIUM SNACKBAR LOGIC ---
+  void _removeSnackbar() {
+    _currentSnackbar?.remove();
+    _currentSnackbar = null;
+  }
+
+  void _showPremiumSnackbar(
+    String title,
+    String message, {
+    bool isError = false,
+  }) {
+    _removeSnackbar();
+    final overlay = Overlay.of(context);
+
+    _currentSnackbar = OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          Positioned(
+            bottom: 100, // Position above the bottom bar
+            left: 20,
+            right: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.elasticOut,
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(0, 30 * (1 - value)),
+                    child: Opacity(
+                      opacity: value.clamp(0.0, 1.0),
+                      child: child,
+                    ),
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isError
+                            ? Colors.red.withValues(alpha: 0.9)
+                            : const Color(0xFF1F2937).withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isError ? Iconsax.warning_2 : Iconsax.heart5,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  message,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 12,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    overlay.insert(_currentSnackbar!);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _removeSnackbar();
+    });
+  }
+
+  // --- LOGIC HELPERS ---
+
   TextEditingController _getControllerForItem(int productId, double basePrice) {
     if (_sellingPriceControllers[productId] != null) {
       return _sellingPriceControllers[productId]!;
     }
-
-    // 1) Try to use saved selling price from CartController
     final saved = cartController.getSellingPrice(productId);
     String initialText = '';
 
+    // Default to 20% margin
     if (saved != null && saved > 0) {
       initialText = saved.toStringAsFixed(0);
     } else if (basePrice > 0) {
-      // 2) Default 20% margin
-      final defaultPrice = basePrice * 1.2;
+      final defaultPrice = basePrice * 1.20;
       initialText = defaultPrice.toStringAsFixed(0);
-      // Save default in controller for persistence and later use (review page)
       cartController.setSellingPrice(productId, defaultPrice);
     }
 
@@ -62,750 +202,899 @@ class _InventoryPageState extends State<InventoryPage> {
     return controller;
   }
 
-  /// ✅ Check that every cart item has a selling price giving margin > 9.99%
-  /// Uses _getControllerForItem so default 20% margin is applied for all.
-  bool _areAllMarginsValid() {
-    final items = cartController.cartItems;
-
-    if (items.isEmpty) return false;
-
-    for (final item in items) {
-      final basePrice = double.tryParse(item.product.price) ?? 0;
-      if (basePrice <= 0) return false;
-
-      // Always go via helper (creates controller + default / uses saved)
-      final ctrl = _getControllerForItem(item.product.id, basePrice);
-
-      final selling = double.tryParse(ctrl.text);
-      if (selling == null || selling <= 0) return false;
-
-      final marginPercent = ((selling - basePrice) / basePrice) * 100;
-      if (marginPercent <= 9.99) {
-        return false;
+  TextEditingController _getQtyControllerForItem(
+    int productId,
+    int currentQty,
+  ) {
+    if (_quantityControllers[productId] != null) {
+      if (_quantityControllers[productId]!.text != currentQty.toString()) {
+        _quantityControllers[productId]!.text = currentQty.toString();
+        _quantityControllers[productId]!.selection = TextSelection.fromPosition(
+          TextPosition(offset: currentQty.toString().length),
+        );
       }
+      return _quantityControllers[productId]!;
     }
-    return true;
+    final controller = TextEditingController(text: currentQty.toString());
+    _quantityControllers[productId] = controller;
+    return controller;
   }
 
-  /// 💰 Total amount to be collected from customer (selling prices * qty)
+  // --- CALCULATION HELPERS ---
+
+  double _computeTotalFees() {
+    // Fees are applied once per order (usually) or per item?
+    // Based on typical reseller apps (Meesho), shipping might be per item or order.
+    // Assuming flat fee structure per order for simplicity as per prompt "shipping fee is 100 rs".
+    if (cartController.cartItems.isEmpty) return 0.0;
+    return kShippingFee + kPlatformFee + kConvenienceFee;
+  }
+
   double _computeAmountToCollect() {
     double total = 0;
     final items = cartController.cartItems;
+    for (final item in items) {
+      final basePrice = double.tryParse(item.product.price) ?? 0;
+      final ctrl = _getControllerForItem(item.product.id, basePrice);
+      final selling = double.tryParse(ctrl.text) ?? 0;
+      if (selling > 0) total += selling * item.quantity;
+    }
+    return total;
+  }
 
+  double _computeNetMargin() {
+    double totalCollect = _computeAmountToCollect();
+    double totalProductCost = cartController.totalPrice;
+    double totalFees = _computeTotalFees();
+
+    // Net Margin = (Collected Amount) - (Product Cost + Fees)
+    return totalCollect - (totalProductCost + totalFees);
+  }
+
+  bool _isOrderValid() {
+    final items = cartController.cartItems;
+    if (items.isEmpty) return false;
+
+    // 1. Per Product Validation (Gross Margin > 20%)
     for (final item in items) {
       final basePrice = double.tryParse(item.product.price) ?? 0;
       final ctrl = _getControllerForItem(item.product.id, basePrice);
       final selling = double.tryParse(ctrl.text) ?? 0;
 
-      if (selling > 0) {
-        total += selling * item.quantity;
-      }
+      final marginPercent = ((selling - basePrice) / basePrice) * 100;
+      if (marginPercent < 19.9)
+        return false; // Strict 20% rule on product level
     }
 
-    return total;
+    // 2. Net Profit Validation (Must cover fees)
+    // Reseller shouldn't suffer a loss after paying shipping/platform fees
+    if (_computeNetMargin() < 0) return false;
+
+    return true;
+  }
+
+  // --- ACTIONS ---
+  void _applyMarginTag(int productId, double basePrice, double percentage) {
+    HapticFeedback.lightImpact();
+    final newSellingPrice = basePrice + (basePrice * (percentage / 100));
+
+    if (_sellingPriceControllers[productId] != null) {
+      _sellingPriceControllers[productId]!.text = newSellingPrice
+          .ceil()
+          .toStringAsFixed(0);
+    }
+    cartController.setSellingPrice(productId, newSellingPrice.ceilToDouble());
+    setState(() {});
+  }
+
+  void _toggleWishlist(ProductModel product) {
+    HapticFeedback.mediumImpact();
+
+    final bool isAlreadyIn = wishlistController.isInWishlist(product.id);
+    wishlistController.toggleWishlist(product);
+
+    if (!isAlreadyIn) {
+      _showPremiumSnackbar(
+        "Saved to Wishlist",
+        "${product.name} is saved for later.",
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.black87,
-            size: 20,
+    const Color kBgColor = Color(0xFFF0F3F6);
+    final Color actionColor = accentColor;
+
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        backgroundColor: kBgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 1,
+          shadowColor: Colors.black.withValues(alpha: 0.1),
+          titleSpacing: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Obx(
-          () => Text(
-            'My Cart (${cartController.itemCount})',
-            style: const TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
-              fontSize: 22,
+          title: Obx(
+            () => Text(
+              "Cart (${cartController.itemCount})",
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+              ),
             ),
           ),
         ),
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
+        body: Obx(() {
+          if (cartController.cartItems.isEmpty) return _buildEmptyState();
 
-          // 🔹 Step header: this is the Cart step (1)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: CheckoutStepHeader(currentStep: 1),
-          ),
-
-          const SizedBox(height: 8),
-
-          _buildSearchAndFilter(),
-          _buildCartSummary(),
-          Expanded(
-            child: Obx(() {
-              final filteredItems = cartController.cartItems.where((item) {
-                if (_searchQuery.isEmpty) return true;
-                return item.product.name.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                );
-              }).toList();
-
-              if (filteredItems.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Iconsax.shopping_cart,
-                        size: 64,
-                        color: Colors.grey.shade300,
+          return Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  children: [
+                    // 1. Stepper
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _searchQuery.isEmpty
-                            ? 'Your cart is empty'
-                            : 'No items match your search',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: const CheckoutStepHeader(currentStep: 1),
+                    ),
 
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                    // 2. Cart Items
+                    ...cartController.cartItems.map((item) {
+                      return _buildMeeshoCard(item);
+                    }),
+
+                    // 3. Price Details
+                    _buildPriceDetailsSection(),
+                  ],
                 ),
-                itemCount: filteredItems.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final item = filteredItems[index];
-                  return _buildInventoryItemCard(item, cartController);
-                },
-              );
-            }),
-          ),
-        ],
+              ),
+
+              // 4. Bottom Sticky Bar
+              _buildBottomBar(actionColor),
+            ],
+          );
+        }),
       ),
-      bottomNavigationBar: _buildPurchaseBar(cartController),
     );
   }
 
-  // -------- Summary Card --------
-  Widget _buildCartSummary() {
-    return Obx(() {
-      final items = cartController.cartItems;
-      if (items.isEmpty) return const SizedBox.shrink();
-
-      int totalUnits = 0;
-      double mrpTotal = 0;
-
-      for (final item in items) {
-        final qty = item.quantity;
-        totalUnits += qty;
-
-        final regularPriceStr = (item.product.regularPrice.isNotEmpty)
-            ? item.product.regularPrice
-            : item.product.price;
-
-        final regular =
-            double.tryParse(regularPriceStr) ??
-            double.tryParse(item.product.price) ??
-            0;
-
-        mrpTotal += regular * qty;
-      }
-
-      // Base total = cost to reseller
-      final baseTotal = cartController.totalPrice;
-      final rawSavings = mrpTotal - baseTotal;
-      final savings = rawSavings > 0 ? rawSavings : 0;
-
-      return Container(
-        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Items',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$totalUnits',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'MRP Total',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '₹${mrpTotal.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    'You Save (vs MRP)',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(
-                        Iconsax.discount_circle,
-                        size: 16,
-                        color: savings > 0
-                            ? Colors.green
-                            : Colors.grey.shade400,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '₹${savings.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: savings > 0
-                              ? Colors.green.shade700
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  // -------- Item Card --------
-  Widget _buildInventoryItemCard(CartItem item, CartController controller) {
+  // ---------------------------------------------------------------------------
+  // CARD WIDGET
+  // ---------------------------------------------------------------------------
+  Widget _buildMeeshoCard(CartItem item) {
     final double basePrice = double.tryParse(item.product.price) ?? 0;
     final TextEditingController priceCtrl = _getControllerForItem(
       item.product.id,
       basePrice,
     );
 
-    double? sellingPrice = double.tryParse(priceCtrl.text);
-    double? marginAmount;
-    double? marginPercent;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // PRODUCT INFO - NAVIGATION ENABLED
+          GestureDetector(
+            onTap: () {
+              Get.to(
+                () => ProductDetailsPage(product: item.product),
+                transition: Transition.fadeIn,
+              );
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade200),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      item.product.image,
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                        width: 70,
+                        height: 70,
+                        child: Icon(Icons.image),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.product.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (item.selectedAttributes.isNotEmpty)
+                        Text(
+                          item.selectedAttributes.values.join(", "),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text(
+                            "Buy Price: ₹${basePrice.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // No "Free Delivery" tag here since we charge shipping below
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-    if (sellingPrice != null && basePrice > 0) {
-      marginAmount = (sellingPrice - basePrice) * item.quantity;
-      marginPercent = ((sellingPrice - basePrice) / basePrice) * 100;
-    }
+          const Divider(height: 24, thickness: 1, color: Color(0xFFF5F5F5)),
 
-    final bool marginOk =
-        marginPercent != null &&
-        marginPercent > 9.99 &&
-        (sellingPrice ?? 0) > 0;
+          // QTY & ACTIONS
+          Row(
+            children: [
+              Row(
+                children: [
+                  _qtyButton(Icons.remove, () {
+                    HapticFeedback.lightImpact();
+                    cartController.decrementQuantity(item.product.id);
+                  }),
+                  Container(
+                    alignment: Alignment.center,
+                    width: 50,
+                    child: TextField(
+                      controller: _getQtyControllerForItem(
+                        item.product.id,
+                        item.quantity,
+                      ),
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onSubmitted: (val) {
+                        int? newQty = int.tryParse(val);
+                        if (newQty != null && newQty > 0) {
+                          int diff = newQty - item.quantity;
+                          if (diff > 0) {
+                            for (int i = 0; i < diff; i++)
+                              cartController.incrementQuantity(item.product.id);
+                          } else if (diff < 0) {
+                            for (int i = 0; i < diff.abs(); i++)
+                              cartController.decrementQuantity(item.product.id);
+                          }
+                        } else {
+                          _getQtyControllerForItem(
+                            item.product.id,
+                            item.quantity,
+                          ).text = item.quantity
+                              .toString();
+                        }
+                      },
+                    ),
+                  ),
+                  _qtyButton(Icons.add, () {
+                    HapticFeedback.lightImpact();
+                    cartController.incrementQuantity(item.product.id);
+                  }),
+                ],
+              ),
+              const Spacer(),
 
-    // 🔹 Build variation text:
-    //    ONLY show attributes actually selected on the product details page.
-    String variationText = '';
-    if (item.selectedAttributes.isNotEmpty) {
-      variationText = item.selectedAttributes.entries
-          .map((e) => '${e.key}: ${e.value}')
-          .join(' • ');
-    }
+              // WISHLIST TOGGLE (Updated)
+              Obx(() {
+                final bool isInWishlist = wishlistController.isInWishlist(
+                  item.product.id,
+                );
+                return InkWell(
+                  onTap: () => _toggleWishlist(item.product),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isInWishlist ? Iconsax.heart5 : Iconsax.heart,
+                        size: 18,
+                        color: isInWishlist
+                            ? const Color(0xFFEB2A7E)
+                            : Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "WISHLIST",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isInWishlist
+                              ? const Color(0xFFEB2A7E)
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              Container(
+                height: 14,
+                width: 1,
+                color: Colors.grey.shade300,
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+
+              InkWell(
+                onTap: () => cartController.removeFromCart(item.product.id),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "REMOVE",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const Divider(height: 24, thickness: 1, color: Color(0xFFF5F5F5)),
+
+          // PRICE INPUT
+          _buildCustomerPriceInput(item, priceCtrl, basePrice),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerPriceInput(
+    CartItem item,
+    TextEditingController ctrl,
+    double basePrice,
+  ) {
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (context, _) {
+        double selling = double.tryParse(ctrl.text) ?? 0;
+        double margin = (selling - basePrice) * item.quantity;
+        double marginPercent = basePrice > 0
+            ? ((selling - basePrice) / basePrice) * 100
+            : 0;
+        bool isValid = marginPercent >= 19.9;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Add your Margin (%)",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black54,
+                  ),
+                ),
+                Row(
+                  children: [
+                    _marginTag("20%", 20, item, basePrice),
+                    const SizedBox(width: 6),
+                    _marginTag("50%", 50, item, basePrice),
+                    const SizedBox(width: 6),
+                    _marginTag("100%", 100, item, basePrice),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  width: 140,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: isValid
+                          ? Colors.grey.shade300
+                          : Colors.red.shade300,
+                      width: isValid ? 1 : 1.5,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      const Text(
+                        "₹",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: TextField(
+                          controller: ctrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 15,
+                            color: isValid ? Colors.black87 : Colors.red,
+                          ),
+                          onChanged: (v) {
+                            final val = double.tryParse(v);
+                            if (val != null) {
+                              cartController.setSellingPrice(
+                                item.product.id,
+                                val,
+                              );
+                            }
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: isValid
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Gross Margin (Product)",
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.green,
+                              ),
+                            ),
+                            Text(
+                              "₹${margin.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Text(
+                          "Min 20% margin required",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _marginTag(
+    String label,
+    double percent,
+    CartItem item,
+    double basePrice,
+  ) {
+    return InkWell(
+      onTap: () => _applyMarginTag(item.product.id, basePrice, percent),
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          border: Border.all(color: Colors.blue.shade100),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          "+$label",
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.blue.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _qtyButton(IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(icon, size: 16, color: Colors.black87),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // PRICE DETAILS SECTION (With Added Fees)
+  // ---------------------------------------------------------------------------
+  Widget _buildPriceDetailsSection() {
+    double totalCollect = _computeAmountToCollect();
+    double supplierTotal = cartController.totalPrice;
+    double netMargin = _computeNetMargin();
+    double totalFees = _computeTotalFees();
 
     return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Price Details",
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 16),
+          _priceRow(
+            "Total Product Price",
+            "₹${supplierTotal.toStringAsFixed(0)}",
+          ),
+          const SizedBox(height: 8),
+
+          // FEES SECTION
+          const Text(
+            "Charges & Fees",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _priceRow(
+            "Shipping Fee",
+            "+₹${kShippingFee.toStringAsFixed(0)}",
+            color: Colors.black54,
+          ),
+          _priceRow(
+            "Platform Fee",
+            "+₹${kPlatformFee.toStringAsFixed(0)}",
+            color: Colors.black54,
+          ),
+          _priceRow(
+            "Convenience Fee",
+            "+₹${kConvenienceFee.toStringAsFixed(0)}",
+            color: Colors.black54,
+          ),
+          const Divider(height: 24),
+
+          // NET PROFIT CALCULATION
+          _priceRow(
+            "Your Net Profit",
+            netMargin >= 0
+                ? "+₹${netMargin.toStringAsFixed(0)}"
+                : "-₹${netMargin.abs().toStringAsFixed(0)}",
+            color: netMargin >= 0 ? Colors.green : Colors.red,
+            isBold: true,
+          ),
+
+          const Divider(height: 24),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                children: [
+                  const Text(
+                    "Order Total (Amount in Invoice)",
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  const Text(
+                    "These price will be Printed in Invoice",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                      color: Color.fromARGB(255, 190, 14, 175),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                "₹${totalCollect.toStringAsFixed(0)}",
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF4A317E),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // WARNING / SUCCESS MESSAGE
+          Container(
+            padding: const EdgeInsets.all(10),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: netMargin >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: netMargin >= 0
+                    ? Colors.green.withValues(alpha: 0.3)
+                    : Colors.red.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  netMargin >= 0 ? Iconsax.tick_circle : Iconsax.info_circle,
+                  color: netMargin >= 0 ? Colors.green : Colors.red,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    netMargin >= 0
+                        ? "Great! You earn ₹${netMargin.toStringAsFixed(0)} after paying all fees."
+                        : "Loss Alert! Increase margin to cover fees (₹${totalFees.toStringAsFixed(0)}).",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: netMargin >= 0
+                          ? Colors.green.shade800
+                          : Colors.red.shade800,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _priceRow(
+    String label,
+    String value, {
+    Color color = Colors.black87,
+    bool isBold = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(Color actionColor) {
+    bool isValid = _isOrderValid();
+    double totalCollect = _computeAmountToCollect();
+    double supplierTotal = cartController.totalPrice;
+    double totalFees = _computeTotalFees();
+    double resellerPayable = supplierTotal + totalFees;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  item.product.image,
-                  width: 96,
-                  height: 96,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: 96,
-                    height: 96,
-                    color: Colors.grey.shade100,
-                    child: const Icon(Icons.broken_image, color: Colors.grey),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
+              // PRICE SECTION
               Expanded(
+                flex: 4,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.product.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () =>
-                              controller.removeFromCart(item.product.id),
-                          child: const Padding(
-                            padding: EdgeInsets.all(6.0),
-                            child: Icon(
-                              Iconsax.trash,
-                              size: 18,
-                              color: Colors.redAccent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // 🔹 Variation row (Size / Color / etc.) – ONLY selected ones
-                    if (variationText.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Iconsax.category,
-                            size: 14,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              variationText,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade700,
-                                fontFamily: 'Poppins',
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-
-                    const SizedBox(height: 6),
                     Text(
-                      'Base Price: ₹${item.product.price}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
+                      "₹${resellerPayable.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                        fontFamily: 'Poppins',
+                        height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Quantity + item total (base)
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              _circleIconButton(
-                                Icons.remove,
-                                () => controller.decrementQuantity(
-                                  item.product.id,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '${item.quantity}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              _circleIconButton(
-                                Icons.add,
-                                () => controller.incrementQuantity(
-                                  item.product.id,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Base total: ₹${item.totalPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Selling price + margin info
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Your selling price (per unit)',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: marginOk
-                              ? Colors.green.shade400
-                              : Colors.redAccent.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: TextField(
-                        controller: priceCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          prefixText: '₹ ',
-                          border: InputBorder.none,
-                          hintText: 'Enter price for customer',
-                          hintStyle: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            final parsed = double.tryParse(value);
-                            if (parsed != null && parsed > 0) {
-                              cartController.setSellingPrice(
-                                item.product.id,
-                                parsed,
-                              );
-                            } else {
-                              // If invalid, remove saved selling price
-                              cartController.sellingPrices.remove(
-                                item.product.id,
-                              );
-                            }
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              if (sellingPrice != null && basePrice > 0)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
+                    const SizedBox(height: 2),
                     Text(
-                      marginOk
-                          ? 'Margin: ${marginPercent.toStringAsFixed(1)}%  (₹${marginAmount!.toStringAsFixed(2)} total)'
-                          : 'Margin must be > 9.99%',
+                      "Amount to be paid by you",
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: marginOk ? Colors.green.shade700 : Colors.red,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
-                )
-              else
-                const Text(
-                  'Set a price at least 10% higher than base price.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.red,
-                  ),
                 ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _circleIconButton(IconData icon, VoidCallback onPressed) {
-    return InkWell(
-      onTap: onPressed,
-      child: Icon(icon, size: 16, color: Colors.black87),
-    );
-  }
-
-  // -------- Bottom Bar (Checkout) --------
-  Widget _buildPurchaseBar(CartController controller) {
-    return Obx(() {
-      final isEmpty = controller.cartItems.isEmpty;
-      final bool marginsValid = _areAllMarginsValid();
-
-      final double baseTotal = controller.totalPrice;
-      final double collectTotal = _computeAmountToCollect();
-      final double profit = (collectTotal - baseTotal).clamp(
-        0,
-        double.infinity,
-      );
-
-      return Container(
-        color: Colors.white,
-        padding: const EdgeInsets.all(16).copyWith(bottom: 24),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Your cost (base)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (!isEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${controller.itemCount} items',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '₹${baseTotal.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Column(
-                        children: [
-                          Text(
-                            'Amount in Invoice: ',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          Text(
-                            '(Including GST) ',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '₹${collectTotal.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (!isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        'Your profit: ₹${profit.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: profit > 0
-                              ? Colors.green.shade700
-                              : Colors.grey.shade600,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  if (!isEmpty && !marginsValid)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Add > 9.99% margin for every item to continue.',
-                        style: TextStyle(fontSize: 11, color: Colors.red),
-                      ),
-                    ),
-                ],
               ),
-            ),
-            ElevatedButton(
-              onPressed: (isEmpty || !marginsValid)
-                  ? () {
-                      if (!isEmpty && !marginsValid) {
-                        Get.snackbar(
-                          'Add margin',
-                          'Please set at least 10% margin for all products before checkout.',
-                          snackPosition: SnackPosition.BOTTOM,
-                          margin: const EdgeInsets.all(16),
-                        );
+
+              // BUTTON SECTION
+              Expanded(
+                flex: 5,
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (!isValid) {
+                        // Check why it's invalid to show correct message
+                        if (_computeNetMargin() < 0) {
+                          _showPremiumSnackbar(
+                            "Net Loss Alert",
+                            "Margins must cover all fees.",
+                            isError: true,
+                          );
+                        } else {
+                          _showPremiumSnackbar(
+                            "Check Margins",
+                            "Ensure 20% gross margin on products.",
+                            isError: true,
+                          );
+                        }
+                        return;
                       }
-                    }
-                  : () {
-                      // All margins ok -> proceed to business details
+                      HapticFeedback.mediumImpact();
                       Get.to(
                         () => BusinessDetailsPage(userData: widget.userData),
                       );
                     },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: (isEmpty || !marginsValid)
-                    ? Colors.grey.shade300
-                    : accentColor,
-                disabledBackgroundColor: Colors.grey.shade300,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isValid
+                          ? actionColor
+                          : Colors.grey.shade300,
+                      foregroundColor: Colors.white,
+                      elevation: isValid ? 8 : 0,
+                      shadowColor: isValid
+                          ? actionColor.withValues(alpha: 0.4)
+                          : null,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Continue",
+                          style: TextStyle(
+                            color: isValid
+                                ? Colors.white
+                                : Colors.grey.shade600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        if (isValid) ...[
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Iconsax.arrow_right_1,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'Checkout',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
-    });
+      ),
+    );
   }
 
-  // -------- Search Bar --------
-  Widget _buildSearchAndFilter() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() => _searchQuery = value);
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search in cart...',
-                  prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          color: Colors.grey.shade600,
-                          onPressed: () {
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
+          Icon(
+            Icons.shopping_cart_outlined,
+            size: 80,
+            color: Colors.grey.shade300,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Your Cart is Empty",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: const Text(
+              "Start Shopping",
+              style: TextStyle(color: accentColor),
             ),
           ),
         ],
