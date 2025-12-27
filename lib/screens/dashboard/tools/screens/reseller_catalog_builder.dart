@@ -11,9 +11,10 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const Color kAccentColor = Color(0xFF2563EB); // Royal Blue
 const Color kSuccessColor = Color(0xFF10B981); // Emerald
-const Color kBgColor = Color(0xFFF8FAFC);
-const Color kTextBlack = Color(0xFF1E293B);
-const Color kTextGrey = Color(0xFF64748B);
+const Color kBgColor = Color(0xFFF8FAFC); // Slate 50
+const Color kTextBlack = Color(0xFF0F172A); // Slate 900
+const Color kTextGrey = Color(0xFF64748B); // Slate 500
+const Color kBorderColor = Color(0xFFE2E8F0);
 
 class ResellerCatalogPage extends StatefulWidget {
   const ResellerCatalogPage({super.key});
@@ -34,7 +35,7 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
 
   // Export Settings
   double _exportMargin = 0.0;
-  bool _includeDescription = true;
+  bool _includeHtml = true;
 
   @override
   void initState() {
@@ -60,7 +61,17 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
     }
   }
 
-  // ─── CSV GENERATION LOGIC ──────────────────────────────────────────────────
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedProducts.length == _products.length) {
+        _selectedProducts.clear();
+      } else {
+        _selectedProducts.addAll(_products);
+      }
+    });
+  }
+
+  // ─── INTELLIGENT CSV ENGINE ────────────────────────────────────────────────
 
   Future<void> _exportCatalog() async {
     if (_selectedProducts.isEmpty) {
@@ -73,61 +84,121 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
     setState(() => _isExporting = true);
 
     try {
-      // 1. Build CSV Header
+      // 1. Build Headers (Shopify & Amazon Hybrid Friendly)
       List<String> headers = [
-        "Product Name",
-        "Selling Price",
-        "Category",
-        "Stock Status",
-        "Image URL",
+        "Handle",
+        "Title",
+        "Body (HTML)",
+        "Vendor", // Brand
+        "Tags",
+        "Type",
+        "Option1 Name", // e.g. Size
+        "Option1 Value",
+        "Option2 Name", // e.g. Color
+        "Option2 Value",
+        "Variant Price", // Selling Price
+        "Variant Compare At Price", // MRP
+        "HSN Code", // Custom Field
+        "GST Rate", // Custom Field
+        "Image Src",
+        "Image Src 2",
+        "Image Src 3",
+        "Status",
       ];
-      if (_includeDescription) headers.add("Description");
 
       String csvContent = headers.join(",") + "\n";
 
       // 2. Build Rows
       for (var p in _selectedProducts) {
+        // Price Logic
         double basePrice = double.tryParse(p.price) ?? 0;
         double finalPrice = basePrice + _exportMargin;
+        double regularPrice = double.tryParse(p.regularPrice) ?? 0;
+
+        // Data Cleaning
+        String handle = p.name.toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9]+'),
+          '-',
+        );
+        String description = _includeHtml
+            ? p.description
+            : p.description.replaceAll(RegExp(r'<[^>]*>'), '');
+        String vendor = p.brandName ?? "Generic";
+
+        // Attribute Mapping (Smart Detect Size/Color)
+        String opt1Name = "", opt1Val = "";
+        String opt2Name = "", opt2Val = "";
+        List<String> otherTags = [];
+
+        for (var attr in p.attributes) {
+          if (attr.name.toLowerCase().contains("size")) {
+            opt1Name = attr.name;
+            opt1Val = attr.options.join("/"); // S/M/L
+          } else if (attr.name.toLowerCase().contains("color") ||
+              attr.name.toLowerCase().contains("colour")) {
+            opt2Name = attr.name;
+            opt2Val = attr.options.join("/");
+          } else {
+            // Add other attributes to tags
+            otherTags.add("${attr.name}:${attr.options.join('/')}");
+          }
+        }
+
+        String tags = otherTags.join(", ");
+
+        // Image Logic (Get up to 3 images)
+        String img1 = p.image;
+        String img2 = (p.images.length > 1) ? p.images[1] : "";
+        String img3 = (p.images.length > 2) ? p.images[2] : "";
 
         List<String> row = [
+          handle,
           _escapeCsv(p.name),
-          finalPrice.toStringAsFixed(0),
-          _escapeCsv(p.image),
+          _escapeCsv(description),
+          _escapeCsv(vendor),
+          _escapeCsv(tags),
+          "Reseller Product", // Type
+          _escapeCsv(opt1Name),
+          _escapeCsv(opt1Val),
+          _escapeCsv(opt2Name),
+          _escapeCsv(opt2Val),
+          finalPrice.toStringAsFixed(2),
+          regularPrice > 0 ? regularPrice.toStringAsFixed(2) : "",
+          _escapeCsv(p.hsnCode ?? ""),
+          _escapeCsv(p.gst ?? ""),
+          _escapeCsv(img1),
+          _escapeCsv(img2),
+          _escapeCsv(img3),
+          "active",
         ];
-
-        if (_includeDescription) {
-          // Strip HTML tags for clean CSV
-          String cleanDesc = p.description
-              .replaceAll(RegExp(r'<[^>]*>'), '')
-              .trim();
-          row.add(_escapeCsv(cleanDesc));
-        }
 
         csvContent += row.join(",") + "\n";
       }
 
-      // 3. Save to Temp File
+      // 3. Save & Share
       final directory = await getTemporaryDirectory();
       final path =
-          "${directory.path}/Catalog_Export_${DateTime.now().millisecondsSinceEpoch}.csv";
+          "${directory.path}/Universal_Catalog_${DateTime.now().millisecondsSinceEpoch}.csv";
       final file = File(path);
       await file.writeAsString(csvContent);
 
-      // 4. Share File
-      await Share.shareXFiles([
-        XFile(path),
-      ], text: "Here is the product catalog CSV.");
+      await Share.shareXFiles(
+        [XFile(path)],
+        text: "Here is your E-commerce Ready CSV Catalog.",
+        subject: "Catalog Export",
+      );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Export failed: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Export failed: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
-  /// Helper to handle commas, quotes, and newlines in CSV
   String _escapeCsv(String value) {
     if (value.contains(',') || value.contains('"') || value.contains('\n')) {
       return '"${value.replaceAll('"', '""')}"';
@@ -143,8 +214,8 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       backgroundColor: kBgColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_new,
@@ -153,77 +224,112 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "Catalog Builder",
-          style: TextStyle(
-            color: kTextBlack,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Catalog Architect",
+              style: TextStyle(
+                color: kTextBlack,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            Text(
+              "Shopify • Amazon • WooCommerce",
+              style: TextStyle(
+                color: kTextGrey,
+                fontSize: 10,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
         ),
         actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16),
+          if (_products.isNotEmpty)
+            TextButton(
+              onPressed: _toggleSelectAll,
               child: Text(
-                "${_selectedProducts.length} Selected",
+                _selectedProducts.length == _products.length
+                    ? "Deselect All"
+                    : "Select All",
                 style: const TextStyle(
                   color: kAccentColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // 1. SETTINGS BAR
-          _buildSettingsBar(),
+          // 1. CONTROL PANEL
+          _buildControlPanel(),
 
           // 2. SEARCH
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: "Search products...",
-                prefixIcon: const Icon(Iconsax.search_normal, size: 18),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: kBorderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              onChanged: (v) => _loadProducts(query: v),
+              child: TextField(
+                controller: _searchCtrl,
+                decoration: InputDecoration(
+                  hintText: "Search by name, brand, or code...",
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 13,
+                  ),
+                  prefixIcon: const Icon(
+                    Iconsax.search_normal,
+                    size: 18,
+                    color: kTextGrey,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+                onChanged: (v) => _loadProducts(query: v),
+              ),
             ),
           ),
 
-          // 3. LIST
+          // 3. PRODUCT LIST
           Expanded(
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: kAccentColor),
                   )
+                : _products.isEmpty
+                ? _buildEmptyState()
                 : ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     itemCount: _products.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final p = _products[index];
                       final isSelected = _selectedProducts.contains(p);
-                      return _CatalogProductCard(
+                      return _ProductCatalogCard(
                         product: p,
                         isSelected: isSelected,
                         onTap: () {
                           setState(() {
-                            if (isSelected) {
-                              _selectedProducts.remove(p);
-                            } else {
-                              _selectedProducts.add(p);
-                            }
+                            isSelected
+                                ? _selectedProducts.remove(p)
+                                : _selectedProducts.add(p);
                           });
                         },
                       );
@@ -238,57 +344,92 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
     );
   }
 
-  Widget _buildSettingsBar() {
+  Widget _buildControlPanel() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
         children: [
-          const Icon(Iconsax.money_tick, size: 18, color: kTextGrey),
-          const SizedBox(width: 8),
-          const Text(
-            "Add Margin:",
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 12),
-          // Margin Input
-          SizedBox(
-            width: 80,
-            height: 36,
-            child: TextField(
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                prefixText: "₹",
-                hintText: "0",
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onChanged: (v) =>
-                  setState(() => _exportMargin = double.tryParse(v) ?? 0),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kBgColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kBorderColor),
             ),
-          ),
-          const Spacer(),
-          // Toggle Select All (Basic implementation)
-          TextButton(
-            onPressed: () {
-              setState(() {
-                if (_selectedProducts.length == _products.length) {
-                  _selectedProducts.clear();
-                } else {
-                  _selectedProducts.addAll(_products);
-                }
-              });
-            },
-            child: Text(
-              _selectedProducts.length == _products.length
-                  ? "Clear All"
-                  : "Select All",
-              style: const TextStyle(fontSize: 12),
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "YOUR PROFIT",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: kTextGrey,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Text(
+                          "+ ₹",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: kSuccessColor,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 60,
+                          child: TextField(
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              hintText: "0",
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: kSuccessColor,
+                            ),
+                            onChanged: (v) => setState(
+                              () => _exportMargin = double.tryParse(v) ?? 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Container(
+                  width: 1,
+                  height: 30,
+                  color: Colors.grey.shade300,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Text(
+                        "Include HTML",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Switch(
+                        value: _includeHtml,
+                        activeColor: kAccentColor,
+                        onChanged: (v) => setState(() => _includeHtml = v),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -316,17 +457,18 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       ),
       child: SizedBox(
         width: double.infinity,
-        height: 50,
-        child: ElevatedButton(
+        height: 54,
+        child: ElevatedButton.icon(
           onPressed: _isExporting ? null : _exportCatalog,
           style: ElevatedButton.styleFrom(
-            backgroundColor: kSuccessColor,
+            backgroundColor: kTextBlack,
+            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 0,
           ),
-          child: _isExporting
+          icon: _isExporting
               ? const SizedBox(
                   width: 20,
                   height: 20,
@@ -335,33 +477,40 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
                     strokeWidth: 2,
                   ),
                 )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Iconsax.document_download, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      "Download CSV",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+              : const Icon(Iconsax.document_download, size: 20),
+          label: Text(
+            _isExporting
+                ? "GENERATING..."
+                : "EXPORT ${_selectedProducts.length} PRODUCTS",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Iconsax.box_remove, size: 48, color: kTextGrey),
+          SizedBox(height: 12),
+          Text("No products found", style: TextStyle(color: kTextGrey)),
+        ],
       ),
     );
   }
 }
 
-class _CatalogProductCard extends StatelessWidget {
+// ─── COMPONENT: PRODUCT CATALOG CARD ─────────────────────────────────────────
+
+class _ProductCatalogCard extends StatelessWidget {
   final ProductModel product;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _CatalogProductCard({
+  const _ProductCatalogCard({
     required this.product,
     required this.isSelected,
     required this.onTap,
@@ -369,76 +518,174 @@ class _CatalogProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Extract Data
+    bool hasHSN = product.hsnCode != null && product.hsnCode!.isNotEmpty;
+    bool hasGST = product.gst != null && product.gst!.isNotEmpty;
+    String? brand = product.brandName;
+
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? kAccentColor : Colors.grey.shade200,
+            color: isSelected ? kAccentColor : kBorderColor,
             width: isSelected ? 2 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: kAccentColor.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Checkbox visual
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isSelected ? kAccentColor : Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? kAccentColor : Colors.grey.shade300,
+            // SELECTION CIRCLE
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isSelected ? kAccentColor : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? kAccentColor : Colors.grey.shade300,
+                  ),
                 ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
               ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
             ),
             const SizedBox(width: 12),
-            // Image
+
+            // IMAGE
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                product.image,
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.grey.shade100,
-                  width: 60,
-                  height: 60,
-                  child: const Icon(Icons.image),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 70,
+                height: 70,
+                color: kBgColor,
+                child: Image.network(
+                  product.image,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Iconsax.image, color: kTextGrey),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            // Details
+
+            // DETAILS
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // BRAND CHIP
+                  if (brand != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kBgColor,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: kBorderColor),
+                      ),
+                      child: Text(
+                        brand.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: kTextGrey,
+                        ),
+                      ),
+                    ),
+
                   Text(
                     product.name,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 13,
+                      height: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "₹${product.price}",
-                    style: const TextStyle(color: kTextGrey, fontSize: 13),
+                  const SizedBox(height: 6),
+
+                  // PRICE & INFO
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "₹${product.price}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: kTextBlack,
+                        ),
+                      ),
+
+                      // META BADGES
+                      Row(
+                        children: [
+                          if (hasHSN)
+                            _buildMiniBadge(
+                              "HSN",
+                              Colors.purple.shade50,
+                              Colors.purple,
+                            ),
+                          if (hasHSN && hasGST) const SizedBox(width: 4),
+                          if (hasGST)
+                            _buildMiniBadge(
+                              "GST",
+                              Colors.orange.shade50,
+                              Colors.orange,
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniBadge(String text, Color bg, Color textCol) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
+          color: textCol,
         ),
       ),
     );
