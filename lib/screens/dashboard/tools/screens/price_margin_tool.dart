@@ -1,11 +1,20 @@
 // lib/screens/dashboard/tools/price_margin_tool.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart'; // for accentColor
+
+// ─── THEME ───────────────────────────────────────────────────────────────────
+const Color kAccentColor = Color(0xFF2563EB); // Royal Blue
+const Color kProfitColor = Color(0xFF10B981); // Emerald Green
+const Color kCostColor = Color(0xFF64748B); // Slate
+const Color kFeeColor = Color(0xFFF59E0B); // Amber
+const Color kBgColor = Color(0xFFF8FAFC);
+const Color kSurface = Colors.white;
 
 class PriceMarginToolPage extends StatefulWidget {
   const PriceMarginToolPage({super.key});
@@ -15,1133 +24,814 @@ class PriceMarginToolPage extends StatefulWidget {
 }
 
 class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
-  // Margin & rounding controllers
-  final TextEditingController _markupController = TextEditingController(
-    text: '20',
-  );
-  final TextEditingController _roundingController = TextEditingController(
-    text: '9',
-  );
+  // --- STATE ---
+  final List<ProductModel> _selectedProducts = [];
 
-  // Optional: user can type a custom selling price to see margin
-  final TextEditingController _customSellingController =
-      TextEditingController();
+  // The Core Variables
+  double _sellingPrice = 0.0;
+  double _targetGoal = 5000.0; // Default goal: Earn 5k
 
-  ProductModel? _selectedProduct;
+  // Fees Configuration
+  double _shippingCost = 100.0;
+  bool _resellerAbsorbsShipping = false;
+  bool _isSharing = false;
 
-  double _marginSlider = 20;
-  int _roundingDigit = 9;
+  // Constants
+  static const double kPlatformFeePerItem = 5.0;
+  static const double kConvenienceFeeConst = 10.0;
+
+  // Text Controllers
+  final TextEditingController _priceCtrl = TextEditingController();
+  final TextEditingController _profitCtrl = TextEditingController();
+  final TextEditingController _marginCtrl = TextEditingController();
+  final TextEditingController _goalCtrl = TextEditingController(text: "5000");
 
   @override
-  void initState() {
-    super.initState();
-    _marginSlider = double.tryParse(_markupController.text) ?? 20;
-    _roundingDigit = int.tryParse(_roundingController.text) ?? 9;
+  void dispose() {
+    _priceCtrl.dispose();
+    _profitCtrl.dispose();
+    _marginCtrl.dispose();
+    _goalCtrl.dispose();
+    super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  //  PRICE / MARGIN LOGIC
-  // ---------------------------------------------------------------------------
+  // ─── CALCULATION ENGINE 🧠 ────────────────────────────────────────────────
 
-  double? _parsePrice(String? priceStr) {
-    if (priceStr == null) return null;
-    return double.tryParse(priceStr);
+  double get _baseProductCost => _selectedProducts.fold(
+    0.0,
+    (sum, p) => sum + (double.tryParse(p.price) ?? 0),
+  );
+
+  // Fees
+  double get _platformFee => _selectedProducts.isEmpty
+      ? 0
+      : (_selectedProducts.length * kPlatformFeePerItem);
+  double get _convenienceFee =>
+      _selectedProducts.isEmpty ? 0 : kConvenienceFeeConst;
+  double get _shippingVal => _resellerAbsorbsShipping ? _shippingCost : 0;
+
+  // Break Even & Profit
+  double get _totalCost =>
+      _baseProductCost + _platformFee + _convenienceFee + _shippingVal;
+  double get _netProfit => _sellingPrice - _totalCost;
+  double get _marginPercent =>
+      _totalCost > 0 ? ((_sellingPrice - _totalCost) / _totalCost) * 100 : 0;
+
+  // Goal Math
+  int get _unitsToGoal {
+    if (_netProfit <= 0) return 0;
+    return (_targetGoal / _netProfit).ceil();
   }
 
-  /// Base = your buy price (what you pay to Kakiso)
-  double? get _basePrice {
-    if (_selectedProduct == null) return null;
-    return _parsePrice(_selectedProduct!.price);
+  // Breakdown for Monthly Goal
+  String get _weeklyGoalText {
+    if (_unitsToGoal <= 0) return "Check profit settings";
+    int weekly = (_unitsToGoal / 4).ceil();
+    if (weekly < 1) weekly = 1;
+    return "$weekly bundles / week";
   }
 
-  double? get _mrpPrice {
-    if (_selectedProduct == null) return null;
-    return _parsePrice(_selectedProduct!.regularPrice);
+  // Market Estimate (Heuristic)
+  double get _marketValue => _baseProductCost * 2.2;
+
+  // --- SYNC LOGIC ---
+
+  void _onSellingPriceChanged(String val) {
+    if (val.isEmpty) return;
+    double price = double.tryParse(val.replaceAll(',', '')) ?? 0;
+    setState(() {
+      _sellingPrice = price;
+      _syncControllers(source: 'price');
+    });
   }
 
-  /// Core margin calculation with rounding.
-  double? _calcSuggestedPrice(double base) {
-    final markup = double.tryParse(_markupController.text) ?? _marginSlider;
-    final roundingText = _roundingController.text.trim();
-    final roundingDigit =
-        int.tryParse(roundingText.isEmpty ? '0' : roundingText) ?? 0;
+  void _onProfitChanged(String val) {
+    if (val.isEmpty) return;
+    double targetProfit = double.tryParse(val.replaceAll(',', '')) ?? 0;
+    double newPrice = _totalCost + targetProfit;
+    setState(() {
+      _sellingPrice = newPrice;
+      _syncControllers(source: 'profit');
+    });
+  }
 
-    var p = base * (1 + markup / 100);
+  void _onMarginChanged(String val) {
+    if (val.isEmpty) return;
+    double marginPct = double.tryParse(val) ?? 0;
+    double newPrice = _totalCost * (1 + (marginPct / 100));
+    setState(() {
+      _sellingPrice = newPrice;
+      _syncControllers(source: 'margin');
+    });
+  }
 
-    if (roundingDigit > 0) {
-      // Example: want last digit 9 -> 349, 459, 999 etc.
-      final baseRoundedTo10 = (p / 10).ceil() * 10; // 343 -> 350
-      p = (baseRoundedTo10 - (10 - roundingDigit)).toDouble(); // 350 - 1 = 349
+  void _onGoalChanged(String val) {
+    if (val.isEmpty) return;
+    setState(() {
+      _targetGoal = double.tryParse(val.replaceAll(',', '')) ?? 5000;
+    });
+  }
+
+  void _syncControllers({required String source}) {
+    if (source != 'price') _priceCtrl.text = _sellingPrice.toStringAsFixed(0);
+    if (source != 'profit') _profitCtrl.text = _netProfit.toStringAsFixed(0);
+    if (source != 'margin')
+      _marginCtrl.text = _marginPercent.toStringAsFixed(1);
+  }
+
+  // --- AUTOMATION BUTTONS ---
+
+  void _applyAutoPrice(String type) {
+    double price = _sellingPrice;
+    if (type == 'quick') {
+      price = _totalCost * 1.15; // 15% Margin
+      price = (price / 10).ceil() * 10.0 - 1; // Round to 9
+    } else if (type == 'max') {
+      price = _totalCost * 1.40; // 40% Margin
+      double next100 = (price / 100).ceil() * 100.0;
+      if (next100 == price) next100 += 100;
+      price = next100 - 1; // Round to 99
+    }
+    setState(() {
+      _sellingPrice = price;
+      _syncControllers(source: 'all');
+    });
+  }
+
+  // --- DEAL BROADCASTER (SHARE) ---
+  Future<void> _broadcastDeal() async {
+    if (_selectedProducts.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Select products first")));
+      return;
     }
 
-    return p;
-  }
+    setState(() => _isSharing = true);
 
-  double? _profit(double? base, double? sell) {
-    if (base == null || sell == null) return null;
-    return sell - base;
-  }
+    try {
+      // 1. Generate "Deal Alert" Caption
+      final buffer = StringBuffer();
 
-  double? _margin(double? base, double? sell) {
-    if (base == null || sell == null || base == 0) return null;
-    return (sell - base) / base * 100;
-  }
+      // Hook
+      buffer.writeln("🔥 *STEAL DEAL ALERT!* 🔥");
+      if (_selectedProducts.length > 1) {
+        buffer.writeln("📦 *${_selectedProducts.length} Item Combo Pack*");
+      } else {
+        buffer.writeln("📦 *Premium Quality Pick*");
+      }
+      buffer.writeln("");
 
-  void _applyPresetMargin(double value) {
-    _marginSlider = value;
-    _markupController.text = value.toStringAsFixed(0);
-    setState(() {});
-  }
+      // Pricing Psychology
+      if (_sellingPrice < _marketValue) {
+        buffer.writeln("❌ Market Price: ~₹${_marketValue.toStringAsFixed(0)}~");
+      }
+      buffer.writeln(
+        "✅ *OFFER PRICE: ₹${_sellingPrice.toStringAsFixed(0)} Only!* 🤑",
+      );
+      buffer.writeln("");
 
-  void _updateRoundingDigit(int value) {
-    _roundingDigit = value;
-    _roundingController.text = value.toString();
-    setState(() {});
-  }
+      // Features
+      if (_resellerAbsorbsShipping) {
+        buffer.writeln("🚚 *Free Home Delivery Included*");
+      } else {
+        buffer.writeln("🚚 *Fast Delivery Available*");
+      }
 
-  // ---------------------------------------------------------------------------
-  //  PRODUCT PICKER
-  // ---------------------------------------------------------------------------
+      if (_selectedProducts.length > 1) {
+        buffer.writeln("\n🎁 _Includes:_");
+        for (var p in _selectedProducts) {
+          buffer.writeln("• ${p.name}");
+        }
+      }
 
-  Future<void> _pickProduct() async {
-    final ProductModel? picked = await showModalBottomSheet<ProductModel>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => const _ProductPickerSheet(),
-    );
+      buffer.writeln("\n👇 *Reply 'BOOK' to grab this deal!*");
 
-    if (picked != null) {
-      setState(() {
-        _selectedProduct = picked;
-      });
+      // 2. Download Images
+      List<XFile> filesToShare = [];
+      for (var product in _selectedProducts) {
+        if (product.image.isNotEmpty) {
+          final file = await ApiService.downloadImageAsFile(product.image);
+          filesToShare.add(file);
+        }
+      }
+
+      // 3. Share using Native Sheet
+      await Share.shareXFiles(filesToShare, text: buffer.toString());
+    } catch (e) {
+      debugPrint("Share error: $e");
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  //  UI BUILD
-  // ---------------------------------------------------------------------------
+  // ─── UI COMPONENTS ─────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final base = _basePrice;
-    final suggested = (base != null) ? _calcSuggestedPrice(base) : null;
-    final profit = _profit(base, suggested);
-    final margin = _margin(base, suggested);
-
-    final customSell = double.tryParse(
-      _customSellingController.text.trim().isEmpty
-          ? '0'
-          : _customSellingController.text.trim(),
-    );
-    final customMargin = _margin(base, customSell);
-    final customProfit = _profit(base, customSell);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: kBgColor,
       appBar: AppBar(
+        title: const Text(
+          "Profit Lab",
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+        backgroundColor: kSurface,
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: accentColor,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Iconsax.activity, color: accentColor),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Smart price & margin',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                color: Color(0xFF111827),
-              ),
-            ),
-          ],
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Color(0xFF1E293B),
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFE0ECFF), Color(0xFFF3F4F6)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeroCard(),
-                  const SizedBox(height: 14),
-                  _buildProductCard(),
-                  const SizedBox(height: 14),
-                  if (_selectedProduct == null)
-                    _buildEmptyStateCard()
-                  else ...[
-                    _buildBasePriceSummary(base, suggested),
-                    const SizedBox(height: 14),
-                    _buildMarginControls(),
-                    const SizedBox(height: 14),
-                    _buildSuggestionCard(
-                      base: base,
-                      suggested: suggested,
-                      profit: profit,
-                      margin: margin,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildCustomPriceCard(
-                      base: base,
-                      customSell: customSell,
-                      customMargin: customMargin,
-                      customProfit: customProfit,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  TOP HERO
-  // ---------------------------------------------------------------------------
-
-  Widget _buildHeroCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: LinearGradient(
-                colors: [
-                  accentColor.withValues(alpha: 0.9),
-                  accentColor.withValues(alpha: 0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: const Icon(
-              Iconsax.dollar_circle,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Set a profitable selling price',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: Color(0xFF111827),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Pick a product, choose your margin and get instant suggested prices with profit & margin insights.',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: Color(0xFF6B7280),
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  PRODUCT CARD
-  // ---------------------------------------------------------------------------
-
-  Widget _buildProductCard() {
-    final p = _selectedProduct;
-    final hasProduct = p != null;
-    final base = _basePrice;
-
-    return GestureDetector(
-      onTap: _pickProduct,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: const Color(0xFFF3F4F6),
-              ),
-              child: hasProduct && (p.image.isNotEmpty)
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        p.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Iconsax.image, color: Colors.grey),
-                      ),
-                    )
-                  : const Icon(
-                      Iconsax.bag_happy,
-                      color: Color(0xFF9CA3AF),
-                      size: 28,
-                    ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: hasProduct
-                    ? Column(
-                        key: const ValueKey('product'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            p.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: Color(0xFF111827),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          if (base != null)
-                            Text(
-                              'Your buy price: ₹${base.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                color: Color(0xFF059669),
-                              ),
-                            ),
-                          if (p.brandName != null &&
-                              p.brandName!.trim().isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                p.brandName!,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF9CA3AF),
-                                ),
-                              ),
-                            ),
-                        ],
-                      )
-                    : Column(
-                        key: const ValueKey('empty'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Step 1 · Select a product',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: Color(0xFF111827),
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Tap here to choose a product. We will use its buy price to calculate smart selling prices.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    hasProduct ? Iconsax.refresh : Iconsax.add_circle,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    hasProduct ? 'Change' : 'Choose',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  EMPTY STATE (AFTER PRODUCT CARD)
-  // ---------------------------------------------------------------------------
-
-  Widget _buildEmptyStateCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFECFDF5),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
-      ),
-      child: Row(
-        children: const [
-          Icon(Iconsax.info_circle, color: Color(0xFF047857)),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Select a product to see recommended selling price, profit per unit and margin insights.',
-              style: TextStyle(
-                fontSize: 12.5,
-                color: Color(0xFF047857),
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  BASE PRICE SUMMARY
-  // ---------------------------------------------------------------------------
-
-  Widget _buildBasePriceSummary(double? base, double? suggested) {
-    final mrp = _mrpPrice;
-    final hasMrp = mrp != null && mrp > 0 && base != null;
-    final discount = hasMrp
-        ? ((mrp - base) / mrp * 100).clamp(0, 100).toDouble()
-        : null;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: const [
-              Icon(Iconsax.chart_square, size: 18, color: Color(0xFF4B5563)),
-              SizedBox(width: 8),
-              Text(
-                'Price overview',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  color: Color(0xFF111827),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _smallMetric(
-                label: 'Your buy price',
-                value: base == null ? '--' : '₹${base.toStringAsFixed(0)}',
-                chipColor: const Color(0xFFDBEAFE),
-                valueColor: const Color(0xFF1D4ED8),
-              ),
-              const SizedBox(width: 10),
-              _smallMetric(
-                label: 'Recommended',
-                value: suggested == null
-                    ? '--'
-                    : '₹${suggested.toStringAsFixed(0)}',
-                chipColor: const Color(0xFFDCFCE7),
-                valueColor: const Color(0xFF16A34A),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (hasMrp && discount != null)
-            Row(
-              children: [
-                _smallMetric(
-                  label: 'MRP',
-                  value: '₹${mrp.toStringAsFixed(0)}',
-                  chipColor: const Color(0xFFFEE2E2),
-                  valueColor: const Color(0xFFB91C1C),
-                ),
-                const SizedBox(width: 10),
-                _smallMetric(
-                  label: 'You get off MRP',
-                  value: '${discount.toStringAsFixed(1)}%',
-                  chipColor: const Color(0xFFF5F3FF),
-                  valueColor: const Color(0xFF7C3AED),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _smallMetric({
-    required String label,
-    required String value,
-    required Color chipColor,
-    required Color valueColor,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: chipColor.withValues(alpha: 0.25),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: chipColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: valueColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  MARGIN CONTROLS
-  // ---------------------------------------------------------------------------
-
-  Widget _buildMarginControls() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: const [
-              Icon(
-                Iconsax.slider_horizontal,
-                size: 18,
-                color: Color(0xFF4B5563),
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Margin settings',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  color: Color(0xFF111827),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Margin slider
-          Row(
-            children: [
-              const Text(
-                'Target margin',
-                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: 70,
-                child: TextField(
-                  controller: _markupController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    suffixText: '%',
-                    border: OutlineInputBorder(),
-                  ),
-                  style: const TextStyle(fontSize: 12),
-                  onChanged: (v) {
-                    final val = double.tryParse(v) ?? _marginSlider;
-                    _marginSlider = val.clamp(0, 200);
-                    setState(() {});
-                  },
-                ),
-              ),
-            ],
-          ),
-          Slider(
-            value: _marginSlider.clamp(0, 200),
-            min: 0,
-            max: 100,
-            divisions: 20,
-            label: '${_marginSlider.toStringAsFixed(0)}%',
-            activeColor: accentColor,
-            onChanged: (v) {
+        actions: [
+          IconButton(
+            icon: const Icon(Iconsax.refresh, color: kAccentColor),
+            onPressed: () {
               setState(() {
-                _marginSlider = v;
-                _markupController.text = v.toStringAsFixed(0);
+                _selectedProducts.clear();
+                _sellingPrice = 0;
+                _syncControllers(source: 'all');
               });
             },
           ),
-
-          // Preset chips
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _marginChip(10),
-              _marginChip(20),
-              _marginChip(30),
-              _marginChip(40),
-              _marginChip(50),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Rounding row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Rounding',
-                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                '(last digit)',
-                style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: 65,
-                child: TextField(
-                  controller: _roundingController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    border: OutlineInputBorder(),
-                  ),
-                  style: const TextStyle(fontSize: 12),
-                  onChanged: (v) {
-                    final val = int.tryParse(v) ?? _roundingDigit;
-                    _roundingDigit = val.clamp(0, 9);
-                    setState(() {});
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [_roundingChip(9), _roundingChip(5), _roundingChip(0)],
-          ),
         ],
       ),
-    );
-  }
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 1. PRODUCT STACK
+            _buildProductStack(),
+            const SizedBox(height: 20),
 
-  Widget _marginChip(double value) {
-    final selected =
-        _marginSlider.toStringAsFixed(0) == value.toStringAsFixed(0);
-    return ChoiceChip(
-      selected: selected,
-      label: Text('${value.toStringAsFixed(0)}%'),
-      selectedColor: accentColor.withValues(alpha: 0.12),
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(999),
-        side: BorderSide(
-          color: selected
-              ? accentColor.withValues(alpha: 0.7)
-              : const Color(0xFFE5E7EB),
+            if (_selectedProducts.isNotEmpty) ...[
+              // 2. MAIN CALCULATOR
+              _buildMainDashboard(),
+              const SizedBox(height: 16),
+
+              // 3. COST BREAKDOWN (Mini)
+              _buildCostSummary(),
+              const SizedBox(height: 20),
+
+              // 4. STRATEGY BUTTONS
+              _buildStrategyPad(),
+              const SizedBox(height: 20),
+
+              // 5. GOAL TRACKER (EMHANCED)
+              _buildEnhancedGoalTracker(),
+              const SizedBox(height: 24),
+
+              // 6. DEAL BROADCASTER (SHARE)
+              _buildDealBroadcaster(),
+            ],
+          ],
         ),
       ),
-      labelStyle: TextStyle(
-        color: selected ? accentColor : const Color(0xFF4B5563),
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-        fontSize: 12,
-      ),
-      onSelected: (_) => _applyPresetMargin(value),
     );
   }
 
-  Widget _roundingChip(int digit) {
-    final selected = _roundingDigit == digit;
-    return ChoiceChip(
-      selected: selected,
-      label: Text(digit.toString()),
-      selectedColor: const Color(0xFFF97316).withValues(alpha: 0.12),
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(999),
-        side: BorderSide(
-          color: selected ? const Color(0xFFF97316) : const Color(0xFFE5E7EB),
-        ),
-      ),
-      labelStyle: TextStyle(
-        color: selected ? const Color(0xFFF97316) : const Color(0xFF4B5563),
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-        fontSize: 12,
-      ),
-      onSelected: (_) => _updateRoundingDigit(digit),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  SUGGESTION CARD
-  // ---------------------------------------------------------------------------
-
-  Widget _buildSuggestionCard({
-    required double? base,
-    required double? suggested,
-    required double? profit,
-    required double? margin,
-  }) {
-    final hasData = base != null && suggested != null && profit != null;
-
-    final safePrice = base != null
-        ? _calcSuggestedPrice(base * 0.0 + base * 1.15)
-        : null; // ~15% margin
-    final goodPrice = base != null
-        ? _calcSuggestedPrice(base * 0.0 + base * 1.25)
-        : null; // ~25%
-    final premiumPrice = base != null
-        ? _calcSuggestedPrice(base * 0.0 + base * 1.35)
-        : null; // ~35%
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+  Widget _buildProductStack() {
+    if (_selectedProducts.isEmpty) {
+      return GestureDetector(
+        onTap: _pickProducts,
+        child: Container(
+          width: double.infinity,
+          height: 130,
+          decoration: BoxDecoration(
+            color: kSurface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade300, width: 2),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(Iconsax.money, color: Color(0xFF4B5563), size: 18),
-              const SizedBox(width: 8),
-              const Text(
-                'Recommended selling price',
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Iconsax.bag_2, size: 32, color: Colors.grey),
+              SizedBox(height: 10),
+              Text(
+                "Build Your Deal",
                 style: TextStyle(
-                  color: Color(0xFF111827),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                  fontSize: 16,
                 ),
               ),
-              const Spacer(),
-              if (margin != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${margin.toStringAsFixed(1)}% margin',
-                    style: const TextStyle(
-                      color: Color(0xFF166534),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+              Text(
+                "Add products to calculate margins",
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
             ],
-          ),
-          const SizedBox(height: 10),
-          if (!hasData)
-            const Text(
-              'Adjust margin above to see profit suggestions.',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5),
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Main price line
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '₹${suggested.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '+₹${profit.toStringAsFixed(0)} / unit',
-                        style: const TextStyle(
-                          color: Color(0xFF166534),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'This is the selling price you can charge to earn a healthy profit while staying competitive.',
-                  style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Divider(color: Color(0xFFE5E7EB), height: 18),
-                const SizedBox(height: 6),
-                const Text(
-                  'Quick scenarios',
-                  style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _scenarioPill(
-                      label: 'Safe',
-                      subtitle: '~15% margin',
-                      price: safePrice,
-                      base: base,
-                    ),
-                    const SizedBox(width: 8),
-                    _scenarioPill(
-                      label: 'Balanced',
-                      subtitle: '~25% margin',
-                      price: goodPrice,
-                      base: base,
-                    ),
-                    const SizedBox(width: 8),
-                    _scenarioPill(
-                      label: 'Premium',
-                      subtitle: '~35% margin',
-                      price: premiumPrice,
-                      base: base,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _scenarioPill({
-    required String label,
-    required String subtitle,
-    required double? price,
-    required double base,
-  }) {
-    if (price == null) {
-      return Expanded(
-        child: Opacity(
-          opacity: 0.3,
-          child: _scenarioBox(
-            label: label,
-            subtitle: subtitle,
-            priceText: '--',
-            profitText: '',
           ),
         ),
       );
     }
 
-    final profit = price - base;
-    final margin = (profit / base * 100);
-    return Expanded(
-      child: _scenarioBox(
-        label: label,
-        subtitle: subtitle,
-        priceText: '₹${price.toStringAsFixed(0)}',
-        profitText:
-            '+₹${profit.toStringAsFixed(0)} • ${margin.toStringAsFixed(0)}%',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Your Bundle (${_selectedProducts.length})",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _pickProducts,
+              icon: const Icon(Iconsax.add_circle, size: 16),
+              label: const Text("Add"),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 80,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _selectedProducts.length,
+            itemBuilder: (ctx, i) {
+              final p = _selectedProducts[i];
+              return Container(
+                width: 70,
+                margin: const EdgeInsets.only(right: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                  image: DecorationImage(
+                    image: NetworkImage(p.image),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedProducts.removeAt(i);
+                        // Recalc logic
+                        if (_selectedProducts.isEmpty)
+                          _sellingPrice = 0;
+                        else
+                          _sellingPrice = _totalCost * 1.2;
+                        _syncControllers(source: 'all');
+                      });
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 12,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMainDashboard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // HERO INPUT
+          const Text(
+            "CUSTOMER PAYS",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              const Text(
+                "₹",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black38,
+                ),
+              ),
+              const SizedBox(width: 4),
+              IntrinsicWidth(
+                child: TextField(
+                  controller: _priceCtrl,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                    height: 1.0,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: "0",
+                  ),
+                  onChanged: _onSellingPriceChanged,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // PROFIT & MARGIN
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    const Text(
+                      "Net Profit",
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                    TextField(
+                      controller: _profitCtrl,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: kProfitColor,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        prefixText: "₹",
+                      ),
+                      onChanged: _onProfitChanged,
+                    ),
+                  ],
+                ),
+              ),
+              Container(width: 1, height: 40, color: Colors.grey.shade200),
+              Expanded(
+                child: Column(
+                  children: [
+                    const Text(
+                      "Margin",
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                    TextField(
+                      controller: _marginCtrl,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: kAccentColor,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        suffixText: "%",
+                      ),
+                      onChanged: _onMarginChanged,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Shipping Toggle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: kBgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _resellerAbsorbsShipping ? Iconsax.truck_fast : Iconsax.box,
+                  size: 18,
+                  color: Colors.purple,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _resellerAbsorbsShipping
+                        ? "Free Shipping (You pay)"
+                        : "Customer Pays Shipping",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: _resellerAbsorbsShipping,
+                  activeColor: Colors.purple,
+                  onChanged: (v) {
+                    setState(() {
+                      _resellerAbsorbsShipping = v;
+                      _syncControllers(source: 'all'); // Recalc totals
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _scenarioBox({
-    required String label,
-    required String subtitle,
-    required String priceText,
-    required String profitText,
-  }) {
+  Widget _buildCostSummary() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            "Base Cost + Fees",
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          Row(
+            children: [
+              Text(
+                "Break Even: ",
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              Text(
+                "₹${_totalCost.toStringAsFixed(0)}",
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: kCostColor,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStrategyPad() {
+    return Row(
+      children: [
+        Expanded(
+          child: _strategyBtn(
+            "🚀 Quick Sell",
+            "Low Margin",
+            () => _applyAutoPrice('quick'),
+            Colors.orange,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _strategyBtn(
+            "💎 Max Profit",
+            "Premium",
+            () => _applyAutoPrice('max'),
+            Colors.purple,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _strategyBtn(
+    String label,
+    String sub,
+    VoidCallback onTap,
+    Color color,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              sub,
+              style: TextStyle(
+                fontSize: 10,
+                color: color.withValues(alpha: 0.8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── ENHANCED GOAL TRACKER ────────────────────────────────────────────────
+  Widget _buildEnhancedGoalTracker() {
+    bool isLoss = _netProfit <= 0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF111827),
-              fontWeight: FontWeight.w600,
-              fontSize: 11.5,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10.5),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            priceText,
-            style: const TextStyle(
-              color: Color(0xFF111827),
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (profitText.isNotEmpty)
-            Text(
-              profitText,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  //  CUSTOM PRICE CARD
-  // ---------------------------------------------------------------------------
-
-  Widget _buildCustomPriceCard({
-    required double? base,
-    required double? customSell,
-    required double? customMargin,
-    required double? customProfit,
-  }) {
-    final hasBase = base != null;
-    final hasCustom = hasBase && (customSell != null && customSell > 0);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: const [
-              Icon(Iconsax.calculator, size: 18, color: Color(0xFF4B5563)),
-              SizedBox(width: 8),
-              Text(
-                'Try your own price',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  color: Color(0xFF111827),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
+          // Header
           Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _customSellingController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Your selling price',
-                    prefixText: '₹ ',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (_) => setState(() {}),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blueGrey.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Iconsax.triangle,
+                  size: 20,
+                  color: Colors.blueGrey,
                 ),
               ),
-              const SizedBox(width: 10),
-              IconButton(
-                tooltip: 'Clear',
-                onPressed: () {
-                  _customSellingController.clear();
-                  setState(() {});
-                },
-                icon: const Icon(Iconsax.close_circle),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "Monthly Target",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    "Plan your earnings",
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // Goal Input
+              Container(
+                width: 90,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: kBgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextField(
+                  controller: _goalCtrl,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey,
+                  ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    prefixText: "₹",
+                  ),
+                  onChanged: _onGoalChanged,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          if (!hasBase)
-            const Text(
-              'We need a base (buy) price from the product to calculate margin.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-            )
-          else if (!hasCustom)
-            const Text(
-              'Enter any selling price to see how much profit and margin you will make.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+
+          const Divider(height: 24),
+
+          if (isLoss)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  "⚠️ Increase margin to see goal progress",
+                  style: TextStyle(fontSize: 12, color: Colors.red),
+                ),
+              ),
             )
           else
             Row(
               children: [
-                _smallMetric(
-                  label: 'Profit per unit',
-                  value: customProfit == null
-                      ? '--'
-                      : '₹${customProfit.toStringAsFixed(0)}',
-                  chipColor: const Color(0xFFDCFCE7),
-                  valueColor: const Color(0xFF16A34A),
+                // Stat 1: Total Units
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "TOTAL SALES NEEDED",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "$_unitsToGoal Bundles",
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 10),
-                _smallMetric(
-                  label: 'Margin',
-                  value: customMargin == null
-                      ? '--'
-                      : '${customMargin.toStringAsFixed(1)}%',
-                  chipColor: const Color(0xFFE0F2FE),
-                  valueColor: const Color(0xFF0284C7),
+                Container(width: 1, height: 40, color: Colors.grey.shade200),
+                const SizedBox(width: 16),
+                // Stat 2: Weekly Breakdown
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "SPEED REQUIRED",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _weeklyGoalText,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: kAccentColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1149,323 +839,282 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
       ),
     );
   }
+
+  // ─── DEAL BROADCASTER (New Feature) ───────────────────────────────────────
+  Widget _buildDealBroadcaster() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: kAccentColor.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Iconsax.flash_1, color: Colors.yellow, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "READY TO SELL?",
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Broadcast Deal: ₹${_sellingPrice.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isSharing ? null : _broadcastDeal,
+              icon: _isSharing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Iconsax.share, color: Colors.black),
+              label: Text(
+                _isSharing ? "Generating..." : "Share Deal with Photos",
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  //  MULTI PRODUCT PICKER
+  // ---------------------------------------------------------------------------
+  Future<void> _pickProducts() async {
+    final List<ProductModel>? picked = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const _MultiProductPickerSheet(),
+    );
+
+    if (picked != null && picked.isNotEmpty) {
+      setState(() {
+        _selectedProducts.addAll(picked);
+        // Default 20% margin
+        _sellingPrice = _totalCost * 1.20;
+        _syncControllers(source: 'all');
+      });
+    }
+  }
 }
 
-// ============================================================================
-//  PRODUCT PICKER SHEET
-// ============================================================================
-
-class _ProductPickerSheet extends StatefulWidget {
-  // ignore: use_super_parameters
-  const _ProductPickerSheet({Key? key}) : super(key: key);
-
+// ─── HELPER: MULTI PICKER SHEET ──────────────────────────────────────────────
+class _MultiProductPickerSheet extends StatefulWidget {
+  const _MultiProductPickerSheet();
   @override
-  State<_ProductPickerSheet> createState() => _ProductPickerSheetState();
+  State<_MultiProductPickerSheet> createState() =>
+      _MultiProductPickerSheetState();
 }
 
-class _ProductPickerSheetState extends State<_ProductPickerSheet> {
+class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-
   List<ProductModel> _products = [];
+  final Set<ProductModel> _selected = {};
   bool _isLoading = true;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
-  int _page = 1;
-  String _query = '';
 
   @override
   void initState() {
     super.initState();
-    _loadInitial();
-    _scrollController.addListener(_onScroll);
+    _fetch();
   }
 
-  Future<void> _loadInitial() async {
+  Future<void> _fetch({String query = ''}) async {
+    setState(() => _isLoading = true);
+    try {
+      final items = query.isEmpty
+          ? await ApiService.fetchProducts(page: 1, perPage: 30)
+          : await ApiService.searchProducts(query);
+      if (mounted)
+        setState(() {
+          _products = items;
+          _isLoading = false;
+        });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _toggle(ProductModel p) {
     setState(() {
-      _isLoading = true;
-      _hasMore = true;
-      _page = 1;
-      _products.clear();
+      if (_selected.contains(p))
+        _selected.remove(p);
+      else
+        _selected.add(p);
     });
-
-    try {
-      final items = _query.isEmpty
-          ? await ApiService.fetchProducts(page: _page, perPage: 20)
-          : await ApiService.searchProducts(_query);
-
-      setState(() {
-        _products = items;
-        _isLoading = false;
-        _hasMore = _query.isEmpty && items.length == 20;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load products: $e')));
-      }
-    }
-  }
-
-  Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore || _query.isNotEmpty) return;
-
-    setState(() => _isLoadingMore = true);
-    try {
-      final nextPage = _page + 1;
-      final items = await ApiService.fetchProducts(page: nextPage, perPage: 20);
-      setState(() {
-        _page = nextPage;
-        _products.addAll(items);
-        _hasMore = items.length == 20;
-        _isLoadingMore = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingMore = false);
-    }
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final pos = _scrollController.position;
-    if (pos.pixels > pos.maxScrollExtent * 0.7) {
-      _loadMore();
-    }
-  }
-
-  void _onSearchChanged(String value) {
-    _query = value.trim();
-    _loadInitial();
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      clipBehavior: Clip.antiAlias,
+      height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: const [
-                  Icon(Iconsax.bag_2),
-                  SizedBox(width: 8),
-                  Text(
-                    'Pick a product',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search products...',
-                  prefixIcon: const Icon(Iconsax.search_normal),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            _onSearchChanged('');
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                ),
-                onChanged: _onSearchChanged,
-              ),
-            ),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _products.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No products found',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      itemCount: _products.length + (_isLoadingMore ? 1 : 0),
-                      itemBuilder: (ctx, idx) {
-                        if (idx >= _products.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            child: Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          );
-                        }
-                        final p = _products[idx];
-                        return _ProductTile(
-                          product: p,
-                          onTap: () => Navigator.pop(context, p),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProductTile extends StatelessWidget {
-  final ProductModel product;
-  final VoidCallback onTap;
-
-  const _ProductTile({required this.product, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasDiscount =
-        product.discountPercentage != null && product.discountPercentage! > 0;
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9FAFB),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  color: Colors.grey.shade200,
-                  width: 64,
-                  height: 64,
-                  child: product.image.isNotEmpty
-                      ? Image.network(
-                          product.image,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Iconsax.image),
-                        )
-                      : const Icon(Iconsax.image),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      "Select Products",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
+                      "${_selected.length} selected",
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          '₹${product.price}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (hasDiscount)
-                          Text(
-                            '₹${product.regularPrice}',
-                            style: TextStyle(
-                              decoration: TextDecoration.lineThrough,
-                              color: Colors.grey.shade500,
-                              fontSize: 11,
-                            ),
-                          ),
-                        if (hasDiscount) const SizedBox(width: 4),
-                        if (hasDiscount)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '-${product.discountPercentage}%',
-                              style: TextStyle(
-                                color: Colors.red.shade600,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (product.brandName != null &&
-                        product.brandName!.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          product.brandName!,
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(Iconsax.arrow_right_3, size: 18),
-            ],
+                if (_selected.isNotEmpty)
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, _selected.toList()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAccentColor,
+                    ),
+                    child: const Text(
+                      "Done",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Iconsax.search_normal),
+                filled: true,
+                fillColor: kBgColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (v) => _fetch(query: v),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 0.7,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                    itemCount: _products.length,
+                    itemBuilder: (ctx, i) {
+                      final p = _products[i];
+                      final isSelected = _selected.contains(p);
+                      return GestureDetector(
+                        onTap: () => _toggle(p),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? kAccentColor
+                                  : Colors.grey.shade200,
+                              width: isSelected ? 3 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(9),
+                                  ),
+                                  child: Image.network(
+                                    p.image,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Text(
+                                  "₹${p.price}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

@@ -2,19 +2,29 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 // INTERNAL IMPORTS
-// Ensure these match your actual project structure
+// Ensure these match your project structure
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
-const Color kAccent = Color(0xFF0BA39A);
-const Color kBgColor = Color(0xFFF9FAFB);
+// ─── THEME CONSTANTS ─────────────────────────────────────────────────────────
+const Color kWhatsAppTeal = Color(0xFF075E54);
+const Color kWhatsAppGreen = Color(0xFF25D366);
+const Color kChatBubble = Color(0xFFDCF8C6);
+const Color kSurface = Colors.white;
+const Color kBgColor = Color(0xFFE5DDD5); // WhatsApp chat bg color style
+const Color kDarkText = Color(0xFF111827);
+const Color kAccentBlue = Color(0xFF2563EB);
+
+enum MarginType { fixed, percentage }
 
 class OneClickWhatsAppPage extends StatefulWidget {
   const OneClickWhatsAppPage({super.key});
@@ -23,710 +33,956 @@ class OneClickWhatsAppPage extends StatefulWidget {
   State<OneClickWhatsAppPage> createState() => _OneClickWhatsAppPageState();
 }
 
-class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage>
-    with WidgetsBindingObserver {
-  // --- CONTROLLERS ---
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController messageController = TextEditingController();
-
+class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
   // --- STATE ---
-  ProductModel? selectedProduct;
-  final List<String> recipients = [];
-  bool isSending = false;
-  int sendingIndex = 0; // To track progress
+  final List<ProductModel> selectedProducts = [];
+  final TextEditingController businessNameController = TextEditingController();
+  final TextEditingController marginInputController = TextEditingController();
+  final FlutterNativeContactPicker _contactPicker =
+      FlutterNativeContactPicker();
 
-  final FlutterNativeContactPicker nativePicker = FlutterNativeContactPicker();
+  // --- CONTROLLERS ---
+  String _generatedCaption = "";
+  bool _isDownloading = false;
 
-  // This completer helps us wait until the user returns to the app
-  Completer<void>? _resumeCompleter;
+  // --- PROFIT & PRICING ENGINE ---
+  MarginType _marginType = MarginType.fixed; // Fixed ₹ or %
+  double _marginValue = 100.0; // Default ₹100
+  bool _useMagicPricing = true;
+  bool _showDiscount = true;
 
-  // --- TEMPLATES ---
-  static const List<String> _defaultTemplates = [
-    'Hi! I found this amazing product 👇\n\n{product_block}\n\nLet me know if you want to order! 😊',
-    'Hey! Check this out:\n\n{product_block}\n\nAvailable in all sizes. Reply to book yours.',
-    '🔥 Limited Time Deal 🔥\n\n{product_block}\n\nGrab it before it goes out of stock!',
-  ];
-  final List<String> _userTemplates = [];
-  List<String> get _allTemplates =>
-      List.unmodifiable([..._defaultTemplates, ..._userTemplates]);
-  static const String _prefsKey = 'wa_user_templates';
+  // --- CONTENT CONTROLS ---
+  bool _includeTitle = true;
+  bool _includePrice = true;
+  bool _includeSizes = true;
+  bool _includeDescription = false;
 
-  // --- COUNTRY CODES ---
-  final List<Map<String, String>> countryCodes = [
-    {'label': 'IN', 'code': '+91'},
-    {'label': 'US', 'code': '+1'},
-    {'label': 'UK', 'code': '+44'},
-    {'label': 'CA', 'code': '+1'},
-    {'label': 'AU', 'code': '+61'},
-  ];
-  String selectedCountry = '+91';
+  // --- MARKETING BOOSTERS ---
+  bool _isHinglish = false;
+  bool _addTrustBadge = true;
+  bool _showBranding = true;
+  String _validityPeriod = 'None';
+  String _selectedTone = 'Urgency';
 
   @override
   void initState() {
     super.initState();
-    // Register this class to listen to app lifecycle changes (Background/Foreground)
-    WidgetsBinding.instance.addObserver(this);
-    _loadTemplates();
+    marginInputController.text = "100";
+    _loadBusinessName();
+    _updateCaption();
+  }
+
+  Future<void> _loadBusinessName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('business_name') ?? '';
+    if (name.isNotEmpty) {
+      setState(() {
+        businessNameController.text = name;
+        _showBranding = true;
+      });
+      _updateCaption();
+    }
+  }
+
+  Future<void> _saveBusinessName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('business_name', name);
   }
 
   @override
   void dispose() {
-    // Remove observer to prevent memory leaks
-    WidgetsBinding.instance.removeObserver(this);
-    phoneController.dispose();
-    messageController.dispose();
+    businessNameController.dispose();
+    marginInputController.dispose();
     super.dispose();
   }
 
-  // --- LIFECYCLE LISTENER ---
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When the app resumes (user comes back from WhatsApp), complete the future
-    if (state == AppLifecycleState.resumed) {
-      if (_resumeCompleter != null && !_resumeCompleter!.isCompleted) {
-        _resumeCompleter!.complete();
-      }
-    }
-  }
+  // ─── 🧠 PRICING LOGIC ─────────────────────────────────────────────────────
 
-  // --- LOGIC: TEMPLATES ---
-  Future<void> _loadTemplates() async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<String>? stored = prefs.getStringList(_prefsKey);
-    if (stored != null) {
-      setState(() {
-        _userTemplates.clear();
-        _userTemplates.addAll(stored);
-      });
-    }
-  }
+  double _calculateSellingPrice(String basePriceStr) {
+    double base = double.tryParse(basePriceStr) ?? 0.0;
+    double price = base;
 
-  Future<void> _saveTemplates() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_prefsKey, _userTemplates);
-  }
-
-  Future<void> _saveMessageAsTemplate() async {
-    final t = messageController.text.trim();
-    if (t.isEmpty) {
-      _showSnack('Cannot save empty message');
-      return;
-    }
-    setState(() => _userTemplates.insert(0, t));
-    await _saveTemplates();
-    _showSnack('Template saved!');
-  }
-
-  void _applyTemplate(int index) {
-    if (index < 0 || index >= _allTemplates.length || selectedProduct == null) {
-      _showSnack('Select a product first to apply template');
-      return;
-    }
-    final p = selectedProduct!;
-    final productBlock = _buildProductBlock(p);
-    String template = _allTemplates[index];
-    template = template.replaceAll('{product_block}', productBlock);
-
-    setState(() {
-      messageController.text = template;
-      messageController.selection = TextSelection.fromPosition(
-        TextPosition(offset: messageController.text.length),
-      );
-    });
-  }
-
-  // --- LOGIC: PRODUCT BLOCK ---
-  String _buildProductBlock(ProductModel p) {
-    final buffer = StringBuffer();
-    buffer.writeln('🛍️ *${p.name}*');
-    buffer.writeln('💰 Price: *₹${p.price}*');
-
-    if (p.discountPercentage != null && p.discountPercentage! > 0) {
-      buffer.writeln(
-        '✨ MRP: ~₹${p.regularPrice}~ (${p.discountPercentage}% OFF)',
-      );
-    }
-    if (p.brandName != null && p.brandName!.trim().isNotEmpty) {
-      buffer.writeln('🏷 Brand: ${p.brandName}');
-    }
-    if (p.attributes.isNotEmpty) {
-      final summary = p.attributes
-          .take(2)
-          .map(
-            (a) => a.options.isNotEmpty ? '${a.name}: ${a.options.first}' : '',
-          )
-          .where((s) => s.isNotEmpty)
-          .join(' | ');
-      if (summary.isNotEmpty) buffer.writeln('📌 $summary');
-    }
-    return buffer.toString().trim();
-  }
-
-  // --- LOGIC: RECIPIENTS ---
-  String _sanitizeNumber(String raw) {
-    String clean = raw.replaceAll(RegExp(r'[^\d+]'), '');
-    if (clean.isEmpty) return '';
-    if (!clean.startsWith('+')) {
-      clean = '$selectedCountry$clean';
-    }
-    return clean;
-  }
-
-  void _addQuickPhone() {
-    final raw = phoneController.text.trim();
-    if (raw.isEmpty) return;
-    final sanitized = _sanitizeNumber(raw);
-    if (sanitized.length < 10) {
-      _showSnack('Invalid phone number');
-      return;
-    }
-    if (!recipients.contains(sanitized)) {
-      setState(() {
-        recipients.add(sanitized);
-        phoneController.clear();
-      });
+    // 1. Apply Margin
+    if (_marginType == MarginType.fixed) {
+      price = base + _marginValue;
     } else {
-      _showSnack('Number already added');
-      phoneController.clear();
-    }
-  }
-
-  Future<void> _pickContactAndAdd() async {
-    try {
-      final contact = await nativePicker.selectPhoneNumber();
-      if (contact != null) {
-        final raw = contact.selectedPhoneNumber ?? contact.phoneNumbers?.first;
-        if (raw != null) {
-          final sanitized = _sanitizeNumber(raw);
-          setState(() {
-            if (!recipients.contains(sanitized)) recipients.add(sanitized);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Contact picker error: $e");
-    }
-  }
-
-  // --- LOGIC: SENDING (FIXED) ---
-  Future<bool> _launchSingleWhatsApp(String number, String msg) async {
-    // Remove all non-digits for the URL, but keep the + if needed or strip it depending on requirement.
-    // Usually WA api works best with straight digits including country code, no + or spaces
-    final cleanNum = number.replaceAll(RegExp(r'[^\d]'), '');
-    final encodedMsg = Uri.encodeComponent(msg);
-
-    final appUrl = Uri.parse(
-      'whatsapp://send?phone=$cleanNum&text=$encodedMsg',
-    );
-    final webUrl = Uri.parse('https://wa.me/$cleanNum?text=$encodedMsg');
-
-    try {
-      // 1. Try launching the App Intent
-      if (await canLaunchUrl(appUrl)) {
-        return await launchUrl(appUrl, mode: LaunchMode.externalApplication);
-      }
-      // 2. Fallback to Web/Universal link
-      else {
-        return await launchUrl(webUrl, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint("Launch Error: $e");
-      return false;
-    }
-  }
-
-  Future<void> _sendToAll() async {
-    if (selectedProduct == null) {
-      _showSnack('Please select a product first');
-      return;
-    }
-    if (recipients.isEmpty) {
-      _showSnack('Add at least one recipient');
-      return;
-    }
-    final msg = messageController.text.trim();
-    if (msg.isEmpty) {
-      _showSnack('Message cannot be empty');
-      return;
+      // Percentage Logic: Base + (Base * % / 100)
+      price = base + (base * _marginValue / 100);
     }
 
-    setState(() {
-      isSending = true;
-      sendingIndex = 0;
-    });
-
-    _showSnack(
-      'Starting bulk send. Please press BACK after sending each message.',
-    );
-
-    int successCount = 0;
-
-    for (int i = 0; i < recipients.length; i++) {
-      setState(() => sendingIndex = i + 1); // Update UI
-
-      final number = recipients[i];
-
-      // Initialize the completer
-      _resumeCompleter = Completer<void>();
-
-      // Launch WhatsApp
-      bool launched = await _launchSingleWhatsApp(number, msg);
-
-      if (launched) {
-        successCount++;
-
-        // If there are more recipients left, we MUST wait for the user to return
-        if (i < recipients.length - 1) {
-          // Wait here until 'didChangeAppLifecycleState' fires 'resumed'
-          await _resumeCompleter!.future;
-
-          // Small buffer delay to ensure UI is ready before firing next intent
-          await Future.delayed(const Duration(milliseconds: 700));
-        }
+    // 2. Apply Magic Pricing (Psychology)
+    if (_useMagicPricing) {
+      double remainder = price % 100;
+      if (remainder < 50) {
+        price = (price - remainder) + 49;
       } else {
-        _showSnack('Could not open WhatsApp for $number');
+        price = (price - remainder) + 99;
       }
     }
-
-    setState(() {
-      isSending = false;
-      sendingIndex = 0;
-    });
-    _showSnack('Completed! Sent to $successCount recipients.');
+    return price;
   }
 
-  Future<void> _shareImageWithCaption() async {
-    if (selectedProduct == null) {
-      _showSnack('Select a product first');
+  double _calculateTotalPotentialProfit() {
+    double totalProfit = 0.0;
+    for (var p in selectedProducts) {
+      double base = double.tryParse(p.price) ?? 0.0;
+      double selling = _calculateSellingPrice(p.price);
+      totalProfit += (selling - base);
+    }
+    return totalProfit;
+  }
+
+  String _getDiscountString(double sellingPrice) {
+    if (!_showDiscount) return "";
+    double fakeMRP = sellingPrice * 1.45;
+    fakeMRP = (fakeMRP / 50).ceil() * 50;
+    int offPercent = ((fakeMRP - sellingPrice) / fakeMRP * 100).round();
+    return "MRP ~₹${fakeMRP.toStringAsFixed(0)}~ ($offPercent% OFF)";
+  }
+
+  String _getDynamicDate() {
+    switch (_validityPeriod) {
+      case '24 Hours':
+        return "⏳ Offer Ends in 24 Hours!";
+      case 'Sunday':
+        return "⏳ Valid till this Sunday Midnight.";
+      case 'Month End':
+        return "⏳ Month End Clearance Sale.";
+      default:
+        return "";
+    }
+  }
+
+  // ─── 📝 CAPTION GENERATOR ─────────────────────────────────────────────────
+
+  void _updateCaption() {
+    if (selectedProducts.isEmpty) {
+      setState(() => _generatedCaption = "Add products to generate catalog.");
       return;
     }
 
-    final caption = messageController.text.isNotEmpty
-        ? messageController.text
-        : _buildProductBlock(selectedProduct!);
+    final buffer = StringBuffer();
+    final businessName = businessNameController.text.trim();
+    final hasName = businessName.isNotEmpty && _showBranding;
 
-    try {
-      if (selectedProduct!.image.isNotEmpty) {
-        final XFile file = await ApiService.downloadImageAsFile(
-          selectedProduct!.image,
+    // --- 1. HEADLINE ---
+    if (_isHinglish) {
+      if (hasName) buffer.writeln("👋 *Welcome to $businessName*");
+      if (_selectedTone == 'Urgency') {
+        buffer.writeln("🔥 *Jaldi Karo! Offer Khatam hone wala hai* 🔥");
+      } else if (_selectedTone == 'Luxury') {
+        buffer.writeln("✨ *Premium Collection - Sirf Aapke Liye* ✨");
+      } else {
+        buffer.writeln("😍 *Dekhiye hamari nayi collection*");
+      }
+    } else {
+      if (hasName) buffer.writeln("👋 *New at $businessName*");
+      if (_selectedTone == 'Urgency') {
+        buffer.writeln("🚨 *FLASH SALE! Limited Time Offer* 🚨");
+      } else if (_selectedTone == 'Luxury') {
+        buffer.writeln("✨ *Exclusive Premium Designs* ✨");
+      } else {
+        buffer.writeln("😍 *Check out these new arrivals!*");
+      }
+    }
+
+    if (_validityPeriod != 'None') {
+      buffer.writeln(_getDynamicDate());
+    }
+    buffer.writeln("");
+
+    // --- 2. PRODUCTS ---
+    for (int i = 0; i < selectedProducts.length; i++) {
+      final p = selectedProducts[i];
+      final sellingPrice = _calculateSellingPrice(p.price);
+
+      buffer.writeln("━━━━━━━━━━━━━━━━");
+      buffer.writeln("✅ *Design ${i + 1}*");
+
+      if (_includeTitle) buffer.writeln("📦 ${p.name}");
+
+      if (_includePrice) {
+        if (_showDiscount) {
+          buffer.writeln("🏷️ ${_getDiscountString(sellingPrice)}");
+          buffer.writeln(
+            "👉 *Offer Price: ₹${sellingPrice.toStringAsFixed(0)}* 🔥",
+          );
+        } else {
+          buffer.writeln("💰 *Price: ₹${sellingPrice.toStringAsFixed(0)}*");
+        }
+      }
+
+      if (_includeSizes && p.attributes.isNotEmpty) {
+        final sizes = p.attributes.firstWhere(
+          (a) => a.name.toLowerCase().contains('size'),
+          orElse: () => ProductAttribute(id: 0, name: '', options: []),
         );
-        await Share.shareXFiles([file], text: caption);
+        if (sizes.options.isNotEmpty)
+          buffer.writeln("📏 Sizes: ${sizes.options.join(', ')}");
+      }
+
+      if (_includeDescription && p.description.isNotEmpty) {
+        String cleanDesc = p.description.replaceAll(RegExp(r'<[^>]*>'), '');
+        if (cleanDesc.length > 100)
+          cleanDesc = "${cleanDesc.substring(0, 100)}...";
+        buffer.writeln("📝 Details: $cleanDesc");
+      }
+    }
+    buffer.writeln("━━━━━━━━━━━━━━━━");
+
+    // --- 3. FOOTER ---
+    if (_addTrustBadge) {
+      buffer.writeln(
+        _isHinglish
+            ? "\n⭐ *Best Quality* | ⭐ *Easy Returns*"
+            : "\n⭐ *Quality Verified* | ⭐ *Easy Returns*",
+      );
+    }
+
+    buffer.writeln(
+      _isHinglish ? "🚚 *Free Home Delivery*" : "🚚 *Free Shipping*",
+    );
+    buffer.writeln("");
+
+    if (_isHinglish) {
+      buffer.writeln("👇 *Order karne ke liye photo reply karein!*");
+    } else {
+      buffer.writeln("👇 *Reply with photo to place order!*");
+    }
+
+    // Auto-hashtags
+    buffer.writeln(
+      "\n#Fashion #Sale #Trending #${_isHinglish ? 'DilSeDesi' : 'Style'}",
+    );
+
+    setState(() {
+      _generatedCaption = buffer.toString();
+    });
+  }
+
+  // ─── ACTIONS ──────────────────────────────────────────────────────────────
+
+  Future<void> _shareCampaign() async {
+    if (selectedProducts.isEmpty) {
+      _showSnack("Please select products first", isError: true);
+      return;
+    }
+    setState(() => _isDownloading = true);
+    try {
+      List<XFile> filesToShare = [];
+      for (var product in selectedProducts) {
+        if (product.image.isNotEmpty) {
+          final file = await ApiService.downloadImageAsFile(product.image);
+          filesToShare.add(file);
+        }
+      }
+
+      // Backup copy
+      await Clipboard.setData(ClipboardData(text: _generatedCaption));
+
+      // Native Share (Attach text directly)
+      if (filesToShare.isEmpty) {
+        await Share.share(_generatedCaption);
       } else {
-        await Share.share(caption);
+        await Share.shareXFiles(
+          filesToShare,
+          text: _generatedCaption,
+          subject: 'New Collection',
+        );
       }
     } catch (e) {
-      _showSnack('Could not share: $e');
+      _showSnack("Error: $e", isError: true);
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
-  void _showSnack(String msg) {
+  Future<void> _sendDirectMessage() async {
+    if (selectedProducts.isEmpty) {
+      _showSnack("Select products first", isError: true);
+      return;
+    }
+    final contact = await _contactPicker.selectPhoneNumber();
+    if (contact?.selectedPhoneNumber == null) return;
+
+    String phone = contact!.selectedPhoneNumber!;
+    String cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    final message = Uri.encodeComponent(_generatedCaption);
+    final url = Uri.parse("whatsapp://send?phone=$cleanPhone&text=$message");
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      _showSnack("Could not launch WhatsApp");
+    }
+  }
+
+  // ─── HELPER WIDGETS ───────────────────────────────────────────────────────
+
+  void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: isError ? Colors.red : kDarkText,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  // --- PRODUCT PICKER ---
-  Future<void> _openProductPicker() async {
-    final ProductModel? picked = await showModalBottomSheet(
+  void _openMultiProductPicker() async {
+    final List<ProductModel>? picked = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _ProductPickerSheet(),
+      builder: (_) => const _MultiProductPickerSheet(),
     );
-
-    if (picked != null) {
+    if (picked != null && picked.isNotEmpty) {
       setState(() {
-        selectedProduct = picked;
+        for (var p in picked) {
+          if (!selectedProducts.any((existing) => existing.id == p.id)) {
+            if (selectedProducts.length < 10) selectedProducts.add(p);
+          }
+        }
       });
-      if (messageController.text.trim().isEmpty) {
-        final block = _buildProductBlock(picked);
-        messageController.text =
-            "Hey! Check out this product:\n\n$block\n\nReply if interested!";
-      }
+      _updateCaption();
     }
   }
 
-  // ===========================================================================
-  // UI BUILD
-  // ===========================================================================
+  // ─── MAIN UI BUILD ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBgColor,
+      backgroundColor: kBgColor, // WhatsApp-like BG
       appBar: AppBar(
         title: const Text(
-          'One Click WhatsApp Share',
+          'Marketing Studio',
           style: TextStyle(
             fontFamily: 'Poppins',
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             fontSize: 18,
-            color: Colors.black,
+            color: kDarkText,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: kSurface,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: kDarkText,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (selectedProducts.isNotEmpty)
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  selectedProducts.clear();
+                  _updateCaption();
+                });
+              },
+              icon: const Icon(Iconsax.trash, color: Colors.red),
+            ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
               physics: const BouncingScrollPhysics(),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- STEP 1: PRODUCT ---
-                  _SectionHeader(number: '1', title: 'Select Product'),
-                  const SizedBox(height: 12),
-                  _buildProductSelector(),
+                  _buildSectionTitle("1. Select Products"),
+                  _buildProductShowcase(),
 
-                  const SizedBox(height: 24),
+                  _buildSectionTitle("2. Profit & Pricing"),
+                  _buildPricingEngine(),
 
-                  // --- STEP 2: RECIPIENTS ---
-                  _SectionHeader(number: '2', title: 'Add Recipients'),
-                  const SizedBox(height: 12),
-                  _buildRecipientInput(),
-                  if (recipients.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _buildRecipientChips(),
-                  ],
+                  _buildSectionTitle("3. Content & Marketing"),
+                  _buildMarketingTools(),
 
-                  const SizedBox(height: 24),
+                  _buildSectionTitle("4. Live Preview"),
+                  _buildRealWhatsAppPreview(),
 
-                  // --- STEP 3: MESSAGE ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const _SectionHeader(
-                        number: '3',
-                        title: 'Compose Message',
-                      ),
-                      if (_allTemplates.isNotEmpty)
-                        TextButton(
-                          onPressed: _saveMessageAsTemplate,
-                          child: const Text(
-                            'Save as Template',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: 50,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            itemCount: _allTemplates.length,
-                            itemBuilder: (ctx, i) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ActionChip(
-                                  label: Text(
-                                    'Template ${i + 1}',
-                                    style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  backgroundColor: Colors.grey.shade100,
-                                  onPressed: () => _applyTemplate(i),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const Divider(height: 1),
-                        TextField(
-                          controller: messageController,
-                          maxLines: 6,
-                          minLines: 3,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 14,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: 'Type your message here...',
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.all(16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // --- PREVIEW ---
-                  const Text(
-                    'PREVIEW',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildWhatsAppPreview(),
-
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
           ),
-
-          // --- BOTTOM BAR ---
-          _buildBottomBar(),
+          _buildBottomDock(),
         ],
       ),
     );
   }
 
-  // --- WIDGETS ---
-
-  Widget _buildProductSelector() {
-    final bool hasProduct = selectedProduct != null;
-
-    return InkWell(
-      onTap: _openProductPicker,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: hasProduct ? kAccent : Colors.grey.shade200,
-            width: hasProduct ? 1.5 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                image: (hasProduct && selectedProduct!.image.isNotEmpty)
-                    ? DecorationImage(
-                        image: NetworkImage(selectedProduct!.image),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: !hasProduct
-                  ? Icon(Iconsax.bag_2, color: Colors.grey.shade400)
-                  : null,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    hasProduct ? selectedProduct!.name : 'No Product Selected',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: hasProduct ? Colors.black87 : Colors.grey.shade500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    hasProduct
-                        ? '₹${selectedProduct!.price}'
-                        : 'Tap to select a product from catalog',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 13,
-                      color: hasProduct ? kAccent : Colors.grey.shade400,
-                      fontWeight: hasProduct
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Iconsax.arrow_right_3, size: 18, color: Colors.grey.shade400),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecipientInput() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Row(
-        children: [
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedCountry,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                color: Colors.black,
-                fontWeight: FontWeight.w600,
-              ),
-              items: countryCodes
-                  .map(
-                    (c) => DropdownMenuItem(
-                      value: c['code'],
-                      child: Text(c['code']!),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => selectedCountry = v!),
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 24,
-            color: Colors.grey.shade300,
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          Expanded(
-            child: TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 15),
-              decoration: const InputDecoration(
-                hintText: 'Phone number',
-                border: InputBorder.none,
-              ),
-              onSubmitted: (_) => _addQuickPhone(),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Iconsax.add_circle, color: kAccent),
-            onPressed: _addQuickPhone,
-            tooltip: 'Add',
-          ),
-          IconButton(
-            icon: const Icon(Iconsax.profile_add, color: Colors.black54),
-            onPressed: _pickContactAndAdd,
-            tooltip: 'Import Contact',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecipientChips() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: recipients.map((phone) {
-        return Chip(
-          label: Text(
-            phone,
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-          ),
-          backgroundColor: kAccent.withValues(alpha: 0.1),
-          deleteIcon: const Icon(Icons.close, size: 14),
-          onDeleted: () => setState(() => recipients.remove(phone)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          side: BorderSide.none,
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildWhatsAppPreview() {
+  Widget _buildSectionTitle(String title) {
     return Container(
       width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Colors.grey.shade600,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
+  // ─── 1. PRODUCT SHOWCASE ──────────────────────────────────────────────────
+  Widget _buildProductShowcase() {
+    if (selectedProducts.isEmpty) {
+      return GestureDetector(
+        onTap: _openMultiProductPicker,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          height: 140,
+          decoration: BoxDecoration(
+            color: kSurface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade300, width: 2),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kWhatsAppTeal.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Iconsax.add, color: kWhatsAppTeal, size: 30),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "Tap to Create Catalog",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: kWhatsAppTeal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      height: 180,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: selectedProducts.length + 1,
+        itemBuilder: (context, index) {
+          if (index == selectedProducts.length) {
+            return GestureDetector(
+              onTap: _openMultiProductPicker,
+              child: Container(
+                width: 100,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: kSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Iconsax.add_circle, color: Colors.grey, size: 28),
+                    SizedBox(height: 8),
+                    Text(
+                      "Add",
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          final p = selectedProducts[index];
+          final sellingPrice = _calculateSellingPrice(p.price);
+          return Stack(
+            children: [
+              Container(
+                width: 120,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: kSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: Image.network(
+                          p.image,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        "₹${sellingPrice.toStringAsFixed(0)}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: kDarkText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: 4,
+                right: 16,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedProducts.removeAt(index);
+                      _updateCaption();
+                    });
+                  },
+                  child: const CircleAvatar(
+                    radius: 12,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.close, size: 16, color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── 2. PROFIT ENGINE ─────────────────────────────────────────────────────
+  Widget _buildPricingEngine() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFDCF8C6),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.zero,
-        ),
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (selectedProduct != null && selectedProduct!.image.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  selectedProduct!.image,
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Your Profit",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    "+ ₹${_calculateTotalPotentialProfit().toStringAsFixed(0)}",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: kWhatsAppTeal,
+                    ),
+                  ),
+                ],
+              ),
+              // Manual Input Field
+              SizedBox(
+                width: 90,
+                child: TextField(
+                  controller: marginInputController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    isDense: true,
+                    prefixText: _marginType == MarginType.fixed ? '₹ ' : '',
+                    suffixText: _marginType == MarginType.fixed ? '' : '%',
+                  ),
+                  onChanged: (val) {
+                    double v = double.tryParse(val) ?? 0;
+                    setState(() {
+                      _marginValue = v;
+                      _updateCaption();
+                    });
+                  },
                 ),
               ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Slider
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: kWhatsAppTeal,
+              thumbColor: kWhatsAppTeal,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
             ),
-          Text(
-            messageController.text.isEmpty
-                ? 'Your message will appear here...'
-                : messageController.text,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.4,
+            child: Slider(
+              value: _marginValue.clamp(
+                0.0,
+                _marginType == MarginType.fixed ? 1000.0 : 100.0,
+              ),
+              min: 0,
+              max: _marginType == MarginType.fixed ? 1000.0 : 100.0,
+              onChanged: (val) {
+                setState(() {
+                  _marginValue = val;
+                  marginInputController.text = val.toStringAsFixed(0);
+                  _updateCaption();
+                });
+              },
             ),
           ),
-          const SizedBox(height: 4),
+
+          // Quick Tags
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildMarginTag(50),
+                const SizedBox(width: 8),
+                _buildMarginTag(100),
+                const SizedBox(width: 8),
+                _buildMarginTag(200),
+                const SizedBox(width: 8),
+                _buildMarginTag(500),
+              ],
+            ),
+          ),
+
+          const Divider(height: 20),
+          _buildSwitchTile(
+            title: "Magic '99' Pricing",
+            subtitle: "Auto-rounds price to end in 99",
+            value: _useMagicPricing,
+            onChanged: (v) => setState(() {
+              _useMagicPricing = v;
+              _updateCaption();
+            }),
+            icon: Iconsax.magic_star,
+            iconColor: Colors.purple,
+          ),
+          _buildSwitchTile(
+            title: "Show Fake Discount",
+            subtitle: "Adds 'MRP ₹999 (50% OFF)'",
+            value: _showDiscount,
+            onChanged: (v) => setState(() {
+              _showDiscount = v;
+              _updateCaption();
+            }),
+            icon: Iconsax.discount_shape,
+            iconColor: Colors.orange,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarginTag(double val) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _marginType = MarginType.fixed;
+          _marginValue = val;
+          marginInputController.text = val.toStringAsFixed(0);
+          _updateCaption();
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: kBgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          "+ ₹${val.toStringAsFixed(0)}",
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  // ─── 3. MARKETING ─────────────────────────────────────────────────────────
+  Widget _buildMarketingTools() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Content Toggles
           const Align(
-            alignment: Alignment.bottomRight,
+            alignment: Alignment.centerLeft,
             child: Text(
-              '10:30 AM',
-              style: TextStyle(fontSize: 10, color: Colors.black45),
+              "Content to Share:",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              _buildFilterChip(
+                "Title",
+                _includeTitle,
+                (v) => setState(() {
+                  _includeTitle = v;
+                  _updateCaption();
+                }),
+              ),
+              _buildFilterChip(
+                "Price",
+                _includePrice,
+                (v) => setState(() {
+                  _includePrice = v;
+                  _updateCaption();
+                }),
+              ),
+              _buildFilterChip(
+                "Sizes",
+                _includeSizes,
+                (v) => setState(() {
+                  _includeSizes = v;
+                  _updateCaption();
+                }),
+              ),
+              _buildFilterChip(
+                "Full Desc",
+                _includeDescription,
+                (v) => setState(() {
+                  _includeDescription = v;
+                  _updateCaption();
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+
+          // Business Name
+          TextField(
+            controller: businessNameController,
+            decoration: InputDecoration(
+              hintText: "Your Business Name",
+              prefixIcon: const Icon(Iconsax.shop, size: 18),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (v) {
+              _saveBusinessName(v);
+              _updateCaption();
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Vibe Selector
+          Row(
+            children: [
+              _buildVibeBtn("Urgency 🚨", "Urgency", Colors.red),
+              const SizedBox(width: 8),
+              _buildVibeBtn("Luxury ✨", "Luxury", Colors.purple),
+              const SizedBox(width: 8),
+              _buildVibeBtn("Friendly 😊", "Friendly", Colors.orange),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              "Hinglish Mode 🇮🇳",
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            subtitle: const Text(
+              "Use mix of Hindi-English (Increases trust)",
+              style: TextStyle(fontSize: 11),
+            ),
+            activeColor: Colors.orange,
+            value: _isHinglish,
+            onChanged: (v) => setState(() {
+              _isHinglish = v;
+              _updateCaption();
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(
+    String label,
+    bool selected,
+    Function(bool) onSelected,
+  ) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected,
+      backgroundColor: Colors.grey.shade100,
+      selectedColor: kWhatsAppTeal.withValues(alpha: 0.2),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        color: selected ? kWhatsAppTeal : Colors.black87,
+      ),
+      checkmarkColor: kWhatsAppTeal,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: selected ? kWhatsAppTeal : Colors.transparent),
+      ),
+    );
+  }
+
+  Widget _buildVibeBtn(String label, String val, Color color) {
+    bool isSelected = _selectedTone == val;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _selectedTone = val;
+          _updateCaption();
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? color.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.shade300,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? color : Colors.grey,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── 4. PREVIEW ───────────────────────────────────────────────────────────
+  Widget _buildRealWhatsAppPreview() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE5DDD5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: kChatBubble,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (selectedProducts.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        selectedProducts.first.image,
+                        height: 160,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox(),
+                      ),
+                    ),
+                  ),
+                SelectableText(
+                  _generatedCaption,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      DateFormat('hh:mm a').format(DateTime.now()),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.done_all, size: 14, color: Colors.blue),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -734,14 +990,64 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage>
     );
   }
 
-  Widget _buildBottomBar() {
+  Widget _buildSwitchTile({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required Function(bool) onChanged,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 20, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeColor: kWhatsAppTeal,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── BOTTOM DOCK ──────────────────────────────────────────────────────────
+  Widget _buildBottomDock() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kSurface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black12,
             blurRadius: 10,
             offset: const Offset(0, -4),
           ),
@@ -751,58 +1057,65 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage>
         top: false,
         child: Row(
           children: [
-            Expanded(
-              flex: 1,
-              child: OutlinedButton.icon(
-                onPressed: _shareImageWithCaption,
-                icon: const Icon(Iconsax.gallery, size: 20),
-                label: const Text('Share Img'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  foregroundColor: Colors.black87,
-                  side: BorderSide(color: Colors.grey.shade300),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                  ),
+            InkWell(
+              onTap: _sendDirectMessage,
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: kBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
+                child: const Icon(Iconsax.direct_send, color: kDarkText),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              flex: 2,
-              child: ElevatedButton.icon(
-                onPressed: isSending ? null : _sendToAll,
-                icon: isSending
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isDownloading ? null : _shareCampaign,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kWhatsAppGreen,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isDownloading
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              "Preparing...",
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Iconsax.share, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              "Share the Campaign",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
-                      )
-                    : const Icon(Iconsax.send_2, color: Colors.white),
-                label: Text(
-                  isSending
-                      ? 'Sending $sendingIndex/${recipients.length}...'
-                      : 'Send Message',
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
               ),
             ),
@@ -813,59 +1126,18 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage>
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String number;
-  final String title;
-
-  const _SectionHeader({required this.number, required this.title});
-
+// ─── PRODUCT PICKER SHEET ──────────────────────────────────────────────────
+class _MultiProductPickerSheet extends StatefulWidget {
+  const _MultiProductPickerSheet();
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            number,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              fontFamily: 'Poppins',
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          title,
-          style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-      ],
-    );
-  }
+  State<_MultiProductPickerSheet> createState() =>
+      _MultiProductPickerSheetState();
 }
 
-class _ProductPickerSheet extends StatefulWidget {
-  const _ProductPickerSheet();
-
-  @override
-  State<_ProductPickerSheet> createState() => _ProductPickerSheetState();
-}
-
-class _ProductPickerSheetState extends State<_ProductPickerSheet> {
+class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
   List<ProductModel> _products = [];
+  final Set<ProductModel> _selected = {};
   bool _isLoading = true;
 
   @override
@@ -878,9 +1150,8 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
     setState(() => _isLoading = true);
     try {
       final items = query.isEmpty
-          ? await ApiService.fetchProducts(page: 1, perPage: 20)
+          ? await ApiService.fetchProducts(page: 1, perPage: 40)
           : await ApiService.searchProducts(query);
-
       if (mounted)
         setState(() {
           _products = items;
@@ -891,94 +1162,139 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
     }
   }
 
+  void _toggleSelection(ProductModel p) {
+    setState(() {
+      if (_selected.contains(p)) {
+        _selected.remove(p);
+      } else {
+        if (_selected.length >= 10) return;
+        _selected.add(p);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: kSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Select Products",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      "${_selected.length} selected",
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                if (_selected.isNotEmpty)
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, _selected.toList()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kWhatsAppTeal,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: const Text(
+                      "Done",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+              ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search product...',
+                hintText: 'Search...',
                 prefixIcon: const Icon(Iconsax.search_normal),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: kBgColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
               onChanged: (v) => _fetch(query: v),
             ),
           ),
+          const SizedBox(height: 10),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: kAccent))
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                ? const Center(
+                    child: CircularProgressIndicator(color: kWhatsAppTeal),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 0.7,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
                     itemCount: _products.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
+                    itemBuilder: (ctx, i) {
                       final p = _products[i];
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey.shade100,
-                            child: p.image.isNotEmpty
-                                ? Image.network(
+                      final isSelected = _selected.contains(p);
+                      return GestureDetector(
+                        onTap: () => _toggleSelection(p),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? kWhatsAppTeal
+                                  : Colors.grey.shade200,
+                              width: isSelected ? 3 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(9),
+                                  ),
+                                  child: Image.network(
                                     p.image,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Icon(Icons.image),
-                                  )
-                                : const Icon(Icons.image),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Text(
+                                  "₹${p.price}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        title: Text(
-                          p.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '₹${p.price}',
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            color: kAccent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        trailing: Radio<String>(
-                          value: p.id.toString(),
-                          groupValue: null,
-                          onChanged: (_) => Navigator.pop(context, p),
-                          activeColor: kAccent,
-                        ),
-                        onTap: () => Navigator.pop(context, p),
                       );
                     },
                   ),

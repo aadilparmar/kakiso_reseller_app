@@ -18,6 +18,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 // --- TOOLS SCREENS (LIVE TOOLS) ---
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/one_click_wp_share/one_click_whatsapp.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/price_margin_tool.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/reseller_catalog_builder.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/screens/trending_products_dashboard.dart';
 
 // --- DRAWER IMPORT ---
@@ -81,11 +82,19 @@ class _ToolsSectionState extends State<ToolsSection> {
     tools = [
       Tool(
         id: 'whatsapp_share',
-        title: 'One-click WhatsApp sharing',
-        subtitle: 'Instantly broadcast products to your WhatsApp customers.',
+        title: 'Marketing Studio',
+        subtitle: 'Instantly broadcast products to your Customers.',
         iconData: Iconsax.send_1,
         enabled: true,
         pageBuilder: (_) => const OneClickWhatsAppPage(),
+      ),
+      Tool(
+        id: 'reseller_catalog',
+        title: 'CSV export tool',
+        subtitle: 'Download product catalogs in CSV/Excel for bulk upload.',
+        iconData: Iconsax.document_download,
+        enabled: true,
+        pageBuilder: (_) => const ResellerCatalogPage(),
       ),
       Tool(
         id: 'auto_video',
@@ -153,13 +162,18 @@ class _ToolsSectionState extends State<ToolsSection> {
 
     Iterable<Tool> data = tools;
 
-    // Super-light "category" logic based on id
-    if (selectedChip == 'Automation') {
+    // Filter by Chip Selection
+    if (selectedChip == 'Live') {
+      data = tools.where((t) => _liveToolIds.contains(t.id));
+    } else if (selectedChip == 'Coming Soon') {
+      data = tools.where((t) => !_liveToolIds.contains(t.id));
+    } else if (selectedChip == 'Automation') {
       data = tools.where(
         (t) =>
             t.id.contains('inventory') ||
             t.id.contains('price') ||
-            t.id.contains('auto'),
+            t.id.contains('auto') ||
+            t.id.contains('catalog'),
       );
     } else if (selectedChip == 'Marketing') {
       data = tools.where(
@@ -172,13 +186,16 @@ class _ToolsSectionState extends State<ToolsSection> {
       data = tools.where((t) => t.id.contains('trending'));
     }
 
-    if (q.isEmpty) return data.toList();
+    // Filter by Search Query
+    if (q.isNotEmpty) {
+      data = data.where((t) {
+        return t.title.toLowerCase().contains(q) ||
+            t.subtitle.toLowerCase().contains(q) ||
+            t.id.toLowerCase().contains(q);
+      });
+    }
 
-    return data.where((t) {
-      return t.title.toLowerCase().contains(q) ||
-          t.subtitle.toLowerCase().contains(q) ||
-          t.id.toLowerCase().contains(q);
-    }).toList();
+    return data.toList();
   }
 
   // ───────────────────────── DRAWER / LOGOUT ──────────────────────
@@ -503,8 +520,6 @@ class _ToolsSectionState extends State<ToolsSection> {
               color: accentColor,
               iconSize: 30,
               onPressed: () {
-                // Navigate to ProfilePage using currently stored user data
-                // We use _userData which is initialized in initState from widget.userData
                 Get.to(() => WishlistScreen());
               },
             ),
@@ -583,7 +598,8 @@ class _ToolsSectionState extends State<ToolsSection> {
               ),
 
               // ── CHIPS ROW ─────────────────────────────────────────────
-              Padding(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 2,
@@ -594,6 +610,18 @@ class _ToolsSectionState extends State<ToolsSection> {
                       label: 'All',
                       selected: selectedChip == 'All',
                       onTap: () => setState(() => selectedChip = 'All'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Live',
+                      selected: selectedChip == 'Live',
+                      onTap: () => setState(() => selectedChip = 'Live'),
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: 'Coming Soon',
+                      selected: selectedChip == 'Coming Soon',
+                      onTap: () => setState(() => selectedChip = 'Coming Soon'),
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
