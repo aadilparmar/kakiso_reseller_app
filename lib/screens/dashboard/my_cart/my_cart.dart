@@ -40,7 +40,7 @@ class _InventoryPageState extends State<InventoryPage> {
   // --- FEES CONSTANTS ---
   static const double kShippingFee = 100.0;
   static const double kPlatformFee = 15.0;
-  static const double kConvenienceFee = 15.0;
+  static const double kConvenienceFee = 12.0;
 
   // Snackbar State
   OverlayEntry? _currentSnackbar;
@@ -304,6 +304,22 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
+  // 🔹 NEW: Handle navigation to Business Details with proper refresh
+  Future<void> _navigateToBusinessDetails() async {
+    HapticFeedback.mediumImpact();
+
+    // Navigate and wait for result
+    final result = await Get.to(
+      () => BusinessDetailsPage(userData: widget.userData),
+    );
+
+    // If the user saved data (result == true), we might want to show a confirmation
+    // or refresh any state if needed. The BusinessDetailsPage handles its own refresh.
+    if (result == true && mounted) {
+      debugPrint('Business details were updated');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color kBgColor = Color(0xFFF0F3F6);
@@ -325,7 +341,7 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
           title: Obx(
             () => Text(
-              "Cart (${cartController.itemCount})",
+              "My Cart (${cartController.itemCount})",
               style: const TextStyle(
                 color: Colors.black,
                 fontSize: 18,
@@ -1025,20 +1041,21 @@ class _InventoryPageState extends State<InventoryPage> {
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
+          _priceRow(
+            "Order Price (Buy Price)",
+            "₹${supplierTotal.toStringAsFixed(0)}",
+          ),
           if (totalDiscount > 0)
             _priceRow(
               "Total Discount",
               "-₹${totalDiscount.toStringAsFixed(0)}",
               color: Colors.green,
               isBold: false,
-              tooltip: "Discount is Mrp - Products price",
+              tooltip: "Discount is MRP - Buy Price ",
             ),
 
           const SizedBox(height: 4),
-          _priceRow(
-            "Order Price (Buy Price)",
-            "₹${supplierTotal.toStringAsFixed(0)}",
-          ),
+
           const SizedBox(height: 8),
           const Divider(height: 24),
 
@@ -1326,10 +1343,7 @@ class _InventoryPageState extends State<InventoryPage> {
                         }
                         return;
                       }
-                      HapticFeedback.mediumImpact();
-                      Get.to(
-                        () => BusinessDetailsPage(userData: widget.userData),
-                      );
+                      _navigateToBusinessDetails();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isValid

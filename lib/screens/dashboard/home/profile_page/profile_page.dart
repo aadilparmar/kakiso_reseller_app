@@ -147,23 +147,11 @@ class _ProfilePageState extends State<ProfilePage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
-            onPressed: () => Get.back(),
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              size: 20,
-              color: Colors.black87,
-            ),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              padding: const EdgeInsets.all(12),
-            ),
-          ),
           const Text(
             "Member Profile",
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              fontSize: 19,
               letterSpacing: 0.5,
             ),
           ),

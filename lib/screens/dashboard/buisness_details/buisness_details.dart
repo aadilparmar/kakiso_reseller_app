@@ -8,13 +8,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/checkout/checkout.dart';
+// 🔹 Import Final Checkout Page
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// 🔹 Checkout step: Business details (Step 2)
-
 class BusinessDetailsPage extends StatefulWidget {
-  final UserData? userData; // optional, to prefill if available
+  final UserData? userData; // optional
 
   /// If true → opened from drawer (settings mode)
   /// If false / null → opened from checkout flow
@@ -37,13 +37,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _storageKey = 'business_details';
 
+  UserData? _currentUser;
+
   final TextEditingController _businessNameCtrl = TextEditingController();
   final TextEditingController _ownerNameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _whatsappCtrl = TextEditingController();
 
-  // Address controllers (two lines)
+  // Address controllers
   final TextEditingController _addressLine1Ctrl = TextEditingController();
   final TextEditingController _addressLine2Ctrl = TextEditingController();
   final TextEditingController _cityCtrl = TextEditingController();
@@ -52,15 +54,16 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     text: 'India',
   );
   final TextEditingController _pincodeCtrl = TextEditingController();
-
   final TextEditingController _gstinCtrl = TextEditingController();
 
   bool _isWhatsAppSame = true;
   bool _isSaving = false;
-  bool _hasSavedDetails = false; // 🔹 to know if user already saved once
-  bool _isRemoteLoading = false; // 🔹 when fetching from server
+  bool _hasSavedDetails = false;
+  bool _isRemoteLoading = false;
 
-  // 🔹 Indian states list and selected state
+  // 🔹 Ship to business address option
+  bool _shipToBusinessAddress = false;
+
   final List<String> _indianStates = const [
     'Andhra Pradesh',
     'Arunachal Pradesh',
@@ -105,31 +108,33 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   @override
   void initState() {
     super.initState();
-
-    // Prefill from UserData (name + email)
-    if (widget.userData != null) {
-      _ownerNameCtrl.text = widget.userData!.name;
-      _emailCtrl.text = widget.userData!.email;
+    _resolveCurrentUser();
+    if (_currentUser != null) {
+      _ownerNameCtrl.text = _currentUser!.name;
+      _emailCtrl.text = _currentUser!.email;
     }
-
-    // Country is always India
     _countryCtrl.text = 'India';
-
-    // Load any previously saved business details (device-local)
     _loadSavedDetails();
-
-    // Then load from server so details follow the user across devices
     _loadRemoteDetails();
   }
 
-  // 🔹 load from secure storage (fast, device-only)
+  void _resolveCurrentUser() {
+    if (widget.userData != null) {
+      _currentUser = widget.userData;
+      return;
+    }
+    try {
+      // if (Get.isRegistered<UserController>()) _currentUser = Get.find<UserController>().user;
+    } catch (e) {
+      debugPrint("Could not auto-fetch user: $e");
+    }
+  }
+
   Future<void> _loadSavedDetails() async {
     try {
       final String? jsonStr = await _storage.read(key: _storageKey);
       if (jsonStr == null) return;
-
       final Map<String, dynamic> data = jsonDecode(jsonStr);
-
       if (!mounted) return;
 
       final String savedState = (data['state'] as String?)?.trim() ?? '';
@@ -145,7 +150,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _whatsappCtrl.text = data['whatsapp'] ?? '';
         _emailCtrl.text = data['email'] ?? _emailCtrl.text;
 
-        // Address lines
         if (savedLine1.isNotEmpty || savedLine2.isNotEmpty) {
           _addressLine1Ctrl.text = savedLine1;
           _addressLine2Ctrl.text = savedLine2;
@@ -155,44 +159,32 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         }
 
         _cityCtrl.text = data['city'] ?? '';
-
-        // State via dropdown
         if (savedState.isNotEmpty && _indianStates.contains(savedState)) {
           _selectedState = savedState;
         } else {
           _selectedState = null;
         }
         _stateCtrl.text = _selectedState ?? savedState;
-
-        // Country always India, ignore saved value
-        _countryCtrl.text = 'India';
-
         _pincodeCtrl.text = data['pincode'] ?? '';
-
         _gstinCtrl.text = data['gstin'] ?? '';
 
         _isWhatsAppSame =
             _whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text;
-
-        _hasSavedDetails = true; // 🔹 show summary UI
+        _hasSavedDetails = true;
       });
     } catch (e) {
       debugPrint('Failed to load saved business details: $e');
     }
   }
 
-  // 🔹 load from WooCommerce/Kakiso backend (cross-device source of truth)
   Future<void> _loadRemoteDetails() async {
-    final userId = widget.userData?.userId;
-    if (userId == null || userId.trim().isEmpty) {
-      return;
-    }
+    final userId = _currentUser?.userId;
+    if (userId == null || userId.trim().isEmpty) return;
 
     setState(() => _isRemoteLoading = true);
 
     try {
       final remoteData = await ApiService.fetchBusinessDetails(userId: userId);
-
       if (remoteData == null || !mounted) return;
 
       final String remoteState = (remoteData['state'] as String?)?.trim() ?? '';
@@ -207,13 +199,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _whatsappCtrl.text = remoteData['whatsapp'] ?? _whatsappCtrl.text;
         _emailCtrl.text = remoteData['email'] ?? _emailCtrl.text;
 
-        // Only override address line 1 if empty and remote has value
         if (_addressLine1Ctrl.text.trim().isEmpty && remoteAddress.isNotEmpty) {
           _addressLine1Ctrl.text = remoteAddress;
         }
         _cityCtrl.text = remoteData['city'] ?? _cityCtrl.text;
 
-        // State via dropdown
         if (remoteState.isNotEmpty && _indianStates.contains(remoteState)) {
           _selectedState = remoteState;
         } else if (_stateCtrl.text.isNotEmpty &&
@@ -223,21 +213,14 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           _selectedState = null;
         }
         _stateCtrl.text = _selectedState ?? remoteState;
-
-        // Country always India, ignore remote value
-        _countryCtrl.text = 'India';
-
         _pincodeCtrl.text = remoteData['pincode'] ?? _pincodeCtrl.text;
-
         _gstinCtrl.text = remoteData['gstin'] ?? _gstinCtrl.text;
 
         _isWhatsAppSame =
             _whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text;
-
         _hasSavedDetails = true;
       });
 
-      // Also sync to local storage so next open is instant
       await _storage.write(key: _storageKey, value: jsonEncode(remoteData));
     } catch (e) {
       debugPrint('Failed to fetch remote business details: $e');
@@ -253,50 +236,39 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _whatsappCtrl.dispose();
-
     _addressLine1Ctrl.dispose();
     _addressLine2Ctrl.dispose();
     _cityCtrl.dispose();
     _stateCtrl.dispose();
     _countryCtrl.dispose();
     _pincodeCtrl.dispose();
-
     _gstinCtrl.dispose();
     super.dispose();
   }
 
-  // 🔹 Submit (ONLY when opened from drawer)
   Future<void> _onSubmit() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Ensure state selected
     if (_selectedState == null || _selectedState!.trim().isEmpty) {
       Get.snackbar(
         'State required',
-        'Please select your state from the list.',
-        snackPosition: SnackPosition.BOTTOM,
+        'Please select your state.',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
       return;
     }
 
-    // Keep controllers in sync
     _stateCtrl.text = _selectedState!;
-    _countryCtrl.text = 'India';
-
     setState(() => _isSaving = true);
 
     final String line1 = _addressLine1Ctrl.text.trim();
     final String line2 = _addressLine2Ctrl.text.trim();
     String combinedAddress = line1;
-    if (line2.isNotEmpty) {
+    if (line2.isNotEmpty)
       combinedAddress = combinedAddress.isEmpty
           ? line2
           : '$combinedAddress, $line2';
-    }
 
-    // Build the payload that we save locally AND send to backend
     final Map<String, dynamic> payload = {
       "businessName": _businessNameCtrl.text.trim(),
       "ownerName": _ownerNameCtrl.text.trim(),
@@ -305,97 +277,184 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           ? _phoneCtrl.text.trim()
           : _whatsappCtrl.text.trim(),
       "email": _emailCtrl.text.trim(),
-      // store combined address for WooCommerce
       "address": combinedAddress,
       "addressLine1": line1,
       "addressLine2": line2,
       "city": _cityCtrl.text.trim(),
-      // 🔹 Forced to dropdown value
       "state": _selectedState ?? _stateCtrl.text.trim(),
-      // 🔹 Country always India
       "country": 'India',
       "pincode": _pincodeCtrl.text.trim(),
       "gstin": _gstinCtrl.text.trim(),
     };
 
     try {
-      // 1️⃣ Save locally (for app reuse)
       await _storage.write(key: _storageKey, value: jsonEncode(payload));
-
-      // 2️⃣ Push to WooCommerce "customer" (billing/shipping)
-      await ApiService.updateBusinessDetails(
-        userId: widget.userData?.userId,
-        data: payload,
-      );
-
-      // 3️⃣ Push to WordPress "Business Details (Reseller)" user meta box
-      await ApiService.updateResellerBusinessMeta(
-        userId: widget.userData?.userId,
-        data: payload,
-      );
-
+      if (_currentUser?.userId != null) {
+        await ApiService.updateBusinessDetails(
+          userId: _currentUser!.userId,
+          data: payload,
+        );
+        await ApiService.updateResellerBusinessMeta(
+          userId: _currentUser!.userId,
+          data: payload,
+        );
+      }
       if (!mounted) return;
-
-      setState(() {
-        _hasSavedDetails = true;
-      });
+      setState(() => _hasSavedDetails = true);
 
       if (widget.fromDrawer) {
-        // SETTINGS MODE
         Get.snackbar(
-          'Details updated',
-          'Your business details have been updated.',
-          snackPosition: SnackPosition.BOTTOM,
+          'Success',
+          'Business details updated.',
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
       } else {
-        // (we won’t normally hit this path now, submit is called only from drawer)
         Get.snackbar(
-          'Business details saved',
-          'Your information will be used on invoices & catalogues.',
-          snackPosition: SnackPosition.BOTTOM,
+          'Saved',
+          'Details saved successfully.',
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-        Get.to(() => CustomerAddressPage(userData: widget.userData));
+        Get.to(() => CustomerAddressPage(userData: _currentUser));
       }
     } catch (e) {
-      if (!mounted) return;
-      // Keep same behaviour as before (silent or custom error).
+      // Handle error
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  // 🔹 Checkout flow: read-only, just continue
   void _onContinueFromCheckout() {
-    // Basic check – if details are clearly missing, stop
-    if (_businessNameCtrl.text.trim().isEmpty ||
-        _ownerNameCtrl.text.trim().isEmpty ||
-        _phoneCtrl.text.trim().isEmpty ||
-        _addressLine1Ctrl.text.trim().isEmpty ||
-        _cityCtrl.text.trim().isEmpty ||
-        (_selectedState == null || _selectedState!.trim().isEmpty) ||
-        _pincodeCtrl.text.trim().isEmpty) {
-      Get.snackbar(
-        'Business details incomplete',
-        'Please open Business Details from the drawer to complete and save your information before checkout.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
+    bool isDetailsComplete =
+        _businessNameCtrl.text.trim().isNotEmpty &&
+        _ownerNameCtrl.text.trim().isNotEmpty &&
+        _phoneCtrl.text.trim().isNotEmpty &&
+        _addressLine1Ctrl.text.trim().isNotEmpty &&
+        _cityCtrl.text.trim().isNotEmpty &&
+        (_selectedState != null && _selectedState!.trim().isNotEmpty) &&
+        _pincodeCtrl.text.trim().isNotEmpty;
+
+    if (!isDetailsComplete) {
+      _showMissingDetailsDialog();
       return;
     }
 
-    // If everything looks ok, proceed to customer address step
-    Get.to(() => CustomerAddressPage(userData: widget.userData));
+    // 🔹 Build the Full Address String once
+    final line1 = _addressLine1Ctrl.text.trim();
+    final line2 = _addressLine2Ctrl.text.trim();
+    final city = _cityCtrl.text.trim();
+    final state = (_selectedState ?? _stateCtrl.text).trim();
+    final pin = _pincodeCtrl.text.trim();
+
+    String fullFormattedAddress = [
+      line1,
+      line2,
+      city,
+      state,
+      'India',
+    ].where((s) => s.isNotEmpty).join(', ');
+    if (pin.isNotEmpty) fullFormattedAddress += ' - $pin';
+
+    // 🔹 LOGIC CHECK: Ship to business?
+    if (_shipToBusinessAddress) {
+      // DIRECTLY GO TO FINAL CHECKOUT
+      // We use the Business Name as the Label and the Business Address for BOTH fields
+
+      Get.to(
+        () => FinalCheckoutPage(
+          userData: _currentUser,
+          // Billing Info
+          businessAddressLabel: _businessNameCtrl.text.trim(),
+          businessAddressText: fullFormattedAddress,
+          // Shipping Info (SAME AS BILLING)
+          customerAddressLabel: "${_ownerNameCtrl.text.trim()} (Self)",
+          customerAddressText: fullFormattedAddress,
+          // Flag to update UI
+          isSelfShip: true,
+        ),
+      );
+    } else {
+      // Normal Flow: Select Customer Address
+      Get.to(() => CustomerAddressPage(userData: _currentUser));
+    }
+  }
+
+  void _showMissingDetailsDialog() {
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Iconsax.warning_2,
+                  color: Colors.orange,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Missing Business Details',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'To proceed with your order, you must first add your business details.\n\nPlease navigate to the Profile Page manually to add them.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontFamily: 'Poppins',
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => Get.back(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Got it',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool fromDrawer = widget.fromDrawer;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
@@ -419,14 +478,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         child: Column(
           children: [
             const SizedBox(height: 8),
-
-            // 🔹 STEP 2 header only in checkout flow (NOT from drawer)
-            if (!fromDrawer)
+            if (!widget.fromDrawer)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: CheckoutStepHeader(currentStep: 2),
               ),
-
             if (_isRemoteLoading)
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -453,15 +509,17 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                 ),
               ),
 
-            // Info banner only in checkout mode
-            if (!fromDrawer) _buildInfoBanner(),
+            if (!widget.fromDrawer && _hasSavedDetails) _buildInfoBanner(),
 
-            if (_hasSavedDetails) _buildSavedSummaryCard(),
+            if (_hasSavedDetails) ...[
+              _buildSavedSummaryCard(),
+              if (!widget.fromDrawer) _buildShipToBusinessOption(),
+            ],
 
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                child: fromDrawer
+                child: widget.fromDrawer
                     ? Form(
                         key: _formKey,
                         child: Column(
@@ -475,13 +533,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     label: 'Business / Shop Name',
                                     hint: 'Eg. Aadil Fashion Hub',
                                     icon: Iconsax.shop,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Please enter your business name';
-                                      }
-                                      return null;
-                                    },
+                                    validator: (v) =>
+                                        v!.trim().isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   _buildTextField(
@@ -489,19 +542,13 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     label: 'Your Name',
                                     hint: 'Owner / Proprietor name',
                                     icon: Iconsax.user,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Please enter your name';
-                                      }
-                                      return null;
-                                    },
+                                    validator: (v) =>
+                                        v!.trim().isEmpty ? 'Required' : null,
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 16),
-
                             _buildSectionCard(
                               title: 'Contact Details',
                               child: Column(
@@ -509,23 +556,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                   _buildTextField(
                                     controller: _phoneCtrl,
                                     label: 'Primary Phone Number',
-                                    hint: '10-digit mobile number',
+                                    hint: '10-digit mobile',
                                     icon: Iconsax.call,
                                     keyboardType: TextInputType.phone,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Please enter phone number';
-                                      }
-                                      if (value.trim().length < 10) {
-                                        return 'Enter a valid phone number';
-                                      }
-                                      return null;
-                                    },
+                                    validator: (v) => v!.trim().length < 10
+                                        ? 'Invalid phone'
+                                        : null,
                                     onChanged: (val) {
-                                      if (_isWhatsAppSame) {
+                                      if (_isWhatsAppSame)
                                         _whatsappCtrl.text = val;
-                                      }
                                     },
                                   ),
                                   const SizedBox(height: 12),
@@ -534,15 +573,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                       Checkbox(
                                         value: _isWhatsAppSame,
                                         activeColor: accentColor,
-                                        onChanged: (val) {
-                                          setState(() {
-                                            _isWhatsAppSame = val ?? true;
-                                            if (_isWhatsAppSame) {
-                                              _whatsappCtrl.text =
-                                                  _phoneCtrl.text;
-                                            }
-                                          });
-                                        },
+                                        onChanged: (val) => setState(() {
+                                          _isWhatsAppSame = val ?? true;
+                                          if (_isWhatsAppSame)
+                                            _whatsappCtrl.text =
+                                                _phoneCtrl.text;
+                                        }),
                                       ),
                                       const Expanded(
                                         child: Text(
@@ -563,40 +599,27 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                       hint: 'WhatsApp contact',
                                       icon: Iconsax.sms,
                                       keyboardType: TextInputType.phone,
-                                      validator: (v) {
-                                        if (!_isWhatsAppSame) {
-                                          if (v == null || v.trim().isEmpty) {
-                                            return 'Please enter WhatsApp number';
-                                          }
-                                        }
-                                        return null;
-                                      },
+                                      validator: (v) =>
+                                          !_isWhatsAppSame && v!.trim().isEmpty
+                                          ? 'Required'
+                                          : null,
                                     ),
                                   ],
                                   const SizedBox(height: 12),
                                   _buildTextField(
                                     controller: _emailCtrl,
                                     label: 'Email',
-                                    hint: 'For invoices & communication',
+                                    hint: 'For invoices',
                                     icon: Iconsax.direct_right,
                                     keyboardType: TextInputType.emailAddress,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Please enter your email';
-                                      }
-                                      if (!value.contains('@')) {
-                                        return 'Enter a valid email';
-                                      }
-                                      return null;
-                                    },
+                                    validator: (v) => !v!.contains('@')
+                                        ? 'Invalid email'
+                                        : null,
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 16),
-
-                            // 🔹 Address section (India + state dropdown + 2 lines)
                             _buildSectionCard(
                               title: 'Address',
                               child: Column(
@@ -604,28 +627,19 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                   _buildTextField(
                                     controller: _addressLine1Ctrl,
                                     label: 'Address Line 1',
-                                    hint: 'Building / Flat / House No.',
+                                    hint: 'Building / Flat',
                                     icon: Iconsax.location,
-                                    maxLines: 1,
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Please enter address line 1';
-                                      }
-                                      return null;
-                                    },
+                                    validator: (v) =>
+                                        v!.trim().isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   _buildTextField(
                                     controller: _addressLine2Ctrl,
                                     label: 'Address Line 2 (optional)',
-                                    hint: 'Street, Area, Landmark',
+                                    hint: 'Street, Area',
                                     icon: Iconsax.location,
-                                    maxLines: 1,
                                   ),
                                   const SizedBox(height: 12),
-
-                                  // City + State
                                   Row(
                                     children: [
                                       Expanded(
@@ -634,13 +648,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                           label: 'City',
                                           hint: 'Eg. Rajkot',
                                           icon: Iconsax.location5,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.trim().isEmpty) {
-                                              return 'City required';
-                                            }
-                                            return null;
-                                          },
+                                          validator: (v) => v!.trim().isEmpty
+                                              ? 'Required'
+                                              : null,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -664,15 +674,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                                 ),
                                               )
                                               .toList(),
-                                          onChanged: (val) {
-                                            setState(() {
-                                              _selectedState = val;
-                                              _stateCtrl.text = val ?? '';
-                                            });
-                                          },
+                                          onChanged: (val) => setState(() {
+                                            _selectedState = val;
+                                            _stateCtrl.text = val ?? '';
+                                          }),
                                           decoration: InputDecoration(
                                             labelText: 'State',
-                                            hintText: 'Select state',
                                             prefixIcon: const Icon(
                                               Iconsax.map,
                                               size: 18,
@@ -683,28 +690,21 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                             ),
                                             isDense: true,
                                           ),
-                                          validator: (v) {
-                                            if (v == null || v.trim().isEmpty) {
-                                              return 'State required';
-                                            }
-                                            return null;
-                                          },
+                                          validator: (v) =>
+                                              v == null ? 'Required' : null,
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-
-                                  // Country (fixed India) + Pincode
                                   Row(
                                     children: [
                                       Expanded(
                                         child: TextFormField(
                                           controller: _countryCtrl,
-                                          enabled: false, // cannot change
+                                          enabled: false,
                                           decoration: InputDecoration(
                                             labelText: 'Country',
-                                            hintText: 'India',
                                             prefixIcon: const Icon(
                                               Iconsax.global,
                                               size: 18,
@@ -725,16 +725,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                           hint: 'Eg. 360001',
                                           icon: Iconsax.location_tick,
                                           keyboardType: TextInputType.number,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.trim().isEmpty) {
-                                              return 'Pincode required';
-                                            }
-                                            if (value.trim().length < 6) {
-                                              return 'Invalid';
-                                            }
-                                            return null;
-                                          },
+                                          validator: (v) => v!.trim().length < 6
+                                              ? 'Invalid'
+                                              : null,
                                         ),
                                       ),
                                     ],
@@ -743,7 +736,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                               ),
                             ),
                             const SizedBox(height: 16),
-
                             _buildSectionCard(
                               title: 'GST & Compliance (Optional)',
                               child: Column(
@@ -785,29 +777,70 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   }
 
   Widget _buildReadOnlyBody() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        SizedBox(height: 8),
-        Text(
-          'You cannot edit business details from checkout.',
-          style: TextStyle(
-            fontSize: 12,
-            fontFamily: 'Poppins',
-            color: Colors.black87,
+    if (_hasSavedDetails) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          SizedBox(height: 8),
+          Text(
+            'To update your business details, open the menu/drawer and go to "Business Details".',
+            style: TextStyle(
+              fontSize: 12,
+              fontFamily: 'Poppins',
+              color: Colors.grey,
+            ),
           ),
+        ],
+      );
+    } else {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
         ),
-        SizedBox(height: 4),
-        Text(
-          'To update your business details, open the menu/drawer and go to "Business Details".',
-          style: TextStyle(
-            fontSize: 11,
-            fontFamily: 'Poppins',
-            color: Colors.grey,
-          ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Iconsax.info_circle,
+                size: 32,
+                color: Colors.redAccent,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No Business Details Found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Poppins',
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'To proceed with your order, you must first add your business details.\n\nPlease navigate to the Profile Page manually to add them.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontFamily: 'Poppins',
+                color: Colors.black54,
+                height: 1.5,
+              ),
+            ),
+          ],
         ),
-      ],
-    );
+      );
+    }
   }
 
   Widget _buildInfoBanner() {
@@ -851,32 +884,23 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     );
   }
 
-  // 🔹 Summary when details already saved
   Widget _buildSavedSummaryCard() {
-    // Build a clean one-line address for summary
     final line1 = _addressLine1Ctrl.text.trim();
     final line2 = _addressLine2Ctrl.text.trim();
     final city = _cityCtrl.text.trim();
     final state = (_selectedState ?? _stateCtrl.text).trim();
-    final country = 'India';
     final pin = _pincodeCtrl.text.trim();
-
-    final List<String> parts = [];
-    if (line1.isNotEmpty) parts.add(line1);
-    if (line2.isNotEmpty) parts.add(line2);
-    if (city.isNotEmpty) parts.add(city);
-    if (state.isNotEmpty) parts.add(state);
-    if (country.isNotEmpty) parts.add(country);
-
-    String addressLine = parts.isEmpty
-        ? 'No address added yet'
-        : parts.join(', ');
-    if (pin.isNotEmpty) {
-      addressLine = '$addressLine - $pin';
-    }
+    String addressLine = [
+      line1,
+      line2,
+      city,
+      state,
+      'India',
+    ].where((s) => s.isNotEmpty).join(', ');
+    if (pin.isNotEmpty) addressLine += ' - $pin';
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -990,22 +1014,71 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                     ],
                   ],
                 ),
-                if (_gstinCtrl.text.trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    "GSTIN: ${_gstinCtrl.text.trim()}",
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade700,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShipToBusinessOption() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _shipToBusinessAddress ? accentColor : Colors.transparent,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: CheckboxListTile(
+        value: _shipToBusinessAddress,
+        activeColor: accentColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onChanged: (val) {
+          setState(() {
+            _shipToBusinessAddress = val ?? false;
+          });
+        },
+        title: const Text(
+          "Ship to my business address",
+          style: TextStyle(
+            fontSize: 13,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        subtitle: const Text(
+          "The order will be delivered to you instead of a customer.",
+          style: TextStyle(
+            fontSize: 11,
+            fontFamily: 'Poppins',
+            color: Colors.grey,
+          ),
+        ),
+        secondary: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _shipToBusinessAddress
+                ? accentColor.withValues(alpha: 0.1)
+                : Colors.grey.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Iconsax.box,
+            size: 18,
+            color: _shipToBusinessAddress ? accentColor : Colors.grey,
+          ),
+        ),
       ),
     );
   }
@@ -1039,9 +1112,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                 ),
               ),
               const SizedBox(width: 6),
-              if (title == 'Business Profile' ||
-                  title == 'Contact Details' ||
-                  title == 'Address')
+              if (title != 'GST & Compliance (Optional)')
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
@@ -1099,15 +1170,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   }
 
   Widget _buildBottomButton() {
-    final bool fromDrawer = widget.fromDrawer;
-
-    String buttonText;
-    if (fromDrawer) {
-      buttonText = _hasSavedDetails ? 'Update & Save' : 'Save';
-    } else {
-      buttonText = 'Continue';
-    }
-
     return SafeArea(
       top: false,
       child: Container(
@@ -1119,7 +1181,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           child: ElevatedButton(
             onPressed: _isSaving
                 ? null
-                : (fromDrawer ? _onSubmit : _onContinueFromCheckout),
+                : (widget.fromDrawer ? _onSubmit : _onContinueFromCheckout),
             style: ElevatedButton.styleFrom(
               backgroundColor: accentColor,
               shape: RoundedRectangleBorder(
@@ -1139,7 +1201,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        buttonText,
+                        widget.fromDrawer
+                            ? (_hasSavedDetails ? 'Update & Save' : 'Save')
+                            : 'Continue',
                         style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontWeight: FontWeight.w600,

@@ -9,10 +9,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/payment/payment.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 /// Final Checkout / Review Order Screen
-///
-/// Call this after:
-/// 1. Business details (your business address) are filled
-/// 2. Customer address is selected
 class FinalCheckoutPage extends StatelessWidget {
   final UserData? userData;
 
@@ -28,6 +24,9 @@ class FinalCheckoutPage extends StatelessWidget {
   /// Full formatted customer address text
   final String customerAddressText;
 
+  // 🔹 To detect if shipping to self/business
+  final bool isSelfShip;
+
   // 🔹 Fixed charges
   static const double shippingFee = 100.0;
   static const double platformFee = 15.0;
@@ -40,6 +39,7 @@ class FinalCheckoutPage extends StatelessWidget {
     required this.businessAddressText,
     required this.customerAddressLabel,
     required this.customerAddressText,
+    this.isSelfShip = false,
   });
 
   @override
@@ -114,21 +114,18 @@ class FinalCheckoutPage extends StatelessWidget {
               : basePrice;
 
           double perUnitMargin = perUnit - basePrice;
-          if (perUnitMargin < 0) perUnitMargin = 0; // just in case
+          if (perUnitMargin < 0) perUnitMargin = 0;
 
           marginTotal += perUnitMargin * item.quantity;
         }
 
         // ---- AMOUNT RESELLER PAYS TO KAKISO ----
-        // product cost + all charges
         final double resellerPayAmount = baseSubTotal + totalCharges;
 
-        // ---- AMOUNT KAKISO COLLECTS FROM CUSTOMER (on reseller's behalf) ----
-        // reseller pay amount + margin
+        // ---- AMOUNT KAKISO COLLECTS FROM CUSTOMER ----
         final double customerCollectAmount = resellerPayAmount + marginTotal;
 
         // ---- PROFIT FOR RESELLER ----
-        // profit = marginTotal
         final double profit = marginTotal;
 
         return SingleChildScrollView(
@@ -155,12 +152,12 @@ class FinalCheckoutPage extends StatelessWidget {
 
               // CUSTOMER ADDRESS (SHIPPING)
               _AddressSectionCard(
-                icon: Iconsax.location,
-                title: 'Shipping (Customer)',
+                icon: isSelfShip ? Iconsax.box : Iconsax.location,
+                title: 'Shipping Address',
                 label: customerAddressLabel,
                 address: customerAddressText,
-                badgeText: 'Customer',
-                badgeColor: accentColor,
+                badgeText: isSelfShip ? 'Self / Business' : 'Customer',
+                badgeColor: isSelfShip ? Colors.blue : accentColor,
               ),
 
               const SizedBox(height: 16),
@@ -184,7 +181,7 @@ class FinalCheckoutPage extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // PRICING SUMMARY (reseller pays vs Kakiso collects)
+              // PRICING SUMMARY
               _buildPriceBreakup(
                 baseSubTotal: baseSubTotal,
                 totalCharges: totalCharges,
@@ -281,11 +278,11 @@ class FinalCheckoutPage extends StatelessWidget {
 
   // --- PRICE BREAKUP ---
   Widget _buildPriceBreakup({
-    required double baseSubTotal, // product cost
-    required double totalCharges, // shipping + platform + convenience
-    required double resellerPayAmount, // baseSubTotal + totalCharges
-    required double customerCollectAmount, // resellerPayAmount + margin
-    required double profit, // marginTotal
+    required double baseSubTotal,
+    required double totalCharges,
+    required double resellerPayAmount,
+    required double customerCollectAmount,
+    required double profit,
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -303,7 +300,6 @@ class FinalCheckoutPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // SECTION 1: Amount reseller pays
           const Text(
             'Amount you will pay to Kakiso',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
@@ -320,7 +316,6 @@ class FinalCheckoutPage extends StatelessWidget {
           _priceRow('Total you will pay', resellerPayAmount, isBold: true),
           const Divider(height: 24),
 
-          // SECTION 2: Amount Kakiso collects from customer
           const Text(
             'Amount in Invoice (to collect from customer) (Including GST)',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
@@ -329,7 +324,6 @@ class FinalCheckoutPage extends StatelessWidget {
           _priceRow('Customer will pay', customerCollectAmount, isBold: true),
           const SizedBox(height: 10),
 
-          // SECTION 3: Profit
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -465,8 +459,6 @@ class FinalCheckoutPage extends StatelessWidget {
   }
 
   // --- BOTTOM BAR ---
-  // Reseller pays: product cost + all charges (this is sent to PaymentPage)
-  // Kakiso collects from customer: that amount + margin
   Widget _buildBottomBar() {
     final CartController cartController = Get.find<CartController>();
 
@@ -477,7 +469,6 @@ class FinalCheckoutPage extends StatelessWidget {
       final double baseSubTotal = cartController.totalPrice;
       final double totalCharges = shippingFee + platformFee + convenienceFee;
 
-      // Margin total
       double marginTotal = 0;
       for (final item in items) {
         final double basePrice = double.tryParse(item.product.price) ?? 0;
@@ -485,10 +476,8 @@ class FinalCheckoutPage extends StatelessWidget {
         final double perUnit = (selling != null && selling > 0)
             ? selling
             : basePrice;
-
         double perUnitMargin = perUnit - basePrice;
         if (perUnitMargin < 0) perUnitMargin = 0;
-
         marginTotal += perUnitMargin * item.quantity;
       }
 
@@ -536,13 +525,14 @@ class FinalCheckoutPage extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                // 👉 PaymentPage charges what the reseller pays: product cost + charges
+                // 🔹 UPDATE: Pass isSelfShip to PaymentPage so it knows which address logic to use
                 Get.to(
                   () => PaymentPage(
                     payableAmount: resellerPayAmount,
                     userData: userData,
                     businessAddressLabel: businessAddressLabel,
                     customerAddressLabel: customerAddressLabel,
+                    isSelfShip: isSelfShip, // 👈 KEY FIX HERE
                   ),
                 );
               },
@@ -579,7 +569,6 @@ class FinalCheckoutPage extends StatelessWidget {
   }
 }
 
-/// --- SMALL REUSABLE ADDRESS CARD ---
 class _AddressSectionCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -691,7 +680,6 @@ class _AddressSectionCard extends StatelessWidget {
   }
 }
 
-/// --- ORDER ITEM TILE (per product in order summary) ---
 class _OrderItemTile extends StatelessWidget {
   final CartItem item;
 
