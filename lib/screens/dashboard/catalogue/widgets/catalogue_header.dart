@@ -29,7 +29,7 @@ class CatalogueHeader extends StatelessWidget {
             ),
           ),
           Text(
-            "$totalCatalogues cat • $totalProducts items",
+            "$totalCatalogues catalog • $totalProducts items",
             style: TextStyle(
               fontFamily: 'Poppins',
               fontSize: 11,

@@ -17,7 +17,7 @@ class CollageService {
     required CollageLayout layout,
     required String shopName,
     required String contactNumber,
-    double extraMargin = 0.0, // 💰 NEW: Margin Parameter
+    double extraMargin = 0.0,
     bool showPrices = true,
     bool showBranding = true,
     Color themeColor = Colors.black,
@@ -35,7 +35,7 @@ class CollageService {
         break;
       case CollageLayout.minimal:
         itemsPerPage = 6;
-        break;
+        break; // Elegant 2x3 Grid
       case CollageLayout.catalog:
         itemsPerPage = 20;
         break;
@@ -79,7 +79,7 @@ class CollageService {
           layout: layout,
           shopName: shopName,
           contactNumber: contactNumber,
-          extraMargin: extraMargin, // Pass margin
+          extraMargin: extraMargin,
           showPrices: showPrices,
           showBranding: showBranding,
           themeColor: themeColor,
@@ -192,6 +192,7 @@ class CollageService {
           contentY,
           contentH,
           showPrices,
+          themeColor,
           extraMargin,
         );
         break;
@@ -263,14 +264,75 @@ class CollageService {
     return file;
   }
 
-  // ─── HELPER: CALCULATE PRICE WITH MARGIN ───────────────────────────────────
+  // ─── HELPER: CALCULATE PRICE ───────────────────────────────────────────────
   static String _getPrice(ProductModel p, double margin) {
     double base = double.tryParse(p.price) ?? 0;
     double finalPrice = base + margin;
     return finalPrice.toStringAsFixed(0);
   }
 
-  // ─── LAYOUTS (UPDATED WITH PRICE CALC) ─────────────────────────────────────
+  // ─── LAYOUTS ───────────────────────────────────────────────────────────────
+
+  // 1. MINIMAL (The "World's Best" Clean Layout)
+  static void _drawMinimal(
+    ui.Canvas canvas,
+    List<ui.Image> images,
+    List<ProductModel> items,
+    double w,
+    double startY,
+    double h,
+    bool showPrices,
+    Color theme,
+    double margin,
+  ) {
+    // 2x3 Grid with generous whitespace
+    int cols = 2;
+    int rows = 3;
+    double padding = 60; // Huge padding for "Clean" look
+    double cellW = (w - (padding * (cols + 1))) / cols;
+    double cellH = (h - (padding * (rows + 1))) / rows;
+
+    // Maintain aspect ratio for cell content
+    double imgH = cellH * 0.85; // Image takes 85% height
+
+    for (int i = 0; i < images.length; i++) {
+      int r = i ~/ cols;
+      int c = i % cols;
+
+      double dx = padding + (c * (cellW + padding));
+      double dy = startY + padding + (r * (cellH + padding));
+
+      ui.Rect rect = ui.Rect.fromLTWH(dx, dy, cellW, imgH);
+
+      // Clean Shadow
+      canvas.drawRRect(
+        ui.RRect.fromRectAndRadius(
+          rect.shift(const Offset(0, 10)),
+          const ui.Radius.circular(0),
+        ),
+        ui.Paint()
+          ..color = Colors.black.withOpacity(0.1)
+          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 15),
+      );
+
+      // Image
+      _drawImageCover(canvas, images[i], rect);
+
+      // Minimal Text (No tag, just elegant text below)
+      if (showPrices) {
+        _drawText(
+          canvas: canvas,
+          text: "₹${_getPrice(items[i], margin)}",
+          x: rect.center.dx,
+          y: rect.bottom + 15,
+          color: theme,
+          fontSize: 32,
+          fontWeight: FontWeight.w900,
+          align: TextAlign.center,
+        );
+      }
+    }
+  }
 
   static void _drawCatalog(
     ui.Canvas canvas,
@@ -481,50 +543,7 @@ class CollageService {
     }
   }
 
-  static void _drawMinimal(
-    ui.Canvas canvas,
-    List<ui.Image> images,
-    List<ProductModel> items,
-    double w,
-    double startY,
-    double h,
-    bool showPrices,
-    double margin,
-  ) {
-    double padding = 40;
-    int cols = 2;
-    double cellW = (w - (padding * 3)) / cols;
-    double cellH = cellW * 1.2;
-
-    for (int i = 0; i < images.length; i++) {
-      int r = i ~/ cols;
-      int c = i % cols;
-      double dx = padding + (c * (cellW + padding));
-      double dy = startY + padding + (r * (cellH + padding));
-      ui.Rect rect = ui.Rect.fromLTWH(dx, dy, cellW, cellH);
-
-      canvas.drawRRect(
-        ui.RRect.fromRectAndRadius(
-          rect.shift(const Offset(0, 8)),
-          const ui.Radius.circular(4),
-        ),
-        ui.Paint()
-          ..color = Colors.black12
-          ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 8),
-      );
-      _drawImageCover(canvas, images[i], rect);
-      if (showPrices)
-        _drawPriceTag(
-          canvas,
-          _getPrice(items[i], margin),
-          rect.right - 10,
-          rect.bottom - 10,
-          Colors.black,
-        );
-    }
-  }
-
-  // ─── UTILS (Drawing Helpers) ───────────────────────────────────────────────
+  // ─── HELPERS ───────────────────────────────────────────────────────────────
 
   static void _drawImageCover(
     ui.Canvas canvas,
