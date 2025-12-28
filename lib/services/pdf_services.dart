@@ -3,7 +3,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:intl/intl.dart';
 
 class PdfService {
   // --- 🎨 PLATINUM PALETTE ---
@@ -14,6 +13,7 @@ class PdfService {
   static const PdfColor darkCharcoal = PdfColor.fromInt(0xFF111827);
 
   /// Generates the "Vogue Edition" PDF Catalog
+  /// [products] should contain the final list of items to print (user selected or all)
   static Future<void> createAndShareCatalog({
     required String categoryName,
     required List<ProductModel> products,
@@ -22,12 +22,13 @@ class PdfService {
   }) async {
     final pdf = pw.Document();
 
-    // 1. 🛡️ TOP 30 LIMIT (Guaranteed Images)
-    final List<ProductModel> limitedProducts = products.take(30).toList();
+    // 1. 🛡️ USE PASSED PRODUCTS (No internal limit)
+    // The UI handles selection limits. We print what is given.
+    final List<ProductModel> finalProducts = products;
 
     // 2. ⚡ HYBRID IMAGE FETCHER
     final List<pw.ImageProvider?> productImages =
-        await _fetchImagesWithAssurance(limitedProducts);
+        await _fetchImagesWithAssurance(finalProducts);
 
     // 3. 🌟 WORLD-CLASS COVER PAGE
     pdf.addPage(
@@ -159,7 +160,7 @@ class PdfService {
                       borderRadius: pw.BorderRadius.circular(20),
                     ),
                     child: pw.Text(
-                      "LIMITED EDITION // 30 ITEMS",
+                      "LIMITED EDITION // ${finalProducts.length} ITEMS",
                       style: pw.TextStyle(
                         color: luxuryGold,
                         fontSize: 8,
@@ -234,8 +235,8 @@ class PdfService {
               childAspectRatio: 0.65, // Tall fashion cards
               crossAxisSpacing: 20,
               mainAxisSpacing: 25,
-              children: List.generate(limitedProducts.length, (index) {
-                final product = limitedProducts[index];
+              children: List.generate(finalProducts.length, (index) {
+                final product = finalProducts[index];
                 final image = productImages[index];
 
                 // Price Logic

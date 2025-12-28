@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
@@ -385,6 +386,42 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       return;
     }
 
+    // ⚡ CHECK IF PRODUCT COUNT > 30 ⚡
+    if (cat.products.length > 30) {
+      _showProductSelectionSheet(cat);
+      return;
+    }
+
+    // Normal flow for <= 30 items
+    _showMarginInputAndGenerate(cat, cat.products.toList());
+  }
+
+  // 🔹 New: Dialog to let user pick products if > 30
+  void _showProductSelectionSheet(CatalogueModel cat) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ProductSelectionSheet(
+        catalogue: cat,
+        onConfirm: (selectedProducts) {
+          Navigator.pop(ctx);
+          // Proceed to margin input with the filtered list
+          if (selectedProducts.isEmpty) {
+            Get.snackbar("Error", "No products selected!");
+            return;
+          }
+          _showMarginInputAndGenerate(cat, selectedProducts);
+        },
+      ),
+    );
+  }
+
+  // 🔹 Extracted: The final Margin Input -> Generate logic
+  void _showMarginInputAndGenerate(
+    CatalogueModel cat,
+    List<ProductModel> productsToPrint,
+  ) {
     final TextEditingController nameCtrl = TextEditingController(
       text: widget.userData.name.isNotEmpty ? widget.userData.name : cat.name,
     );
@@ -400,9 +437,9 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              "We’ll create a sharable PDF with your reseller margin in % added to each product price. There will be PDF created for first 30 products in the Catalog , Arrage the Catalog Arrocdingly.",
-              style: TextStyle(
+            Text(
+              "Generating PDF for ${productsToPrint.length} items.\nAdd your margin (%) to display prices.",
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
                 color: Colors.grey,
@@ -451,7 +488,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               final double marginPercent =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
               Get.back();
-              _generateCataloguePdf(cat, name, marginPercent);
+              _generateCataloguePdf(cat, name, marginPercent, productsToPrint);
             },
             child: const Text(
               "Generate",
@@ -467,6 +504,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     CatalogueModel cat,
     String businessName,
     double extraMargin,
+    List<ProductModel> products,
   ) async {
     if (_isGeneratingPdf) return;
     setState(() => _isGeneratingPdf = true);
@@ -476,7 +514,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         try {
           await PdfService.createAndShareCatalog(
             categoryName: cat.name,
-            products: cat.products.toList(),
+            products: products, // Use the passed list (filtered or all)
             businessName: businessName,
             extraMargin: extraMargin,
           );
@@ -1197,6 +1235,314 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 },
               );
             }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── ✨ UPDATED: PRODUCT SELECTION SHEET (Strict 30 Limit) ───────────────────
+
+class _ProductSelectionSheet extends StatefulWidget {
+  final CatalogueModel catalogue;
+  final Function(List<ProductModel>) onConfirm;
+
+  const _ProductSelectionSheet({
+    required this.catalogue,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_ProductSelectionSheet> createState() => _ProductSelectionSheetState();
+}
+
+class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
+  // Store IDs of selected products
+  final Set<String> _selectedIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Default: select first 30 (or all if less)
+    for (var i = 0; i < widget.catalogue.products.length; i++) {
+      if (i < 30) {
+        _selectedIds.add(widget.catalogue.products[i].id.toString());
+      }
+    }
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        // 🔒 STRICT LIMIT CHECK
+        if (_selectedIds.length >= 30) {
+          Get.snackbar(
+            "Limit Reached",
+            "PDF limit is 30 products. Unselect an item to add this one.",
+            backgroundColor: Colors.orange.shade50,
+            colorText: Colors.orange.shade900,
+            duration: const Duration(seconds: 3),
+            snackPosition: SnackPosition.BOTTOM,
+            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+          );
+          return;
+        }
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _selectAllSmart() {
+    setState(() {
+      _selectedIds.clear();
+      final products = widget.catalogue.products;
+      // If total > 30, only select the first 30
+      final int limit = products.length > 30 ? 30 : products.length;
+
+      for (var i = 0; i < limit; i++) {
+        _selectedIds.add(products[i].id.toString());
+      }
+    });
+
+    if (widget.catalogue.products.length > 30) {
+      Get.snackbar(
+        "Selection Limited",
+        "Selected the first 30 products automatically.",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  void _deselectAll() {
+    setState(() {
+      _selectedIds.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final products = widget.catalogue.products;
+    final isFullSelection = _selectedIds.isNotEmpty;
+    final isLargeCatalog = products.length > 30;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title & Count
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Select Products for PDF",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          "${_selectedIds.length} / 30 selected",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _selectedIds.length == 30
+                                ? Colors.red
+                                : accentColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (_selectedIds.length == 30)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 6.0),
+                            child: Text(
+                              "(Max limit)",
+                              style: TextStyle(fontSize: 10, color: Colors.red),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: isFullSelection ? _deselectAll : _selectAllSmart,
+                  child: Text(
+                    isFullSelection
+                        ? "Clear"
+                        : (isLargeCatalog ? "Select Top 30" : "Select All"),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(),
+
+          // List
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (ctx, i) {
+                final p = products[i];
+                final isSelected = _selectedIds.contains(p.id.toString());
+                // Visual feedback: If user hit limit & item not selected -> dim it slightly
+                final isLimitReached = _selectedIds.length >= 30;
+                final bool isDisabled = isLimitReached && !isSelected;
+
+                return InkWell(
+                  onTap: () => _toggle(p.id.toString()),
+                  child: Opacity(
+                    opacity: isDisabled ? 0.5 : 1.0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: isSelected
+                              ? accentColor
+                              : Colors.grey.shade200,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        color: isSelected
+                            ? accentColor.withValues(alpha: 0.04)
+                            : Colors.white,
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Row(
+                        children: [
+                          // Image
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              image: p.image.isNotEmpty
+                                  ? DecorationImage(
+                                      image: NetworkImage(p.image),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                            child: p.image.isEmpty
+                                ? const Icon(Iconsax.image, size: 20)
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          // Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  "₹${p.price}",
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Checkbox
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: isSelected ? accentColor : Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected
+                                    ? accentColor
+                                    : Colors.grey.shade400,
+                              ),
+                            ),
+                            child: isSelected
+                                ? const Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: Colors.white,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Bottom Button
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: _selectedIds.isEmpty
+                    ? null
+                    : () {
+                        final selectedProducts = products
+                            .where(
+                              (p) => _selectedIds.contains(p.id.toString()),
+                            )
+                            .toList();
+                        widget.onConfirm(selectedProducts);
+                      },
+                child: Text(
+                  "Continue (${_selectedIds.length})",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
