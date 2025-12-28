@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
@@ -62,23 +61,6 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
       ),
 
       // ACTIONS (WISHLIST)
-      actions: [
-        Obx(() {
-          final bool isLiked = wishlistController.isInWishlist(
-            widget.product.id,
-          );
-
-          return _buildGlassButton(
-            icon: isLiked ? Iconsax.heart5 : Iconsax.heart,
-            iconColor: isLiked ? Colors.red : Colors.black,
-            onTap: () {
-              wishlistController.toggleWishlist(widget.product);
-            },
-          );
-        }),
-        const SizedBox(width: 12),
-      ],
-
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
