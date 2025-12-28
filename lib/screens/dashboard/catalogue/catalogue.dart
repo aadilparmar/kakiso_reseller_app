@@ -401,7 +401,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "We’ll create a sharable PDF with your reseller margin in % added to each product price.",
+              "We’ll create a sharable PDF with your reseller margin in % added to each product price. There will be PDF created for first 30 products in the Catalog , Arrage the Catalog Arrocdingly.",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
