@@ -1,34 +1,35 @@
 // lib/screens/dashboard/catalogue/catalouge_section.dart
 
 import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ Clipboard
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:http/http.dart' as http; // ✅ for downloading images
-import 'package:path_provider/path_provider.dart'; // ✅ for temp dir
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
-import 'package:kakiso_reseller_app/controllers/cart_controller.dart'; // ✅ CART CONTROLLER
+import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart';
 import 'package:kakiso_reseller_app/services/pdf_services.dart';
-import 'package:kakiso_reseller_app/services/collage_service.dart'; // ✅ collage
+import 'package:kakiso_reseller_app/services/collage_service.dart';
 
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue_sort.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_header.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_sort_bar.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_empty_state.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_empty_state.dart';
+
+const Color accentColor = Color(0xFF2563EB); // Royal Blue
 
 class CatalogueSection extends StatefulWidget {
   final UserData userData;
@@ -47,7 +48,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     permanent: true,
   );
 
-  // ✅ Cart controller for badge logic
   final CartController cartController = Get.put(CartController());
 
   String _searchQuery = '';
@@ -56,6 +56,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isGeneratingPdf = false;
+
   // --- LOGOUT DIALOG ---
   Future<void> _showLogoutConfirmation() async {
     Get.dialog(
@@ -184,7 +185,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   // --- SORTING + FILTER HELPERS ---
   List<CatalogueModel> _buildFilteredSortedList() {
     final List<CatalogueModel> base = catalogueController.myCatalogues.toList();
-
     final query = _searchQuery.trim().toLowerCase();
     List<CatalogueModel> filtered = base;
     if (query.isNotEmpty) {
@@ -207,7 +207,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           return b.products.length.compareTo(a.products.length);
       }
     });
-
     return filtered;
   }
 
@@ -285,10 +284,8 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               final name = nameCtrl.text.trim().isEmpty
                   ? "Reseller"
                   : nameCtrl.text.trim();
-
               final double marginPercent =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
-
               Get.back();
               _generateCataloguePdf(cat, name, marginPercent);
             },
@@ -308,7 +305,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     double extraMargin,
   ) async {
     if (_isGeneratingPdf) return;
-
     setState(() => _isGeneratingPdf = true);
 
     Get.showOverlay(
@@ -320,7 +316,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             businessName: businessName,
             extraMargin: extraMargin,
           );
-
           Get.snackbar(
             "Success",
             "Catalog PDF generated.",
@@ -337,9 +332,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             colorText: Colors.white,
           );
         } finally {
-          if (mounted) {
-            setState(() => _isGeneratingPdf = false);
-          }
+          if (mounted) setState(() => _isGeneratingPdf = false);
         }
       },
       loadingWidget: Center(
@@ -349,55 +342,16 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                color: Color.fromARGB(255, 185, 28, 224),
-                strokeWidth: 2,
-              ),
-              SizedBox(height: 12),
-            ],
+          child: const CircularProgressIndicator(
+            color: Color.fromARGB(255, 185, 28, 224),
+            strokeWidth: 2,
           ),
         ),
       ),
     );
   }
 
-  // --- HELPER: Download product images to XFile list ---
-  Future<List<XFile>> _downloadProductImages(
-    CatalogueModel cat, {
-    int maxImages = 10,
-  }) async {
-    final List<XFile> files = [];
-    final productsWithImage = cat.products
-        .where((p) => p.image.isNotEmpty)
-        .take(maxImages)
-        .toList();
-
-    if (productsWithImage.isEmpty) return files;
-
-    final tempDir = await getTemporaryDirectory();
-
-    for (int i = 0; i < productsWithImage.length; i++) {
-      final p = productsWithImage[i];
-      try {
-        final uri = Uri.parse(p.image);
-        final resp = await http.get(uri);
-        if (resp.statusCode == 200) {
-          final file = File('${tempDir.path}/cat_${cat.id}_img_$i.jpg');
-          await file.writeAsBytes(resp.bodyBytes, flush: true);
-          files.add(XFile(file.path));
-        }
-      } catch (_) {
-        // skip failed image
-      }
-    }
-
-    return files;
-  }
-
-  // --- WHATSAPP: ASK MARGIN % THEN SHARE ---
+  // --- WHATSAPP LOGIC ---
   void _openWhatsappMarginDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
@@ -407,9 +361,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       );
       return;
     }
-
     final TextEditingController marginCtrl = TextEditingController();
-
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -466,70 +418,44 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  // --- WHATSAPP CATALOGUE: copy text + share images ---
   Future<void> _shareCatalogueOnWhatsApp(
     CatalogueModel cat,
     double marginPercent,
   ) async {
-    if (cat.products.isEmpty) {
-      Get.snackbar(
-        "Empty catalog",
-        "Add products before sharing.",
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
+    if (cat.products.isEmpty) return;
     final buffer = StringBuffer();
-
     buffer.writeln("📦 *${cat.name}*");
-    if (cat.description.isNotEmpty) {
-      buffer.writeln(cat.description);
-    }
-    buffer.writeln("Total items: ${cat.products.length}");
-    buffer.writeln("");
-    buffer.writeln("🛍 *Catalog Items*:");
-    buffer.writeln("");
+    if (cat.description.isNotEmpty) buffer.writeln(cat.description);
+    buffer.writeln("Total items: ${cat.products.length}\n");
+    buffer.writeln("🛍 *Catalog Items*:\n");
 
     for (int i = 0; i < cat.products.length; i++) {
       final p = cat.products[i];
-
       final double basePrice = double.tryParse(p.price) ?? 0;
       final double finalPrice = basePrice * (1 + marginPercent / 100);
-
       buffer.writeln("${i + 1}. *${p.name}*");
       buffer.writeln("   Price: ₹${finalPrice.toStringAsFixed(0)}");
-
-      if (p.shortDescription.isNotEmpty) {
+      if (p.shortDescription.isNotEmpty)
         buffer.writeln("   ${p.shortDescription}");
-      }
-
       buffer.writeln("");
     }
-
     buffer.writeln("– ${cat.name}");
-
-    final text = buffer.toString();
-
-    await Clipboard.setData(ClipboardData(text: text));
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
 
     Get.showOverlay(
       asyncFunction: () async {
         try {
           final xFiles = await _downloadProductImages(cat);
-
           if (xFiles.isEmpty) {
             Get.snackbar(
               "Copied text",
               "Catalog text copied. No images found to share.",
               snackPosition: SnackPosition.BOTTOM,
             );
-            await Share.share(text);
+            await Share.share(buffer.toString());
             return;
           }
-
           await Share.shareXFiles(xFiles, text: "");
-
           Get.snackbar(
             "Ready on WhatsApp",
             "Images shared. Text is copied — just paste it in WhatsApp.",
@@ -547,82 +473,63 @@ class _CatalogueSectionState extends State<CatalogueSection> {
           );
         }
       },
-      loadingWidget: Center(
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                color: Color.fromARGB(255, 185, 28, 224),
-                strokeWidth: 2,
-              ),
-              SizedBox(height: 12),
-            ],
-          ),
-        ),
+      loadingWidget: const Center(
+        child: CircularProgressIndicator(color: accentColor),
       ),
     );
   }
 
-  // --- 📸 SHARE COLLAGE (IMAGES ONLY) ---
-  Future<void> _shareCatalogueCollage(CatalogueModel cat) async {
+  Future<List<XFile>> _downloadProductImages(
+    CatalogueModel cat, {
+    int maxImages = 10,
+  }) async {
+    final List<XFile> files = [];
+    final productsWithImage = cat.products
+        .where((p) => p.image.isNotEmpty)
+        .take(maxImages)
+        .toList();
+    if (productsWithImage.isEmpty) return files;
+    final tempDir = await getTemporaryDirectory();
+    for (int i = 0; i < productsWithImage.length; i++) {
+      final p = productsWithImage[i];
+      try {
+        final uri = Uri.parse(p.image);
+        final resp = await http.get(uri);
+        if (resp.statusCode == 200) {
+          final file = File('${tempDir.path}/cat_${cat.id}_img_$i.jpg');
+          await file.writeAsBytes(resp.bodyBytes, flush: true);
+          files.add(XFile(file.path));
+        }
+      } catch (_) {}
+    }
+    return files;
+  }
+
+  // --- 📸 COLLAGE STUDIO ENTRY ---
+  void _openCollageStudio(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalog",
-        "Add products before sharing collage.",
-        snackPosition: SnackPosition.BOTTOM,
+        "Empty Catalog",
+        "Add products first!",
+        backgroundColor: Colors.red.shade50,
       );
       return;
     }
 
-    Get.showOverlay(
-      asyncFunction: () async {
-        try {
-          final file = await CollageService.createCatalogueCollage(
-            products: cat.products.toList(),
-          );
-
-          await Share.shareXFiles([
-            XFile(file.path),
-          ], text: "${cat.name} – Product Collage");
-        } catch (e) {
-          Get.snackbar(
-            "Collage Error",
-            "Failed to create collage: $e",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-        }
-      },
-      loadingWidget: Center(
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                color: Color.fromARGB(255, 185, 28, 224),
-                strokeWidth: 2,
-              ),
-              SizedBox(height: 12),
-            ],
-          ),
-        ),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CollageStudioSheet(
+        catalogue: cat,
+        shopName: widget.userData.name.isNotEmpty
+            ? widget.userData.name
+            : "My Shop",
+        phone: widget.userData.phone,
       ),
     );
   }
 
-  // --- Small helper button widget for actions ---
   Widget _buildCatalogueActionButton({
     required IconData icon,
     required String label,
@@ -633,14 +540,13 @@ class _CatalogueSectionState extends State<CatalogueSection> {
   }) {
     final Color effectiveColor = color ?? accentColor;
     final Color effectiveBg = bgColor ?? Colors.white;
-
     return SizedBox(
       height: 34,
       child: outlined
           ? OutlinedButton.icon(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: effectiveColor.withValues(alpha: 0.5)),
+                side: BorderSide(color: effectiveColor.withOpacity(0.5)),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
@@ -680,7 +586,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  // --- BUILD ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -701,7 +606,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         titleSpacing: 0,
         title: Row(
           children: [
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Iconsax.menu_1),
@@ -720,8 +625,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               ),
             ),
             const Spacer(),
-
-            // --- CART ICON WITH BADGE ---
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -764,17 +667,12 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 ),
               ],
             ),
-
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Iconsax.heart),
               color: accentColor,
               iconSize: 30,
-              onPressed: () {
-                // Navigate to ProfilePage using currently stored user data
-                // We use _userData which is initialized in initState from widget.userData
-                Get.to(() => WishlistScreen());
-              },
+              onPressed: () => Get.to(() => WishlistScreen()),
             ),
             const SizedBox(width: 8),
           ],
@@ -788,57 +686,39 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       ),
       body: Column(
         children: [
-          // Header with totals
-          Obx(() {
-            final totalCats = catalogueController.myCatalogues.length;
-            final totalProducts = catalogueController.myCatalogues.fold<int>(
-              0,
-              (sum, cat) => sum + cat.products.length,
-            );
-            return CatalogueHeader(
-              totalCatalogues: totalCats,
-              totalProducts: totalProducts,
-            );
-          }),
-
-          // Search & sort
+          Obx(
+            () => CatalogueHeader(
+              totalCatalogues: catalogueController.myCatalogues.length,
+              totalProducts: catalogueController.myCatalogues.fold(
+                0,
+                (sum, cat) => sum + cat.products.length,
+              ),
+            ),
+          ),
           CatalogueSearchAndSortBar(
             searchController: _searchController,
             searchQuery: _searchQuery,
-            onSearchChanged: (value) {
-              setState(() => _searchQuery = value);
-            },
+            onSearchChanged: (value) => setState(() => _searchQuery = value),
             currentSort: _currentSort,
-            onSortChanged: (value) {
-              setState(() => _currentSort = value);
-            },
+            onSortChanged: (value) => setState(() => _currentSort = value),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
           Expanded(
             child: Obx(() {
               final items = _buildFilteredSortedList();
-
-              if (catalogueController.myCatalogues.isEmpty) {
+              if (catalogueController.myCatalogues.isEmpty)
                 return CatalogueEmptyState(
                   onCreatePressed: _openCreateCatalogueDialog,
                 );
-              }
-
-              if (items.isEmpty) {
-                return const CatalogueSearchEmptyState();
-              }
-
+              if (items.isEmpty) return const CatalogueSearchEmptyState();
               return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final cat = items[index];
-
                   return GestureDetector(
-                    onTap: () {
-                      Get.to(() => CatalogueDetailsPage(catalogueId: cat.id));
-                    },
+                    onTap: () =>
+                        Get.to(() => CatalogueDetailsPage(catalogueId: cat.id)),
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
@@ -846,7 +726,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
+                            color: Colors.black.withOpacity(0.04),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -856,15 +736,12 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Top gradient strip + title
                           Container(
                             decoration: const BoxDecoration(
                               borderRadius: BorderRadius.vertical(
                                 top: Radius.circular(18),
                               ),
                               gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
                                 colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
                               ),
                             ),
@@ -877,7 +754,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.12),
+                                    color: Colors.white.withOpacity(0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -908,8 +785,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                               ],
                             ),
                           ),
-
-                          // Middle info section
                           Padding(
                             padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
                             child: Column(
@@ -943,7 +818,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                         ),
                                       ),
                                       child: Row(
-                                        mainAxisSize: MainAxisSize.min,
                                         children: [
                                           const Icon(
                                             Iconsax.bag_2,
@@ -976,7 +850,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                         ),
                                       ),
                                       child: Row(
-                                        mainAxisSize: MainAxisSize.min,
                                         children: const [
                                           Icon(
                                             Iconsax.star1,
@@ -1001,14 +874,11 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                               ],
                             ),
                           ),
-
                           const Divider(
                             height: 14,
                             thickness: 0.7,
                             color: Color(0xFFE5E7EB),
                           ),
-
-                          // Actions row (visible)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                             child: Wrap(
@@ -1022,10 +892,11 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                   bgColor: const Color(0xFFEFF6FF),
                                   color: const Color(0xFF1D4ED8),
                                 ),
+                                // 🌟 NEW: COLLAGE STUDIO ACTION
                                 _buildCatalogueActionButton(
-                                  icon: Iconsax.category_2,
-                                  label: "Collage",
-                                  onTap: () => _shareCatalogueCollage(cat),
+                                  icon: Iconsax.magicpen,
+                                  label: "Collage Studio",
+                                  onTap: () => _openCollageStudio(cat),
                                   bgColor: const Color(0xFFFFFBEB),
                                   color: const Color(0xFFF59E0B),
                                 ),
@@ -1039,45 +910,8 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                 _buildCatalogueActionButton(
                                   icon: Iconsax.trash,
                                   label: "Delete",
-                                  onTap: () {
-                                    Get.dialog(
-                                      AlertDialog(
-                                        title: const Text(
-                                          "Delete Catalog",
-                                          style: TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        content: Text(
-                                          "Delete \"${cat.name}\"?",
-                                          style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Get.back(),
-                                            child: const Text("Cancel"),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              catalogueController
-                                                  .deleteCatalogue(cat.id);
-                                              Get.back();
-                                            },
-                                            child: const Text(
-                                              "Delete",
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                                  onTap: () => catalogueController
+                                      .deleteCatalogue(cat.id),
                                   outlined: true,
                                   color: Colors.red,
                                 ),
@@ -1093,6 +927,415 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             }),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── COLLAGE STUDIO SHEET (UPDATED WITH IMAGE PICKER) ────────────────────────
+
+class _CollageStudioSheet extends StatefulWidget {
+  final CatalogueModel catalogue;
+  final String shopName;
+  final String phone;
+
+  const _CollageStudioSheet({
+    required this.catalogue,
+    required this.shopName,
+    required this.phone,
+  });
+
+  @override
+  State<_CollageStudioSheet> createState() => _CollageStudioSheetState();
+}
+
+class _CollageStudioSheetState extends State<_CollageStudioSheet> {
+  CollageLayout _selectedLayout = CollageLayout.grid;
+  Color _themeColor = Colors.black;
+  Color _bgColor = Colors.white;
+  File? _customBgImage; // 📸 Custom Background
+  bool _showPrices = true;
+  bool _showBranding = true;
+  bool _isGenerating = false;
+
+  // 💰 NEW MARGIN INPUT
+  final TextEditingController _marginController = TextEditingController();
+
+  final ImagePicker _picker = ImagePicker();
+
+  final List<Color> _colors = [
+    Colors.white,
+    Colors.black,
+    const Color(0xFFFFF8E1), // Cream
+    const Color(0xFFE3F2FD), // Light Blue
+    const Color(0xFFF3E5F5), // Light Purple
+  ];
+
+  Future<void> _pickBgImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: source);
+      if (image != null) {
+        setState(() {
+          _customBgImage = File(image.path);
+          _bgColor = Colors.transparent; // Should ignore color if image present
+        });
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Could not load image: $e",
+        backgroundColor: Colors.red.shade50,
+      );
+    }
+  }
+
+  Future<void> _createAndShare() async {
+    setState(() => _isGenerating = true);
+    double margin =
+        double.tryParse(_marginController.text) ?? 0.0; // Get user margin
+
+    try {
+      final List<File> files = await CollageService.generateCollages(
+        products: widget.catalogue.products.toList(),
+        layout: _selectedLayout,
+        shopName: _showBranding ? widget.shopName : "",
+        contactNumber: _showBranding ? widget.phone : "",
+        showPrices: _showPrices,
+        showBranding: _showBranding,
+        themeColor: _themeColor,
+        backgroundColor: _bgColor,
+        backgroundImage: _customBgImage, // 📸 Pass Image
+        extraMargin: margin, // 💰 Pass Margin
+      );
+
+      List<XFile> xFiles = files.map((f) => XFile(f.path)).toList();
+      await Share.shareXFiles(
+        xFiles,
+        text: "Check out our latest collection! ✨",
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Failed: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Center(
+            child: Text(
+              "Collage Studio Pro 📸",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Layouts
+          const Text(
+            "CHOOSE LAYOUT",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _layoutOption("Grid", Iconsax.grid_3, CollageLayout.grid),
+                const SizedBox(width: 8),
+                _layoutOption("Story", Iconsax.mobile, CollageLayout.story),
+                const SizedBox(width: 8),
+                _layoutOption("Mag", Iconsax.book_1, CollageLayout.magazine),
+                const SizedBox(width: 8),
+                _layoutOption(
+                  "Clean",
+                  Iconsax.maximize_3,
+                  CollageLayout.minimal,
+                ),
+                const SizedBox(width: 8),
+                _layoutOption("Catalog", Iconsax.book, CollageLayout.catalog),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 📸 BACKGROUND SECTION (UPDATED)
+          const Text(
+            "BACKGROUND",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Gallery Button
+              _bgOptionBtn(
+                Iconsax.gallery,
+                "Gallery",
+                () => _pickBgImage(ImageSource.gallery),
+              ),
+              const SizedBox(width: 10),
+              // Camera Button
+              _bgOptionBtn(
+                Iconsax.camera,
+                "Camera",
+                () => _pickBgImage(ImageSource.camera),
+              ),
+              const SizedBox(width: 10),
+              // Separator
+              Container(width: 1, height: 30, color: Colors.grey.shade300),
+              const SizedBox(width: 10),
+              // Colors
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _colors
+                        .map(
+                          (c) => GestureDetector(
+                            onTap: () => setState(() {
+                              _bgColor = c;
+                              _customBgImage = null;
+                            }),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                color: c,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.grey.shade300),
+                                boxShadow:
+                                    (_bgColor == c && _customBgImage == null)
+                                    ? [
+                                        const BoxShadow(
+                                          color: Colors.blue,
+                                          blurRadius: 4,
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: (_bgColor == c && _customBgImage == null)
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Preview selected image
+          if (_customBgImage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.image, size: 16, color: Colors.green),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Image Selected",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => setState(() => _customBgImage = null),
+                      child: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 24),
+
+          // 💰 MARGIN INPUT
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: TextField(
+              controller: _marginController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                labelText: "Add Extra Margin (₹)",
+                prefixIcon: Icon(Iconsax.money, size: 18),
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Toggles
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            activeColor: _themeColor,
+            title: const Text(
+              "Show Price Tags",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            value: _showPrices,
+            onChanged: (v) => setState(() => _showPrices = v),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            activeColor: _themeColor,
+            title: const Text(
+              "Add Branding",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            value: _showBranding,
+            onChanged: (v) => setState(() => _showBranding = v),
+          ),
+          const SizedBox(height: 16),
+
+          // Generate
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton.icon(
+              onPressed: _isGenerating ? null : _createAndShare,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _themeColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: _isGenerating
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Iconsax.magicpen, color: Colors.white),
+              label: Text(
+                _isGenerating ? "Designing..." : "Create & Share",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bgOptionBtn(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 20, color: Colors.black87),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  Widget _layoutOption(String label, IconData icon, CollageLayout layout) {
+    bool selected = _selectedLayout == layout;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedLayout = layout),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: selected ? _themeColor.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? _themeColor : Colors.grey.shade200,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? _themeColor : Colors.grey),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: selected ? _themeColor : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
