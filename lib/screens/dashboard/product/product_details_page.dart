@@ -1,5 +1,3 @@
-// lib/screens/dashboard/product/product_details_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -18,282 +16,573 @@ import 'widgets/variant_selector.dart';
 import 'widgets/description_section.dart';
 import 'widgets/reseller_tools_box.dart';
 import 'widgets/sticky_bottom_bar.dart';
-import 'widgets/product_brand_section.dart'; // 🔹 Brand section import
+import 'widgets/product_brand_section.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   final ProductModel product;
 
   ProductDetailsPage({super.key, required this.product});
 
-  // Global controllers
+  // Global Controller for Catalogue
   final CatalogueController catalogueController = Get.put(
     CatalogueController(),
-    permanent: true,
   );
-
-  /// Resolve HSN code:
-  /// 1) Use product.hsnCode (from model/meta_data)
-  /// 2) Fallback to any attribute whose name contains "hsn"
-  /// 3) Fallback to regex scan in description / shortDescription (e.g. "HSN: 1234")
-  String? _getHsnCode(ProductModel product) {
-    // 1) direct field from model
-    if (product.hsnCode != null && product.hsnCode!.trim().isNotEmpty) {
-      return product.hsnCode!.trim();
-    }
-
-    // 2) fallback from attributes like "HSN", "HSN Code" etc.
-    for (final attr in product.attributes) {
-      final lowerName = attr.name.toLowerCase();
-      if (lowerName.contains('hsn')) {
-        if (attr.options.isNotEmpty) {
-          final val = attr.options.first.trim();
-          if (val.isNotEmpty) return val;
-        }
-      }
-    }
-
-    // 3) fallback from description text (if your store writes HSN in the content)
-    String combinedText = '${product.description} ${product.shortDescription}'
-        .toLowerCase();
-
-    // If nothing even contains 'hsn', skip
-    if (!combinedText.contains('hsn')) {
-      return null;
-    }
-
-    // Try to find something like "hsn", then some non-digits, then 4–8 digits
-    final regex = RegExp(r'hsn[^0-9]{0,10}([0-9]{4,8})', caseSensitive: false);
-    final match = regex.firstMatch(
-      '${product.description} ${product.shortDescription}',
-    );
-
-    if (match != null && match.groupCount >= 1) {
-      final code = match.group(1)?.trim();
-      if (code != null && code.isNotEmpty) {
-        return code;
-      }
-    }
-
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
-    // Initialize Controller
+    // Initialize Product Controller
     final controller = Get.put(ProductDetailsController());
     controller.initialize(product);
 
-    final String? hsnCode = _getHsnCode(product);
-
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // 1. Image Slider (Sliver App Bar)
-              ProductImageSlider(product: product, controller: controller),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // 1. IMAGE SLIDER
+          ProductImageSlider(product: product, controller: controller),
 
-              // 2. Scrollable Content
-              SliverToBoxAdapter(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(32),
+          // 2. MAIN CONTENT
+          SliverToBoxAdapter(
+            child: Container(
+              transform: Matrix4.translationValues(0, -24, 0),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Grey Handle Bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                     ),
-                  ),
-                  transform: Matrix4.translationValues(0, -24, 0),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Grey Pull Bar
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+
+                    // Title, Price, Discount
+                    ProductInfoHeader(product: product),
+
+                    // Secondary Name (if exists)
+                    if (product.userProductName != null &&
+                        product.userProductName != product.name)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          "(${product.userProductName})",
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
+                      ),
 
-                        // Title, Rating, Price
-                        ProductInfoHeader(product: product),
+                    const SizedBox(height: 16),
 
-                        const SizedBox(height: 16),
+                    // Brand / Sold By
+                    ProductBrandSection(product: product),
 
-                        // 🔹 BRAND SECTION
-                        ProductBrandSection(product: product),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    const SizedBox(height: 24),
 
-                        // 🔹 HSN CODE ROW (only if resolved)
-                        if (hsnCode != null && hsnCode.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Iconsax.document_text,
-                                  size: 18,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'HSN Code: ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Poppins',
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Flexible(
-                                  child: Text(
-                                    hsnCode,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Poppins',
-                                      color: Colors.black87,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        // 🔹 GST ROW (only if available)
-                        if (product.gst != null &&
-                            product.gst!.trim().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6.0),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Iconsax.percentage_square,
-                                  size: 18,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'GST: ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Poppins',
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Flexible(
-                                  child: Text(
-                                    product.gst!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Poppins',
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        const SizedBox(height: 16),
-                        const Divider(height: 1, color: Color(0xFFF3F4F6)),
-                        const SizedBox(height: 24),
-
-                        // Dynamic Attributes (Size/Color etc.)
-                        ...product.attributes.map((attr) {
-                          return VariantSelector(
+                    // Variant Selectors (Size/Color)
+                    if (product.attributes.isNotEmpty)
+                      ...product.attributes.map(
+                        (attr) => Padding(
+                          padding: const EdgeInsets.only(bottom: 24.0),
+                          child: VariantSelector(
                             attribute: attr,
                             controller: controller,
-                          );
-                        }),
-
-                        // Description
-                        DescriptionSection(
-                          product: product,
-                          controller: controller,
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Tools
-                        ResellerToolsBox(
-                          product: product,
-                          controller: controller,
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // 🔹 BIG "ADD TO CATALOGUE" BUTTON
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openAddToCatalogueSheet(product),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: accentColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 16,
-                                horizontal: 20,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 3,
-                            ),
-                            icon: const Icon(Iconsax.book_saved, size: 20),
-                            label: const Text(
-                              'Add to Catalogue',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Poppins',
-                              ),
-                            ),
                           ),
                         ),
+                      ),
 
-                        const SizedBox(height: 24),
-
-                        PricingCalculator(
-                          productCost: double.tryParse(product.price) ?? 0.0,
-                        ),
-
-                        const SizedBox(height: 30),
-
-                        SimilarProductsSection(categoryId: "0"),
-
-                        // Space for bottom bar
-                        const SizedBox(height: 120),
-                      ],
+                    // Description Section
+                    // Description
+                    DescriptionSection(
+                      product: product,
+                      controller: controller,
                     ),
-                  ),
+
+                    const SizedBox(height: 24),
+                    // 🔹 SECTION 1: GENERAL SPECIFICATIONS (SKU, HSN, Origin)
+                    _buildSpecsSection(),
+
+                    const SizedBox(height: 24),
+
+                    // 🔹 SECTION 2: DIMENSIONS & WEIGHT
+                    _buildDimensionsSection(),
+
+                    const SizedBox(height: 24),
+
+                    // 🔹 SECTION 3: HIGHLIGHTS & CARE
+                    _buildHighlightsAndCare(),
+
+                    const SizedBox(height: 24),
+
+                    // Keywords / Tags
+                    if (product.keywords.isNotEmpty) _buildKeywordsSection(),
+
+                    const SizedBox(height: 24),
+
+                    // Reseller Tools (Download, Share)
+                    ResellerToolsBox(product: product, controller: controller),
+
+                    const SizedBox(height: 20),
+
+                    // Add to Catalogue Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openAddToCatalogueSheet(product),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Iconsax.book_saved, size: 20),
+                        label: const Text(
+                          'Add to Catalogue',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Price Calculator
+                    PricingCalculator(
+                      productCost: double.tryParse(product.price) ?? 0.0,
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // Similar Products
+                    SimilarProductsSection(categoryId: "0"),
+
+                    // Bottom Padding for Sticky Bar
+                    const SizedBox(height: 80),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-
-          // 3. Bottom Bar
-          ProductStickyBottomBar(controller: controller, product: product),
         ],
+      ),
+      bottomNavigationBar: ProductStickyBottomBar(
+        controller: controller,
+        product: product,
       ),
     );
   }
 
-  // ========================================================================
-  // 🔹 ADD TO CATALOGUE SHEET (single product)
-  // ========================================================================
+  // ===========================================================================
+  // 🔹 WIDGET: GENERAL SPECIFICATIONS
+  // ===========================================================================
+  Widget _buildSpecsSection() {
+    final Map<String, String?> data = {
+      'Product Id': product.userSku,
+      'Unique Code': product.uniqueCode,
+      'HSN Code': product.hsnCode,
+      'GST Rate': product.gst != null ? '${product.gst}%' : null,
+      'Shipping Fee': product.shippingFee != null
+          ? '₹${product.shippingFee}'
+          : null,
+      'Dispatch Time': product.dispatchTime,
+      'Country of Origin': product.countryOfOrigin,
+      'Manufactured By': product.manufacturedBy,
+      'Marketed By': product.marketedBy,
+      'Imported By': product.importedBy,
+      'Net Contents': product.netContents,
+      'Package Includes': product.packageIncludes,
+      'Warranty': product.warranty,
+      'EAN/Barcode': product.eanBarcode,
+    };
+
+    // Remove empty fields
+    data.removeWhere((key, value) => value == null || value.trim().isEmpty);
+
+    if (data.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Product Specifications",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB), // Light Grey
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: data.entries.toList().asMap().entries.map((entry) {
+              final index = entry.key;
+              final key = entry.value.key;
+              final value = entry.value.value!;
+              final isLast = index == data.length - 1;
+
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 4,
+                          child: Text(
+                            key,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 5,
+                          child: Text(
+                            value,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isLast)
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.grey.shade200,
+                    ),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 🔹 WIDGET: DIMENSIONS & WEIGHT TABLE
+  // ===========================================================================
+  Widget _buildDimensionsSection() {
+    bool hasItemDims = product.itemLength != null || product.itemWeight != null;
+    bool hasPkgDims = product.length != null || product.weight != null;
+
+    if (!hasItemDims && !hasPkgDims) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Dimensions & Weight",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(1),
+              1: FlexColumnWidth(1),
+              2: FlexColumnWidth(1),
+            },
+            border: TableBorder(
+              horizontalInside: BorderSide(color: Colors.grey.shade100),
+              verticalInside: BorderSide(color: Colors.grey.shade100),
+            ),
+            children: [
+              // Header
+              TableRow(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                ),
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      "Metric",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      "Item",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      "Package",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              // Data Rows
+              _buildTableRow(
+                "Length",
+                "${product.itemLength ?? '-'} cm",
+                "${product.length ?? '-'} cm",
+              ),
+              _buildTableRow(
+                "Width",
+                "${product.itemWidth ?? '-'} cm",
+                "${product.width ?? '-'} cm",
+              ),
+              _buildTableRow(
+                "Height",
+                "${product.itemHeight ?? '-'} cm",
+                "${product.height ?? '-'} cm",
+              ),
+              _buildTableRow(
+                "Weight",
+                "${product.itemWeight ?? '-'} g",
+                "${product.weight ?? '-'} g",
+              ),
+              if (product.packageGrossWeight != null)
+                _buildTableRow(
+                  "Gross Wt.",
+                  "-",
+                  "${product.packageGrossWeight} g",
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  TableRow _buildTableRow(String label, String item, String pkg) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            item,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            pkg,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 🔹 WIDGET: HIGHLIGHTS, CARE & DISCLAIMER
+  // ===========================================================================
+  Widget _buildHighlightsAndCare() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Highlights Box
+        if (product.highlights != null && product.highlights!.isNotEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED), // Light Orange
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFEDD5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Iconsax.flash_1, size: 16, color: Color(0xFFEA580C)),
+                    SizedBox(width: 8),
+                    Text(
+                      "Highlights",
+                      style: TextStyle(
+                        color: Color(0xFFEA580C),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  product.highlights!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: Color(0xFF9A3412),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Care Instructions
+        if (product.careInstruction != null &&
+            product.careInstruction!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Iconsax.info_circle,
+                  size: 20,
+                  color: Colors.black87,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Care Instructions",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        product.careInstruction!,
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Disclaimer
+        if (product.disclaimer != null && product.disclaimer!.isNotEmpty)
+          Text(
+            "Disclaimer: ${product.disclaimer}",
+            style: const TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: Colors.grey,
+              height: 1.4,
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 🔹 WIDGET: KEYWORDS / TAGS
+  // ===========================================================================
+  Widget _buildKeywordsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Tags / Keywords",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: product.keywords.map((tag) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Text(
+                "#$tag",
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 🔹 HELPER: ADD TO CATALOGUE
+  // ===========================================================================
   void _openAddToCatalogueSheet(ProductModel product) {
     final availableCatalogues = catalogueController.catalogueNames;
-
     showModalBottomSheet(
       context: Get.context!,
       backgroundColor: Colors.transparent,
@@ -309,7 +598,6 @@ class ProductDetailsPage extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 40,
@@ -321,130 +609,47 @@ class ProductDetailsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                'Add "${product.name}" to catalogue',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Poppins',
-                ),
+              const Text(
+                'Add to Catalogue',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
 
               if (availableCatalogues.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade100),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Iconsax.folder_open,
-                        size: 30,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        "No catalogues found",
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        "Create a new catalogue to start saving products.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 11,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ],
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      "No catalogues found. Create a new one below!",
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ),
                 )
               else
                 ...availableCatalogues.map(
-                  (name) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade100),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Iconsax.book,
-                          color: accentColor,
-                          size: 18,
-                        ),
-                      ),
-                      title: Text(
+                  (name) => ListTile(
+                    title: Text(name),
+                    leading: const Icon(Iconsax.folder, color: accentColor),
+                    onTap: () {
+                      catalogueController.addProductToExistingCatalogue(
                         name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        "Tap to add this product",
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      trailing: const Icon(
-                        Iconsax.arrow_right_3,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      onTap: () {
-                        catalogueController.addProductToExistingCatalogue(
-                          name,
-                          product,
-                        );
-                        Navigator.pop(ctx);
-                        Get.snackbar(
-                          'Added to catalogue',
-                          '"${product.name}" added to "$name".',
-                          snackPosition: SnackPosition.BOTTOM,
-                        );
-                      },
-                    ),
+                        product,
+                      );
+                      Navigator.pop(ctx);
+                      Get.snackbar("Success", "Added to $name");
+                    },
                   ),
                 ),
 
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: OutlinedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _showCreateNewCatalogueDialogForSingle(product);
+                    _showCreateNewCatalogueDialog(product);
                   },
-                  icon: const Icon(Iconsax.add_circle, size: 20),
-                  label: const Text('Create New Catalogue'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
+                  child: const Text("Create New Catalogue"),
                 ),
               ),
             ],
@@ -454,75 +659,34 @@ class ProductDetailsPage extends StatelessWidget {
     );
   }
 
-  // ========================================================================
-  // 🔹 CREATE NEW CATALOGUE DIALOG (single product)
-  // ========================================================================
-  void _showCreateNewCatalogueDialogForSingle(ProductModel product) {
+  void _showCreateNewCatalogueDialog(ProductModel product) {
     final TextEditingController nameController = TextEditingController();
-
     showDialog(
       context: Get.context!,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'New Catalogue',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          title: const Text('New Catalogue'),
           content: TextField(
             controller: nameController,
             autofocus: true,
-            style: const TextStyle(fontFamily: 'Poppins'),
-            decoration: InputDecoration(
-              labelText: 'Catalogue Name',
-              hintText: 'e.g. Diwali Offers, Premium Dresses',
-              filled: true,
-              fillColor: const Color.fromARGB(185, 250, 250, 250),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-                borderSide: BorderSide(color: accentColor),
-              ),
-            ),
+            decoration: const InputDecoration(hintText: 'Collection Name'),
           ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              style: TextButton.styleFrom(foregroundColor: Colors.grey),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isNotEmpty) {
+                if (nameController.text.isNotEmpty) {
                   catalogueController.createCatalogueAndAddProduct(
-                    name,
+                    nameController.text.trim(),
                     product,
                   );
                   Navigator.pop(ctx);
-                  Get.snackbar(
-                    'Catalogue created',
-                    '"${product.name}" added to "$name".',
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
+                  Get.snackbar("Success", "Catalogue Created");
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
               child: const Text('Create'),
             ),
           ],
