@@ -12,7 +12,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
-// IMPORT PRODUCT DETAILS PAGE
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -27,7 +26,6 @@ class InventoryPage extends StatefulWidget {
 class _InventoryPageState extends State<InventoryPage> {
   final CartController cartController = Get.find<CartController>();
 
-  // Inject WishlistController
   final WishlistController wishlistController =
       Get.isRegistered<WishlistController>()
       ? Get.find<WishlistController>()
@@ -57,7 +55,7 @@ class _InventoryPageState extends State<InventoryPage> {
     super.dispose();
   }
 
-  // --- PREMIUM SNACKBAR LOGIC ---
+  // --- SNACKBAR LOGIC ---
   void _removeSnackbar() {
     _currentSnackbar?.remove();
     _currentSnackbar = null;
@@ -75,7 +73,7 @@ class _InventoryPageState extends State<InventoryPage> {
       builder: (context) => Stack(
         children: [
           Positioned(
-            bottom: 100, // Position above the bottom bar
+            bottom: 100,
             left: 20,
             right: 20,
             child: Material(
@@ -179,7 +177,7 @@ class _InventoryPageState extends State<InventoryPage> {
     });
   }
 
-  // --- LOGIC HELPERS ---
+  // --- CONTROLLER HELPERS ---
 
   TextEditingController _getMarginControllerForItem(
     int productId,
@@ -211,17 +209,78 @@ class _InventoryPageState extends State<InventoryPage> {
     int currentQty,
   ) {
     if (_quantityControllers[productId] != null) {
-      if (_quantityControllers[productId]!.text != currentQty.toString()) {
-        _quantityControllers[productId]!.text = currentQty.toString();
-        _quantityControllers[productId]!.selection = TextSelection.fromPosition(
-          TextPosition(offset: currentQty.toString().length),
-        );
+      final ctrl = _quantityControllers[productId]!;
+      // CRITICAL FIX: Only update text if the value actually differs.
+      // This prevents overwriting what the user is currently typing and jumping the cursor.
+      final parsed = int.tryParse(ctrl.text);
+      if (parsed != currentQty) {
+        // If the parsed text doesn't match the actual cart qty, we must update it
+        // (e.g. if the user pressed '+' button).
+        // But if the user typed "12" and cart qty is 12, do nothing.
+        // If the user typed "1" (start of 12) and cart qty is 1, do nothing.
+
+        // We only force update if the mismatch is likely due to external change
+        // rather than typing. Since we sync instantly on type, the cart qty
+        // should basically always match the text.
+
+        // Safe check: if the user is editing, we rely on _handleManualQtyChange to sync.
+        // We only overwrite here if the diff is not caused by typing.
+        // A simple way is to trust the text if it parses correctly.
+
+        // However, if the user pressed '+' button, text needs to update.
+        // We can solve this by not rebuilding the TextField entirely or by updating selection.
+        String newText = currentQty.toString();
+        if (ctrl.text != newText) {
+          ctrl.text = newText;
+          ctrl.selection = TextSelection.fromPosition(
+            TextPosition(offset: newText.length),
+          );
+        }
       }
-      return _quantityControllers[productId]!;
+      return ctrl;
     }
     final controller = TextEditingController(text: currentQty.toString());
     _quantityControllers[productId] = controller;
     return controller;
+  }
+
+  // --- INSTANT QUANTITY UPDATE LOGIC ---
+  void _handleManualQtyChange(int productId, String val) {
+    int? newQty = int.tryParse(val);
+
+    // If invalid input (empty or 0), do nothing yet (let them type)
+    if (newQty == null || newQty <= 0) return;
+
+    // Get current actual quantity from controller
+    // We have to find the item to know its current qty, or track it.
+    // Simpler: we know the item ID. We can check cartController.cartItems.
+
+    try {
+      final item = cartController.cartItems.firstWhere(
+        (element) => element.product.id == productId,
+      );
+      int currentQty = item.quantity;
+      int diff = newQty - currentQty;
+
+      if (diff == 0) return;
+
+      if (diff > 0) {
+        for (int i = 0; i < diff; i++) {
+          cartController.incrementQuantity(productId);
+        }
+      } else {
+        for (int i = 0; i < diff.abs(); i++) {
+          cartController.decrementQuantity(productId);
+        }
+      }
+
+      // Force UI rebuild to update Price Details immediately
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint("Error updating qty: $e");
+    }
   }
 
   // --- CALCULATION HELPERS ---
@@ -304,17 +363,11 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  // 🔹 NEW: Handle navigation to Business Details with proper refresh
   Future<void> _navigateToBusinessDetails() async {
     HapticFeedback.mediumImpact();
-
-    // Navigate and wait for result
     final result = await Get.to(
       () => BusinessDetailsPage(userData: widget.userData),
     );
-
-    // If the user saved data (result == true), we might want to show a confirmation
-    // or refresh any state if needed. The BusinessDetailsPage handles its own refresh.
     if (result == true && mounted) {
       debugPrint('Business details were updated');
     }
@@ -403,6 +456,11 @@ class _InventoryPageState extends State<InventoryPage> {
     final TextEditingController marginCtrl = _getMarginControllerForItem(
       item.product.id,
       basePrice,
+    );
+
+    final TextEditingController qtyCtrl = _getQtyControllerForItem(
+      item.product.id,
+      item.quantity,
     );
 
     return Container(
@@ -536,17 +594,25 @@ class _InventoryPageState extends State<InventoryPage> {
                   _qtyButton(Icons.remove, () {
                     HapticFeedback.lightImpact();
                     cartController.decrementQuantity(item.product.id);
+                    // Force refresh of text field on button click
+                    setState(() {
+                      // We manually update text controller to match new qty
+                      // in case user clicks button after typing
+                      qtyCtrl.text =
+                          (item.quantity > 1
+                                  ? item.quantity - 1
+                                  : item.quantity)
+                              .toString();
+                    });
                   }),
                   Container(
                     alignment: Alignment.center,
                     width: 50,
                     child: TextField(
-                      controller: _getQtyControllerForItem(
-                        item.product.id,
-                        item.quantity,
-                      ),
+                      controller: qtyCtrl,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
+                      textInputAction: TextInputAction.done,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -556,30 +622,19 @@ class _InventoryPageState extends State<InventoryPage> {
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
-                      onSubmitted: (val) {
-                        int? newQty = int.tryParse(val);
-                        if (newQty != null && newQty > 0) {
-                          int diff = newQty - item.quantity;
-                          if (diff > 0) {
-                            for (int i = 0; i < diff; i++)
-                              cartController.incrementQuantity(item.product.id);
-                          } else if (diff < 0) {
-                            for (int i = 0; i < diff.abs(); i++)
-                              cartController.decrementQuantity(item.product.id);
-                          }
-                        } else {
-                          _getQtyControllerForItem(
-                            item.product.id,
-                            item.quantity,
-                          ).text = item.quantity
-                              .toString();
-                        }
+                      // INSTANT UPDATE ON CHANGED
+                      onChanged: (val) {
+                        _handleManualQtyChange(item.product.id, val);
                       },
                     ),
                   ),
                   _qtyButton(Icons.add, () {
                     HapticFeedback.lightImpact();
                     cartController.incrementQuantity(item.product.id);
+                    setState(() {
+                      // Manually update text to match
+                      qtyCtrl.text = (item.quantity + 1).toString();
+                    });
                   }),
                 ],
               ),
@@ -952,7 +1007,7 @@ class _InventoryPageState extends State<InventoryPage> {
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.03), // Very subtle grey bg
+            color: Colors.grey.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(6),
           ),
           child: content,

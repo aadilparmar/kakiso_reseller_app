@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added for input formatters
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
@@ -14,15 +15,14 @@ import 'package:kakiso_reseller_app/screens/authentication/signup/privacy_policy
 import 'package:kakiso_reseller_app/screens/authentication/signup/terms_and_condition.dart';
 
 // ─────────────────────────────────────────────────────────────
-//  THEME CONSTANTS (MATCHING INTRO & LOGIN)
+//  THEME CONSTANTS
 // ─────────────────────────────────────────────────────────────
 const Color kPrimaryDeep = Color(0xFF4B3DAF);
 const Color kPrimaryLight = Color(0xFF7B45C9);
 const Color kAccentColor = Color(0xFFE91E63);
 const Color kBgColor = Color(0xFFF8F7FF);
 
-// Basic protection against obvious disposable / dummy emails (frontend only)
-// Real protection must be on backend.
+// Basic protection against obvious disposable emails
 const List<String> _blockedDisposableDomains = [
   'tempmail.com',
   '10minutemail.com',
@@ -37,8 +37,6 @@ const List<String> _blockedDummyLocalParts = [
   'dummy',
   'fake',
   'sample',
-  'asdf',
-  'qwerty',
 ];
 
 class RegisterPage extends StatefulWidget {
@@ -52,10 +50,19 @@ class _RegisterPageState extends State<RegisterPage>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
+  // Visibility Toggles
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+
+  // Loading & Terms
   bool _isLoading = false;
   bool _acceptTerms = false;
+
+  // Password Strength State
+  bool _hasMinLength = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasDigits = false;
 
   // Controllers
   final _fullNameController = TextEditingController();
@@ -65,10 +72,13 @@ class _RegisterPageState extends State<RegisterPage>
   final _confirmPasswordController = TextEditingController();
   final _referralController = TextEditingController();
 
+  // Focus Nodes for "Instant" Validation logic
+  final FocusNode _phoneFocusNode = FocusNode();
+
   // Background animation
   late final AnimationController _bgController;
 
-  // GraphQL client (same endpoint as login)
+  // GraphQL
   final String _graphqlUrl = "https://stage.kakiso.com/graphql";
   late GraphQLClient _client;
 
@@ -85,14 +95,8 @@ class _RegisterPageState extends State<RegisterPage>
     _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
   }
 
-  Timer? _passwordHideTimer;
-  Timer? _confirmPasswordHideTimer;
-
-  @override
   @override
   void dispose() {
-    _passwordHideTimer?.cancel();
-    _confirmPasswordHideTimer?.cancel();
     _bgController.dispose();
     _fullNameController.dispose();
     _phoneController.dispose();
@@ -100,51 +104,62 @@ class _RegisterPageState extends State<RegisterPage>
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _referralController.dispose();
+    _phoneFocusNode.dispose();
     super.dispose();
   }
 
   // ─────────────────────────────────────────────────────────
-  //  CALL WORDPRESS VIA GRAPHQL → CREATE REAL USER
+  //  PASSWORD STRENGTH CHECKER
+  // ─────────────────────────────────────────────────────────
+  void _updatePasswordStrength(String value) {
+    setState(() {
+      _hasMinLength = value.length >= 6 && value.length <= 20;
+      _hasUppercase = value.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = value.contains(RegExp(r'[a-z]'));
+      _hasDigits = value.contains(RegExp(r'[0-9]'));
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  API CALL
+  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
+  //  API CALL - REGISTER WITH WELCOME EMAIL
   // ─────────────────────────────────────────────────────────
   Future<void> _registerUserInWordPress({
     required String fullName,
     required String email,
     required String password,
   }) async {
-    // Split full name into first + last
     final parts = fullName.trim().split(' ');
     final String firstName = parts.isNotEmpty ? parts.first : '';
     final String lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
 
-    // This mutation shape assumes you are using a WPGraphQL "registerUser" mutation.
-    // If your backend uses a different mutation name or input fields,
-    // adjust this string and the "variables" map accordingly.
     const String mutation = r'''
-      mutation RegisterUser(
-        $username: String!
-        $email: String!
-        $password: String!
-        $firstName: String!
-        $lastName: String!
+    mutation RegisterUser(
+      $username: String!
+      $email: String!
+      $password: String!
+      $firstName: String!
+      $lastName: String!
+    ) {
+      registerUser(
+        input: {
+          username: $username
+          email: $email
+          password: $password
+          firstName: $firstName
+          lastName: $lastName
+        }
       ) {
-        registerUser(
-          input: {
-            username: $username
-            email: $email
-            password: $password
-            firstName: $firstName
-            lastName: $lastName
-          }
-        ) {
-          user {
-            databaseId
-            email
-            firstName
-            lastName
-          }
+        user {
+          databaseId
+          email
+          name
         }
       }
-    ''';
+    }
+  ''';
 
     final variables = <String, dynamic>{
       'username': email,
@@ -159,132 +174,75 @@ class _RegisterPageState extends State<RegisterPage>
     );
 
     if (result.hasException) {
-      String message =
-          'Registration failed. Please check details or try a different email.';
-
+      String message = 'Registration failed.';
       if (result.exception!.graphqlErrors.isNotEmpty) {
         message = result.exception!.graphqlErrors.first.message;
       }
-
       throw Exception(message);
     }
 
     final data = result.data?['registerUser'];
     if (data == null || data['user'] == null) {
-      throw Exception('Registration failed. Invalid response from server.');
+      throw Exception('Registration failed. Invalid response.');
     }
 
-    // At this point a real WP user exists and can log in using the login screen.
-    return;
+    // ✅ Welcome email is automatically sent by WordPress hook
+    // No need to call API manually - the 'user_register' hook handles it!
   }
 
   // ─────────────────────────────────────────────────────────
-  //  REGISTER HANDLER
+  //  HANDLE REGISTER
   // ─────────────────────────────────────────────────────────
   Future<void> _handleRegister() async {
     if (_isLoading) return;
 
-    // Validate form first
-    if (!_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Double check password strength manually
+    if (!(_hasMinLength && _hasUppercase && _hasLowercase && _hasDigits)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Please meet all password requirements."),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
     if (!_acceptTerms) {
-      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: Colors.red.shade700,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          content: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: const [
-              Icon(Icons.gpp_maybe_rounded, color: Colors.white, size: 26),
-              SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'Please accept the Terms & Privacy Policy to continue.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          duration: Duration(seconds: 4),
+          content: const Text('Please accept the Terms & Privacy Policy.'),
         ),
       );
-
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final fullName = _fullNameController.text.trim();
-      //final phone = _phoneController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
-      //final referral = _referralController.text.trim();
-
-      // 1) Create WP user via GraphQL
       await _registerUserInWordPress(
-        fullName: fullName,
-        email: email,
-        password: password,
+        fullName: _fullNameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-
-      // 2) Optional: if you have a custom REST/GraphQL endpoint for storing
-      //    phone + referral in user meta, call it here.
-      //
-      // Example (pseudo-code):
-      // await ApiService.updateResellerProfileMeta(
-      //   email: email,
-      //   phone: '+91$phone',
-      //   referral: referral.isEmpty ? null : referral,
-      // );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      // 🎉 Show success & redirect to login
-      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: Colors.green.shade600,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
-          content: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: const [
-              Icon(Icons.verified_rounded, color: Colors.white, size: 26),
-              SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'Account created successfully!\nPlease log in to continue.',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          duration: Duration(seconds: 4),
+          content: const Text('Account created! Please log in.'),
         ),
       );
 
@@ -292,47 +250,21 @@ class _RegisterPageState extends State<RegisterPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: Colors.red.shade700,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
-          content: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  "Account Already exists or an error occurred.\nPlease try again with different details.",
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          duration: const Duration(seconds: 4),
+          content: Text("Error: ${e.toString().replaceAll('Exception:', '')}"),
         ),
       );
     }
   }
 
   // ─────────────────────────────────────────────────────────
-  //  UI
+  //  UI BUILD
   // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -351,7 +283,7 @@ class _RegisterPageState extends State<RegisterPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // TOP LOGO
+                    // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -382,10 +314,9 @@ class _RegisterPageState extends State<RegisterPage>
                     ),
                     const SizedBox(height: 24),
 
-                    // MAIN CARD
+                    // Main Form Card
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
@@ -402,6 +333,7 @@ class _RegisterPageState extends State<RegisterPage>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // "New Reseller" Badge
                             Align(
                               alignment: Alignment.centerLeft,
                               child: Container(
@@ -426,7 +358,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                             const SizedBox(height: 16),
 
-                            // Full Name
+                            // 1. Full Name
                             TextFormField(
                               controller: _fullNameController,
                               decoration: _inputDecoration(
@@ -434,24 +366,32 @@ class _RegisterPageState extends State<RegisterPage>
                                 icon: Iconsax.user,
                               ),
                               textCapitalization: TextCapitalization.words,
-                              validator: (value) {
-                                if (value == null || value.trim().length < 3) {
-                                  return 'Please enter your full name.';
-                                }
-                                return null;
-                              },
+                              validator: (value) =>
+                                  (value == null || value.trim().length < 3)
+                                  ? 'Enter your full name'
+                                  : null,
                             ),
                             const SizedBox(height: 14),
 
-                            // Phone (REQUIRED) with +91 prefix
+                            // 2. Phone Number (Strict Validation)
                             TextFormField(
                               controller: _phoneController,
+                              focusNode: _phoneFocusNode,
+                              // Shows error as soon as user types or leaves field
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              keyboardType: TextInputType.number,
+                              // Enforce exactly 10 digits max
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(10),
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                               decoration:
                                   _inputDecoration(
                                     label: 'Phone Number',
                                     icon: Iconsax.call,
                                   ).copyWith(
-                                    hintText: '10-digit WhatsApp number',
+                                    hintText: '10-digit number',
                                     prefixText: '+91 ',
                                     prefixStyle: const TextStyle(
                                       fontFamily: 'Poppins',
@@ -459,21 +399,18 @@ class _RegisterPageState extends State<RegisterPage>
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                              keyboardType: TextInputType.phone,
                               validator: (value) {
                                 final v = value?.trim() ?? '';
-                                if (v.isEmpty) {
+                                if (v.isEmpty)
                                   return 'Phone number is required.';
-                                }
-                                if (!RegExp(r'^[0-9]{10}$').hasMatch(v)) {
-                                  return 'Enter a valid 10-digit mobile number.';
-                                }
+                                if (v.length != 10)
+                                  return 'Must be exactly 10 digits.';
                                 return null;
                               },
                             ),
                             const SizedBox(height: 14),
 
-                            // Email with extra checks
+                            // 3. Email
                             TextFormField(
                               controller: _emailController,
                               decoration: _inputDecoration(
@@ -481,46 +418,39 @@ class _RegisterPageState extends State<RegisterPage>
                                 icon: Iconsax.sms,
                               ),
                               keyboardType: TextInputType.emailAddress,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
                               validator: (value) {
                                 final v = value?.trim() ?? '';
-                                if (v.isEmpty) {
-                                  return 'Email is required.';
-                                }
+                                if (v.isEmpty) return 'Email is required';
                                 final emailRegex = RegExp(
                                   r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
                                 );
-                                if (!emailRegex.hasMatch(v)) {
-                                  return 'Enter a valid email address.';
-                                }
+                                if (!emailRegex.hasMatch(v))
+                                  return 'Enter valid email';
 
                                 final parts = v.split('@');
-                                if (parts.length != 2) {
-                                  return 'Enter a valid email address.';
+                                if (parts.length == 2) {
+                                  if (_blockedDummyLocalParts.contains(
+                                    parts.first.toLowerCase(),
+                                  ))
+                                    return 'Use your real email';
+                                  if (_blockedDisposableDomains.any(
+                                    (d) => parts.last.toLowerCase().endsWith(d),
+                                  ))
+                                    return 'No temporary emails';
                                 }
-                                final localPart = parts.first.toLowerCase();
-                                final domain = parts.last.toLowerCase();
-
-                                if (_blockedDummyLocalParts.contains(
-                                  localPart,
-                                )) {
-                                  return 'Please use your real email address.';
-                                }
-
-                                if (_blockedDisposableDomains.any(
-                                  (d) => domain.endsWith(d),
-                                )) {
-                                  return 'Temporary email addresses are not allowed.';
-                                }
-
                                 return null;
                               },
                             ),
                             const SizedBox(height: 14),
 
-                            // Password
+                            // 4. Password (with visible checks)
                             TextFormField(
                               controller: _passwordController,
                               obscureText: !_isPasswordVisible,
+                              onChanged:
+                                  _updatePasswordStrength, // Updates the UI below
                               decoration:
                                   _inputDecoration(
                                     label: 'Password',
@@ -528,77 +458,68 @@ class _RegisterPageState extends State<RegisterPage>
                                   ).copyWith(
                                     suffixIcon: IconButton(
                                       icon: Icon(
-                                        _isConfirmPasswordVisible
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                        color: kAccentColor,
+                                        _isPasswordVisible
+                                            ? Icons.visibility
+                                            : Icons.visibility_off,
+                                        color: Colors.grey,
                                       ),
                                       onPressed: () {
-                                        setState(
-                                          () =>
-                                              _isConfirmPasswordVisible = true,
-                                        );
-
-                                        _confirmPasswordHideTimer?.cancel();
-                                        _confirmPasswordHideTimer = Timer(
-                                          const Duration(seconds: 3),
-                                          () {
-                                            if (mounted) {
-                                              setState(
-                                                () =>
-                                                    _isConfirmPasswordVisible =
-                                                        false,
-                                              );
-                                            }
-                                          },
-                                        );
+                                        // Simple Toggle
+                                        setState(() {
+                                          _isPasswordVisible =
+                                              !_isPasswordVisible;
+                                        });
                                       },
                                     ),
                                   ),
                               validator: (value) {
-                                final v = value ?? '';
-                                if (v.isEmpty) {
-                                  return 'Password is required.';
-                                }
-                                if (v.length < 6 || v.length > 20) {
-                                  return 'Password must be 6–20 characters.';
-                                }
-                                if (!RegExp(r'[A-Z]').hasMatch(v)) {
-                                  return 'Include at least one uppercase letter.';
-                                }
-                                if (!RegExp(r'[a-z]').hasMatch(v)) {
-                                  return 'Include at least one lowercase letter.';
-                                }
-                                if (!RegExp(r'[0-9]').hasMatch(v)) {
-                                  return 'Include at least one number.';
+                                if (value == null || value.isEmpty)
+                                  return 'Required';
+                                if (!(_hasMinLength &&
+                                    _hasUppercase &&
+                                    _hasLowercase &&
+                                    _hasDigits)) {
+                                  return 'Password is too weak';
                                 }
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: const [
-                                Icon(
-                                  Iconsax.shield_tick,
-                                  size: 16,
-                                  color: Colors.green,
-                                ),
-                                SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Use 6–20 characters with uppercase, lowercase letters & numbers.',
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 11,
-                                      color: Colors.black54,
-                                    ),
+
+                            // Visual Password Requirements
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF5F7FA),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildRequirementRow(
+                                    "At least 6 characters",
+                                    _hasMinLength,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 6),
+                                  _buildRequirementRow(
+                                    "One uppercase letter (A-Z)",
+                                    _hasUppercase,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _buildRequirementRow(
+                                    "One lowercase letter (a-z)",
+                                    _hasLowercase,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _buildRequirementRow(
+                                    "One number (0-9)",
+                                    _hasDigits,
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 14),
 
-                            // Confirm Password
+                            // 5. Confirm Password
                             TextFormField(
                               controller: _confirmPasswordController,
                               obscureText: !_isConfirmPasswordVisible,
@@ -609,67 +530,50 @@ class _RegisterPageState extends State<RegisterPage>
                                   ).copyWith(
                                     suffixIcon: IconButton(
                                       icon: Icon(
-                                        _isPasswordVisible
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                        color: kAccentColor,
+                                        _isConfirmPasswordVisible
+                                            ? Icons.visibility
+                                            : Icons.visibility_off,
+                                        color: Colors.grey,
                                       ),
                                       onPressed: () {
-                                        setState(
-                                          () => _isPasswordVisible = true,
-                                        );
-
-                                        _passwordHideTimer?.cancel();
-                                        _passwordHideTimer = Timer(
-                                          const Duration(seconds: 3),
-                                          () {
-                                            if (mounted) {
-                                              setState(
-                                                () =>
-                                                    _isPasswordVisible = false,
-                                              );
-                                            }
-                                          },
-                                        );
+                                        // Simple Toggle
+                                        setState(() {
+                                          _isConfirmPasswordVisible =
+                                              !_isConfirmPasswordVisible;
+                                        });
                                       },
                                     ),
                                   ),
                               validator: (value) {
-                                if (value != _passwordController.text) {
-                                  return 'Passwords do not match.';
-                                }
+                                if (value != _passwordController.text)
+                                  return 'Passwords do not match';
                                 return null;
                               },
                             ),
                             const SizedBox(height: 14),
 
-                            // Optional Referral Code
+                            // 6. Referral
                             TextFormField(
                               controller: _referralController,
                               decoration: _inputDecoration(
-                                label: 'Referral / Invite Code (optional)',
+                                label: 'Referral Code (Optional)',
                                 icon: Iconsax.ticket_discount,
                               ),
                             ),
                             const SizedBox(height: 16),
 
-                            // Terms & Privacy
+                            // Terms
                             GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _acceptTerms = !_acceptTerms;
-                                });
-                              },
+                              onTap: () =>
+                                  setState(() => _acceptTerms = !_acceptTerms),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Checkbox(
                                     value: _acceptTerms,
-                                    onChanged: (v) {
-                                      setState(() {
-                                        _acceptTerms = v ?? false;
-                                      });
-                                    },
+                                    onChanged: (v) => setState(
+                                      () => _acceptTerms = v ?? false,
+                                    ),
                                     activeColor: kPrimaryDeep,
                                     visualDensity: VisualDensity.compact,
                                   ),
@@ -695,13 +599,11 @@ class _RegisterPageState extends State<RegisterPage>
                                                   TextDecoration.underline,
                                             ),
                                             recognizer: TapGestureRecognizer()
-                                              ..onTap = () {
-                                                Get.to(
-                                                  () => const TermsOfUsePage(),
-                                                );
-                                              },
+                                              ..onTap = () => Get.to(
+                                                () => const TermsOfUsePage(),
+                                              ),
                                           ),
-                                          const TextSpan(text: ' and '),
+                                          const TextSpan(text: ' & '),
                                           TextSpan(
                                             text: 'Privacy Notice',
                                             style: const TextStyle(
@@ -711,12 +613,9 @@ class _RegisterPageState extends State<RegisterPage>
                                                   TextDecoration.underline,
                                             ),
                                             recognizer: TapGestureRecognizer()
-                                              ..onTap = () {
-                                                Get.to(
-                                                  () =>
-                                                      const PrivacyPolicyPage(),
-                                                );
-                                              },
+                                              ..onTap = () => Get.to(
+                                                () => const PrivacyPolicyPage(),
+                                              ),
                                           ),
                                           const TextSpan(text: '.'),
                                         ],
@@ -728,7 +627,7 @@ class _RegisterPageState extends State<RegisterPage>
                             ),
                             const SizedBox(height: 16),
 
-                            // SIGN UP BUTTON
+                            // Submit Button
                             _BouncyButton(
                               onPressed: _isLoading ? () {} : _handleRegister,
                               child: Container(
@@ -737,8 +636,6 @@ class _RegisterPageState extends State<RegisterPage>
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
                                   gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
                                     colors: [kPrimaryDeep, kPrimaryLight],
                                   ),
                                   boxShadow: [
@@ -777,40 +674,28 @@ class _RegisterPageState extends State<RegisterPage>
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 24),
 
-                    // Already have account
-                    Column(
-                      children: [
-                        GestureDetector(
-                          onTap: _isLoading
-                              ? null
-                              : () => Get.offAll(() => const LoginPage()),
-                          child: const Text(
-                            'Already have an account? Log in',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: kAccentColor,
-                              decoration: TextDecoration.underline,
-                              decorationColor: kAccentColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'It takes less than a minute to start selling with KaKiSo',
-                          textAlign: TextAlign.center,
+                    // Already have account?
+                    GestureDetector(
+                      onTap: _isLoading
+                          ? null
+                          : () => Get.offAll(() => const LoginPage()),
+                      child: const Center(
+                        child: Text(
+                          'Already have an account? Log in',
                           style: TextStyle(
                             fontFamily: 'Poppins',
-                            fontSize: 12,
-                            color: Colors.black54,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: kAccentColor,
+                            decoration: TextDecoration.underline,
+                            decorationColor: kAccentColor,
                           ),
                         ),
-                      ],
+                      ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -822,7 +707,32 @@ class _RegisterPageState extends State<RegisterPage>
   }
 
   // ─────────────────────────────────────────────────────────
-  //  AMBIENT BACKGROUND (BLURRED BLOBS)
+  //  WIDGET: PASSWORD REQUIREMENT ROW
+  // ─────────────────────────────────────────────────────────
+  Widget _buildRequirementRow(String text, bool isMet) {
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle_rounded : Icons.circle_outlined,
+          color: isMet ? Colors.green : Colors.grey.shade400,
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            color: isMet ? Colors.black87 : Colors.grey.shade500,
+            decoration: isMet ? null : null,
+            fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  DECORATION & BACKGROUND
   // ─────────────────────────────────────────────────────────
   Widget _buildAmbientBackground() {
     return AnimatedBuilder(
@@ -864,9 +774,6 @@ class _RegisterPageState extends State<RegisterPage>
     );
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  COMMON INPUT DECORATION
-  // ─────────────────────────────────────────────────────────
   InputDecoration _inputDecoration({
     required String label,
     required IconData icon,
@@ -877,7 +784,7 @@ class _RegisterPageState extends State<RegisterPage>
       prefixIcon: Icon(icon, size: 20, color: kPrimaryDeep),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14.0),
-        borderSide: BorderSide(color: Colors.grey),
+        borderSide: const BorderSide(color: Colors.grey),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14.0),
@@ -898,9 +805,8 @@ class _RegisterPageState extends State<RegisterPage>
 }
 
 // ─────────────────────────────────────────────────────────────
-//  EXTENSION + BOUNCY BUTTON
+//  EXTENSIONS & BOUNCY BUTTON
 // ─────────────────────────────────────────────────────────────
-
 extension WidgetBlurExtension on Widget {
   Widget blur(double sigma) {
     return BackdropFilter(
@@ -913,7 +819,6 @@ extension WidgetBlurExtension on Widget {
 class _BouncyButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onPressed;
-
   const _BouncyButton({required this.child, required this.onPressed});
 
   @override

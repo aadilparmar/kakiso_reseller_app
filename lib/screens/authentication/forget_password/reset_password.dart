@@ -1,29 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:kakiso_reseller_app/screens/authentication/login/login.dart'; // Assuming you are still using GetX for navigation
+import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
-class PasswordResetConfirmationPage extends StatelessWidget {
-  const PasswordResetConfirmationPage({super.key});
+class PasswordResetConfirmationPage extends StatefulWidget {
+  final String email; // Receive the email here
+
+  const PasswordResetConfirmationPage({super.key, required this.email});
+
+  @override
+  State<PasswordResetConfirmationPage> createState() =>
+      _PasswordResetConfirmationPageState();
+}
+
+class _PasswordResetConfirmationPageState
+    extends State<PasswordResetConfirmationPage> {
+  bool _isLoading = false;
+
+  Future<void> _resendEmail() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Reuse the same API service logic using the passed email
+      await ApiService.requestPasswordReset(widget.email);
+
+      if (!mounted) return;
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          backgroundColor: Colors.green.shade600,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Row(
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Email resent successfully to ${widget.email}.',
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to resend email: ${e.toString().replaceFirst("Exception: ", "")}',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.center, // Center all content
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 20),
 
               // 1. Illustration Image
-              // Using a placeholder image for now. Replace with your actual asset.
               Image.asset(
-                'assets/images/animations/email_marketing.gif', // Placeholder URL
-                height: 200, // Adjust size as needed
+                'assets/images/animations/email_marketing.gif',
+                height: 200,
               ),
               const SizedBox(height: 40),
 
@@ -41,7 +108,7 @@ class PasswordResetConfirmationPage extends StatelessWidget {
 
               // 3. Description Text
               const Text(
-                'Your Account Security is our Priority ! We have sent you a Secure link to change your password and keep Your Account Protected.',
+                'Your Account Security is our Priority! We have sent you a Secure link to change your password and keep Your Account Protected.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 15, color: Colors.black54),
               ),
@@ -49,13 +116,11 @@ class PasswordResetConfirmationPage extends StatelessWidget {
 
               // 4. Continue Button
               SizedBox(
-                width: double.infinity, // Make button full width
+                width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Get.to(() => const LoginPage()),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(
-                      0xFFE91E63,
-                    ), // Light blue from image
+                    backgroundColor: const Color(0xFFE91E63),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10.0),
@@ -64,7 +129,7 @@ class PasswordResetConfirmationPage extends StatelessWidget {
                     shadowColor: const Color(0xFF29B6F6).withValues(alpha: 0.4),
                   ),
                   child: const Text(
-                    'continue',
+                    'Continue',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
@@ -76,64 +141,26 @@ class PasswordResetConfirmationPage extends StatelessWidget {
               const SizedBox(height: 20),
 
               // 5. Resend Email Button
-              TextButton(
-                onPressed: () {
-                  // Handle resend email logic (e.g., show a snackbar, call an API)
-                  Get.snackbar(
-                    '',
-                    '',
-                    titleText: const Text(
-                      'Email Sent',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15.5,
+              _isLoading
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFE91E63),
+                      ),
+                    )
+                  : TextButton(
+                      onPressed: _resendEmail,
+                      child: const Text(
+                        'Resend Email',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFE91E63),
+                        ),
                       ),
                     ),
-                    messageText: const Text(
-                      'A password reset email has been sent to your registered email address.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13.5,
-                        height: 1.3,
-                      ),
-                    ),
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: const Color(0xFF4A317E),
-                    borderRadius: 14,
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    icon: const Icon(
-                      Icons.mark_email_read_outlined,
-                      color: Colors.white,
-                      size: 26,
-                    ),
-                    shouldIconPulse: false,
-                    boxShadows: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                    duration: const Duration(seconds: 3),
-                  );
-                },
-                child: const Text(
-                  'Resend Email',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFFE91E63), // Light blue from image
-                  ),
-                ),
-              ),
             ],
           ),
         ),

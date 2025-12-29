@@ -97,6 +97,22 @@ class _ToolsSectionState extends State<ToolsSection> {
         pageBuilder: (_) => const ResellerCatalogPage(),
       ),
       Tool(
+        id: 'price_margin',
+        title: 'Smart price margin tool',
+        subtitle: 'Define rules and get recommended margins automatically.',
+        iconData: Iconsax.percentage_circle,
+        enabled: true,
+        pageBuilder: (_) => const PriceMarginToolPage(),
+      ),
+      Tool(
+        id: 'trending',
+        title: 'Trending products dashboard',
+        subtitle: 'See what’s trending across categories in real time.',
+        iconData: Iconsax.activity,
+        enabled: true,
+        pageBuilder: (_) => const TrendingProductsDashboardPage(),
+      ),
+      Tool(
         id: 'auto_video',
         title: 'Auto video generator',
         subtitle: 'Convert product photos into short vertical videos.',
@@ -120,14 +136,7 @@ class _ToolsSectionState extends State<ToolsSection> {
         enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
-      Tool(
-        id: 'price_margin',
-        title: 'Smart price margin tool',
-        subtitle: 'Define rules and get recommended margins automatically.',
-        iconData: Iconsax.percentage_circle,
-        enabled: true,
-        pageBuilder: (_) => const PriceMarginToolPage(),
-      ),
+
       Tool(
         id: 'ai_caption',
         title: 'AI caption generator',
@@ -136,14 +145,7 @@ class _ToolsSectionState extends State<ToolsSection> {
         enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
-      Tool(
-        id: 'trending',
-        title: 'Trending products dashboard',
-        subtitle: 'See what’s trending across categories in real time.',
-        iconData: Iconsax.activity,
-        enabled: true,
-        pageBuilder: (_) => const TrendingProductsDashboardPage(),
-      ),
+
       Tool(
         id: 'broadcast',
         title: 'Broadcast marketing tools',

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 
-// Filter Model
+// ─────────────────────────────────────────────────────────────
+//  FILTER MODEL
+// ─────────────────────────────────────────────────────────────
 enum SortType { relevance, priceLowToHigh, priceHighToLow, newest }
 
 class FilterOptions {
@@ -46,7 +48,9 @@ class FilterOptions {
   }
 }
 
-// Main Filter Bottom Sheet Class
+// ─────────────────────────────────────────────────────────────
+//  MAIN BOTTOM SHEET ENTRY POINT
+// ─────────────────────────────────────────────────────────────
 class ModernFilterBottomSheet {
   static Future<FilterOptions?> show({
     required BuildContext context,
@@ -57,31 +61,51 @@ class ModernFilterBottomSheet {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _FilterBottomSheetContent(
-        currentFilter: currentFilter,
-        accentColor: accentColor,
+      // Use constrained height (e.g. 85% of screen) to look like a proper panel
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.6,
+        maxChildSize: 0.95,
+        builder: (_, controller) => _SplitFilterContent(
+          currentFilter: currentFilter,
+          accentColor: accentColor,
+        ),
       ),
     );
   }
 }
 
-// Internal Content Widget
-class _FilterBottomSheetContent extends StatefulWidget {
+// ─────────────────────────────────────────────────────────────
+//  SPLIT VIEW CONTENT
+// ─────────────────────────────────────────────────────────────
+class _SplitFilterContent extends StatefulWidget {
   final FilterOptions currentFilter;
   final Color accentColor;
 
-  const _FilterBottomSheetContent({
+  const _SplitFilterContent({
     required this.currentFilter,
     required this.accentColor,
   });
 
   @override
-  State<_FilterBottomSheetContent> createState() =>
-      _FilterBottomSheetContentState();
+  State<_SplitFilterContent> createState() => _SplitFilterContentState();
 }
 
-class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
+class _SplitFilterContentState extends State<_SplitFilterContent> {
+  // Sidebar categories
+  final List<String> _categories = ['Sort By', 'Price', 'Availability'];
+
+  // Icons for sidebar
+  final List<IconData> _categoryIcons = [
+    Iconsax.sort,
+    Iconsax.wallet_3,
+    Iconsax.box_tick,
+  ];
+
+  int _selectedIndex = 0; // Which category is selected on left
   late FilterOptions _tempFilter;
+
+  // Price controllers
   late TextEditingController _minController;
   late TextEditingController _maxController;
 
@@ -107,12 +131,20 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
   bool _validatePriceRange() {
     final min = double.tryParse(_minController.text);
     final max = double.tryParse(_maxController.text);
-    return min == null || max == null || min <= max;
+    if (min != null && max != null && min > max) return false;
+    return true;
   }
 
   void _handleApply() {
     if (!_validatePriceRange()) {
       HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Min price cannot be greater than Max price"),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -125,273 +157,141 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
 
   void _handleClear() {
     HapticFeedback.lightImpact();
-    _tempFilter.reset();
-    Navigator.pop(context, _tempFilter);
+    setState(() {
+      _tempFilter.reset();
+      _minController.clear();
+      _maxController.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasError = !_validatePriceRange();
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // 1. HEADER
+          _buildHeader(),
+          const Divider(height: 1),
 
-    return GestureDetector(
-      onTap: () => Navigator.pop(context),
-      child: Container(
-        color: Colors.transparent,
-        child: GestureDetector(
-          onTap: () {}, // Prevent closing when tapping inside
-          child: Container(
-            margin: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 20,
-                  offset: Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          // 2. MIDDLE (SPLIT VIEW)
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle Bar
+                // LEFT SIDEBAR
                 Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  width: 48,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(3),
+                  width: 110, // Fixed width sidebar
+                  color: Colors.grey.shade100,
+                  child: ListView.builder(
+                    itemCount: _categories.length,
+                    itemBuilder: (context, index) {
+                      final isSelected = _selectedIndex == index;
+                      return _buildSidebarItem(index, isSelected);
+                    },
                   ),
                 ),
 
-                // Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              widget.accentColor.withOpacity(0.15),
-                              widget.accentColor.withOpacity(0.05),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Iconsax.filter,
-                          color: widget.accentColor,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Text(
-                          'Filters & Sort',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _tempFilter.reset();
-                            _minController.clear();
-                            _maxController.clear();
-                          });
-                          HapticFeedback.lightImpact();
-                        },
-                        icon: Icon(
-                          Iconsax.refresh,
-                          color: Colors.grey.shade600,
-                        ),
-                        tooltip: 'Reset all',
-                      ),
-                    ],
+                // RIGHT CONTENT
+                Expanded(
+                  child: Container(
+                    color: Colors.white,
+                    child: _buildRightContent(),
                   ),
                 ),
-
-                const Divider(height: 1),
-
-                // Content
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Sort By Section
-                        _buildSectionHeader('Sort By', Iconsax.sort),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            _buildSortChip(
-                              'Relevance',
-                              SortType.relevance,
-                              Iconsax.star,
-                            ),
-                            _buildSortChip(
-                              'Price: Low → High',
-                              SortType.priceLowToHigh,
-                              Iconsax.arrow_up_3,
-                            ),
-                            _buildSortChip(
-                              'Price: High → Low',
-                              SortType.priceHighToLow,
-                              Iconsax.arrow_down_2,
-                            ),
-                            _buildSortChip(
-                              'Newest First',
-                              SortType.newest,
-                              Iconsax.clock,
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Price Range Section
-                        _buildSectionHeader('Price Range', Iconsax.wallet_3),
-                        const SizedBox(height: 16),
-                        _buildPriceInputs(hasError),
-
-                        if (hasError) ...[
-                          const SizedBox(height: 12),
-                          _buildErrorMessage(),
-                        ],
-
-                        const SizedBox(height: 24),
-
-                        // Quick Filters
-                        const Text(
-                          'Quick Filters',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildQuickFilter('Under ₹500', () {
-                                _minController.text = '0';
-                                _maxController.text = '500';
-                              }),
-                              const SizedBox(width: 8),
-                              _buildQuickFilter('₹500 - ₹1000', () {
-                                _minController.text = '500';
-                                _maxController.text = '1000';
-                              }),
-                              const SizedBox(width: 8),
-                              _buildQuickFilter('₹1000 - ₹5000', () {
-                                _minController.text = '1000';
-                                _maxController.text = '5000';
-                              }),
-                              const SizedBox(width: 8),
-                              _buildQuickFilter('Above ₹5000', () {
-                                _minController.text = '5000';
-                                _maxController.clear();
-                              }),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Availability Toggle
-                        _buildAvailabilityToggle(),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Action Buttons
-                _buildActionButtons(hasError),
               ],
             ),
           ),
-        ),
+
+          const Divider(height: 1),
+
+          // 3. BOTTOM ACTIONS
+          _buildBottomBar(),
+        ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey.shade700),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            fontFamily: 'Poppins',
+  // ---------------------------------------------------------------------------
+  // WIDGET BUILDERS
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(Iconsax.setting_4, color: widget.accentColor, size: 22),
+              const SizedBox(width: 8),
+              const Text(
+                "Filters",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildSortChip(String label, SortType type, IconData icon) {
-    final bool isSelected = _tempFilter.sortType == type;
-
-    return InkWell(
+  Widget _buildSidebarItem(int index, bool isSelected) {
+    return GestureDetector(
       onTap: () {
-        setState(() => _tempFilter.sortType = type);
         HapticFeedback.selectionClick();
+        setState(() {
+          _selectedIndex = index;
+        });
       },
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? widget.accentColor : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? widget.accentColor : Colors.grey.shade200,
-            width: 1.5,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: widget.accentColor.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
-        ),
+      child: Container(
+        height: 60, // Fixed height cells
+        color: isSelected ? Colors.white : Colors.grey.shade100,
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+            // Selection Indicator Bar
+            Container(
+              width: 4,
+              height: 60,
+              color: isSelected ? widget.accentColor : Colors.transparent,
             ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
-                fontFamily: 'Poppins',
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _categoryIcons[index],
+                    size: 20,
+                    color: isSelected
+                        ? widget.accentColor
+                        : Colors.grey.shade600,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _categories[index],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: isSelected ? Colors.black87 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -400,278 +300,262 @@ class _FilterBottomSheetContentState extends State<_FilterBottomSheetContent> {
     );
   }
 
-  Widget _buildPriceInputs(bool hasError) {
-    return Row(
+  Widget _buildRightContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildSortView();
+      case 1:
+        return _buildPriceView();
+      case 2:
+        return _buildAvailabilityView();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  // --- SORT VIEW (Radio List) ---
+  Widget _buildSortView() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: hasError ? Colors.red.shade300 : Colors.grey.shade200,
-                width: 1.5,
-              ),
-            ),
-            child: TextField(
-              controller: _minController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Min',
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 8),
-                  child: Text(
-                    '₹',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 18,
-                ),
-              ),
-            ),
-          ),
+        const Text(
+          "Sort By",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Container(width: 24, height: 2, color: Colors.grey.shade300),
+        const SizedBox(height: 12),
+        _buildRadioOption("Relevance", SortType.relevance),
+        _buildRadioOption("Price (Low to High)", SortType.priceLowToHigh),
+        _buildRadioOption("Price (High to Low)", SortType.priceHighToLow),
+        _buildRadioOption("Newest First", SortType.newest),
+      ],
+    );
+  }
+
+  Widget _buildRadioOption(String label, SortType value) {
+    final isSelected = _tempFilter.sortType == value;
+    return InkWell(
+      onTap: () => setState(() => _tempFilter.sortType = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: isSelected ? widget.accentColor : Colors.grey,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: hasError ? Colors.red.shade300 : Colors.grey.shade200,
-                width: 1.5,
-              ),
+      ),
+    );
+  }
+
+  // --- PRICE VIEW (Inputs + Chips) ---
+  Widget _buildPriceView() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          "Custom Price Range",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildPriceField("Min", _minController)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Text("to", style: TextStyle(color: Colors.grey)),
             ),
-            child: TextField(
-              controller: _maxController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Max',
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 8),
-                  child: Text(
-                    '₹',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 18,
-                ),
-              ),
-            ),
-          ),
+            Expanded(child: _buildPriceField("Max", _maxController)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          "Quick Select",
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildPriceChip('Under ₹500', '0', '500'),
+            _buildPriceChip('₹500 - ₹1000', '500', '1000'),
+            _buildPriceChip('₹1000 - ₹2000', '1000', '2000'),
+            _buildPriceChip('Above ₹2000', '2000', ''),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildErrorMessage() {
+  Widget _buildPriceField(String hint, TextEditingController controller) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      height: 48,
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        children: [
-          Icon(Iconsax.info_circle, color: Colors.red.shade700, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Min price cannot exceed max price',
-              style: TextStyle(
-                color: Colors.red.shade700,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      alignment: Alignment.center,
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixText: "₹ ",
+          border: InputBorder.none,
+          isDense: true,
+        ),
+        onChanged: (_) => setState(() {}), // Trigger validation UI updates
       ),
     );
   }
 
-  Widget _buildQuickFilter(String label, VoidCallback onTap) {
+  Widget _buildPriceChip(String label, String min, String max) {
+    bool isActive = _minController.text == min && _maxController.text == max;
     return InkWell(
       onTap: () {
-        setState(() => onTap());
-        HapticFeedback.lightImpact();
+        setState(() {
+          _minController.text = min;
+          _maxController.text = max;
+        });
       },
-      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isActive
+              ? widget.accentColor.withValues(alpha: 0.1)
+              : Colors.white,
+          border: Border.all(
+            color: isActive ? widget.accentColor : Colors.grey.shade300,
+          ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade300),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
+            color: isActive ? widget.accentColor : Colors.black87,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildAvailabilityToggle() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _tempFilter.inStockOnly
-            ? widget.accentColor.withOpacity(0.08)
-            : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _tempFilter.inStockOnly
-              ? widget.accentColor.withOpacity(0.3)
-              : Colors.grey.shade200,
-          width: 1.5,
+  // --- AVAILABILITY VIEW (Checkbox) ---
+  Widget _buildAvailabilityView() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          "Availability",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-      ),
-      child: SwitchListTile(
-        value: _tempFilter.inStockOnly,
-        onChanged: (v) {
-          setState(() => _tempFilter.inStockOnly = v);
-          HapticFeedback.selectionClick();
-        },
-        activeColor: widget.accentColor,
-        title: Row(
-          children: [
-            Icon(
-              Iconsax.box_tick,
-              size: 20,
-              color: _tempFilter.inStockOnly
-                  ? widget.accentColor
-                  : Colors.grey.shade600,
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'In Stock Only',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => setState(
+            () => _tempFilter.inStockOnly = !_tempFilter.inStockOnly,
+          ),
+          child: Row(
+            children: [
+              Checkbox(
+                value: _tempFilter.inStockOnly,
+                activeColor: widget.accentColor,
+                onChanged: (v) => setState(() => _tempFilter.inStockOnly = v!),
               ),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(left: 32),
-          child: Text(
-            'Show only available products',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              const Expanded(child: Text("Include Out of Stock items")),
+            ],
           ),
         ),
-      ),
+        // Normally e-commerce sites show "Exclude out of stock",
+        // but here we toggle `inStockOnly`.
+        // Let's make it clearer:
+        InkWell(
+          onTap: () => setState(
+            () => _tempFilter.inStockOnly = !_tempFilter.inStockOnly,
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  _tempFilter.inStockOnly
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
+                  color: _tempFilter.inStockOnly
+                      ? widget.accentColor
+                      : Colors.grey,
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Show In-Stock Only",
+                  style: TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildActionButtons(bool hasError) {
+  // --- BOTTOM BAR ---
+  Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.shade200,
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: const Offset(0, -4),
             blurRadius: 10,
-            offset: const Offset(0, -2),
           ),
         ],
       ),
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child: TextButton(
               onPressed: _handleClear,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: Colors.grey.shade300, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+              child: const Text(
+                "Clear All",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Iconsax.close_circle,
-                    size: 18,
-                    color: Colors.grey.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Clear',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
-            flex: 2,
             child: ElevatedButton(
-              onPressed: hasError ? null : _handleApply,
+              onPressed: _handleApply,
               style: ElevatedButton.styleFrom(
-                backgroundColor: hasError
-                    ? Colors.grey.shade300
-                    : widget.accentColor,
+                backgroundColor: widget.accentColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                elevation: 0,
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Iconsax.tick_circle, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Apply Filters',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
+              child: const Text(
+                "Apply",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),

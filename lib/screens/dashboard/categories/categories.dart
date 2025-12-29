@@ -46,8 +46,10 @@ class _CategoriesPageState extends State<CategoriesSection>
   Timer? _debounce;
 
   // Navigation & Selection
-  int _selectedParentId = 0;
-  int? _selectedChildId;
+  int _selectedParentId = 0; // Level 1
+  int? _selectedChildId; // Level 2
+  int? _selectedGrandchildId; // Level 3
+
   final Set<int> _selectedProductIds = {};
 
   // Controllers
@@ -139,7 +141,8 @@ class _CategoriesPageState extends State<CategoriesSection>
       if (mounted) {
         setState(() {
           _searchQuery = query;
-          _selectedChildId = null; // Reset sub-cat selection on search
+          _selectedChildId = null;
+          _selectedGrandchildId = null;
         });
       }
     });
@@ -285,14 +288,25 @@ class _CategoriesPageState extends State<CategoriesSection>
     );
   }
 
+  // --- HIERARCHY LOGIC ---
   List<CategoryModel> _getParents() =>
       _allCategoriesFlat.where((c) => c.parent == 0).toList();
+
   List<CategoryModel> _getChildren(int parentId) =>
       _allCategoriesFlat.where((c) => c.parent == parentId).toList();
 
   @override
   Widget build(BuildContext context) {
     final textScaler = MediaQuery.textScalerOf(context);
+
+    // Prepare lists for UI
+    final level2Categories = _getChildren(_selectedParentId);
+
+    // Level 3 Logic
+    List<CategoryModel> level3Categories = [];
+    if (_selectedChildId != null) {
+      level3Categories = _getChildren(_selectedChildId!);
+    }
 
     return Scaffold(
       backgroundColor: _bgLeft,
@@ -313,7 +327,7 @@ class _CategoriesPageState extends State<CategoriesSection>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // LEFT RAIL
+                      // LEFT RAIL (Level 1)
                       _buildLeftRail(textScaler),
 
                       // RIGHT CONTENT
@@ -339,31 +353,43 @@ class _CategoriesPageState extends State<CategoriesSection>
                               controller: _rightScrollController,
                               physics: const BouncingScrollPhysics(),
                               slivers: [
-                                // FIX: Title acts as a normal scrollable item
+                                // Title
                                 _buildTitleSliver(),
 
-                                // FIX: Sticky Header only contains the Search Bar now (Fixed Height)
+                                // 1. Search Bar (Sticky)
                                 SliverPersistentHeader(
                                   pinned: true,
-                                  delegate: _StickySearchDelegate(
-                                    height:
-                                        74, // Fixed height prevents overflow
+                                  delegate: _StickyDelegate(
+                                    height: 74,
                                     child: _buildStickySearchBar(),
                                   ),
                                 ),
 
+                                // 2. Level 2 Tabs (Sticky)
                                 if (_searchQuery.isEmpty &&
-                                    _getChildren(_selectedParentId).isNotEmpty)
+                                    level2Categories.isNotEmpty)
                                   SliverPersistentHeader(
                                     pinned: true,
-                                    delegate: _StickyFilterDelegate(
+                                    delegate: _StickyDelegate(
                                       height: 60,
                                       child: _buildSubCategoryTabs(
-                                        _getChildren(_selectedParentId),
+                                        level2Categories,
                                       ),
                                     ),
                                   ),
-                                _buildRightSideBody(),
+
+                                // 3. Level 3 Chips (Visible when Level 2 Tab is selected)
+                                if (_searchQuery.isEmpty &&
+                                    level3Categories.isNotEmpty)
+                                  SliverToBoxAdapter(
+                                    child: _buildGrandchildChips(
+                                      level3Categories,
+                                    ),
+                                  ),
+
+                                // 4. Products Body
+                                _buildRightSideBody(level2Categories),
+
                                 const SliverPadding(
                                   padding: EdgeInsets.only(bottom: 100),
                                 ),
@@ -404,7 +430,8 @@ class _CategoriesPageState extends State<CategoriesSection>
               }
               setState(() {
                 _selectedParentId = cat.id;
-                _selectedChildId = null;
+                _selectedChildId = null; // Reset L2
+                _selectedGrandchildId = null; // Reset L3
               });
               if (_rightScrollController.hasClients) {
                 _rightScrollController.jumpTo(0);
@@ -482,7 +509,6 @@ class _CategoriesPageState extends State<CategoriesSection>
 
   // --- RIGHT HEADER COMPONENTS ---
 
-  // 1. Scrollable Title (New)
   Widget _buildTitleSliver() {
     final parent = _getSelectedParent();
     if (_searchQuery.isNotEmpty) {
@@ -506,11 +532,9 @@ class _CategoriesPageState extends State<CategoriesSection>
     );
   }
 
-  // 2. Sticky Search Bar (Updated)
   Widget _buildStickySearchBar() {
     return Container(
-      color:
-          _bgRight, // Background ensures content doesn't show behind when sticky
+      color: _bgRight,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       alignment: Alignment.center,
       child: SearchAndFilterBar(
@@ -532,7 +556,7 @@ class _CategoriesPageState extends State<CategoriesSection>
     );
   }
 
-  // --- SUB TABS ---
+  // --- LEVEL 2 TABS ---
   Widget _buildSubCategoryTabs(List<CategoryModel> children) {
     return Container(
       color: _bgRight,
@@ -549,8 +573,13 @@ class _CategoriesPageState extends State<CategoriesSection>
               : _selectedChildId == cat!.id;
 
           return GestureDetector(
-            onTap: () =>
-                setState(() => _selectedChildId = isOverview ? null : cat!.id),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _selectedChildId = isOverview ? null : cat!.id;
+                _selectedGrandchildId = null; // Reset L3 when changing L2
+              });
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -577,26 +606,88 @@ class _CategoriesPageState extends State<CategoriesSection>
     );
   }
 
+  // --- LEVEL 3 (GRANDCHILD) CHIPS (For specific L2 tab) ---
+  Widget _buildGrandchildChips(List<CategoryModel> grandchildren) {
+    return Container(
+      color: _bgRight,
+      height: 50,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        scrollDirection: Axis.horizontal,
+        itemCount: grandchildren.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final isAll = index == 0;
+          final cat = isAll ? null : grandchildren[index - 1];
+          final isSelected = isAll
+              ? _selectedGrandchildId == null
+              : _selectedGrandchildId == cat!.id;
+
+          return ChoiceChip(
+            label: Text(
+              isAll ? "All items" : cat!.name,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? accentColor : Colors.black87,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            selected: isSelected,
+            onSelected: (bool selected) {
+              if (selected) {
+                setState(() {
+                  _selectedGrandchildId = isAll ? null : cat!.id;
+                });
+              }
+            },
+            selectedColor: accentColor.withOpacity(0.1),
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: isSelected ? accentColor : Colors.grey.shade300,
+              ),
+            ),
+            padding: EdgeInsets.zero,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+        },
+      ),
+    );
+  }
+
   // --- BODY ---
-  Widget _buildRightSideBody() {
+  Widget _buildRightSideBody(List<CategoryModel> level2Categories) {
     if (_searchQuery.isNotEmpty) return _buildSearchResultsGrid();
 
-    final children = _getChildren(_selectedParentId);
-
-    if (children.isEmpty) {
+    // 1. If Level 1 has no children
+    if (level2Categories.isEmpty) {
       return _buildProductGrid(
         categoryId: _selectedParentId,
         key: ValueKey("p_$_selectedParentId"),
       );
     }
 
+    // 2. If Level 2 is selected (Specific Tab)
     if (_selectedChildId != null) {
+      // 2a. If Level 3 is selected (Grandchild Chip)
+      if (_selectedGrandchildId != null) {
+        return _buildProductGrid(
+          categoryId: _selectedGrandchildId!,
+          key: ValueKey("gc_$_selectedGrandchildId"),
+        );
+      }
+
+      // 2b. Else show Level 2 products
       return _buildProductGrid(
         categoryId: _selectedChildId!,
         key: ValueKey("c_$_selectedChildId"),
       );
-    } else {
-      return _buildOverviewSliver(children);
+    }
+    // 3. Overview (All Tabs selected)
+    else {
+      return _buildOverviewSliver(level2Categories);
     }
   }
 
@@ -609,12 +700,34 @@ class _CategoriesPageState extends State<CategoriesSection>
           return _ModernCategorySection(
             key: ValueKey("sec_${cat.id}"),
             category: cat,
-            onSeeAll: () => Get.to(
-              () => CategoryDetailsPage(
-                categoryId: cat.id,
-                categoryName: cat.name,
-              ),
-            ),
+            // Pass full category list to find grandchildren
+            allCategories: _allCategoriesFlat,
+
+            // Standard "View All" (No filter active): Go to dedicated Detail Page for this category
+            onSeeAll: () {
+              Get.to(
+                () => CategoryDetailsPage(
+                  categoryId: cat.id,
+                  categoryName: cat.name,
+                ),
+              );
+            },
+
+            // Filtered "View All" (Grandchild active): Go to dedicated Detail Page for that grandchild
+            onGrandchildNavigate: (grandchildId) {
+              // Find the grandchild object to pass correct name
+              final grandchild = _allCategoriesFlat.firstWhere(
+                (c) => c.id == grandchildId,
+                orElse: () => cat,
+              );
+
+              Get.to(
+                () => CategoryDetailsPage(
+                  categoryId: grandchild.id,
+                  categoryName: grandchild.name,
+                ),
+              );
+            },
             catalogueController: catalogueController,
             selectedProductIds: _selectedProductIds,
             onToggleSelection: _toggleProductSelection,
@@ -637,7 +750,9 @@ class _CategoriesPageState extends State<CategoriesSection>
           return const SliverToBoxAdapter(child: _SliverSkeletonGrid());
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SliverFillRemaining(child: _EmptyState("No products."));
+          return const SliverFillRemaining(
+            child: _EmptyState("No products found."),
+          );
         }
         return _buildSliverGridProducts(snapshot.data!);
       },
@@ -886,8 +1001,6 @@ class _CategoriesPageState extends State<CategoriesSection>
             color: accentColor,
             iconSize: 30,
             onPressed: () {
-              // Navigate to ProfilePage using currently stored user data
-              // We use _userData which is initialized in initState from widget.userData
               Get.to(() => WishlistScreen());
             },
           ),
@@ -914,10 +1027,10 @@ class _CategoriesPageState extends State<CategoriesSection>
 
 // --- DELEGATES ---
 
-class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
+class _StickyDelegate extends SliverPersistentHeaderDelegate {
   final double height;
   final Widget child;
-  _StickySearchDelegate({required this.height, required this.child});
+  _StickyDelegate({required this.height, required this.child});
   @override
   Widget build(
     BuildContext context,
@@ -929,25 +1042,7 @@ class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
   @override
   double get minExtent => height;
   @override
-  bool shouldRebuild(_StickySearchDelegate oldDelegate) => true;
-}
-
-class _StickyFilterDelegate extends SliverPersistentHeaderDelegate {
-  final double height;
-  final Widget child;
-  _StickyFilterDelegate({required this.height, required this.child});
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) => SizedBox.expand(child: child);
-  @override
-  double get maxExtent => height;
-  @override
-  double get minExtent => height;
-  @override
-  bool shouldRebuild(_StickyFilterDelegate oldDelegate) => true;
+  bool shouldRebuild(_StickyDelegate oldDelegate) => true;
 }
 
 // --- WIDGETS ---
@@ -983,7 +1078,9 @@ class _SliverSkeletonGrid extends StatelessWidget {
 
 class _ModernCategorySection extends StatefulWidget {
   final CategoryModel category;
+  final List<CategoryModel> allCategories;
   final VoidCallback onSeeAll;
+  final Function(int) onGrandchildNavigate; // Use this ONLY on 'View All'
   final CatalogueController catalogueController;
   final Set<int> selectedProductIds;
   final Function(int) onToggleSelection;
@@ -992,7 +1089,9 @@ class _ModernCategorySection extends StatefulWidget {
   const _ModernCategorySection({
     Key? key,
     required this.category,
+    required this.allCategories,
     required this.onSeeAll,
+    required this.onGrandchildNavigate,
     required this.catalogueController,
     required this.selectedProductIds,
     required this.onToggleSelection,
@@ -1006,19 +1105,32 @@ class _ModernCategorySection extends StatefulWidget {
 class _ModernCategorySectionState extends State<_ModernCategorySection> {
   List<ProductModel> products = [];
   bool loading = true;
+  List<CategoryModel> grandchildren = [];
+
+  // Local state to track selected grandchild filter for THIS section
+  int? _activeGrandchildId;
 
   @override
   void initState() {
     super.initState();
+    // Find Level 3 categories for this section
+    grandchildren = widget.allCategories
+        .where((c) => c.parent == widget.category.id)
+        .toList();
+
     _fetch();
   }
 
   void _fetch() async {
+    setState(() => loading = true);
     try {
-      final res = await ApiService.fetchProductsByCategory(widget.category.id);
+      // Use activeGrandchildId if selected, otherwise use category (Level 2) ID
+      final targetId = _activeGrandchildId ?? widget.category.id;
+      final res = await ApiService.fetchProductsByCategory(targetId);
+
       if (mounted) {
         setState(() {
-          products = res.take(4).toList();
+          products = res.take(6).toList(); // Show top 6 items
           loading = false;
         });
       }
@@ -1029,38 +1141,123 @@ class _ModernCategorySectionState extends State<_ModernCategorySection> {
 
   @override
   Widget build(BuildContext context) {
-    if (!loading && products.isEmpty) return const SizedBox();
+    // We show layout even if loading, to show structure
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 1. Header (Title + View All)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                widget.category.name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  widget.category.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               InkWell(
-                onTap: widget.onSeeAll,
-                child: const Text(
-                  "View All",
-                  style: TextStyle(
-                    color: accentColor,
-                    fontWeight: FontWeight.w600,
+                onTap: () {
+                  // If filter is active, navigate to that filter.
+                  // Else do standard navigation.
+                  if (_activeGrandchildId != null) {
+                    widget.onGrandchildNavigate(_activeGrandchildId!);
+                  } else {
+                    widget.onSeeAll();
+                  }
+                },
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: Text(
+                    "View All",
+                    style: TextStyle(
+                      color: accentColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
         ),
+
+        // 2. Grandchild Chips - updates ONLY local grid
+        if (grandchildren.isNotEmpty)
+          Container(
+            height: 36,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: grandchildren.length + 1, // +1 for "All" option
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final isAll = index == 0;
+                final gc = isAll ? null : grandchildren[index - 1];
+                final isSelected = isAll
+                    ? _activeGrandchildId == null
+                    : _activeGrandchildId == gc!.id;
+
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _activeGrandchildId = isAll ? null : gc!.id;
+                    });
+                    _fetch(); // Refresh products instantly
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 0,
+                    ),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected ? accentColor : Colors.white,
+                      border: Border.all(
+                        color: isSelected ? accentColor : Colors.grey.shade300,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      isAll ? "All" : gc!.name,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isSelected ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+        // 3. Products Grid
         loading
             ? const SizedBox(
                 height: 200,
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(
+                  child: CircularProgressIndicator(color: accentColor),
+                ),
+              )
+            : products.isEmpty
+            ? SizedBox(
+                height: 100,
+                child: Center(
+                  child: Text(
+                    "No items found.",
+                    style: TextStyle(color: Colors.grey.shade400),
+                  ),
+                ),
               )
             : GridView.builder(
                 shrinkWrap: true,

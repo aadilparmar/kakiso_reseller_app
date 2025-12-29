@@ -24,7 +24,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _isValidEmail(String value) {
     final email = value.trim();
     if (email.isEmpty) return false;
-    // Very simple email pattern – enough for basic validation
     final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     return regex.hasMatch(email);
   }
@@ -74,7 +73,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (!mounted) return;
 
       // ✅ Show success message
-      // ✅ Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -107,8 +105,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         ),
       );
 
-      // ✅ Navigate to confirmation screen
-      Get.to(() => const PasswordResetConfirmationPage());
+      // ✅ Navigate to confirmation screen AND PASS THE EMAIL
+      Get.to(() => PasswordResetConfirmationPage(email: email));
     } catch (e) {
       if (!mounted) return;
 
