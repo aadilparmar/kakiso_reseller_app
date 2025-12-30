@@ -273,8 +273,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     final bool isAddedToCatalog = VerticalProductCard._sessionAddedToCatalog
         .containsKey(widget.product.id);
     final bool isVisuallySelected = widget.isSelected || isAddedToCatalog;
-    final String? addedCatalogName =
-        VerticalProductCard._sessionAddedToCatalog[widget.product.id];
 
     final double? basePrice = _parsePrice(widget.product.price);
     final double? resellPrice = basePrice != null ? (basePrice * 1.3) : null;
@@ -319,10 +317,10 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ==========================================
-              // 1. IMAGE SECTION (55% Height) - Reduced to give text room
+              // 1. IMAGE SECTION (55% Height)
               // ==========================================
               Expanded(
-                flex: 55, // Changed from 65 to 55 to prevent overflow below
+                flex: 55,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -349,7 +347,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         ),
                       ),
                     ),
-                    // Shadow overlay for better contrast if needed
                     Positioned(
                       bottom: 0,
                       left: 0,
@@ -466,275 +463,307 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
               ),
 
               // ==========================================
-              // 2. DETAILS SECTION (45% Height) - Increased
+              // 2. DETAILS SECTION (45% Height)
               // ==========================================
               Expanded(
-                flex: 45, // Increased from 35 to 45
+                flex: 45,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // --- Product Name ---
-                      Text(
-                        widget.product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13, // Standard readable size
-                          fontWeight: FontWeight.w600,
-                          color: kBlack,
-                        ),
-                      ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // HIDE PROFIT if card width is less than 130px
+                      final bool showProfit = constraints.maxWidth > 130;
 
-                      const Spacer(), // Distribute space
-                      // --- Buy Price + MRP ---
-                      Row(
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            "Buy ",
-                            style: TextStyle(
+                          // --- Product Name ---
+                          Text(
+                            widget.product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                               fontFamily: 'Poppins',
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: kBlack,
                             ),
                           ),
-                          Flexible(
-                            child: Text(
-                              "₹${widget.product.price}",
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: kPrimaryColor,
-                              ),
-                            ),
-                          ),
-                          if (mrpPrice != null && mrpPrice != basePrice) ...[
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                "₹${mrpPrice.toStringAsFixed(0)}",
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+
+                          const Spacer(),
+
+                          // --- Buy Price + MRP ---
+                          Row(
+                            children: [
+                              const Text(
+                                "Buy ",
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  decoration: TextDecoration.lineThrough,
-                                  color: Colors.grey.shade400,
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: Color(0xFF6B7280),
                                 ),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-
-                      const SizedBox(height: 2),
-
-                      // --- Resell + Profit ---
-                      Row(
-                        children: [
-                          if (resellPrice != null)
-                            const Text(
-                              "Resell ",
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Color.fromARGB(255, 136, 135, 139),
-                              ),
-                            ),
-                          Flexible(
-                            child: Text(
-                              "₹${resellPrice?.toStringAsFixed(0)}",
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: Color.fromARGB(255, 136, 135, 139),
-                              ),
-                            ),
-                          ),
-                          if (profit != null) ...[
-                            const SizedBox(width: 4),
-                            // Profit Badge - Flexible to prevent overflow
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: kGreen.withValues(alpha: 0.2),
+                              Flexible(
+                                child: Text(
+                                  "₹${widget.product.price}",
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: kPrimaryColor,
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Iconsax.trend_up,
-                                      size: 10,
-                                      color: kGreen,
+                              ),
+                              if (mrpPrice != null &&
+                                  mrpPrice != basePrice) ...[
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    "₹${mrpPrice.toStringAsFixed(0)}",
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      decoration: TextDecoration.lineThrough,
+                                      color: Colors.grey.shade400,
                                     ),
-                                    const SizedBox(width: 2),
-                                    Flexible(
-                                      child: Text(
-                                        "₹${profit.toStringAsFixed(0)}",
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+
+                          const SizedBox(height: 2),
+
+                          // --- Resell + Profit (Conditional) ---
+                          Row(
+                            children: [
+                              if (resellPrice != null)
+                                const Text(
+                                  "Resell ",
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color.fromARGB(255, 136, 135, 139),
+                                  ),
+                                ),
+                              Flexible(
+                                child: Text(
+                                  "₹${resellPrice?.toStringAsFixed(0)}",
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color.fromARGB(255, 136, 135, 139),
+                                  ),
+                                ),
+                              ),
+                              if (profit != null && showProfit) ...[
+                                const SizedBox(width: 4),
+                                // Profit Badge - Flexible
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: kGreen.withValues(alpha: 0.2),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Iconsax.trend_up,
+                                          size: 10,
                                           color: kGreen,
                                         ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      // --- Buttons (Row) ---
-                      SizedBox(
-                        height: 32, // Fixed height for button row
-                        child: Row(
-                          children: [
-                            // CART BUTTON
-                            Expanded(
-                              child: Obx(() {
-                                final bool isAdded = cartController.cartItems
-                                    .any(
-                                      (e) => e.product.id == widget.product.id,
-                                    );
-                                return ElevatedButton(
-                                  onPressed: _handleAddToCart,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isAdded
-                                        ? const Color(0xFF9C89C7)
-                                        : Colors.white,
-                                    side: BorderSide(
-                                      color: isVisuallySelected
-                                          ? Colors.transparent
-                                          : kPrimaryColor,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            "₹${profit.toStringAsFixed(0)}",
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: kGreen,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: isAdded
-                                      ? const Icon(
-                                          Icons.check,
-                                          color: Colors.white,
-                                          size: 18,
-                                        )
-                                      : Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: const [
-                                            Icon(
-                                              Iconsax.shopping_cart,
-                                              size: 14,
-                                              color: kPrimaryColor,
+                                ),
+                              ],
+                            ],
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          // --- Buttons ---
+                          SizedBox(
+                            height: 32,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Obx(() {
+                                    final bool isAdded = cartController
+                                        .cartItems
+                                        .any(
+                                          (e) =>
+                                              e.product.id == widget.product.id,
+                                        );
+                                    return ElevatedButton(
+                                      onPressed: _handleAddToCart,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isAdded
+                                            ? const Color(0xFF9C89C7)
+                                            : Colors.white,
+                                        side: BorderSide(
+                                          color: isVisuallySelected
+                                              ? Colors.transparent
+                                              : kPrimaryColor,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                      ),
+                                      child: isAdded
+                                          ? Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: const [
+                                                Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    "Added",
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.start,
+                                              children: const [
+                                                // Icon(
+                                                //   Iconsax.shopping_cart,
+                                                //   size: 14,
+                                                //   color: kPrimaryColor,
+                                                // ),
+                                                SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    "Add to Cart",
+                                                    style: TextStyle(
+                                                      fontSize: 9,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: kPrimaryColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            SizedBox(width: 4),
-                                            Flexible(
-                                              child: Text(
-                                                "Cart",
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: kPrimaryColor,
+                                    );
+                                  }),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () =>
+                                        _onAddToCataloguePressed(context),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: isVisuallySelected
+                                          ? const Color(0xFFEE9BBF)
+                                          : Colors.transparent,
+                                      side: BorderSide(
+                                        color: isVisuallySelected
+                                            ? Colors.transparent
+                                            : kAccentColor,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    child: isVisuallySelected
+                                        ? Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const SizedBox(width: 2),
+                                              Flexible(
+                                                child: Text(
+                                                  "In Cat..",
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.white,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(width: 6),
-
-                            // CATALOG BUTTON
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () =>
-                                    _onAddToCataloguePressed(context),
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: isVisuallySelected
-                                      ? const Color(0xFFEE9BBF)
-                                      : Colors.transparent,
-                                  side: BorderSide(
-                                    color: isVisuallySelected
-                                        ? Colors.transparent
-                                        : kAccentColor,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                ),
-                                child: isVisuallySelected
-                                    ? Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const SizedBox(width: 2),
-                                          Flexible(
-                                            child: Text(
-                                              "In Catalog #$addedCatalogName",
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                    : Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: const [
-                                          Icon(
-                                            Iconsax.book_1,
-                                            size: 14,
-                                            color: kAccentColor,
-                                          ),
-                                          SizedBox(width: 4),
-                                          Flexible(
-                                            child: Text(
-                                              "Add",
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
+                                            ],
+                                          )
+                                        : Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: const [
+                                              Icon(
+                                                Iconsax.book_1,
+                                                size: 14,
                                                 color: kAccentColor,
                                               ),
-                                            ),
+                                              SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  "Add to Catalog",
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: kAccentColor,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                              ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -881,7 +910,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                   },
                   icon: const Icon(Iconsax.add_circle, size: 20),
                   label: const Text(
-                    'Create New Catalogue',
+                    'Create New Catalog',
                     textScaler: TextScaler.linear(1.0),
                   ),
                   style: ElevatedButton.styleFrom(

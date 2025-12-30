@@ -4,7 +4,6 @@ import 'package:kakiso_reseller_app/models/categories.dart';
 
 class LeftNavigationRail extends StatefulWidget {
   final List<CategoryModel> parentCategories;
-  // Use ID for selection logic, not list index, for safer database mapping
   final int selectedCategoryId;
   final Function(int index, String label, int id) onCategorySelected;
   final Color accentColor;
@@ -28,7 +27,6 @@ class _LeftNavigationRailState extends State<LeftNavigationRail> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    // Post-frame callback to scroll to the initially selected item
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
   }
 
@@ -46,16 +44,15 @@ class _LeftNavigationRailState extends State<LeftNavigationRail> {
     );
 
     if (index != -1 && _scrollController.hasClients) {
-      // 112.0 is the itemExtent defined below
-      const double itemHeight = 112.0;
+      // Increased item extent to accommodate larger images + text
+      const double itemHeight = 140.0;
       final double targetOffset = index * itemHeight;
       final double screenHeight = MediaQuery.of(context).size.height;
 
-      // Only scroll if the item is likely out of view
       if (targetOffset < _scrollController.offset ||
           targetOffset > _scrollController.offset + screenHeight - 200) {
         _scrollController.animateTo(
-          targetOffset - (screenHeight / 2) + (itemHeight / 2), // Center it
+          targetOffset - (screenHeight / 2) + (itemHeight / 2),
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic,
         );
@@ -71,21 +68,14 @@ class _LeftNavigationRailState extends State<LeftNavigationRail> {
 
   @override
   Widget build(BuildContext context) {
+    // Increased width to 116 to let the images breathe
     return Container(
-      width: 100, // Slightly wider for better touch targets
+      width: 116,
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC), // Softer grey/blue tint
+        color: const Color(0xFFF5F7FA), // Very subtle cool grey
         border: Border(
-          right: BorderSide(color: Colors.grey.shade200, width: 1.5),
+          right: BorderSide(color: Colors.grey.shade200, width: 1),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(2, 0),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -98,14 +88,12 @@ class _LeftNavigationRailState extends State<LeftNavigationRail> {
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 itemCount: widget.parentCategories.length,
-                // ⚡ OPTIMIZATION: Kept fixed extent for performance
-                itemExtent: 112.0,
+                itemExtent: 140.0, // Taller items
                 itemBuilder: (context, index) {
                   final item = widget.parentCategories[index];
                   final bool isSelected = item.id == widget.selectedCategoryId;
 
-                  // Example Logic: Add a badge if the name contains specific keywords
-                  // In a real app, this would come from the model (e.g., item.badgeText)
+                  // Badge Logic
                   String? badgeText;
                   if (item.name.toLowerCase().contains('sale'))
                     badgeText = 'SALE';
@@ -119,7 +107,7 @@ class _LeftNavigationRailState extends State<LeftNavigationRail> {
                       accentColor: widget.accentColor,
                       badgeText: badgeText,
                       onTap: () {
-                        HapticFeedback.lightImpact(); // lighter feedback is more premium
+                        HapticFeedback.selectionClick();
                         widget.onCategorySelected(index, item.name, item.id);
                       },
                     ),
@@ -128,16 +116,17 @@ class _LeftNavigationRailState extends State<LeftNavigationRail> {
               ),
             ),
           ),
-          // Optional: Bottom fading indicator if list is long
+
+          // Bottom Fade
           Container(
-            height: 20,
+            height: 30,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFFF7F9FC).withOpacity(0),
-                  const Color(0xFFF7F9FC),
+                  const Color(0xFFF5F7FA).withOpacity(0),
+                  const Color(0xFFF5F7FA),
                 ],
               ),
             ),
@@ -165,38 +154,38 @@ class _CategoryRailItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // We use a transparent container with padding to allow the ripple to fill nicely
     return Container(
       margin: const EdgeInsets.only(bottom: 12, left: 8, right: 8),
-      // Material & InkWell allows for standard ripple effects
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          splashColor: accentColor.withOpacity(0.1),
-          highlightColor: accentColor.withOpacity(0.05),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // BACKGROUND & ACTIVE STATE
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutBack,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 1. The Main Card / Touch Area
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: accentColor.withOpacity(0.1),
+              highlightColor: accentColor.withOpacity(0.05),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
                 decoration: BoxDecoration(
                   color: isSelected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected
-                        ? accentColor.withOpacity(0.1)
-                        : Colors.transparent,
-                    width: 1.5,
-                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  // Only show shadow when selected to lift it up
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: accentColor.withOpacity(0.15),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 15,
+                            offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: accentColor.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
                         ]
                       : [],
@@ -205,64 +194,83 @@ class _CategoryRailItem extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // IMAGE CONTAINER
+                      // 2. The Big Image (Rounded Square)
                       AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: isSelected ? 50 : 44,
-                        height: isSelected ? 50 : 44,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutBack,
+                        // Significantly bigger dimensions
+                        width: isSelected ? 76 : 68,
+                        height: isSelected ? 76 : 68,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isSelected
-                              ? Colors.grey.shade50
-                              : Colors.white,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(
+                            18,
+                          ), // Smooth corners
                           boxShadow: isSelected
-                              ? []
+                              ? [] // No shadow on image if card has shadow
                               : [
+                                  // Subtle shadow for unselected items to give depth
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
+                                    color: Colors.black.withOpacity(0.04),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                         ),
-                        child: ClipOval(
-                          child: Padding(
-                            padding: const EdgeInsets.all(
-                              2.0,
-                            ), // Padding inside circle
-                            child: ClipOval(
-                              child: Image.network(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // Background color placeholder
+                              Container(color: Colors.grey.shade100),
+                              // The Image
+                              Image.network(
                                 item.imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 20,
-                                  color: Colors.grey.shade300,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(
+                                    Icons.image_not_supported_rounded,
+                                    size: 28,
+                                    color: Colors.grey.shade300,
+                                  ),
                                 ),
                               ),
-                            ),
+                              // Selection Overlay (optional tint)
+                              if (isSelected)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.black.withOpacity(0.04),
+                                      width: 1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
 
                       const SizedBox(height: 10),
 
-                      // LABEL
+                      // 3. The Label
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 200),
                           style: TextStyle(
                             fontFamily: 'Poppins',
-                            fontSize: isSelected ? 11 : 10,
-                            height: 1.2,
+                            // Slightly bigger font for readability
+                            fontSize: isSelected ? 12 : 11,
+                            height: 1.1,
                             fontWeight: isSelected
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             color: isSelected
-                                ? accentColor
-                                : Colors.grey.shade500,
-                            letterSpacing: isSelected ? 0 : 0.2,
+                                ? const Color(0xFF2D3748)
+                                : const Color(0xFF718096),
+                            letterSpacing: -0.2,
                           ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
@@ -274,60 +282,63 @@ class _CategoryRailItem extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+          ),
 
-              // ACTIVE INDICATOR (Left bar)
-              Positioned(
-                left: 0,
-                top: 30,
-                bottom: 30,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOutQuart,
-                  width: isSelected ? 3 : 0,
-                  decoration: BoxDecoration(
-                    color: accentColor,
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(4),
-                      bottomRight: Radius.circular(4),
+          // 4. Active Indicator (Vertical Pill)
+          Positioned(
+            left: 0,
+            top: 40,
+            bottom: 40,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.elasticOut,
+              width: isSelected ? 4 : 0,
+              decoration: BoxDecoration(
+                color: accentColor,
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(4),
+                  bottomRight: Radius.circular(4),
+                ),
+              ),
+            ),
+          ),
+
+          // 5. Badge (Sale/New)
+          if (badgeText != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFFFF7E5F),
+                      Color(0xFFFF5A5F),
+                    ], // Nice coral gradient
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF5A5F).withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
+                  ],
+                ),
+                child: Text(
+                  badgeText!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
-
-              // NOTIFICATION BADGE (If applicable)
-              if (badgeText != null)
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF5A5F), // Coral red for alerts
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF5A5F).withOpacity(0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      badgeText!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

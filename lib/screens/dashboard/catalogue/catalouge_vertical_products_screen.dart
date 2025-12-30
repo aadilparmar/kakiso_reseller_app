@@ -151,54 +151,13 @@ class CatalogueVerticalProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (product.discountPercentage != null &&
-                      product.discountPercentage! > 0)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEB2A7E),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          "${product.discountPercentage}% OFF",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Iconsax.heart,
-                        size: 16,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
 
             // INFO + PRICE
             Expanded(
-              flex: 45,
+              flex: 25,
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Column(
@@ -218,32 +177,6 @@ class CatalogueVerticalProductCard extends StatelessWidget {
                             color: Color(0xFF1F2937),
                             height: 1.2,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              color: Colors.amber,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              "4.5",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            Text(
-                              " (50)",
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade400,
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -289,7 +222,7 @@ class CatalogueVerticalProductCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
-                              Iconsax.add,
+                              Iconsax.shopping_cart,
                               color: Colors.white,
                               size: 18,
                             ),

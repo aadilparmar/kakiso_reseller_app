@@ -170,7 +170,7 @@ class _LoginPageState extends State<LoginPage>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  e.toString().replaceFirst('Exception: ', '').trim(),
+                  "Login failed: username or password is incorrect.",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -224,11 +224,11 @@ class _LoginPageState extends State<LoginPage>
 
                     // Welcome Text
                     const Text(
-                      'Welcome back 👋',
+                      'Welcome back 🙏',
                       textAlign: TextAlign.left,
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontSize: 28,
+                        fontSize: 21,
                         fontWeight: FontWeight.w700,
                         color: kPrimaryDeep,
                         height: 1.2,
@@ -279,7 +279,7 @@ class _LoginPageState extends State<LoginPage>
                           TextFormField(
                             controller: _emailController,
                             decoration: _inputDecoration(
-                              label: 'Email Id',
+                              label: 'Email Id / Mobile Number',
                               icon: Iconsax.sms,
                             ),
                             keyboardType: TextInputType.emailAddress,
@@ -327,8 +327,8 @@ class _LoginPageState extends State<LoginPage>
                               child: const Text(
                                 'Forgot password?',
                                 style: TextStyle(
-                                  color: kAccentColor,
-                                  fontSize: 13,
+                                  color: Color.fromARGB(183, 233, 30, 98),
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   fontFamily: 'Poppins',
                                 ),

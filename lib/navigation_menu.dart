@@ -183,7 +183,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 icon: _buildIcon(
                   Iconsax.book_saved,
                   Iconsax.book,
-                  'Catalog',
+                  'Catalogs',
                   3,
                   controller.selectedIndex.value,
                   itemWidth,

@@ -108,7 +108,7 @@ class _PasswordResetConfirmationPageState
 
               // 3. Description Text
               const Text(
-                'Your Account Security is our Priority! We have sent you a Secure link to change your password and keep Your Account Protected.',
+                'Your Account Security is our Priority! We have sent you a Secure Email with your new password to keep Your Account Protected.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 15, color: Colors.black54),
               ),

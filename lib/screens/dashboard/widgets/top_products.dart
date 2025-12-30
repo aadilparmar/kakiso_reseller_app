@@ -1055,7 +1055,7 @@ class _LeaderboardCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  "+₹${profit.toStringAsFixed(0)} profit",
+                                  "Min. Profit ₹${profit.toStringAsFixed(0)} ",
                                   style: const TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 11,

@@ -556,7 +556,7 @@ class _ResellerProductCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               const Text(
-                                "Resell ",
+                                "Buy ",
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 10,
@@ -564,7 +564,7 @@ class _ResellerProductCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                "₹${resellPrice.toStringAsFixed(0)}",
+                                "₹${product.price}",
                                 style: const TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 16,
@@ -577,7 +577,7 @@ class _ResellerProductCard extends StatelessWidget {
                           ),
                         const SizedBox(height: 2),
                         Text(
-                          "Buy for ₹${product.price}",
+                          "Resell ₹${resellPrice?.toStringAsFixed(0)}",
                           style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 11,
@@ -662,7 +662,7 @@ class _ResellerProductCard extends StatelessWidget {
             const Icon(Iconsax.trend_up, size: 10, color: Colors.white),
             const SizedBox(width: 4),
             Text(
-              "Profit ₹${profit.toStringAsFixed(0)}",
+              "Min. Profit ₹${profit.toStringAsFixed(0)}",
               style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 10,

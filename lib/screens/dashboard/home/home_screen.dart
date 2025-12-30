@@ -232,7 +232,6 @@ class _HomePageState extends State<HomePage> {
         titleSpacing: 0,
         title: Row(
           children: [
-            SizedBox(width: 6),
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Iconsax.menu_1),
@@ -251,7 +250,12 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const Spacer(),
-
+            IconButton(
+              icon: const Icon(Iconsax.notification),
+              color: accentColor,
+              iconSize: 20,
+              onPressed: () => Get.to(() => const InventoryPage()),
+            ),
             // --- CART ICON WITH BADGE ---
             Stack(
               clipBehavior: Clip.none,
@@ -259,7 +263,7 @@ class _HomePageState extends State<HomePage> {
                 IconButton(
                   icon: const Icon(Iconsax.shopping_cart),
                   color: accentColor,
-                  iconSize: 30,
+                  iconSize: 20,
                   onPressed: () => Get.to(() => const InventoryPage()),
                 ),
                 Positioned(
@@ -295,19 +299,17 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-
-            const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Iconsax.heart),
               color: accentColor,
-              iconSize: 30,
+              iconSize: 20,
               onPressed: () {
                 // Navigate to ProfilePage using currently stored user data
                 // We use _userData which is initialized in initState from widget.userData
                 Get.to(() => WishlistScreen());
               },
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 0),
           ],
         ),
       ),
