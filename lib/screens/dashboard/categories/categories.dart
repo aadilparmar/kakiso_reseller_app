@@ -29,9 +29,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
   String? errorMessage;
   List<CategoryModel> _allCategoriesFlat = [];
 
-  // Search
-  final TextEditingController _searchController = TextEditingController();
-
   // Controllers
   final CartController cartController = Get.find<CartController>();
   final ScrollController _rightScrollController = ScrollController();
@@ -52,7 +49,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
 
   @override
   void dispose() {
-    _searchController.dispose();
     _rightScrollController.dispose();
     super.dispose();
   }
@@ -145,16 +141,28 @@ class _CategoriesPageState extends State<CategoriesSection> {
                           controller: _rightScrollController,
                           physics: const BouncingScrollPhysics(),
                           slivers: [
-                            // Title of Level 1
+                            // Title of Level 1 (Top Header)
                             _buildTitleSliver(),
 
-                            // List of Level 2 Sections containing Level 3 Grids
                             if (level2Categories.isEmpty)
                               SliverFillRemaining(
                                 child: Center(
-                                  child: Text(
-                                    "No sub-categories found.",
-                                    style: TextStyle(color: Colors.grey[400]),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Iconsax.folder_open,
+                                        size: 40,
+                                        color: Colors.grey.shade300,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        "No sub-categories found.",
+                                        style: TextStyle(
+                                          color: Colors.grey[400],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               )
@@ -234,7 +242,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
                             duration: const Duration(milliseconds: 200),
                             height: 48,
                             width: 48,
-                            padding: const EdgeInsets.all(2), // Border width
+                            padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
@@ -321,17 +329,20 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  // --- LEVEL 2 SECTION WITH LEVEL 3 GRID ---
+  // --- LEVEL 2 SECTION (TEXT HEADER + GRID WITH PARENT AS FIRST ITEM) ---
   Widget _buildLevel2Section(CategoryModel level2Cat) {
     final level3Categories = _getChildren(level2Cat.id);
+
+    // Combine items: First item is Level 2 (Parent), followed by Level 3 (Children)
+    // We create a wrapper list so we can iterate easily
+    final List<CategoryModel> displayItems = [level2Cat, ...level3Categories];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Level 2 Header
+        // 1. Simple Text Header
         InkWell(
           onTap: () {
-            // Navigate to detail page of Level 2 if user clicks header
             Get.to(
               () => CategoryDetailsPage(
                 categoryId: level2Cat.id,
@@ -340,18 +351,20 @@ class _CategoriesPageState extends State<CategoriesSection> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
               children: [
-                Text(
-                  level2Cat.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                Expanded(
+                  child: Text(
+                    level2Cat.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                      fontFamily: 'Poppins',
+                    ),
                   ),
                 ),
-                const Spacer(),
                 const Text(
                   "View All",
                   style: TextStyle(
@@ -370,43 +383,34 @@ class _CategoriesPageState extends State<CategoriesSection> {
           ),
         ),
 
-        // Level 3 Grid
-        if (level3Categories.isNotEmpty)
-          GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: level3Categories.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3, // 3 items per row for categories
-              childAspectRatio: 0.75, // Taller for Image + Text
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-            ),
-            itemBuilder: (context, index) {
-              final level3Cat = level3Categories[index];
-              return _buildLevel3Card(level3Cat);
-            },
-          )
-        else
-          // If no children, show a placeholder or nothing
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0, bottom: 8),
-            child: Text(
-              "Tap 'View All' to see products",
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-            ),
+        // 2. The Unified Grid
+        GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: displayItems.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 0.75, // Standard ratio for image + text
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
           ),
+          itemBuilder: (context, index) {
+            final cat = displayItems[index];
+            // If index is 0, it's the Level 2 Parent. Otherwise, it's a Level 3 Child.
+            // Visually they are identical.
+            return _buildGridCard(cat);
+          },
+        ),
 
         const Divider(color: Color(0xFFEEEEEE), height: 30),
       ],
     );
   }
 
-  Widget _buildLevel3Card(CategoryModel cat) {
+  Widget _buildGridCard(CategoryModel cat) {
     return GestureDetector(
       onTap: () {
-        // Navigate to Detail Page on click
         Get.to(
           () => CategoryDetailsPage(categoryId: cat.id, categoryName: cat.name),
         );
@@ -461,7 +465,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
     );
   }
 
-  // --- APP BAR (Same as before) ---
+  // --- APP BAR ---
   AppBar _buildModernAppBar() {
     return AppBar(
       backgroundColor: Colors.white,

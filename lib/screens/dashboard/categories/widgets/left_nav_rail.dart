@@ -265,7 +265,7 @@ class _CategoryRailItem extends StatelessWidget {
                             fontSize: isSelected ? 12 : 11,
                             height: 1.1,
                             fontWeight: isSelected
-                                ? FontWeight.w700
+                                ? FontWeight.w500
                                 : FontWeight.w500,
                             color: isSelected
                                 ? const Color(0xFF2D3748)
@@ -273,7 +273,7 @@ class _CategoryRailItem extends StatelessWidget {
                             letterSpacing: -0.2,
                           ),
                           textAlign: TextAlign.center,
-                          maxLines: 2,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           child: Text(item.name),
                         ),
