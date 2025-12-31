@@ -375,76 +375,78 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                'Add ${selectedProducts.length} items to...',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  'Add ${selectedProducts.length} items to...',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              if (availableCatalogues.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text("No catalogues found. Create one."),
-                  ),
-                )
-              else
-                ...availableCatalogues.map(
-                  (name) => ListTile(
-                    leading: const Icon(Iconsax.folder),
-                    title: Text(name),
-                    onTap: () {
-                      for (final p in selectedProducts) {
-                        catalogueController.addProductToExistingCatalogue(
-                          name,
-                          p,
+                if (availableCatalogues.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text("No catalogues found. Create one."),
+                    ),
+                  )
+                else
+                  ...availableCatalogues.map(
+                    (name) => ListTile(
+                      leading: const Icon(Iconsax.folder),
+                      title: Text(name),
+                      onTap: () {
+                        for (final p in selectedProducts) {
+                          catalogueController.addProductToExistingCatalogue(
+                            name,
+                            p,
+                          );
+                        }
+                        Navigator.pop(ctx);
+                        _showPremiumSnackbar(
+                          title: 'Success',
+                          subtitle: 'Added to $name',
                         );
-                      }
-                      Navigator.pop(ctx);
-                      _showPremiumSnackbar(
-                        title: 'Success',
-                        subtitle: 'Added to $name',
-                      );
-                      setState(() => _selectedProductIds.clear());
-                    },
+                        setState(() => _selectedProductIds.clear());
+                      },
+                    ),
                   ),
-                ),
 
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  // Quick inline creation logic for brevity
-                  catalogueController.createCatalogueAndAddProduct(
-                    "New Collection",
-                    selectedProducts.first,
-                  );
-                  _showPremiumSnackbar(
-                    title: 'Success',
-                    subtitle: 'Created "New Collection"',
-                  );
-                },
-                child: const Text("Create New Catalog"),
-              ),
-            ],
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    // Quick inline creation logic for brevity
+                    catalogueController.createCatalogueAndAddProduct(
+                      "New Collection",
+                      selectedProducts.first,
+                    );
+                    _showPremiumSnackbar(
+                      title: 'Success',
+                      subtitle: 'Created "New Collection"',
+                    );
+                  },
+                  child: const Text("Create New Catalog"),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -474,325 +476,329 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // --- 1. SUB-CATEGORIES LIST (Updated Logic) ---
-              if (!_isLoadingSubCats && _subCategories.isNotEmpty)
-                Container(
-                  height: 110,
-                  width: double.infinity,
-                  color: Colors.white,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    scrollDirection: Axis.horizontal,
-                    // +1 for the "All" button
-                    itemCount: _subCategories.length + 1,
-                    separatorBuilder: (_, __) => const SizedBox(width: 16),
-                    itemBuilder: (context, index) {
-                      // --- "ALL" BUTTON ---
-                      if (index == 0) {
-                        final isSelected =
-                            _activeCategoryId == widget.categoryId;
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // --- 1. SUB-CATEGORIES LIST (Updated Logic) ---
+                if (!_isLoadingSubCats && _subCategories.isNotEmpty)
+                  Container(
+                    height: 110,
+                    width: double.infinity,
+                    color: Colors.white,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      scrollDirection: Axis.horizontal,
+                      // +1 for the "All" button
+                      itemCount: _subCategories.length + 1,
+                      separatorBuilder: (_, __) => const SizedBox(width: 16),
+                      itemBuilder: (context, index) {
+                        // --- "ALL" BUTTON ---
+                        if (index == 0) {
+                          final isSelected =
+                              _activeCategoryId == widget.categoryId;
+                          return GestureDetector(
+                            onTap: () =>
+                                _onSubCategorySelected(widget.categoryId),
+                            child: Column(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  height: 60,
+                                  width: 60,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? accentColor
+                                        : Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? accentColor
+                                          : Colors.grey.shade300,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Iconsax.category,
+                                    size: 24,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "All",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? accentColor
+                                        : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        // --- SUB-CATEGORY ITEMS ---
+                        final subCat = _subCategories[index - 1];
+                        final isSelected = _activeCategoryId == subCat.id;
+
                         return GestureDetector(
-                          onTap: () =>
-                              _onSubCategorySelected(widget.categoryId),
+                          onTap: () => _onSubCategorySelected(subCat.id),
                           child: Column(
                             children: [
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 height: 60,
                                 width: 60,
-                                alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? accentColor
-                                      : Colors.white,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: isSelected
                                         ? accentColor
-                                        : Colors.grey.shade300,
+                                        : Colors.grey.shade200,
                                     width: isSelected ? 2 : 1,
                                   ),
+                                  image: DecorationImage(
+                                    image: NetworkImage(subCat.imageUrl),
+                                    fit: BoxFit.cover,
+                                    onError: (_, __) {},
+                                  ),
                                 ),
-                                child: Icon(
-                                  Iconsax.category,
-                                  size: 24,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.black87,
-                                ),
+                                // Show fallback icon if image fails or is empty
+                                child: subCat.imageUrl.isEmpty
+                                    ? const Icon(Iconsax.image)
+                                    : null,
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                "All",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? accentColor
-                                      : Colors.black54,
+                              SizedBox(
+                                width: 60,
+                                child: Text(
+                                  subCat.name,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? accentColor
+                                        : Colors.black87,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         );
-                      }
+                      },
+                    ),
+                  ),
 
-                      // --- SUB-CATEGORY ITEMS ---
-                      final subCat = _subCategories[index - 1];
-                      final isSelected = _activeCategoryId == subCat.id;
-
-                      return GestureDetector(
-                        onTap: () => _onSubCategorySelected(subCat.id),
-                        child: Column(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              height: 60,
-                              width: 60,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isSelected
-                                      ? accentColor
-                                      : Colors.grey.shade200,
-                                  width: isSelected ? 2 : 1,
-                                ),
-                                image: DecorationImage(
-                                  image: NetworkImage(subCat.imageUrl),
-                                  fit: BoxFit.cover,
-                                  onError: (_, __) {},
+                // --- 2. SORT & FILTER BAR ---
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _openSortSheet,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Iconsax.sort, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                _selectedSortLabel,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              // Show fallback icon if image fails or is empty
-                              child: subCat.imageUrl.isEmpty
-                                  ? const Icon(Iconsax.image)
-                                  : null,
-                            ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              width: 60,
-                              child: Text(
-                                subCat.name,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? accentColor
-                                      : Colors.black87,
-                                ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.keyboard_arrow_down,
+                                size: 16,
+                                color: Colors.grey,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      );
-                    },
+                      ),
+                      Container(
+                        height: 20,
+                        width: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _openModernFilter,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Iconsax.filter, size: 18),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Filter",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-              // --- 2. SORT & FILTER BAR ---
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _openSortSheet,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Iconsax.sort, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              _selectedSortLabel,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                // --- 3. PRODUCT GRID ---
+                Expanded(
+                  child: _isLoadingProducts
+                      ? const Center(
+                          child: CircularProgressIndicator(color: accentColor),
+                        )
+                      : _products.isEmpty
+                      ? _buildEmptyState()
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(10),
+                          itemCount: _products.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.58,
+                                mainAxisSpacing: 3,
+                                crossAxisSpacing: 3,
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Container(
-                      height: 20,
-                      width: 1,
-                      color: Colors.grey.shade300,
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _openModernFilter,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Iconsax.filter, size: 18),
-                            const SizedBox(width: 8),
-                            const Text(
-                              "Filter",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                          itemBuilder: (context, index) {
+                            final product = _products[index];
+                            return VerticalProductCard(
+                              product: product,
+                              availableCatalogues:
+                                  catalogueController.catalogueNames,
+                              isSelected: _selectedProductIds.contains(
+                                product.id,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-              // --- 3. PRODUCT GRID ---
-              Expanded(
-                child: _isLoadingProducts
-                    ? const Center(
-                        child: CircularProgressIndicator(color: accentColor),
-                      )
-                    : _products.isEmpty
-                    ? _buildEmptyState()
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(10),
-                        itemCount: _products.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.58,
-                              mainAxisSpacing: 3,
-                              crossAxisSpacing: 3,
-                            ),
-                        itemBuilder: (context, index) {
-                          final product = _products[index];
-                          return VerticalProductCard(
-                            product: product,
-                            availableCatalogues:
-                                catalogueController.catalogueNames,
-                            isSelected: _selectedProductIds.contains(
-                              product.id,
-                            ),
-                            onSelectionToggle: () {
-                              setState(() {
-                                if (_selectedProductIds.contains(product.id)) {
-                                  _selectedProductIds.remove(product.id);
+                              onSelectionToggle: () {
+                                setState(() {
+                                  if (_selectedProductIds.contains(
+                                    product.id,
+                                  )) {
+                                    _selectedProductIds.remove(product.id);
+                                  } else {
+                                    _selectedProductIds.add(product.id);
+                                  }
+                                });
+                              },
+                              onCatalogueSelected: (product, catalogueName, isNew) {
+                                if (isNew) {
+                                  catalogueController
+                                      .createCatalogueAndAddProduct(
+                                        catalogueName,
+                                        product,
+                                      );
                                 } else {
-                                  _selectedProductIds.add(product.id);
+                                  catalogueController
+                                      .addProductToExistingCatalogue(
+                                        catalogueName,
+                                        product,
+                                      );
                                 }
-                              });
-                            },
-                            onCatalogueSelected: (product, catalogueName, isNew) {
-                              if (isNew) {
-                                catalogueController
-                                    .createCatalogueAndAddProduct(
-                                      catalogueName,
-                                      product,
-                                    );
-                              } else {
-                                catalogueController
-                                    .addProductToExistingCatalogue(
-                                      catalogueName,
-                                      product,
-                                    );
-                              }
-                              _showPremiumSnackbar(
-                                title: 'Added to catalog',
-                                subtitle:
-                                    '"${product.name}" added to "$catalogueName".',
-                                imageUrl: product.image,
-                              );
-                            },
-                          );
-                        },
-                      ),
-              ),
-              if (hasSelection) const SizedBox(height: 70),
-            ],
-          ),
-
-          // --- 4. FLOATING BULK BAR ---
-          if (hasSelection)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Icon(
-                        Iconsax.tick_circle,
-                        color: accentColor,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${_selectedProductIds.length} products selected',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                                _showPremiumSnackbar(
+                                  title: 'Added to catalog',
+                                  subtitle:
+                                      '"${product.name}" added to "$catalogueName".',
+                                  imageUrl: product.image,
+                                );
+                              },
+                            );
+                          },
                         ),
+                ),
+                if (hasSelection) const SizedBox(height: 70),
+              ],
+            ),
+
+            // --- 4. FLOATING BULK BAR ---
+            if (hasSelection)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 10,
                       ),
-                    ),
-                    ElevatedButton(
-                      onPressed: _openBulkAddToCatalogueSheet,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: accentColor,
-                        shape: RoundedRectangleBorder(
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(999),
                         ),
+                        child: const Icon(
+                          Iconsax.tick_circle,
+                          color: accentColor,
+                          size: 18,
+                        ),
                       ),
-                      child: const Text(
-                        'Add to Catalog',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${_selectedProductIds.length} products selected',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      ElevatedButton(
+                        onPressed: _openBulkAddToCatalogueSheet,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        child: const Text(
+                          'Add to Catalog',
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

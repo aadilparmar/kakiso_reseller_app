@@ -12,6 +12,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
+// 1. IMPORT SHOWCASEVIEW
+import 'package:showcaseview/showcaseview.dart';
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
@@ -33,16 +35,31 @@ import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogu
 
 const Color accentColor = Color(0xFF2563EB); // Royal Blue
 
-class CatalogueSection extends StatefulWidget {
+// 2. WRAPPER WIDGET TO INIT SHOWCASE
+class CatalogueSection extends StatelessWidget {
   final UserData userData;
-
   const CatalogueSection({super.key, required this.userData});
 
   @override
-  State<CatalogueSection> createState() => _CatalogueSectionState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      // FIX: Pass the function directly, do not wrap in Builder()
+      builder: (context) => _CatalogueSectionContent(userData: userData),
+    );
+  }
 }
 
-class _CatalogueSectionState extends State<CatalogueSection>
+class _CatalogueSectionContent extends StatefulWidget {
+  final UserData userData;
+
+  const _CatalogueSectionContent({required this.userData});
+
+  @override
+  State<_CatalogueSectionContent> createState() =>
+      _CatalogueSectionContentState();
+}
+
+class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     with SingleTickerProviderStateMixin {
   final _storage = const FlutterSecureStorage();
   final _localStorage = GetStorage();
@@ -72,10 +89,15 @@ class _CatalogueSectionState extends State<CatalogueSection>
   // 🔹 Worker to listen to product updates
   Worker? _productListener;
 
+  // 3. DEFINE SHOWCASE KEYS
+  final GlobalKey _addCatalogKey = GlobalKey();
+  final GlobalKey _shareKey = GlobalKey();
+  final GlobalKey _toolsKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
-    // 1. SETUP PULSE ANIMATION
+    // SETUP PULSE ANIMATION
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -85,44 +107,65 @@ class _CatalogueSectionState extends State<CatalogueSection>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // 2. 🔹 REACTIVE LISTENER: Wait for products to load
-    // This ensures catalogues are created even if products load AFTER this screen opens.
+    // REACTIVE LISTENER
     _productListener = ever(homeProductsController.allProducts, (products) {
       if (products.isNotEmpty) {
         _checkAndCreateDefaultCatalogues();
       }
     });
 
-    // 3. Initial Check (In case products are ALREADY loaded)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (homeProductsController.allProducts.isNotEmpty) {
         _checkAndCreateDefaultCatalogues();
       }
       _checkForNavArguments();
+
+      // 4. TRIGGER TOUR IF FIRST TIME
+      _checkAndStartTour();
     });
   }
 
-  // 🔹 LOGIC TO CREATE DEFAULT CATALOGUES
+  // 🔹 TOUR LOGIC
+  void _checkAndStartTour() async {
+    // Wait a bit for UI to settle and default catalogues to potentially create
+    await Future.delayed(const Duration(seconds: 1));
+
+    // Check if tour has been shown
+    bool hasShownTour =
+        _localStorage.read('has_shown_catalogue_tour_v1') ?? false;
+
+    if (!hasShownTour) {
+      // Ensure we have context and the controller has items (so list keys exist)
+      if (mounted && catalogueController.myCatalogues.isNotEmpty) {
+        ShowCaseWidget.of(
+          context,
+        ).startShowCase([_addCatalogKey, _shareKey, _toolsKey]);
+        _localStorage.write('has_shown_catalogue_tour_v1', true);
+      } else if (mounted) {
+        // If list is empty, just show the add button tour
+        ShowCaseWidget.of(context).startShowCase([_addCatalogKey]);
+        _localStorage.write('has_shown_catalogue_tour_v1', true);
+      }
+    }
+  }
+
+  // LOGIC TO CREATE DEFAULT CATALOGUES
   Future<void> _checkAndCreateDefaultCatalogues() async {
-    // UPDATED KEY to 'v3' to force a retry for you
     bool hasCreated =
         _localStorage.read('has_created_default_catalogs_v3') ?? false;
 
-    // If already created, STOP.
     if (hasCreated) return;
 
-    // Double check products exist
     final allProducts = homeProductsController.allProducts;
     if (allProducts.isEmpty) return;
 
-    // --- 1. 🏆 HIGH MARGIN PICKS (> 1500) ---
+    // --- 1. HIGH MARGIN PICKS ---
     final highMarginProducts = allProducts
         .where((p) => (double.tryParse(p.price) ?? 0) > 1500)
         .take(5)
         .toList();
 
     if (highMarginProducts.isNotEmpty) {
-      // Check if it already exists in controller to avoid duplicates
       if (!catalogueController.myCatalogues.any(
         (c) => c.name == "🏆 High Margin Picks",
       )) {
@@ -143,7 +186,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
       }
     }
 
-    // --- 2. 💰 UNDER ₹1000 STORE ---
+    // --- 2. UNDER ₹1000 STORE ---
     final budgetProducts = allProducts
         .where(
           (p) =>
@@ -174,7 +217,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
       }
     }
 
-    // --- 3. 🚀 TRENDING & VIRAL (Random) ---
+    // --- 3. TRENDING & VIRAL ---
     final trendingProducts = List<ProductModel>.from(allProducts)
       ..shuffle(Random());
     final selectedTrending = trendingProducts.take(6).toList();
@@ -200,10 +243,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
       }
     }
 
-    // Mark as done permanently
     _localStorage.write('has_created_default_catalogs_v3', true);
-
-    // Refresh UI to show the new items immediately
     if (mounted) setState(() {});
   }
 
@@ -221,11 +261,70 @@ class _CatalogueSectionState extends State<CatalogueSection>
   @override
   void dispose() {
     _pulseController.dispose();
-    _productListener?.dispose(); // 🔹 Clean up worker
+    _productListener?.dispose();
     super.dispose();
   }
 
-  // --- 🌟 NEW: BULK DOWNLOAD LOGIC ---
+  // --- REUSABLE MARGIN INPUT WIDGET ---
+  Widget _buildMarginInput({
+    required TextEditingController controller,
+    required Function(String) onTagSelected,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: "Margin Percentage (%)",
+            hintText: "Min 20%",
+            suffixText: "%",
+            prefixIcon: const Icon(Iconsax.percentage_square),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [30, 50, 70, 100].map((val) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: ActionChip(
+                  label: Text(
+                    "$val%",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  backgroundColor: Colors.blue.shade50,
+                  labelStyle: TextStyle(color: Colors.blue.shade900),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(color: Colors.blue.shade100),
+                  ),
+                  onPressed: () {
+                    controller.text = val.toString();
+                    onTagSelected(val.toString());
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          " * Minimum 20% margin is required.",
+          style: TextStyle(fontSize: 10, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+
+  // --- BULK DOWNLOAD LOGIC ---
   Future<void> _handleBulkDownload(CatalogueModel cat) async {
     if (cat.products.isEmpty) {
       Get.snackbar(
@@ -242,15 +341,12 @@ class _CatalogueSectionState extends State<CatalogueSection>
         String savePath = "";
 
         try {
-          // 1. Determine Directory
           Directory? directory;
           if (Platform.isAndroid) {
-            // Create a visible folder in Downloads
             directory = Directory(
               '/storage/emulated/0/Download/Kakiso_Catalogues/${cat.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}',
             );
           } else {
-            // iOS: Use Documents directory
             final docDir = await getApplicationDocumentsDirectory();
             directory = Directory(
               '${docDir.path}/${cat.name.replaceAll(" ", "_")}',
@@ -262,7 +358,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
           }
           savePath = directory.path;
 
-          // 2. Download Loop
           for (int i = 0; i < cat.products.length; i++) {
             final p = cat.products[i];
             if (p.image.isEmpty) continue;
@@ -270,7 +365,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
             try {
               final response = await http.get(Uri.parse(p.image));
               if (response.statusCode == 200) {
-                // Create filename
                 String safeName = p.name.replaceAll(
                   RegExp(r'[^a-zA-Z0-9]'),
                   '_',
@@ -287,7 +381,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
             }
           }
 
-          // 3. Success Message
           Get.snackbar(
             "Download Complete",
             "Saved $successCount images to:\n$savePath",
@@ -336,43 +429,20 @@ class _CatalogueSectionState extends State<CatalogueSection>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0),
         ),
-        title: const Text(
-          'Logout',
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            fontFamily: 'Poppins',
-            fontSize: 20,
-          ),
-        ),
+        title: const Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
         content: const Text(
           'Do you want to log out?',
           style: TextStyle(fontFamily: 'Poppins'),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontFamily: 'Poppins',
-              ),
-            ),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
               Get.back();
               await _storage.delete(key: 'authToken');
               Get.offAll(() => const LoginPage());
             },
-            child: const Text(
-              'Logout',
-              style: TextStyle(
-                color: accentColor,
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Poppins',
-              ),
-            ),
+            child: const Text('Logout', style: TextStyle(color: accentColor)),
           ),
         ],
       ),
@@ -428,22 +498,18 @@ class _CatalogueSectionState extends State<CatalogueSection>
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
               final name = nameCtrl.text.trim();
-              final notes = notesCtrl.text.trim();
               if (name.isEmpty) {
                 Get.snackbar("Error", "Please enter a name");
                 return;
               }
               catalogueController.createCatalogue(
                 name,
-                notes.isEmpty ? "Custom catalog" : notes,
+                notesCtrl.text.trim().isEmpty
+                    ? "Custom catalog"
+                    : notesCtrl.text.trim(),
               );
               Get.back();
             },
@@ -454,7 +520,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
     );
   }
 
-  // --- SORTING + FILTER HELPERS ---
   List<CatalogueModel> _buildFilteredSortedList() {
     final List<CatalogueModel> base = catalogueController.myCatalogues.toList();
     final query = _searchQuery.trim().toLowerCase();
@@ -482,7 +547,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
     return filtered;
   }
 
-  // ─── 📊 CSV EXPORT LOGIC ───────────────────────────────────────────────────
+  // ─── CSV EXPORT LOGIC ───────────────────────────────────────────────────
 
   void _openCsvExportDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
@@ -505,9 +570,10 @@ class _CatalogueSectionState extends State<CatalogueSection>
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Generate a Shopify/Amazon compatible CSV file for bulk listing.",
+              "Generate a Shopify/Amazon compatible CSV.",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
@@ -515,32 +581,25 @@ class _CatalogueSectionState extends State<CatalogueSection>
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: marginCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: "Add Margin (₹)",
-                hintText: "e.g. 100",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
+            _buildMarginInput(controller: marginCtrl, onTagSelected: (val) {}),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
               final double margin =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
+              if (margin < 20) {
+                Get.snackbar(
+                  "Low Margin",
+                  "Minimum margin must be 20%",
+                  backgroundColor: Colors.red.shade100,
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                return;
+              }
               Get.back();
               _generateAndShareCsv(cat, margin);
             },
@@ -554,7 +613,10 @@ class _CatalogueSectionState extends State<CatalogueSection>
     );
   }
 
-  Future<void> _generateAndShareCsv(CatalogueModel cat, double margin) async {
+  Future<void> _generateAndShareCsv(
+    CatalogueModel cat,
+    double marginPercent,
+  ) async {
     if (_isGeneratingCsv) return;
     setState(() => _isGeneratingCsv = true);
 
@@ -581,7 +643,8 @@ class _CatalogueSectionState extends State<CatalogueSection>
 
           for (var p in cat.products) {
             double basePrice = double.tryParse(p.price) ?? 0;
-            double finalPrice = basePrice + margin;
+            // Updated Formula: Base * (1 + margin%)
+            double finalPrice = basePrice * (1 + marginPercent / 100);
             double regularPrice = double.tryParse(p.regularPrice) ?? 0;
 
             String handle = p.name.toLowerCase().replaceAll(
@@ -704,7 +767,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "Generating PDF for ${productsToPrint.length} items.\nAdd your margin (%) to display prices.",
+              "Generating PDF for ${productsToPrint.length} items.",
               style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
@@ -723,36 +786,30 @@ class _CatalogueSectionState extends State<CatalogueSection>
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: marginCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: "Margin (%)",
-                hintText: "Example: 20",
-                suffixText: "%",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
+            _buildMarginInput(controller: marginCtrl, onTagSelected: (val) {}),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
               final name = nameCtrl.text.trim().isEmpty
                   ? "Reseller"
                   : nameCtrl.text.trim();
               final double marginPercent =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
+
+              if (marginPercent < 20) {
+                Get.snackbar(
+                  "Low Margin",
+                  "Minimum margin must be 20%",
+                  backgroundColor: Colors.red.shade100,
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                return;
+              }
+
               Get.back();
               _generateCataloguePdf(cat, name, marginPercent, productsToPrint);
             },
@@ -834,14 +891,15 @@ class _CatalogueSectionState extends State<CatalogueSection>
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          "Share Catalog In WhatsApp / Instagram / Facebook or Other Apps",
+          "Share Catalog",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Enter your ReSelling Profit Margin (%).\nWe'll add it to prices and prepare images for sharing.",
+              "Prices will be increased by your margin percentage.",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
@@ -849,41 +907,25 @@ class _CatalogueSectionState extends State<CatalogueSection>
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              "Min. Margin is required to be 20%.",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: Colors.grey,
-              ),
-            ),
-            TextField(
-              controller: marginCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: "Margin (%) ",
-                hintText: "Example: 20",
-                suffixText: "%",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
+            _buildMarginInput(controller: marginCtrl, onTagSelected: (val) {}),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: accentColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
               final double marginPercent =
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
+              if (marginPercent < 20) {
+                Get.snackbar(
+                  "Low Margin",
+                  "Minimum margin must be 20%",
+                  backgroundColor: Colors.red.shade100,
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                return;
+              }
               Get.back();
               _processShare(cat, marginPercent);
             },
@@ -899,10 +941,9 @@ class _CatalogueSectionState extends State<CatalogueSection>
     if (cat.products.length > 30) {
       Get.snackbar(
         "Large Catalog",
-        "Preparing ${cat.products.length} images. This might take a moment.",
+        "Preparing ${cat.products.length} images...",
         backgroundColor: Colors.orange.shade50,
         colorText: Colors.orange.shade800,
-        duration: const Duration(seconds: 4),
       );
     }
 
@@ -935,7 +976,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
           if (xFiles.isEmpty) {
             Get.snackbar(
               "Copied text",
-              "Catalog text copied. No images found to share.",
+              "Catalog text copied. No images found.",
               snackPosition: SnackPosition.BOTTOM,
             );
             await Share.share(buffer.toString());
@@ -1038,12 +1079,10 @@ class _CatalogueSectionState extends State<CatalogueSection>
     Color? bgColor,
     bool outlined = false,
   }) {
-    // 1. Determine if this button is the "target" of the active guide
     bool isTarget = false;
     bool isOtherDimmed = false;
 
     if (_activeGuideTool != null) {
-      // Mapping logic
       if (_activeGuideTool == 'collage_maker' && label == "Collage") {
         isTarget = true;
       } else if (_activeGuideTool == 'pdf_generator' && label == "PDF") {
@@ -1053,7 +1092,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
       } else if (_activeGuideTool == 'bulk_downloader' && label == "Download") {
         isTarget = true;
       } else {
-        // If guide is active but this isn't the target, dim it
         isOtherDimmed = true;
       }
     }
@@ -1061,10 +1099,9 @@ class _CatalogueSectionState extends State<CatalogueSection>
     Color effectiveColor = color ?? accentColor;
     Color effectiveBg = bgColor ?? Colors.white;
 
-    // Apply Highlight Styles
     if (isTarget) {
       effectiveColor = Colors.white;
-      effectiveBg = accentColor; // Invert for emphasis
+      effectiveBg = accentColor;
     } else if (isOtherDimmed) {
       effectiveColor = effectiveColor.withOpacity(0.3);
       effectiveBg = effectiveBg.withOpacity(0.5);
@@ -1116,7 +1153,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
             ),
     );
 
-    // Apply Animation if Target
     if (isTarget) {
       return ScaleTransition(scale: _pulseAnimation, child: button);
     }
@@ -1130,7 +1166,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
     required Color bgColor,
     required VoidCallback onTap,
   }) {
-    // If a tool guide is active (e.g. PDF), dim these social icons
     double opacity = _activeGuideTool != null ? 0.3 : 1.0;
 
     return Opacity(
@@ -1239,11 +1274,33 @@ class _CatalogueSectionState extends State<CatalogueSection>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: accentColor,
-        onPressed: _openCreateCatalogueDialog,
-        icon: const Icon(Iconsax.folder_add, color: Colors.white),
-        label: const Text("New Catalog", style: TextStyle(color: Colors.white)),
+      // 5. SHOWCASE FAB
+      floatingActionButton: Showcase(
+        key: _addCatalogKey,
+        title: "Create Catalog",
+        description:
+            "Start here! Create custom collections for your customers.",
+        overlayColor: Colors.black.withOpacity(0.7),
+        titleTextStyle: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: accentColor,
+          fontSize: 16,
+        ),
+        descTextStyle: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+          fontSize: 12,
+        ),
+        targetShapeBorder: CircleBorder(),
+        child: FloatingActionButton.extended(
+          backgroundColor: accentColor,
+          onPressed: _openCreateCatalogueDialog,
+          icon: const Icon(Iconsax.folder_add, color: Colors.white),
+          label: const Text(
+            "New Catalog",
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
       ),
       body: Stack(
         children: [
@@ -1283,7 +1340,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
                     itemBuilder: (context, index) {
                       final cat = items[index];
                       // 🌟 If Guide is active, only fully show the first item
-                      // The rest are slightly dimmed to focus user on the example
                       final bool isGuideActive = _activeGuideTool != null;
                       final bool isFirstItem = index == 0;
                       final double cardOpacity = (isGuideActive && !isFirstItem)
@@ -1516,93 +1572,55 @@ class _CatalogueSectionState extends State<CatalogueSection>
                                         WrapCrossAlignment.center,
                                     children: [
                                       // --- SOCIAL ICONS ---
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.grey.shade200,
-                                          ),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
-                                          vertical: 2,
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            _buildSocialIconButton(
-                                              icon: Iconsax.message_text,
-                                              color: const Color(0xFF25D366),
-                                              bgColor: const Color(0xFFDCFCE7),
-                                              onTap: () =>
-                                                  _openShareMarginDialog(cat),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            _buildSocialIconButton(
-                                              icon: Icons.facebook,
-                                              color: const Color(0xFF1877F2),
-                                              bgColor: const Color(0xFFDBEAFE),
-                                              onTap: () =>
-                                                  _openShareMarginDialog(cat),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            _buildSocialIconButton(
-                                              icon: Iconsax.camera,
-                                              color: const Color(0xFFE1306C),
-                                              bgColor: const Color(0xFFFCE7F3),
-                                              onTap: () =>
-                                                  _openShareMarginDialog(cat),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            _buildSocialIconButton(
-                                              icon: Icons.share,
-                                              color: const Color(0xFFE1306C),
-                                              bgColor: const Color(0xFFFCE7F3),
-                                              onTap: () =>
-                                                  _openShareMarginDialog(cat),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                      // 6. SHOWCASE SHARE
+                                      index == 0
+                                          ? Showcase(
+                                              key: _shareKey,
+                                              title: "Easy Sharing",
+                                              description:
+                                                  "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
+                                              overlayColor: Colors.black
+                                                  .withOpacity(0.7),
+                                              titleTextStyle: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: accentColor,
+                                                fontSize: 16,
+                                              ),
+                                              descTextStyle: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black,
+                                                fontSize: 12,
+                                              ),
+                                              targetBorderRadius:
+                                                  BorderRadius.circular(20),
+                                              child: _buildSocialRow(cat),
+                                            )
+                                          : _buildSocialRow(cat),
 
-                                      // 🌟 ACTION BUTTONS (Smart Highlighted)
-                                      _buildCatalogueActionButton(
-                                        icon: Iconsax.magicpen,
-                                        label: "Collage",
-                                        onTap: () => _openCollageStudio(cat),
-                                        bgColor: const Color(0xFFFFFBEB),
-                                        color: const Color(0xFFF59E0B),
-                                      ),
-                                      // 🔴 CHANGED: Calls _handleBulkDownload
-                                      _buildCatalogueActionButton(
-                                        icon: Iconsax.document_download,
-                                        label: "Download",
-                                        onTap: () => _handleBulkDownload(cat),
-                                        bgColor: const Color(0xFFFFFBEB),
-                                        color: const Color.fromARGB(
-                                          255,
-                                          11,
-                                          105,
-                                          245,
-                                        ),
-                                      ),
-                                      _buildCatalogueActionButton(
-                                        icon: Iconsax.document_text,
-                                        label: "CSV",
-                                        onTap: () => _openCsvExportDialog(cat),
-                                        bgColor: const Color(0xFFECFDF5),
-                                        color: const Color(0xFF059669),
-                                      ),
-                                      _buildCatalogueActionButton(
-                                        icon: Iconsax.document_code,
-                                        label: "PDF",
-                                        onTap: () => _openPdfMarginDialog(cat),
-                                        bgColor: const Color(0xFFF5F3FF),
-                                        color: const Color(0xFF7C3AED),
-                                      ),
+                                      // 7. SHOWCASE TOOLS
+                                      index == 0
+                                          ? Showcase(
+                                              key: _toolsKey,
+                                              title: "Power Tools",
+                                              description:
+                                                  "Generate PDFs, Collages, or CSVs instantly to look professional.",
+                                              overlayColor: Colors.black
+                                                  .withOpacity(0.7),
+                                              titleTextStyle: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: accentColor,
+                                                fontSize: 16,
+                                              ),
+                                              descTextStyle: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black,
+                                                fontSize: 12,
+                                              ),
+                                              targetBorderRadius:
+                                                  BorderRadius.circular(20),
+                                              child: _buildToolsRow(cat),
+                                            )
+                                          : _buildToolsRow(cat),
                                     ],
                                   ),
                                 ),
@@ -1618,7 +1636,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
             ],
           ),
 
-          // 2. ⚡ GUIDE OVERLAY (If Active)
+          // 2. ⚡ GUIDE OVERLAY
           if (_activeGuideTool != null)
             _buildGuideOverlay(
               toolId: _activeGuideTool!,
@@ -1626,6 +1644,87 @@ class _CatalogueSectionState extends State<CatalogueSection>
             ),
         ],
       ),
+    );
+  }
+
+  // HELPER FOR SOCIAL ROW
+  Widget _buildSocialRow(CatalogueModel cat) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildSocialIconButton(
+            icon: Iconsax.message_text,
+            color: const Color(0xFF25D366),
+            bgColor: const Color(0xFFDCFCE7),
+            onTap: () => _openShareMarginDialog(cat),
+          ),
+          const SizedBox(width: 6),
+          _buildSocialIconButton(
+            icon: Icons.facebook,
+            color: const Color(0xFF1877F2),
+            bgColor: const Color(0xFFDBEAFE),
+            onTap: () => _openShareMarginDialog(cat),
+          ),
+          const SizedBox(width: 6),
+          _buildSocialIconButton(
+            icon: Iconsax.camera,
+            color: const Color(0xFFE1306C),
+            bgColor: const Color(0xFFFCE7F3),
+            onTap: () => _openShareMarginDialog(cat),
+          ),
+          const SizedBox(width: 6),
+          _buildSocialIconButton(
+            icon: Icons.share,
+            color: const Color(0xFFE1306C),
+            bgColor: const Color(0xFFFCE7F3),
+            onTap: () => _openShareMarginDialog(cat),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // HELPER FOR TOOLS ROW
+  Widget _buildToolsRow(CatalogueModel cat) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildCatalogueActionButton(
+          icon: Iconsax.magicpen,
+          label: "Collage",
+          onTap: () => _openCollageStudio(cat),
+          bgColor: const Color(0xFFFFFBEB),
+          color: const Color(0xFFF59E0B),
+        ),
+        _buildCatalogueActionButton(
+          icon: Iconsax.document_download,
+          label: "Download",
+          onTap: () => _handleBulkDownload(cat),
+          bgColor: const Color(0xFFFFFBEB),
+          color: const Color.fromARGB(255, 11, 105, 245),
+        ),
+        _buildCatalogueActionButton(
+          icon: Iconsax.document_text,
+          label: "CSV",
+          onTap: () => _openCsvExportDialog(cat),
+          bgColor: const Color(0xFFECFDF5),
+          color: const Color(0xFF059669),
+        ),
+        _buildCatalogueActionButton(
+          icon: Iconsax.document_code,
+          label: "PDF",
+          onTap: () => _openPdfMarginDialog(cat),
+          bgColor: const Color(0xFFF5F3FF),
+          color: const Color(0xFF7C3AED),
+        ),
+      ],
     );
   }
 
@@ -1701,7 +1800,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Animated Icon
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -1760,7 +1858,6 @@ class _CatalogueSectionState extends State<CatalogueSection>
                     ],
                   ),
                 ),
-                // Close X
                 GestureDetector(
                   onTap: onDismiss,
                   child: Icon(
@@ -1778,7 +1875,7 @@ class _CatalogueSectionState extends State<CatalogueSection>
   }
 }
 
-// ─── ✨ UPDATED: PRODUCT SELECTION SHEET (Strict 30 Limit) ───────────────────
+// ─── UPDATED: PRODUCT SELECTION SHEET (Strict 30 Limit) ───────────────────
 
 class _ProductSelectionSheet extends StatefulWidget {
   final CatalogueModel catalogue;
@@ -2143,11 +2240,47 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
 
   Future<void> _createAndShare() async {
     setState(() => _isGenerating = true);
-    double margin = double.tryParse(_marginController.text) ?? 0.0;
+    double marginPercent = double.tryParse(_marginController.text) ?? 0.0;
+
+    // 🔒 Strict 20% Check
+    if (marginPercent < 20) {
+      Get.snackbar(
+        "Low Margin",
+        "Minimum margin must be 20%",
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      setState(() => _isGenerating = false);
+      return;
+    }
 
     try {
+      // 📝 To handle % margin correctly while preserving existing Service API,
+      // we pre-calculate the prices here and pass them to the service.
+      List<ProductModel> adjustedProducts = widget.catalogue.products.map((p) {
+        double base = double.tryParse(p.price) ?? 0;
+        double newPrice = base * (1 + marginPercent / 100);
+
+        // Create a copy with the new price string
+        return ProductModel(
+          id: p.id,
+          name: p.name,
+          price: newPrice.toStringAsFixed(0), // Rounded to whole number
+          regularPrice: p.regularPrice,
+
+          image: p.image,
+          images: p.images,
+
+          attributes: p.attributes,
+          description: p.description,
+          shortDescription: p.shortDescription,
+          brandName: p.brandName,
+        );
+      }).toList();
+
       final List<File> files = await CollageService.generateCollages(
-        products: widget.catalogue.products.toList(),
+        products: adjustedProducts,
         layout: _selectedLayout,
         shopName: _showBranding ? widget.shopName : "",
         contactNumber: _showBranding ? widget.phone : "",
@@ -2156,7 +2289,7 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
         themeColor: _themeColor,
         backgroundColor: _bgColor,
         backgroundImage: _customBgImage,
-        extraMargin: margin,
+        extraMargin: 0, // 👈 Margin already applied to product price
       );
 
       List<XFile> xFiles = files.map((f) => XFile(f.path)).toList();
@@ -2380,9 +2513,9 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
 
               const SizedBox(height: 24),
 
-              // 💰 MARGIN INPUT
+              // 💰 MARGIN INPUT (NEW WIDGET)
               const Text(
-                "ADD MARGIN (Per Item)",
+                "ADD MARGIN (%)",
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -2390,27 +2523,70 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: accentColor.withOpacity(0.5)),
-                ),
-                child: TextField(
-                  controller: _marginController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: "e.g. 100",
-                    prefixIcon: Icon(
-                      Iconsax.money,
-                      size: 18,
-                      color: accentColor,
+              // Reusing the same UI logic but embedded
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: accentColor.withOpacity(0.5)),
                     ),
-                    contentPadding: EdgeInsets.symmetric(vertical: 12),
+                    child: TextField(
+                      controller: _marginController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "e.g. 30",
+                        suffixText: "%",
+                        prefixIcon: Icon(
+                          Iconsax.percentage_square,
+                          size: 18,
+                          color: accentColor,
+                        ),
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [30, 50, 70, 100].map((val) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: ActionChip(
+                            label: Text(
+                              "$val%",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                            backgroundColor: Colors.blue.shade50,
+                            labelStyle: TextStyle(color: Colors.blue.shade900),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(color: Colors.blue.shade100),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _marginController.text = val.toString();
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    " * Minimum 20% margin is required.",
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 

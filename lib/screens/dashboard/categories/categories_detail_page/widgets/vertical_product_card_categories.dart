@@ -763,144 +763,150 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const Text(
-                'Add to Catalog',
-                textScaleFactor: 1.0,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  color: Color(0xFF1F2937),
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (widget.availableCatalogues.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade100),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Iconsax.folder_open,
-                          size: 30,
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        "No catalogues found",
-                        textScaleFactor: 1.0,
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                ...widget.availableCatalogues.map(
-                  (name) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Add to Catalog',
+                  textScaleFactor: 1.0,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (widget.availableCatalogues.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.grey.shade100),
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: kPrimaryColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Iconsax.folder_open,
+                            size: 30,
+                            color: Colors.grey.shade400,
+                          ),
                         ),
-                        child: const Icon(
-                          Iconsax.book,
-                          color: kPrimaryColor,
-                          size: 18,
+                        const SizedBox(height: 12),
+                        const Text(
+                          "No catalogues found",
+                          textScaleFactor: 1.0,
+                          style: TextStyle(color: Colors.grey, fontSize: 13),
                         ),
+                      ],
+                    ),
+                  )
+                else
+                  ...widget.availableCatalogues.map(
+                    (name) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade100),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      title: Text(
-                        name,
-                        textScaleFactor: 1.0,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
                         ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: kPrimaryColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Iconsax.book,
+                            color: kPrimaryColor,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          textScaleFactor: 1.0,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Iconsax.arrow_right_3,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                        onTap: () {
+                          widget.onCatalogueSelected(
+                            widget.product,
+                            name,
+                            false,
+                          );
+                          _triggerCatalogSuccess(name);
+                          Navigator.pop(ctx);
+                        },
                       ),
-                      trailing: const Icon(
-                        Iconsax.arrow_right_3,
-                        size: 16,
-                        color: Colors.grey,
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showCreateNewCatalogueDialog(context);
+                    },
+                    icon: const Icon(Iconsax.add_circle, size: 20),
+                    label: const Text(
+                      'Create New Catalogue',
+                      textScaleFactor: 1.0,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      onTap: () {
-                        widget.onCatalogueSelected(widget.product, name, false);
-                        _triggerCatalogSuccess(name);
-                        Navigator.pop(ctx);
-                      },
+                      elevation: 0,
                     ),
                   ),
                 ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showCreateNewCatalogueDialog(context);
-                  },
-                  icon: const Icon(Iconsax.add_circle, size: 20),
-                  label: const Text(
-                    'Create New Catalogue',
-                    textScaleFactor: 1.0,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
