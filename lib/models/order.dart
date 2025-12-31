@@ -1,7 +1,60 @@
 // lib/models/order.dart
 
+// -----------------------------------------------------------
+// 1. New Class: Snapshot of a single item in the order
+//    (Used to generate invoices with correct HSN/GST)
+// -----------------------------------------------------------
+class OrderItemSnapshot {
+  final String productId;
+  final String name;
+  final String hsnCode;
+  final String gstRate; // e.g. "18"
+  final double unitPrice; // Price per unit
+  final int quantity;
+
+  OrderItemSnapshot({
+    required this.productId,
+    required this.name,
+    required this.hsnCode,
+    required this.gstRate,
+    required this.unitPrice,
+    required this.quantity,
+  });
+
+  // Serialization for local storage
+  Map<String, dynamic> toJson() => {
+    'productId': productId,
+    'name': name,
+    'hsnCode': hsnCode,
+    'gstRate': gstRate,
+    'unitPrice': unitPrice,
+    'quantity': quantity,
+  };
+
+  factory OrderItemSnapshot.fromJson(Map<String, dynamic> json) {
+    return OrderItemSnapshot(
+      productId: json['productId']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      hsnCode: json['hsnCode']?.toString() ?? 'NA',
+      gstRate: json['gstRate']?.toString() ?? '18',
+      unitPrice: (json['unitPrice'] is num)
+          ? (json['unitPrice'] as num).toDouble()
+          : double.tryParse(json['unitPrice'].toString()) ?? 0.0,
+      quantity: (json['quantity'] is num)
+          ? (json['quantity'] as num).toInt()
+          : 1,
+    );
+  }
+}
+
+// -----------------------------------------------------------
+// 2. Enum: Order Status
+// -----------------------------------------------------------
 enum OrderStatus { confirmed, packed, shipped, outForDelivery, delivered }
 
+// -----------------------------------------------------------
+// 3. Main Order Class
+// -----------------------------------------------------------
 class Order {
   final String id;
   final String paymentId;
@@ -19,6 +72,9 @@ class Order {
   final bool isPaid;
   final OrderStatus status;
 
+  // 🔹 NEW: List of items in this order
+  final List<OrderItemSnapshot> items;
+
   Order({
     required this.id,
     required this.paymentId,
@@ -31,6 +87,7 @@ class Order {
     required this.userName,
     required this.isPaid,
     required this.status,
+    this.items = const [], // Default to empty
   });
 
   // -----------------------------------------------------------
@@ -84,19 +141,16 @@ class Order {
 
     // 2) Out for delivery (various spellings)
     if (s.contains('out') && s.contains('deliver')) {
-      // e.g. "out-for-delivery", "out_for_delivery", "wc-outfordelivery"
       return OrderStatus.outForDelivery;
     }
 
     // 3) Shipped
     if (s.contains('ship')) {
-      // e.g. "shipped", "order-shipped", "wc-shipped"
       return OrderStatus.shipped;
     }
 
     // 4) Packed
     if (s.contains('pack')) {
-      // e.g. "packed", "packing", "order-packed"
       return OrderStatus.packed;
     }
 
@@ -129,6 +183,8 @@ class Order {
       "userName": userName,
       "isPaid": isPaid,
       "status": _statusToString(status),
+      // 🔹 Serialize Items
+      "items": items.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -136,6 +192,14 @@ class Order {
   // Convert JSON back to Order (from local storage)
   // -----------------------------------------------------------
   factory Order.fromJson(Map<String, dynamic> json) {
+    // 🔹 Parse Items
+    List<OrderItemSnapshot> parsedItems = [];
+    if (json['items'] != null && json['items'] is List) {
+      parsedItems = (json['items'] as List)
+          .map((e) => OrderItemSnapshot.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
     return Order(
       id: json["id"]?.toString() ?? "",
       paymentId: json["paymentId"]?.toString() ?? "",
@@ -150,6 +214,7 @@ class Order {
       userName: json["userName"]?.toString() ?? "",
       isPaid: json["isPaid"] == true,
       status: _statusFromString(json["status"]?.toString() ?? "confirmed"),
+      items: parsedItems,
     );
   }
 
@@ -163,7 +228,7 @@ class Order {
     final String wooTotal = (json['total'] ?? '0').toString();
     final String wooTransactionId = (json['transaction_id'] ?? '').toString();
 
-    // Billing & shipping maps (safe copy to Map<String, dynamic>)
+    // Billing & shipping maps
     final billing = (json['billing'] is Map)
         ? Map<String, dynamic>.from(json['billing'] as Map)
         : <String, dynamic>{};
@@ -175,7 +240,7 @@ class Order {
     // Amount
     final double parsedAmount = double.tryParse(wooTotal) ?? 0.0;
 
-    // Creation time (prefer GMT if present)
+    // Creation time
     DateTime createdAt;
     if (json['date_created_gmt'] != null) {
       createdAt =
@@ -245,7 +310,6 @@ class Order {
         : customerParts.join(', ');
 
     // ---------------- USER IDENTITY ----------------
-    // 1) Try to read your app userId from meta_data.app_user_id
     String appUserId = '';
     if (json['meta_data'] is List) {
       final List meta = json['meta_data'] as List;
@@ -259,15 +323,11 @@ class Order {
       }
     }
 
-    // 2) Fallback to Woo customer_id (usually 0 for guest)
     final String wooCustomerId = (json['customer_id'] ?? '').toString();
-
-    // Effective userId we store and later use in ordersForUser(userId)
     final String effectiveUserId = appUserId.isNotEmpty
         ? appUserId
         : wooCustomerId;
 
-    // Email & name
     final String email = (billing['email'] ?? '').toString().trim();
     final String fullName = [
       billingFirstName,
@@ -283,6 +343,46 @@ class Order {
 
     final OrderStatus localStatus = _statusFromWooStatus(wooStatus);
 
+    // ---------------- 🔹 PARSE ITEMS ----------------
+    // Map WooCommerce line_items to OrderItemSnapshot
+    List<OrderItemSnapshot> loadedItems = [];
+    if (json['line_items'] != null && json['line_items'] is List) {
+      loadedItems = (json['line_items'] as List).map((i) {
+        final Map<String, dynamic> item = i as Map<String, dynamic>;
+
+        final double lineTotal =
+            double.tryParse(item['total']?.toString() ?? '0') ?? 0.0;
+        final int qty = (item['quantity'] is num)
+            ? (item['quantity'] as num).toInt()
+            : 1;
+
+        // Calculate unit price from total (since line_items usually gives line total)
+        final double unitPrice = qty > 0 ? (lineTotal / qty) : 0.0;
+
+        // Try to get meta data for HSN/GST if passed from checkout, else default
+        // WooCommerce doesn't store HSN/GST by default in line_items unless custom meta is added.
+        // We default to 'NA' and '18' here if missing to prevent invoice crash.
+        String hsn = 'NA';
+        String gst = '18';
+
+        if (item['meta_data'] is List) {
+          for (var m in item['meta_data']) {
+            if (m['key'] == 'hsn_code') hsn = m['value'].toString();
+            if (m['key'] == 'gst_rate') gst = m['value'].toString();
+          }
+        }
+
+        return OrderItemSnapshot(
+          productId: item['product_id']?.toString() ?? '',
+          name: item['name']?.toString() ?? 'Unknown Product',
+          hsnCode: hsn,
+          gstRate: gst,
+          unitPrice: unitPrice,
+          quantity: qty,
+        );
+      }).toList();
+    }
+
     return Order(
       id: wooId,
       paymentId: wooTransactionId,
@@ -290,11 +390,12 @@ class Order {
       createdAt: createdAt,
       businessAddress: businessAddress,
       customerAddress: customerAddress,
-      userId: effectiveUserId, // ← THIS IS NOW YOUR APP USER ID WHEN AVAILABLE
+      userId: effectiveUserId,
       userEmail: email,
       userName: fullName.isNotEmpty ? fullName : billingFirstName,
       isPaid: isPaid,
       status: localStatus,
+      items: loadedItems, // <--- Assign parsed items
     );
   }
 }

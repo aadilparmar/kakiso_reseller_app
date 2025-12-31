@@ -6,6 +6,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/order_controller.dart';
 import 'package:kakiso_reseller_app/models/order.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
+// 🔹 IMPORT THE INVOICE SERVICE
+import 'package:kakiso_reseller_app/services/invoice_service.dart';
 
 class OrderDetailsPage extends StatefulWidget {
   final String orderId;
@@ -22,7 +24,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   @override
   void initState() {
     super.initState();
-    _orderController = Get.find<OrderController>();
+    // Safe lookup or put if missing (though usually it should be there)
+    if (Get.isRegistered<OrderController>()) {
+      _orderController = Get.find<OrderController>();
+    } else {
+      _orderController = Get.put(OrderController());
+    }
     _refreshFromServer();
   }
 
@@ -490,28 +497,62 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Download invoice for this order.',
-              style: TextStyle(fontSize: 13),
+              'Tax Invoice',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
+
+          // 🔹 DOWNLOAD BUTTON
           ElevatedButton.icon(
-            onPressed: () {
-              Get.snackbar(
-                'Invoice',
-                'Invoice download coming soon.',
-                snackPosition: SnackPosition.BOTTOM,
-                margin: const EdgeInsets.all(16),
-              );
+            onPressed: () async {
+              // 1. Check if we have items to print
+              if (order.items.isEmpty) {
+                // If items are missing (e.g. old orders), try fetch again
+                Get.snackbar(
+                  'Fetching Data',
+                  'Syncing order details from server...',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                await _refreshFromServer();
+                // Check again
+                final updatedOrder = _orderController.getOrderById(order.id);
+                if (updatedOrder != null && updatedOrder.items.isNotEmpty) {
+                  await InvoiceService.generateAndPrintInvoice(updatedOrder);
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Invoice details unavailable for this order.',
+                  );
+                }
+              } else {
+                // 2. Generate PDF
+                try {
+                  await InvoiceService.generateAndPrintInvoice(order);
+                } catch (e) {
+                  Get.snackbar('Error', 'Failed to generate invoice: $e');
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: accentColor,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            icon: const Icon(Iconsax.document_download, size: 16),
-            label: const Text('Download', style: TextStyle(fontSize: 12)),
+            icon: const Icon(
+              Iconsax.document_download,
+              size: 18,
+              color: Colors.white,
+            ),
+            label: const Text(
+              'Download',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

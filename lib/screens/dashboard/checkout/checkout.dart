@@ -123,10 +123,11 @@ class FinalCheckoutPage extends StatelessWidget {
         final double resellerPayAmount = baseSubTotal + totalCharges;
 
         // ---- AMOUNT KAKISO COLLECTS FROM CUSTOMER ----
-        final double customerCollectAmount = resellerPayAmount + marginTotal;
+        final double customerCollectAmount =
+            resellerPayAmount + marginTotal - totalCharges;
 
         // ---- PROFIT FOR RESELLER ----
-        final double profit = marginTotal;
+        final double profit = marginTotal - totalCharges;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

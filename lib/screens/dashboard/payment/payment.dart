@@ -604,7 +604,7 @@ class _PaymentPageState extends State<PaymentPage> {
           // ---------- 1. Load saved business details ----------
           final businessData = await _loadBusinessDetailsForBilling();
 
-          // Prepare Billing Data first (used in both cases)
+          // Prepare Billing Data
           final ownerName = (businessData?['ownerName'] as String? ?? '')
               .trim();
           final businessName = (businessData?['businessName'] as String? ?? '')
@@ -654,7 +654,6 @@ class _PaymentPageState extends State<PaymentPage> {
           // ---------- 2. Prepare Shipping Data ----------
           Map<String, dynamic> shipping;
 
-          // 🔹 NEW LOGIC: If Self Ship, copy business details to shipping
           if (widget.isSelfShip) {
             shipping = {
               'first_name': billingFirstName,
@@ -669,9 +668,7 @@ class _PaymentPageState extends State<PaymentPage> {
               'phone': billingPhone,
             };
           } else {
-            // 🔹 OLD LOGIC: Load customer address
             final customerAddress = await _loadCustomerAddressForShipping();
-
             final caName = (customerAddress?['name'] as String? ?? '').trim();
             final caAddress = (customerAddress?['addressLine'] as String? ?? '')
                 .trim();
@@ -697,35 +694,48 @@ class _PaymentPageState extends State<PaymentPage> {
               shippingAddress1 = widget.customerAddressLabel;
             }
 
-            final String shippingCity = caCity.isNotEmpty ? caCity : 'NA';
-            final String shippingState = caState.isNotEmpty ? caState : 'NA';
-            final String shippingPostcode = caPincode.isNotEmpty
-                ? caPincode
-                : '000000';
-            final String shippingPhone = caPhone.isNotEmpty
-                ? caPhone
-                : billingPhone;
-
             shipping = {
               'first_name': shippingFirstName,
               'last_name': '',
               'company': '',
               'address_1': shippingAddress1,
               'address_2': '',
-              'city': shippingCity,
-              'state': shippingState,
-              'postcode': shippingPostcode,
+              'city': caCity.isNotEmpty ? caCity : 'NA',
+              'state': caState.isNotEmpty ? caState : 'NA',
+              'postcode': caPincode.isNotEmpty ? caPincode : '000000',
               'country': 'IN',
-              'phone': shippingPhone,
+              'phone': caPhone.isNotEmpty ? caPhone : billingPhone,
             };
           }
 
-          // ---------- 3. Build Woo line items ----------
+          // ---------- 3. Build Woo line items (WITH META DATA FOR HSN/GST) ----------
+          // 🔹 FIX: Added meta_data here so WooCommerce receives the HSN/GST
           final List<Map<String, dynamic>> lineItems = _cartController.cartItems
               .map<Map<String, dynamic>>((item) {
+                final String hsn =
+                    (item.product.hsnCode != null &&
+                        item.product.hsnCode!.isNotEmpty)
+                    ? item.product.hsnCode!
+                    : '';
+
+                final String gst =
+                    (item.product.gst != null && item.product.gst!.isNotEmpty)
+                    ? item.product.gst!
+                    : '';
+
                 return {
                   'product_id': item.product.id,
                   'quantity': item.quantity,
+                  'meta_data': [
+                    if (hsn.isNotEmpty) {'key': 'hsn_code', 'value': hsn},
+                    if (hsn.isNotEmpty)
+                      {
+                        'key': 'HSN',
+                        'value': hsn,
+                      }, // Sending as both keys just in case
+                    if (gst.isNotEmpty) {'key': 'gst_rate', 'value': gst},
+                    if (gst.isNotEmpty) {'key': 'GST', 'value': '$gst%'},
+                  ],
                 };
               })
               .toList();
@@ -767,7 +777,33 @@ class _PaymentPageState extends State<PaymentPage> {
 
           final String wooOrderId = (wooOrder['id'] ?? '').toString();
 
-          // ---------- 6. Local order ----------
+          // ---------- 6. CAPTURE HSN & GST FOR LOCAL ORDER ----------
+          final List<OrderItemSnapshot> orderItems = _cartController.cartItems
+              .map((item) {
+                // 🔹 FIX: Ensure we fall back to sensible defaults if null
+                final String hsn =
+                    (item.product.hsnCode != null &&
+                        item.product.hsnCode!.isNotEmpty)
+                    ? item.product.hsnCode!
+                    : 'NA';
+
+                final String gst =
+                    (item.product.gst != null && item.product.gst!.isNotEmpty)
+                    ? item.product.gst!
+                    : '18'; // Default 18% if missing
+
+                return OrderItemSnapshot(
+                  productId: item.product.id.toString(),
+                  name: item.product.name,
+                  hsnCode: hsn, // Capturing here
+                  gstRate: gst, // Capturing here
+                  unitPrice: double.tryParse(item.product.price) ?? 0.0,
+                  quantity: item.quantity,
+                );
+              })
+              .toList();
+
+          // ---------- 7. Local order creation ----------
           final order = Order(
             id: wooOrderId.isNotEmpty
                 ? wooOrderId
@@ -782,6 +818,7 @@ class _PaymentPageState extends State<PaymentPage> {
             userName: billingFirstName,
             isPaid: true,
             status: OrderStatus.confirmed,
+            items: orderItems,
           );
 
           orderController.addOrder(order);
@@ -789,10 +826,9 @@ class _PaymentPageState extends State<PaymentPage> {
           debugPrint('Failed to create WooCommerce order: $e');
         }
 
-        // ---------- 7. Clear cart ----------
+        // ---------- 8. Clear cart & Navigate ----------
         _cartController.clearCart();
 
-        // ---------- 8. Show success ----------
         Get.snackbar(
           'Payment Successful',
           'Payment ID: $paymentId',
@@ -800,7 +836,6 @@ class _PaymentPageState extends State<PaymentPage> {
           margin: const EdgeInsets.all(16),
         );
 
-        // ---------- 9. Navigate home ----------
         final UserData navUser =
             currentUser ??
             UserData(
