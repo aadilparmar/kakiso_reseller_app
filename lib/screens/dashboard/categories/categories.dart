@@ -3,8 +3,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart'; // 1. IMPORT GET STORAGE
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+// 2. IMPORT SHOWCASEVIEW
+import 'package:showcaseview/showcaseview.dart';
 
 // --- MODELS & SERVICES ---
 import 'package:kakiso_reseller_app/models/categories.dart';
@@ -16,14 +19,27 @@ import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-class CategoriesSection extends StatefulWidget {
+// 3. WRAPPER FOR SHOWCASE
+class CategoriesSection extends StatelessWidget {
   final UserData userData;
   const CategoriesSection({super.key, required this.userData});
+
   @override
-  State<CategoriesSection> createState() => _CategoriesPageState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      builder: (context) => _CategoriesSectionContent(userData: userData),
+    );
+  }
 }
 
-class _CategoriesPageState extends State<CategoriesSection> {
+class _CategoriesSectionContent extends StatefulWidget {
+  final UserData userData;
+  const _CategoriesSectionContent({required this.userData});
+  @override
+  State<_CategoriesSectionContent> createState() => _CategoriesPageState();
+}
+
+class _CategoriesPageState extends State<_CategoriesSectionContent> {
   // --- STATE ---
   bool isCategoriesLoading = true;
   String? errorMessage;
@@ -32,6 +48,11 @@ class _CategoriesPageState extends State<CategoriesSection> {
   // Controllers
   final CartController cartController = Get.find<CartController>();
   final ScrollController _rightScrollController = ScrollController();
+  final _localStorage = GetStorage();
+
+  // 4. SHOWCASE KEYS
+  final GlobalKey _leftRailKey = GlobalKey();
+  final GlobalKey _rightContentKey = GlobalKey();
 
   // Selection (Level 1)
   int _selectedParentId = 0;
@@ -70,6 +91,9 @@ class _CategoriesPageState extends State<CategoriesSection> {
             _selectedParentId = parents.first.id;
           }
         });
+
+        // 5. TRIGGER TOUR AFTER DATA LOADS
+        _checkAndStartTour();
       }
     } catch (e) {
       if (mounted) {
@@ -79,6 +103,23 @@ class _CategoriesPageState extends State<CategoriesSection> {
         });
       }
     }
+  }
+
+  void _checkAndStartTour() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Check if we have categories to show the tour on
+      if (_allCategoriesFlat.isEmpty) return;
+
+      bool hasShownTour =
+          _localStorage.read('has_shown_categories_tour_v1') ?? false;
+
+      if (!hasShownTour) {
+        ShowCaseWidget.of(
+          context,
+        ).startShowCase([_leftRailKey, _rightContentKey]);
+        _localStorage.write('has_shown_categories_tour_v1', true);
+      }
+    });
   }
 
   // --- HIERARCHY LOGIC ---
@@ -204,7 +245,7 @@ class _CategoriesPageState extends State<CategoriesSection> {
           final cat = parents[index];
           final isSelected = cat.id == _selectedParentId;
 
-          return GestureDetector(
+          Widget content = GestureDetector(
             onTap: () {
               HapticFeedback.selectionClick();
               setState(() {
@@ -289,6 +330,31 @@ class _CategoriesPageState extends State<CategoriesSection> {
               ),
             ),
           );
+
+          // 6. WRAP FIRST LEFT ITEM IN SHOWCASE
+          if (index == 0) {
+            return Showcase(
+              key: _leftRailKey,
+              title: "Main Categories",
+              description:
+                  "Tap these icons to switch between major departments.",
+              overlayColor: Colors.black.withOpacity(0.7),
+              titleTextStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: accentColor,
+                fontSize: 16,
+              ),
+              descTextStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+                fontSize: 12,
+              ),
+              targetBorderRadius: BorderRadius.circular(12),
+              child: content,
+            );
+          }
+
+          return content;
         },
         separatorBuilder: (_, __) => const SizedBox(height: 4),
       ),
@@ -298,33 +364,54 @@ class _CategoriesPageState extends State<CategoriesSection> {
   // --- RIGHT HEADER ---
   Widget _buildTitleSliver() {
     final parent = _getSelectedParent();
+
+    // 7. WRAP RIGHT CONTENT TITLE IN SHOWCASE
+    Widget content = Container(
+      color: _bgRight,
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            parent?.name ?? "Categories",
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: _textDark,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Explore collections",
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+
     return SliverToBoxAdapter(
-      child: Container(
-        color: _bgRight,
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              parent?.name ?? "Categories",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: _textDark,
-                fontFamily: 'Poppins',
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              "Explore collections",
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[500],
-                fontFamily: 'Poppins',
-              ),
-            ),
-          ],
+      child: Showcase(
+        key: _rightContentKey,
+        title: "Explore Collections",
+        description: "Browse specific sub-categories and products here.",
+        overlayColor: Colors.black.withOpacity(0.7),
+        titleTextStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: accentColor,
+          fontSize: 16,
         ),
+        descTextStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+          fontSize: 12,
+        ),
+        targetBorderRadius: BorderRadius.circular(12),
+        child: content,
       ),
     );
   }
@@ -334,7 +421,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
     final level3Categories = _getChildren(level2Cat.id);
 
     // Combine items: First item is Level 2 (Parent), followed by Level 3 (Children)
-    // We create a wrapper list so we can iterate easily
     final List<CategoryModel> displayItems = [level2Cat, ...level3Categories];
 
     return Column(
@@ -397,8 +483,6 @@ class _CategoriesPageState extends State<CategoriesSection> {
           ),
           itemBuilder: (context, index) {
             final cat = displayItems[index];
-            // If index is 0, it's the Level 2 Parent. Otherwise, it's a Level 3 Child.
-            // Visually they are identical.
             return _buildGridCard(cat);
           },
         ),

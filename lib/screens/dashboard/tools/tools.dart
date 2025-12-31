@@ -3,14 +3,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart'; // 1. IMPORT GET STORAGE
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+// 2. IMPORT SHOWCASEVIEW
+import 'package:showcaseview/showcaseview.dart';
 
 // --- MODEL IMPORTS ---
 import 'package:kakiso_reseller_app/models/tools.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
-import 'package:kakiso_reseller_app/navigation_menu.dart'; // Added for Catalog Navigation
+import 'package:kakiso_reseller_app/navigation_menu.dart';
 
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
@@ -51,17 +54,38 @@ const Color dividerColor = Color(0xFFE5E7EB);
 
 final CartController cartController = Get.put(CartController());
 
-class ToolsSection extends StatefulWidget {
+// 3. WRAPPER WIDGET FOR TOUR
+class ToolsSection extends StatelessWidget {
   final UserData userData;
 
   const ToolsSection({super.key, required this.userData});
 
   @override
-  State<ToolsSection> createState() => _ToolsSectionState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      builder: (context) => _ToolsSectionContent(userData: userData),
+    );
+  }
 }
 
-class _ToolsSectionState extends State<ToolsSection> {
+class _ToolsSectionContent extends StatefulWidget {
+  final UserData userData;
+
+  const _ToolsSectionContent({required this.userData});
+
+  @override
+  State<_ToolsSectionContent> createState() => _ToolsSectionState();
+}
+
+class _ToolsSectionState extends State<_ToolsSectionContent> {
   final _storage = const FlutterSecureStorage();
+  final _localStorage = GetStorage();
+
+  // 4. SHOWCASE KEYS
+  final GlobalKey _summaryKey = GlobalKey();
+  final GlobalKey _filterKey = GlobalKey();
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _firstToolKey = GlobalKey();
 
   late List<Tool> tools;
   String query = '';
@@ -82,7 +106,6 @@ class _ToolsSectionState extends State<ToolsSection> {
   };
 
   // IDs of tools that should redirect to NavigationMenu Index 3 (Catalog)
-  // These mimic the Drawer's "My Catalog" behavior
   final Set<String> _catalogRedirectIds = {
     'smart_catalog',
     'collage_maker',
@@ -95,7 +118,7 @@ class _ToolsSectionState extends State<ToolsSection> {
   void initState() {
     super.initState();
 
-    // Tools list: some live, some coming soon
+    // Tools list initialization
     tools = [
       // --- NEW TOOLS (Catalog Based) ---
       Tool(
@@ -105,7 +128,6 @@ class _ToolsSectionState extends State<ToolsSection> {
             'Create, customize, and share unlimited product catalogs instantly.',
         iconData: Iconsax.book_1,
         enabled: true,
-        // We handle the navigation logic in onTap, so this builder is a fallback
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
@@ -155,7 +177,7 @@ class _ToolsSectionState extends State<ToolsSection> {
       ),
       Tool(
         id: 'reseller_catalog',
-        title: 'Quick CSV Export',
+        title: 'Category CSV Exporter',
         subtitle: 'Download standard product catalogs in CSV/Excel.',
         iconData: Iconsax.document_download,
         enabled: true,
@@ -222,6 +244,20 @@ class _ToolsSectionState extends State<ToolsSection> {
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
     ];
+
+    // 5. TRIGGER TOUR
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndStartTour());
+  }
+
+  void _checkAndStartTour() {
+    bool hasShown = _localStorage.read('has_shown_tools_tour_v1') ?? false;
+
+    if (!hasShown) {
+      ShowCaseWidget.of(
+        context,
+      ).startShowCase([_summaryKey, _filterKey, _searchKey, _firstToolKey]);
+      _localStorage.write('has_shown_tools_tour_v1', true);
+    }
   }
 
   // ───────────────────────── FILTER LOGIC ─────────────────────────
@@ -640,132 +676,190 @@ class _ToolsSectionState extends State<ToolsSection> {
                     const SizedBox(height: 12),
 
                     // Progress-like summary row
-                    Row(
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            gradient: const LinearGradient(
-                              colors: [accentColor, accentPurple],
+                    // 6. WRAP SUMMARY IN SHOWCASE
+                    Showcase(
+                      key: _summaryKey,
+                      title: "Roadmap Status",
+                      description:
+                          "Quickly see how many tools are live vs coming soon.",
+                      overlayColor: Colors.black.withOpacity(0.7),
+                      titleTextStyle: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: accentColor,
+                        fontSize: 16,
+                      ),
+                      descTextStyle: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                        fontSize: 12,
+                      ),
+                      targetBorderRadius: BorderRadius.circular(10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              gradient: const LinearGradient(
+                                colors: [accentColor, accentPurple],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$liveCount live • $comingSoonCount coming soon',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontFamily: 'Poppins',
-                            color: textMuted,
+                          const SizedBox(width: 8),
+                          Text(
+                            '$liveCount live • $comingSoonCount coming soon',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontFamily: 'Poppins',
+                              color: textMuted,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
 
               // ── CHIPS ROW ─────────────────────────────────────────────
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 2,
+              // 7. WRAP FILTERS IN SHOWCASE
+              Showcase(
+                key: _filterKey,
+                title: "Tool Filters",
+                description:
+                    "Tap to filter tools by category (e.g., Marketing, Automation).",
+                overlayColor: Colors.black.withOpacity(0.7),
+                titleTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                  fontSize: 16,
                 ),
-                child: Row(
-                  children: [
-                    _FilterChip(
-                      label: 'All',
-                      selected: selectedChip == 'All',
-                      onTap: () => setState(() => selectedChip = 'All'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Live',
-                      selected: selectedChip == 'Live',
-                      onTap: () => setState(() => selectedChip = 'Live'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Coming Soon',
-                      selected: selectedChip == 'Coming Soon',
-                      onTap: () => setState(() => selectedChip = 'Coming Soon'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Automation',
-                      selected: selectedChip == 'Automation',
-                      onTap: () => setState(() => selectedChip = 'Automation'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Marketing',
-                      selected: selectedChip == 'Marketing',
-                      onTap: () => setState(() => selectedChip = 'Marketing'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Insights',
-                      selected: selectedChip == 'Insights',
-                      onTap: () => setState(() => selectedChip = 'Insights'),
-                    ),
-                  ],
+                descTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontSize: 12,
+                ),
+                targetBorderRadius: BorderRadius.circular(25),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 2,
+                  ),
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'All',
+                        selected: selectedChip == 'All',
+                        onTap: () => setState(() => selectedChip = 'All'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Live',
+                        selected: selectedChip == 'Live',
+                        onTap: () => setState(() => selectedChip = 'Live'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Coming Soon',
+                        selected: selectedChip == 'Coming Soon',
+                        onTap: () =>
+                            setState(() => selectedChip = 'Coming Soon'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Automation',
+                        selected: selectedChip == 'Automation',
+                        onTap: () =>
+                            setState(() => selectedChip = 'Automation'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Marketing',
+                        selected: selectedChip == 'Marketing',
+                        onTap: () => setState(() => selectedChip = 'Marketing'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Insights',
+                        selected: selectedChip == 'Insights',
+                        onTap: () => setState(() => selectedChip = 'Insights'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
               // ── SEARCH BAR ────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+              // 8. WRAP SEARCH IN SHOWCASE
+              Showcase(
+                key: _searchKey,
+                title: "Search",
+                description: "Type here to find a specific tool instantly.",
+                overlayColor: Colors.black.withOpacity(0.7),
+                titleTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                  fontSize: 16,
                 ),
-                child: Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: surfaceColor,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: cardBorderColor),
+                descTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontSize: 12,
+                ),
+                targetBorderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Iconsax.search_normal,
-                        color: textMuted,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          style: const TextStyle(
-                            color: textPrimary,
-                            fontFamily: 'Poppins',
-                            fontSize: 13,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: 'Search tools...',
-                            hintStyle: TextStyle(
-                              color: textMuted,
+                  child: Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: surfaceColor,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cardBorderColor),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Iconsax.search_normal,
+                          color: textMuted,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            style: const TextStyle(
+                              color: textPrimary,
                               fontFamily: 'Poppins',
                               fontSize: 13,
                             ),
-                            border: InputBorder.none,
-                          ),
-                          onChanged: (v) => setState(() => query = v),
-                        ),
-                      ),
-                      if (query.isNotEmpty)
-                        GestureDetector(
-                          onTap: () => setState(() => query = ''),
-                          child: const Icon(
-                            Icons.close,
-                            size: 18,
-                            color: textMuted,
+                            decoration: const InputDecoration(
+                              hintText: 'Search tools...',
+                              hintStyle: TextStyle(
+                                color: textMuted,
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                              ),
+                              border: InputBorder.none,
+                            ),
+                            onChanged: (v) => setState(() => query = v),
                           ),
                         ),
-                    ],
+                        if (query.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => setState(() => query = ''),
+                            child: const Icon(
+                              Icons.close,
+                              size: 18,
+                              color: textMuted,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -787,7 +881,8 @@ class _ToolsSectionState extends State<ToolsSection> {
                             final isLast = index == visibleTools.length - 1;
                             final isLive = _liveToolIds.contains(tool.id);
 
-                            return _TimelineToolCard(
+                            // 9. WRAP FIRST TOOL IN SHOWCASE
+                            Widget toolCard = _TimelineToolCard(
                               tool: tool,
                               isFirst: isFirst,
                               isLast: isLast,
@@ -802,7 +897,7 @@ class _ToolsSectionState extends State<ToolsSection> {
                                         userData: widget.userData,
                                         initialIndex: 3, // Catalog Index
                                       ),
-                                      // 🔴 THIS IS THE FIX: Passing the argument!
+                                      // Passing the argument for guide overlay
                                       arguments: {'active_tool_guide': tool.id},
                                     );
                                   } else {
@@ -815,6 +910,30 @@ class _ToolsSectionState extends State<ToolsSection> {
                                 }
                               },
                             );
+
+                            if (index == 0) {
+                              return Showcase(
+                                key: _firstToolKey,
+                                title: "Explore Tools",
+                                description:
+                                    "Tap any tool to launch it. 'Coming Soon' tools will notify you when ready.",
+                                overlayColor: Colors.black.withOpacity(0.7),
+                                titleTextStyle: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: accentColor,
+                                  fontSize: 16,
+                                ),
+                                descTextStyle: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  fontSize: 12,
+                                ),
+                                targetBorderRadius: BorderRadius.circular(18),
+                                child: toolCard,
+                              );
+                            }
+
+                            return toolCard;
                           },
                         ),
                 ),

@@ -1302,347 +1302,363 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          // 1. MAIN CONTENT
-          Column(
-            children: [
-              Obx(
-                () => CatalogueHeader(
-                  totalCatalogues: catalogueController.myCatalogues.length,
-                  totalProducts: catalogueController.myCatalogues.fold(
-                    0,
-                    (sum, cat) => sum + cat.products.length,
+      // ✅ FIX: SafeArea added here to prevent body content from going behind bottom nav
+      body: SafeArea(
+        top: false, // Keep top full bleed (covered by AppBar)
+        child: Stack(
+          children: [
+            // 1. MAIN CONTENT
+            Column(
+              children: [
+                Obx(
+                  () => CatalogueHeader(
+                    totalCatalogues: catalogueController.myCatalogues.length,
+                    totalProducts: catalogueController.myCatalogues.fold(
+                      0,
+                      (sum, cat) => sum + cat.products.length,
+                    ),
                   ),
                 ),
-              ),
-              CatalogueSearchAndSortBar(
-                searchController: _searchController,
-                searchQuery: _searchQuery,
-                onSearchChanged: (value) =>
-                    setState(() => _searchQuery = value),
-                currentSort: _currentSort,
-                onSortChanged: (value) => setState(() => _currentSort = value),
-              ),
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
-              Expanded(
-                child: Obx(() {
-                  final items = _buildFilteredSortedList();
-                  if (catalogueController.myCatalogues.isEmpty) {
-                    return CatalogueEmptyState(
-                      onCreatePressed: _openCreateCatalogueDialog,
-                    );
-                  }
-                  if (items.isEmpty) return const CatalogueSearchEmptyState();
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final cat = items[index];
-                      // 🌟 If Guide is active, only fully show the first item
-                      final bool isGuideActive = _activeGuideTool != null;
-                      final bool isFirstItem = index == 0;
-                      final double cardOpacity = (isGuideActive && !isFirstItem)
-                          ? 0.3
-                          : 1.0;
+                CatalogueSearchAndSortBar(
+                  searchController: _searchController,
+                  searchQuery: _searchQuery,
+                  onSearchChanged: (value) =>
+                      setState(() => _searchQuery = value),
+                  currentSort: _currentSort,
+                  onSortChanged: (value) =>
+                      setState(() => _currentSort = value),
+                ),
+                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                Expanded(
+                  child: Obx(() {
+                    final items = _buildFilteredSortedList();
+                    if (catalogueController.myCatalogues.isEmpty) {
+                      return CatalogueEmptyState(
+                        onCreatePressed: _openCreateCatalogueDialog,
+                      );
+                    }
+                    if (items.isEmpty) return const CatalogueSearchEmptyState();
+                    return ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final cat = items[index];
+                        // 🌟 If Guide is active, only fully show the first item
+                        final bool isGuideActive = _activeGuideTool != null;
+                        final bool isFirstItem = index == 0;
+                        final double cardOpacity =
+                            (isGuideActive && !isFirstItem) ? 0.3 : 1.0;
 
-                      return Opacity(
-                        opacity: cardOpacity,
-                        child: GestureDetector(
-                          onTap: () => Get.to(
-                            () => CatalogueDetailsPage(catalogueId: cat.id),
-                          ),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                              border: Border.all(color: Colors.grey.shade200),
+                        return Opacity(
+                          opacity: cardOpacity,
+                          child: GestureDetector(
+                            onTap: () => Get.to(
+                              () => CatalogueDetailsPage(catalogueId: cat.id),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // HEADER GRADIENT
-                                Container(
-                                  decoration: const BoxDecoration(
-                                    borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(18),
-                                    ),
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Color(0xFF8B5CF6),
-                                        Color(0xFFEC4899),
-                                      ],
-                                    ),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.12),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Iconsax.folder_2,
-                                          size: 16,
-                                          color: Colors.white,
-                                        ),
+                                ],
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // HEADER GRADIENT
+                                  Container(
+                                    decoration: const BoxDecoration(
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(18),
                                       ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          cat.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Color(0xFF8B5CF6),
+                                          Color(0xFFEC4899),
+                                        ],
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.12,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Iconsax.folder_2,
+                                            size: 16,
                                             color: Colors.white,
                                           ),
                                         ),
-                                      ),
-                                      const Icon(
-                                        Iconsax.arrow_right_3,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // CONTENT
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    14,
-                                    10,
-                                    14,
-                                    6,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (cat.description.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 6.0,
-                                          ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
                                           child: Text(
-                                            cat.description,
-                                            maxLines: 2,
+                                            cat.name,
+                                            maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               fontFamily: 'Poppins',
-                                              fontSize: 11,
-                                              color: Color(0xFF4B5563),
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
                                             ),
                                           ),
                                         ),
-                                      SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
+                                        const Icon(
+                                          Iconsax.arrow_right_3,
+                                          size: 18,
+                                          color: Colors.white,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // CONTENT
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      14,
+                                      10,
+                                      14,
+                                      6,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (cat.description.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 6.0,
                                             ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE0F2FE),
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
+                                            child: Text(
+                                              cat.description,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                color: Color(0xFF4B5563),
+                                              ),
                                             ),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Iconsax.bag_2,
-                                                  size: 13,
-                                                  color: Color(0xFF1D4ED8),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  "${cat.products.length} items",
-                                                  style: const TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
+                                          ),
+                                        SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE0F2FE),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Iconsax.bag_2,
+                                                    size: 13,
                                                     color: Color(0xFF1D4ED8),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF5F3FF),
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                            ),
-                                            child: Row(
-                                              children: const [
-                                                Icon(
-                                                  Iconsax.star1,
-                                                  size: 13,
-                                                  color: Color(0xFF8B5CF6),
-                                                ),
-                                                SizedBox(width: 4),
-                                                Text(
-                                                  "My Catalog",
-                                                  style: TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Color(0xFF6D28D9),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    "${cat.products.length} items",
+                                                    style: const TextStyle(
+                                                      fontFamily: 'Poppins',
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Color(0xFF1D4ED8),
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const Spacer(),
-                                          // Delete is always dimmed if guide active
-                                          Opacity(
-                                            opacity: isGuideActive ? 0.3 : 1.0,
-                                            child: _buildCatalogueActionButton(
-                                              icon: Iconsax.trash,
-                                              label: "Delete",
-                                              onTap: () => catalogueController
-                                                  .deleteCatalogue(cat.id),
-                                              outlined: true,
-                                              color: Colors.red,
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF5F3FF),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                              child: Row(
+                                                children: const [
+                                                  Icon(
+                                                    Iconsax.star1,
+                                                    size: 13,
+                                                    color: Color(0xFF8B5CF6),
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    "My Catalog",
+                                                    style: TextStyle(
+                                                      fontFamily: 'Poppins',
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Color(0xFF6D28D9),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Divider(
-                                  height: 14,
-                                  thickness: 0.7,
-                                  color: Color(0xFFE5E7EB),
-                                ),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Iconsax.flash_1,
-                                      color: accentColor,
-                                      size: 22,
+                                            const Spacer(),
+                                            // Delete is always dimmed if guide active
+                                            Opacity(
+                                              opacity: isGuideActive
+                                                  ? 0.3
+                                                  : 1.0,
+                                              child:
+                                                  _buildCatalogueActionButton(
+                                                    icon: Iconsax.trash,
+                                                    label: "Delete",
+                                                    onTap: () =>
+                                                        catalogueController
+                                                            .deleteCatalogue(
+                                                              cat.id,
+                                                            ),
+                                                    outlined: true,
+                                                    color: Colors.red,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "Reseller Tools",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
-                                        color: Color(0xFF86198F),
-                                        fontFamily: 'Poppins',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 6),
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    12,
-                                    6,
-                                    12,
-                                    10,
                                   ),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
+                                  const Divider(
+                                    height: 14,
+                                    thickness: 0.7,
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                  Row(
                                     children: [
-                                      // --- SOCIAL ICONS ---
-                                      // 6. SHOWCASE SHARE
-                                      index == 0
-                                          ? Showcase(
-                                              key: _shareKey,
-                                              title: "Easy Sharing",
-                                              description:
-                                                  "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
-                                              overlayColor: Colors.black
-                                                  .withOpacity(0.7),
-                                              titleTextStyle: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: accentColor,
-                                                fontSize: 16,
-                                              ),
-                                              descTextStyle: TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                color: Colors.black,
-                                                fontSize: 12,
-                                              ),
-                                              targetBorderRadius:
-                                                  BorderRadius.circular(20),
-                                              child: _buildSocialRow(cat),
-                                            )
-                                          : _buildSocialRow(cat),
-
-                                      // 7. SHOWCASE TOOLS
-                                      index == 0
-                                          ? Showcase(
-                                              key: _toolsKey,
-                                              title: "Power Tools",
-                                              description:
-                                                  "Generate PDFs, Collages, or CSVs instantly to look professional.",
-                                              overlayColor: Colors.black
-                                                  .withOpacity(0.7),
-                                              titleTextStyle: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: accentColor,
-                                                fontSize: 16,
-                                              ),
-                                              descTextStyle: TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                color: Colors.black,
-                                                fontSize: 12,
-                                              ),
-                                              targetBorderRadius:
-                                                  BorderRadius.circular(20),
-                                              child: _buildToolsRow(cat),
-                                            )
-                                          : _buildToolsRow(cat),
+                                      Icon(
+                                        Iconsax.flash_1,
+                                        color: accentColor,
+                                        size: 22,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        "Reseller Tools",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                          color: Color(0xFF86198F),
+                                          fontFamily: 'Poppins',
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                  SizedBox(height: 6),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      6,
+                                      12,
+                                      10,
+                                    ),
+                                    child: Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        // --- SOCIAL ICONS ---
+                                        // 6. SHOWCASE SHARE
+                                        index == 0
+                                            ? Showcase(
+                                                key: _shareKey,
+                                                title: "Easy Sharing",
+                                                description:
+                                                    "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
+                                                overlayColor: Colors.black
+                                                    .withOpacity(0.7),
+                                                titleTextStyle: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: accentColor,
+                                                  fontSize: 16,
+                                                ),
+                                                descTextStyle: TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.black,
+                                                  fontSize: 12,
+                                                ),
+                                                targetBorderRadius:
+                                                    BorderRadius.circular(20),
+                                                child: _buildSocialRow(cat),
+                                              )
+                                            : _buildSocialRow(cat),
+
+                                        // 7. SHOWCASE TOOLS
+                                        index == 0
+                                            ? Showcase(
+                                                key: _toolsKey,
+                                                title: "Power Tools",
+                                                description:
+                                                    "Generate PDFs, Collages, or CSVs instantly to look professional.",
+                                                overlayColor: Colors.black
+                                                    .withOpacity(0.7),
+                                                titleTextStyle: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: accentColor,
+                                                  fontSize: 16,
+                                                ),
+                                                descTextStyle: TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.black,
+                                                  fontSize: 12,
+                                                ),
+                                                targetBorderRadius:
+                                                    BorderRadius.circular(20),
+                                                child: _buildToolsRow(cat),
+                                              )
+                                            : _buildToolsRow(cat),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  );
-                }),
-              ),
-            ],
-          ),
-
-          // 2. ⚡ GUIDE OVERLAY
-          if (_activeGuideTool != null)
-            _buildGuideOverlay(
-              toolId: _activeGuideTool!,
-              onDismiss: () => setState(() => _activeGuideTool = null),
+                        );
+                      },
+                    );
+                  }),
+                ),
+              ],
             ),
-        ],
+
+            // 2. ⚡ GUIDE OVERLAY
+            if (_activeGuideTool != null)
+              _buildGuideOverlay(
+                toolId: _activeGuideTool!,
+                onDismiss: () => setState(() => _activeGuideTool = null),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1967,217 +1983,224 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          // Handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(4),
+      // ✅ FIX: Wrapped in SafeArea to ensure bottom button isn't hidden
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Title & Count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Select Products for PDF",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          "${_selectedIds.length} / 30 selected",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _selectedIds.length == 30
-                                ? Colors.red
-                                : accentColor,
-                            fontWeight: FontWeight.w600,
-                          ),
+            // Title & Count
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Select Products for PDF",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
                         ),
-                        if (_selectedIds.length == 30)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 6.0),
-                            child: Text(
-                              "(Max limit)",
-                              style: TextStyle(fontSize: 10, color: Colors.red),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            "${_selectedIds.length} / 30 selected",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _selectedIds.length == 30
+                                  ? Colors.red
+                                  : accentColor,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                      ],
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: isFullSelection ? _deselectAll : _selectAllSmart,
-                  child: Text(
-                    isFullSelection
-                        ? "Clear"
-                        : (isLargeCatalog ? "Select Top 30" : "Select All"),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(),
-
-          // List
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (ctx, i) {
-                final p = products[i];
-                final isSelected = _selectedIds.contains(p.id.toString());
-                // Visual feedback: If user hit limit & item not selected -> dim it slightly
-                final isLimitReached = _selectedIds.length >= 30;
-                final bool isDisabled = isLimitReached && !isSelected;
-
-                return InkWell(
-                  onTap: () => _toggle(p.id.toString()),
-                  child: Opacity(
-                    opacity: isDisabled ? 0.5 : 1.0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: isSelected
-                              ? accentColor
-                              : Colors.grey.shade200,
-                          width: isSelected ? 2 : 1,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        color: isSelected
-                            ? accentColor.withValues(alpha: 0.04)
-                            : Colors.white,
+                          if (_selectedIds.length == 30)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 6.0),
+                              child: Text(
+                                "(Max limit)",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      padding: const EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          // Image
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                              image: p.image.isNotEmpty
-                                  ? DecorationImage(
-                                      image: NetworkImage(p.image),
-                                      fit: BoxFit.cover,
+                    ],
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: isFullSelection ? _deselectAll : _selectAllSmart,
+                    child: Text(
+                      isFullSelection
+                          ? "Clear"
+                          : (isLargeCatalog ? "Select Top 30" : "Select All"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(),
+
+            // List
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: products.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (ctx, i) {
+                  final p = products[i];
+                  final isSelected = _selectedIds.contains(p.id.toString());
+                  // Visual feedback: If user hit limit & item not selected -> dim it slightly
+                  final isLimitReached = _selectedIds.length >= 30;
+                  final bool isDisabled = isLimitReached && !isSelected;
+
+                  return InkWell(
+                    onTap: () => _toggle(p.id.toString()),
+                    child: Opacity(
+                      opacity: isDisabled ? 0.5 : 1.0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isSelected
+                                ? accentColor
+                                : Colors.grey.shade200,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          color: isSelected
+                              ? accentColor.withValues(alpha: 0.04)
+                              : Colors.white,
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            // Image
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                                image: p.image.isNotEmpty
+                                    ? DecorationImage(
+                                        image: NetworkImage(p.image),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
+                              ),
+                              child: p.image.isEmpty
+                                  ? const Icon(Iconsax.image, size: 20)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            // Details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    "₹${p.price}",
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Checkbox
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: isSelected ? accentColor : Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? accentColor
+                                      : Colors.grey.shade400,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      size: 16,
+                                      color: Colors.white,
                                     )
                                   : null,
                             ),
-                            child: p.image.isEmpty
-                                ? const Icon(Iconsax.image, size: 20)
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
-                          // Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  p.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Text(
-                                  "₹${p.price}",
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Checkbox
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: isSelected ? accentColor : Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? accentColor
-                                    : Colors.grey.shade400,
-                              ),
-                            ),
-                            child: isSelected
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 16,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                        ],
+                            const SizedBox(width: 8),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
 
-          // Bottom Button
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Bottom Button
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                onPressed: _selectedIds.isEmpty
-                    ? null
-                    : () {
-                        final selectedProducts = products
-                            .where(
-                              (p) => _selectedIds.contains(p.id.toString()),
-                            )
-                            .toList();
-                        widget.onConfirm(selectedProducts);
-                      },
-                child: Text(
-                  "Continue (${_selectedIds.length})",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  onPressed: _selectedIds.isEmpty
+                      ? null
+                      : () {
+                          final selectedProducts = products
+                              .where(
+                                (p) => _selectedIds.contains(p.id.toString()),
+                              )
+                              .toList();
+                          widget.onConfirm(selectedProducts);
+                        },
+                  child: Text(
+                    "Continue (${_selectedIds.length})",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2318,336 +2341,355 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      // ⌨️ KEYBOARD FIX: Padding bottom = viewInsets.bottom
+      // ⌨️ KEYBOARD FIX + SAFE AREA FIX: Handles both navigation bar and keyboard
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(4),
+        // ✅ FIX: Wrapped in SafeArea so bottom content (button) isn't covered by nav bar
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              const Center(
-                child: Text(
-                  "Collage Studio Pro 📸",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                const Center(
+                  child: Text(
+                    "Collage Studio Pro 📸",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
                 ),
-              ),
 
-              const Center(
-                child: Text(
-                  "Create professional collage to share with your customers, social media and others",
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                const Center(
+                  child: Text(
+                    "Create professional collage to share with your customers, social media and others",
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Layouts
-              const Text(
-                "CHOOSE LAYOUT",
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
+                // Layouts
+                const Text(
+                  "CHOOSE LAYOUT",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _layoutOption("Grid", Iconsax.grid_3, CollageLayout.grid),
+                      const SizedBox(width: 8),
+                      _layoutOption(
+                        "Story",
+                        Iconsax.mobile,
+                        CollageLayout.story,
+                      ),
+                      const SizedBox(width: 8),
+                      _layoutOption(
+                        "Mag",
+                        Iconsax.book_1,
+                        CollageLayout.magazine,
+                      ),
+                      const SizedBox(width: 8),
+                      _layoutOption(
+                        "Clean",
+                        Iconsax.maximize_3,
+                        CollageLayout.minimal,
+                      ),
+                      const SizedBox(width: 8),
+                      _layoutOption(
+                        "Catalog",
+                        Iconsax.book,
+                        CollageLayout.catalog,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 📸 BACKGROUND
+                const Text(
+                  "BACKGROUND",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    _layoutOption("Grid", Iconsax.grid_3, CollageLayout.grid),
-                    const SizedBox(width: 8),
-                    _layoutOption("Story", Iconsax.mobile, CollageLayout.story),
-                    const SizedBox(width: 8),
-                    _layoutOption(
-                      "Mag",
-                      Iconsax.book_1,
-                      CollageLayout.magazine,
+                    _bgOptionBtn(
+                      Iconsax.gallery,
+                      "Gallery",
+                      () => _pickBgImage(ImageSource.gallery),
                     ),
-                    const SizedBox(width: 8),
-                    _layoutOption(
-                      "Clean",
-                      Iconsax.maximize_3,
-                      CollageLayout.minimal,
+                    const SizedBox(width: 10),
+                    _bgOptionBtn(
+                      Iconsax.camera,
+                      "Camera",
+                      () => _pickBgImage(ImageSource.camera),
                     ),
-                    const SizedBox(width: 8),
-                    _layoutOption(
-                      "Catalog",
-                      Iconsax.book,
-                      CollageLayout.catalog,
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 1,
+                      height: 30,
+                      color: Colors.grey.shade300,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _colors
+                              .map(
+                                (c) => GestureDetector(
+                                  onTap: () => setState(() {
+                                    _bgColor = c;
+                                    _customBgImage = null;
+                                  }),
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      color: c,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
+                                      boxShadow:
+                                          (_bgColor == c &&
+                                              _customBgImage == null)
+                                          ? [
+                                              const BoxShadow(
+                                                color: Colors.blue,
+                                                blurRadius: 4,
+                                              ),
+                                            ]
+                                          : [],
+                                    ),
+                                    child:
+                                        (_bgColor == c &&
+                                            _customBgImage == null)
+                                        ? const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: Colors.grey,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
 
-              // 📸 BACKGROUND
-              const Text(
-                "BACKGROUND",
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _bgOptionBtn(
-                    Iconsax.gallery,
-                    "Gallery",
-                    () => _pickBgImage(ImageSource.gallery),
-                  ),
-                  const SizedBox(width: 10),
-                  _bgOptionBtn(
-                    Iconsax.camera,
-                    "Camera",
-                    () => _pickBgImage(ImageSource.camera),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(width: 1, height: 30, color: Colors.grey.shade300),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: _colors
-                            .map(
-                              (c) => GestureDetector(
-                                onTap: () => setState(() {
-                                  _bgColor = c;
-                                  _customBgImage = null;
-                                }),
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    color: c,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    boxShadow:
-                                        (_bgColor == c &&
-                                            _customBgImage == null)
-                                        ? [
-                                            const BoxShadow(
-                                              color: Colors.blue,
-                                              blurRadius: 4,
-                                            ),
-                                          ]
-                                        : [],
-                                  ),
-                                  child:
-                                      (_bgColor == c && _customBgImage == null)
-                                      ? const Icon(
-                                          Icons.check,
-                                          size: 16,
-                                          color: Colors.grey,
-                                        )
-                                      : null,
-                                ),
-                              ),
-                            )
-                            .toList(),
+                if (_customBgImage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-
-              if (_customBgImage != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.image, size: 16, color: Colors.green),
-                        const SizedBox(width: 8),
-                        const Text(
-                          "Image Selected",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.image,
+                            size: 16,
                             color: Colors.green,
                           ),
-                        ),
-                        const Spacer(),
-                        InkWell(
-                          onTap: () => setState(() => _customBgImage = null),
-                          child: const Icon(
-                            Icons.close,
-                            size: 18,
-                            color: Colors.red,
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Image Selected",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-
-              // 💰 MARGIN INPUT (NEW WIDGET)
-              const Text(
-                "ADD MARGIN (%)",
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Reusing the same UI logic but embedded
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accentColor.withOpacity(0.5)),
-                    ),
-                    child: TextField(
-                      controller: _marginController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: "e.g. 30",
-                        suffixText: "%",
-                        prefixIcon: Icon(
-                          Iconsax.percentage_square,
-                          size: 18,
-                          color: accentColor,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                          const Spacer(),
+                          InkWell(
+                            onTap: () => setState(() => _customBgImage = null),
+                            child: const Icon(
+                              Icons.close,
+                              size: 18,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [30, 50, 70, 100].map((val) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ActionChip(
-                            label: Text(
-                              "$val%",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
+
+                const SizedBox(height: 24),
+
+                // 💰 MARGIN INPUT (NEW WIDGET)
+                const Text(
+                  "ADD MARGIN (%)",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Reusing the same UI logic but embedded
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: accentColor.withOpacity(0.5)),
+                      ),
+                      child: TextField(
+                        controller: _marginController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: "e.g. 30",
+                          suffixText: "%",
+                          prefixIcon: Icon(
+                            Iconsax.percentage_square,
+                            size: 18,
+                            color: accentColor,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [30, 50, 70, 100].map((val) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ActionChip(
+                              label: Text(
+                                "$val%",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
                               ),
+                              backgroundColor: Colors.blue.shade50,
+                              labelStyle: TextStyle(
+                                color: Colors.blue.shade900,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(color: Colors.blue.shade100),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _marginController.text = val.toString();
+                                });
+                              },
                             ),
-                            backgroundColor: Colors.blue.shade50,
-                            labelStyle: TextStyle(color: Colors.blue.shade900),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(color: Colors.blue.shade100),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      " * Minimum 20% margin is required.",
+                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Toggles
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: _themeColor,
+                  title: const Text(
+                    "Show Price Tags",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  value: _showPrices,
+                  onChanged: (v) => setState(() => _showPrices = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: _themeColor,
+                  title: const Text(
+                    "Add Branding",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  value: _showBranding,
+                  onChanged: (v) => setState(() => _showBranding = v),
+                ),
+                const SizedBox(height: 16),
+
+                // Generate
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: _isGenerating ? null : _createAndShare,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _themeColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: _isGenerating
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _marginController.text = val.toString();
-                              });
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    " * Minimum 20% margin is required.",
-                    style: TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Toggles
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                activeColor: _themeColor,
-                title: const Text(
-                  "Show Price Tags",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                value: _showPrices,
-                onChanged: (v) => setState(() => _showPrices = v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                activeColor: _themeColor,
-                title: const Text(
-                  "Add Branding",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                value: _showBranding,
-                onChanged: (v) => setState(() => _showBranding = v),
-              ),
-              const SizedBox(height: 16),
-
-              // Generate
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: _isGenerating ? null : _createAndShare,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _themeColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: _isGenerating
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(Iconsax.magicpen, color: Colors.white),
-                  label: Text(
-                    _isGenerating ? "Designing..." : "Create & Share",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                          )
+                        : const Icon(Iconsax.magicpen, color: Colors.white),
+                    label: Text(
+                      _isGenerating ? "Designing..." : "Create & Share",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 30),
-            ],
+                const SizedBox(height: 30),
+              ],
+            ),
           ),
         ),
       ),
