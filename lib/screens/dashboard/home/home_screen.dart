@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/notification/notification.dart';
 
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
+
+// 🔹 IMPORT NOTIFICATION SCREEN & CONTROLLER
 
 // --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
@@ -51,6 +54,11 @@ class _HomePageState extends State<HomePage> {
   final CartController cartController = Get.put(CartController());
   final HomeProductsController homeProductsController = Get.put(
     HomeProductsController(),
+  );
+
+  // 🔹 INJECT NOTIFICATION CONTROLLER (Starts timer immediately)
+  final NotificationController notificationController = Get.put(
+    NotificationController(),
   );
 
   @override
@@ -249,21 +257,63 @@ class _HomePageState extends State<HomePage> {
                 fit: BoxFit.contain,
               ),
             ),
+
             const Spacer(),
-            IconButton(
-              icon: const Icon(Iconsax.notification),
-              color: accentColor,
-              iconSize: 20,
-              onPressed: () => Get.to(() => const InventoryPage()),
+
+            // 1. Notification Icon with Dynamic Badge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Iconsax.notification),
+                  color: accentColor,
+                  iconSize: 25,
+                  onPressed: () => Get.to(
+                    () => const NotificationScreen(),
+                    transition: Transition.rightToLeft,
+                  ),
+                ),
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: Obx(() {
+                    // Check for unread notifications
+                    final unreadCount = notificationController.notifications
+                        .where((n) => !n.isRead)
+                        .length;
+
+                    if (unreadCount == 0) return const SizedBox.shrink();
+
+                    return Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      // Optional: Show number if needed, but red dot is cleaner
+                      // child: Text('$unreadCount', style: ...),
+                    );
+                  }),
+                ),
+              ],
             ),
-            // --- CART ICON WITH BADGE ---
+
+            // REDUCED SPACING
+            const SizedBox(width: 4),
+
+            // 2. Cart Icon with Badge
             Stack(
               clipBehavior: Clip.none,
               children: [
                 IconButton(
                   icon: const Icon(Iconsax.shopping_cart),
                   color: accentColor,
-                  iconSize: 20,
+                  iconSize: 25,
                   onPressed: () => Get.to(() => const InventoryPage()),
                 ),
                 Positioned(
@@ -280,8 +330,8 @@ class _HomePageState extends State<HomePage> {
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       constraints: const BoxConstraints(
-                        minWidth: 22,
-                        minHeight: 22,
+                        minWidth: 20,
+                        minHeight: 20,
                       ),
                       child: Center(
                         child: Text(
@@ -299,17 +349,22 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+
+            // REDUCED SPACING
+            const SizedBox(width: 4),
+
+            // 3. Wishlist Icon
             IconButton(
               icon: const Icon(Iconsax.heart),
               color: accentColor,
-              iconSize: 20,
+              iconSize: 25,
               onPressed: () {
-                // Navigate to ProfilePage using currently stored user data
-                // We use _userData which is initialized in initState from widget.userData
                 Get.to(() => WishlistScreen());
               },
             ),
-            const SizedBox(width: 0),
+
+            // End Padding
+            const SizedBox(width: 16),
           ],
         ),
       ),
@@ -335,7 +390,7 @@ class _HomePageState extends State<HomePage> {
               readOnly: true,
               onTap: () {
                 Get.to(
-                  () => const ProductSearchScreen(),
+                  () => const UniversalSearchPage(),
                   transition: Transition.fadeIn,
                 );
               },

@@ -568,14 +568,14 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          "Share Catalog",
+          "Share Catalog In WhatsApp / Instagram / Facebook or Other Apps",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "Enter your reselling margin (%).\nWe'll add it to prices and prepare images for sharing.",
+              "Enter your ReSelling Profit Margin (%).\nWe'll add it to prices and prepare images for sharing.",
               style: TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 11,
@@ -583,11 +583,19 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               ),
             ),
             const SizedBox(height: 16),
+            const Text(
+              "Min. Margin is required to be 20%.",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                color: Colors.grey,
+              ),
+            ),
             TextField(
               controller: marginCtrl,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: "Margin (%)",
+                labelText: "Margin (%) ",
                 hintText: "Example: 20",
                 suffixText: "%",
                 border: OutlineInputBorder(
@@ -891,7 +899,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                 IconButton(
                   icon: const Icon(Iconsax.shopping_cart),
                   color: accentColor,
-                  iconSize: 30,
+                  iconSize: 25,
                   onPressed: () => Get.to(() => const InventoryPage()),
                 ),
                 Positioned(
@@ -931,10 +939,10 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             IconButton(
               icon: const Icon(Iconsax.heart),
               color: accentColor,
-              iconSize: 30,
+              iconSize: 25,
               onPressed: () => Get.to(() => WishlistScreen()),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
           ],
         ),
       ),
@@ -1065,6 +1073,8 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                       ),
                                     ),
                                   ),
+
+                                SizedBox(height: 6),
                                 Row(
                                   children: [
                                     Container(
@@ -1130,6 +1140,15 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                         ],
                                       ),
                                     ),
+                                    const Spacer(),
+                                    _buildCatalogueActionButton(
+                                      icon: Iconsax.trash,
+                                      label: "Delete",
+                                      onTap: () => catalogueController
+                                          .deleteCatalogue(cat.id),
+                                      outlined: true,
+                                      color: Colors.red,
+                                    ),
                                   ],
                                 ),
                               ],
@@ -1140,6 +1159,26 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                             thickness: 0.7,
                             color: Color(0xFFE5E7EB),
                           ),
+                          Row(
+                            children: [
+                              Icon(
+                                Iconsax.flash_1,
+                                color: accentColor,
+                                size: 22,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                "Reseller Tools",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                  color: Color(0xFF86198F), // Darker Purple
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 6),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                             child: Wrap(
@@ -1189,6 +1228,14 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                         onTap: () =>
                                             _openShareMarginDialog(cat),
                                       ),
+                                      const SizedBox(width: 6),
+                                      _buildSocialIconButton(
+                                        icon: Icons.share,
+                                        color: const Color(0xFFE1306C),
+                                        bgColor: const Color(0xFFFCE7F3),
+                                        onTap: () =>
+                                            _openShareMarginDialog(cat),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -1200,6 +1247,19 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                   onTap: () => _openCollageStudio(cat),
                                   bgColor: const Color(0xFFFFFBEB),
                                   color: const Color(0xFFF59E0B),
+                                ),
+                                // 🌟 COLLAGE STUDIO
+                                _buildCatalogueActionButton(
+                                  icon: Iconsax.document_download,
+                                  label: "Download",
+                                  onTap: () => _openCollageStudio(cat),
+                                  bgColor: const Color(0xFFFFFBEB),
+                                  color: const Color.fromARGB(
+                                    255,
+                                    11,
+                                    105,
+                                    245,
+                                  ),
                                 ),
                                 // 📊 CSV EXPORT
                                 _buildCatalogueActionButton(
@@ -1216,14 +1276,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
                                   onTap: () => _openPdfMarginDialog(cat),
                                   bgColor: const Color(0xFFF5F3FF),
                                   color: const Color(0xFF7C3AED),
-                                ),
-                                _buildCatalogueActionButton(
-                                  icon: Iconsax.trash,
-                                  label: "Delete",
-                                  onTap: () => catalogueController
-                                      .deleteCatalogue(cat.id),
-                                  outlined: true,
-                                  color: Colors.red,
                                 ),
                               ],
                             ),
@@ -1676,6 +1728,13 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                 child: Text(
                   "Collage Studio Pro 📸",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+
+              const Center(
+                child: Text(
+                  "Create professional collage to share with your customers, social media and others",
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
                 ),
               ),
               const SizedBox(height: 24),

@@ -95,6 +95,7 @@ class CatalogueCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 6),
+
                   Row(
                     children: [
                       Container(

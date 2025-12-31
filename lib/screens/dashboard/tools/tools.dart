@@ -479,7 +479,7 @@ class _ToolsSectionState extends State<ToolsSection> {
                 IconButton(
                   icon: const Icon(Iconsax.shopping_cart),
                   color: accentColor,
-                  iconSize: 30,
+                  iconSize: 25,
                   onPressed: () => Get.to(() => const InventoryPage()),
                 ),
                 Positioned(
@@ -520,12 +520,12 @@ class _ToolsSectionState extends State<ToolsSection> {
             IconButton(
               icon: const Icon(Iconsax.heart),
               color: accentColor,
-              iconSize: 30,
+              iconSize: 25,
               onPressed: () {
                 Get.to(() => WishlistScreen());
               },
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
           ],
         ),
       ),
