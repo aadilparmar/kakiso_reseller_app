@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
@@ -13,6 +15,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
@@ -42,10 +45,15 @@ class CatalogueSection extends StatefulWidget {
 class _CatalogueSectionState extends State<CatalogueSection>
     with SingleTickerProviderStateMixin {
   final _storage = const FlutterSecureStorage();
+  final _localStorage = GetStorage();
 
   final CatalogueController catalogueController = Get.put(
     CatalogueController(),
     permanent: true,
+  );
+
+  final HomeProductsController homeProductsController = Get.put(
+    HomeProductsController(),
   );
 
   final CartController cartController = Get.put(CartController());
@@ -57,15 +65,17 @@ class _CatalogueSectionState extends State<CatalogueSection>
   bool _isGeneratingPdf = false;
   bool _isGeneratingCsv = false;
 
-  // 🔹 GUIDE MODE VARIABLES
-  String? _activeGuideTool; // e.g., 'pdf_generator', 'collage_maker'
+  String? _activeGuideTool;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // 🔹 Worker to listen to product updates
+  Worker? _productListener;
 
   @override
   void initState() {
     super.initState();
-    // 1. SETUP PULSE ANIMATION FOR GUIDE
+    // 1. SETUP PULSE ANIMATION
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -75,25 +85,248 @@ class _CatalogueSectionState extends State<CatalogueSection>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // 2. CHECK IF NAVIGATED FROM TOOLS PAGE
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (Get.arguments != null &&
-          Get.arguments is Map &&
-          Get.arguments['active_tool_guide'] != null) {
-        setState(() {
-          _activeGuideTool = Get.arguments['active_tool_guide'];
-        });
-
-        // Clear arguments so it doesn't persist on reload
-        Get.arguments['active_tool_guide'] = null;
+    // 2. 🔹 REACTIVE LISTENER: Wait for products to load
+    // This ensures catalogues are created even if products load AFTER this screen opens.
+    _productListener = ever(homeProductsController.allProducts, (products) {
+      if (products.isNotEmpty) {
+        _checkAndCreateDefaultCatalogues();
       }
     });
+
+    // 3. Initial Check (In case products are ALREADY loaded)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (homeProductsController.allProducts.isNotEmpty) {
+        _checkAndCreateDefaultCatalogues();
+      }
+      _checkForNavArguments();
+    });
+  }
+
+  // 🔹 LOGIC TO CREATE DEFAULT CATALOGUES
+  Future<void> _checkAndCreateDefaultCatalogues() async {
+    // UPDATED KEY to 'v3' to force a retry for you
+    bool hasCreated =
+        _localStorage.read('has_created_default_catalogs_v3') ?? false;
+
+    // If already created, STOP.
+    if (hasCreated) return;
+
+    // Double check products exist
+    final allProducts = homeProductsController.allProducts;
+    if (allProducts.isEmpty) return;
+
+    // --- 1. 🏆 HIGH MARGIN PICKS (> 1500) ---
+    final highMarginProducts = allProducts
+        .where((p) => (double.tryParse(p.price) ?? 0) > 1500)
+        .take(5)
+        .toList();
+
+    if (highMarginProducts.isNotEmpty) {
+      // Check if it already exists in controller to avoid duplicates
+      if (!catalogueController.myCatalogues.any(
+        (c) => c.name == "🏆 High Margin Picks",
+      )) {
+        catalogueController.createCatalogue(
+          "🏆 High Margin Picks",
+          "Premium items with high profit potential.",
+        );
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        final cat = catalogueController.myCatalogues.firstWhereOrNull(
+          (c) => c.name == "🏆 High Margin Picks",
+        );
+        if (cat != null) {
+          for (var p in highMarginProducts) {
+            catalogueController.addProductToCatalogue(cat.id, p);
+          }
+        }
+      }
+    }
+
+    // --- 2. 💰 UNDER ₹1000 STORE ---
+    final budgetProducts = allProducts
+        .where(
+          (p) =>
+              (double.tryParse(p.price) ?? 0) < 1000 &&
+              (double.tryParse(p.price) ?? 0) > 0,
+        )
+        .take(8)
+        .toList();
+
+    if (budgetProducts.isNotEmpty) {
+      if (!catalogueController.myCatalogues.any(
+        (c) => c.name == "💰 Under ₹1000 Store",
+      )) {
+        catalogueController.createCatalogue(
+          "💰 Under ₹1000 Store",
+          "Budget-friendly bestsellers.",
+        );
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        final cat = catalogueController.myCatalogues.firstWhereOrNull(
+          (c) => c.name == "💰 Under ₹1000 Store",
+        );
+        if (cat != null) {
+          for (var p in budgetProducts) {
+            catalogueController.addProductToCatalogue(cat.id, p);
+          }
+        }
+      }
+    }
+
+    // --- 3. 🚀 TRENDING & VIRAL (Random) ---
+    final trendingProducts = List<ProductModel>.from(allProducts)
+      ..shuffle(Random());
+    final selectedTrending = trendingProducts.take(6).toList();
+
+    if (selectedTrending.isNotEmpty) {
+      if (!catalogueController.myCatalogues.any(
+        (c) => c.name == "🚀 Trending & Viral",
+      )) {
+        catalogueController.createCatalogue(
+          "🚀 Trending & Viral",
+          "Most popular items right now.",
+        );
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        final cat = catalogueController.myCatalogues.firstWhereOrNull(
+          (c) => c.name == "🚀 Trending & Viral",
+        );
+        if (cat != null) {
+          for (var p in selectedTrending) {
+            catalogueController.addProductToCatalogue(cat.id, p);
+          }
+        }
+      }
+    }
+
+    // Mark as done permanently
+    _localStorage.write('has_created_default_catalogs_v3', true);
+
+    // Refresh UI to show the new items immediately
+    if (mounted) setState(() {});
+  }
+
+  void _checkForNavArguments() {
+    if (Get.arguments != null &&
+        Get.arguments is Map &&
+        Get.arguments['active_tool_guide'] != null) {
+      setState(() {
+        _activeGuideTool = Get.arguments['active_tool_guide'];
+      });
+      Get.arguments['active_tool_guide'] = null;
+    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _productListener?.dispose(); // 🔹 Clean up worker
     super.dispose();
+  }
+
+  // --- 🌟 NEW: BULK DOWNLOAD LOGIC ---
+  Future<void> _handleBulkDownload(CatalogueModel cat) async {
+    if (cat.products.isEmpty) {
+      Get.snackbar(
+        "Empty",
+        "No products to download.",
+        backgroundColor: Colors.orange.shade100,
+      );
+      return;
+    }
+
+    Get.showOverlay(
+      asyncFunction: () async {
+        int successCount = 0;
+        String savePath = "";
+
+        try {
+          // 1. Determine Directory
+          Directory? directory;
+          if (Platform.isAndroid) {
+            // Create a visible folder in Downloads
+            directory = Directory(
+              '/storage/emulated/0/Download/Kakiso_Catalogues/${cat.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}',
+            );
+          } else {
+            // iOS: Use Documents directory
+            final docDir = await getApplicationDocumentsDirectory();
+            directory = Directory(
+              '${docDir.path}/${cat.name.replaceAll(" ", "_")}',
+            );
+          }
+
+          if (!await directory.exists()) {
+            await directory.create(recursive: true);
+          }
+          savePath = directory.path;
+
+          // 2. Download Loop
+          for (int i = 0; i < cat.products.length; i++) {
+            final p = cat.products[i];
+            if (p.image.isEmpty) continue;
+
+            try {
+              final response = await http.get(Uri.parse(p.image));
+              if (response.statusCode == 200) {
+                // Create filename
+                String safeName = p.name.replaceAll(
+                  RegExp(r'[^a-zA-Z0-9]'),
+                  '_',
+                );
+                if (safeName.length > 50) safeName = safeName.substring(0, 50);
+                String fileName = "${safeName}_$i.jpg";
+
+                File file = File('${directory.path}/$fileName');
+                await file.writeAsBytes(response.bodyBytes);
+                successCount++;
+              }
+            } catch (e) {
+              debugPrint("Failed to download image for ${p.name}: $e");
+            }
+          }
+
+          // 3. Success Message
+          Get.snackbar(
+            "Download Complete",
+            "Saved $successCount images to:\n$savePath",
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 5),
+            snackPosition: SnackPosition.BOTTOM,
+            margin: const EdgeInsets.all(10),
+          );
+        } catch (e) {
+          Get.snackbar(
+            "Download Error",
+            "Could not save images: $e",
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      },
+      loadingWidget: Center(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CircularProgressIndicator(color: accentColor),
+              SizedBox(height: 16),
+              Text(
+                "Downloading images...",
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // --- LOGOUT DIALOG ---
@@ -1343,10 +1576,11 @@ class _CatalogueSectionState extends State<CatalogueSection>
                                         bgColor: const Color(0xFFFFFBEB),
                                         color: const Color(0xFFF59E0B),
                                       ),
+                                      // 🔴 CHANGED: Calls _handleBulkDownload
                                       _buildCatalogueActionButton(
                                         icon: Iconsax.document_download,
                                         label: "Download",
-                                        onTap: () => _openCollageStudio(cat),
+                                        onTap: () => _handleBulkDownload(cat),
                                         bgColor: const Color(0xFFFFFBEB),
                                         color: const Color.fromARGB(
                                           255,
