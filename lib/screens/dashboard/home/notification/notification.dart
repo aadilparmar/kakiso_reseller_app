@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart'; // 🔹 IMPORT GET STORAGE
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -40,6 +41,7 @@ class NotificationModel {
 class NotificationController extends GetxController {
   var notifications = <NotificationModel>[].obs;
   Timer? _timer;
+  final _storage = GetStorage(); // 🔹 Storage instance
 
   @override
   void onInit() {
@@ -53,7 +55,7 @@ class NotificationController extends GetxController {
     super.onClose();
   }
 
-  // 🔹 Firebase Handler
+  // 🔹 Firebase Handler (unchanged)
   void addFromFirebase({
     required String title,
     required String body,
@@ -89,11 +91,11 @@ class NotificationController extends GetxController {
 
   // --- SMART GENERATOR LOGIC ---
   void _startProductNotificationTimer() {
-    // Run immediately after 5 seconds
+    // 1. Run immediately after 5 seconds
     Future.delayed(const Duration(seconds: 5), _generateSmartNotification);
 
-    // Schedule for every 5 minutess
-    _timer = Timer.periodic(const Duration(minutes: 20), (timer) {
+    // 2. Schedule for every 30 minutes
+    _timer = Timer.periodic(const Duration(minutes: 30), (timer) {
       _generateSmartNotification();
     });
   }
@@ -112,11 +114,27 @@ class NotificationController extends GetxController {
       String? image;
       ProductModel? linkedProduct;
 
+      // 🔹 LOGIC CHANGE: HANDLE EMPTY PRODUCTS
       if (products.isEmpty) {
-        title = "🚀 Welcome to Kakiso!";
-        body = "Your business journey starts here. Check out new arrivals.";
-        type = NotificationType.info;
+        // Check if we have already sent the Welcome Notification
+        bool sentWelcome = _storage.read('sent_welcome_notification') ?? false;
+
+        if (!sentWelcome) {
+          // It's the FIRST time ever. Send Welcome.
+          title = "🚀 Welcome to Kakiso!";
+          body = "Your business journey starts here. Check out new arrivals.";
+          type = NotificationType.info;
+
+          // Mark as sent immediately so it NEVER happens again
+          _storage.write('sent_welcome_notification', true);
+        } else {
+          // We have already welcomed them.
+          // Products are empty, so we do NOTHING.
+          // We wait for the next 30-min timer or until products load.
+          return;
+        }
       } else {
+        // Products ARE available. Send normal product notification.
         final random = Random();
         final product = products[random.nextInt(products.length)];
         linkedProduct = product;
@@ -140,7 +158,7 @@ class NotificationController extends GetxController {
         }
       }
 
-      // Add to List
+      // 1. Add to Controller List
       final newNotification = NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: title,
@@ -154,15 +172,15 @@ class NotificationController extends GetxController {
 
       notifications.insert(0, newNotification);
 
-      // Trigger System Notification
+      // 2. Trigger Phone System Notification
       NotificationService().showNotification(title: title, body: body);
 
-      // Trigger In-App Snackbar
+      // 3. Trigger In-App Snackbar
       Get.snackbar(
         title,
         body,
         snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.white.withOpacity(0.9),
+        backgroundColor: Colors.white.withOpacity(0.95),
         colorText: Colors.black,
         margin: const EdgeInsets.all(10),
         duration: const Duration(seconds: 4),
@@ -179,6 +197,7 @@ class NotificationController extends GetxController {
     }
   }
 
+  // --- ACTIONS ---
   void markAsRead(String id) {
     final index = notifications.indexWhere((n) => n.id == id);
     if (index != -1) {
@@ -206,7 +225,7 @@ class NotificationController extends GetxController {
   }
 }
 
-// --- 3. UI SCREEN ---
+// --- 3. UI SCREEN (Unchanged) ---
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
 

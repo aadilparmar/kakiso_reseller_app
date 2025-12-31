@@ -3,8 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart'; // 🔹 REQUIRED IMPORT
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/notification/notification.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/welcom_overlay.dart';
 
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
@@ -12,7 +14,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_searc
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 
-// 🔹 IMPORT NOTIFICATION SCREEN & CONTROLLER
+// 🔹 IMPORT THE WELCOME OVERLAY
 
 // --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
@@ -49,6 +51,7 @@ class _HomePageState extends State<HomePage> {
   late UserData _userData;
   String _selectedTitle = 'BusinessDetails';
   final _storage = const FlutterSecureStorage();
+  final _localStorage = GetStorage(); // 🔹 STORAGE INSTANCE
 
   // Controllers
   final CartController cartController = Get.put(CartController());
@@ -56,7 +59,6 @@ class _HomePageState extends State<HomePage> {
     HomeProductsController(),
   );
 
-  // 🔹 INJECT NOTIFICATION CONTROLLER (Starts timer immediately)
   final NotificationController notificationController = Get.put(
     NotificationController(),
   );
@@ -65,6 +67,29 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _userData = widget.userData;
+
+    // 🔹 CHECK FOR FIRST TIME WELCOME
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowWelcome();
+    });
+  }
+
+  void _checkAndShowWelcome() {
+    // 1. Check if key exists
+    bool hasSeen = _localStorage.read('has_seen_welcome') ?? false;
+
+    if (!hasSeen) {
+      // 2. Mark as seen immediately
+      _localStorage.write('has_seen_welcome', true);
+
+      // 3. Show the Overlay
+      Get.dialog(
+        WelcomeOverlay(userName: _userData.name),
+        barrierDismissible: false,
+        barrierColor: Colors.transparent, // Blur is handled inside widget
+        transitionDuration: const Duration(milliseconds: 500),
+      );
+    }
   }
 
   void _handleNavigation(String pageId) {
@@ -277,7 +302,6 @@ class _HomePageState extends State<HomePage> {
                   right: 5,
                   top: 5,
                   child: Obx(() {
-                    // Check for unread notifications
                     final unreadCount = notificationController.notifications
                         .where((n) => !n.isRead)
                         .length;
@@ -295,15 +319,12 @@ class _HomePageState extends State<HomePage> {
                         minWidth: 16,
                         minHeight: 16,
                       ),
-                      // Optional: Show number if needed, but red dot is cleaner
-                      // child: Text('$unreadCount', style: ...),
                     );
                   }),
                 ),
               ],
             ),
 
-            // REDUCED SPACING
             const SizedBox(width: 4),
 
             // 2. Cart Icon with Badge
@@ -350,7 +371,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
 
-            // REDUCED SPACING
             const SizedBox(width: 4),
 
             // 3. Wishlist Icon
@@ -363,7 +383,6 @@ class _HomePageState extends State<HomePage> {
               },
             ),
 
-            // End Padding
             const SizedBox(width: 16),
           ],
         ),
@@ -412,7 +431,7 @@ class _HomePageState extends State<HomePage> {
             const CuratedCollections(),
             const SizedBox(height: 16),
 
-            // 🔹 Budget Store Section with fetched products
+            // 🔹 Budget Store Section
             Obx(() {
               if (homeProductsController.isLoading.value) {
                 return const Padding(
