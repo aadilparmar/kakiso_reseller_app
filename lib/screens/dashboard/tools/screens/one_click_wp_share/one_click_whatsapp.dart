@@ -9,9 +9,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:get_storage/get_storage.dart';
+// 1. IMPORT SHOWCASEVIEW
+import 'package:showcaseview/showcaseview.dart';
 
 // INTERNAL IMPORTS
-// Ensure these match your project structure
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
@@ -20,34 +22,64 @@ const Color kWhatsAppTeal = Color(0xFF075E54);
 const Color kWhatsAppGreen = Color(0xFF25D366);
 const Color kChatBubble = Color(0xFFDCF8C6);
 const Color kSurface = Colors.white;
-const Color kBgColor = Color(0xFFE5DDD5); // WhatsApp chat bg color style
+const Color kBgColor = Color(0xFFE5DDD5);
 const Color kDarkText = Color(0xFF111827);
 const Color kAccentBlue = Color(0xFF2563EB);
 
 enum MarginType { fixed, percentage }
 
-class OneClickWhatsAppPage extends StatefulWidget {
+// 2. WRAPPER WIDGET FOR TOUR
+class OneClickWhatsAppPage extends StatelessWidget {
   const OneClickWhatsAppPage({super.key});
 
   @override
-  State<OneClickWhatsAppPage> createState() => _OneClickWhatsAppPageState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      builder: (context) => const _OneClickWhatsAppContent(),
+      autoPlay: false,
+      blurValue: 1,
+      // 🌟 FIX: Enable Auto Scroll and add a delay for smoother focus
+      enableAutoScroll: true,
+      scrollDuration: const Duration(milliseconds: 400),
+    );
+  }
 }
 
-class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
+class _OneClickWhatsAppContent extends StatefulWidget {
+  const _OneClickWhatsAppContent();
+
+  @override
+  State<_OneClickWhatsAppContent> createState() =>
+      _OneClickWhatsAppContentState();
+}
+
+class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
   // --- STATE ---
   final List<ProductModel> selectedProducts = [];
   final TextEditingController businessNameController = TextEditingController();
   final TextEditingController marginInputController = TextEditingController();
   final FlutterNativeContactPicker _contactPicker =
       FlutterNativeContactPicker();
+  final _localStorage = GetStorage();
+
+  // Scroll Controller
+  final ScrollController _scrollController = ScrollController();
+
+  // 3. SHOWCASE KEYS
+  final GlobalKey _productKey = GlobalKey();
+  final GlobalKey _pricingKey = GlobalKey();
+  final GlobalKey _marketingKey = GlobalKey();
+  final GlobalKey _previewKey = GlobalKey();
+  final GlobalKey _shareKey = GlobalKey();
+  final GlobalKey _infoKey = GlobalKey();
 
   // --- CONTROLLERS ---
   String _generatedCaption = "";
   bool _isDownloading = false;
 
   // --- PROFIT & PRICING ENGINE ---
-  MarginType _marginType = MarginType.fixed; // Fixed ₹ or %
-  double _marginValue = 100.0; // Default ₹100
+  MarginType _marginType = MarginType.fixed;
+  double _marginValue = 100.0;
   bool _useMagicPricing = true;
   bool _showDiscount = true;
 
@@ -70,6 +102,29 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
     marginInputController.text = "100";
     _loadBusinessName();
     _updateCaption();
+
+    // 4. TRIGGER TOUR ON LOAD
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndStartTour());
+  }
+
+  void _checkAndStartTour() {
+    bool hasShown = _localStorage.read('has_shown_whatsapp_tour_v4') ?? false;
+
+    if (!hasShown) {
+      _startTour();
+      _localStorage.write('has_shown_whatsapp_tour_v4', true);
+    }
+  }
+
+  void _startTour() {
+    // 🌟 FIX: Removed manual scroll logic. Let ShowcaseView handle it.
+    ShowCaseWidget.of(context).startShowCase([
+      _productKey,
+      _pricingKey,
+      _marketingKey,
+      _previewKey,
+      _shareKey,
+    ]);
   }
 
   Future<void> _loadBusinessName() async {
@@ -93,6 +148,7 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
   void dispose() {
     businessNameController.dispose();
     marginInputController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -102,15 +158,12 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
     double base = double.tryParse(basePriceStr) ?? 0.0;
     double price = base;
 
-    // 1. Apply Margin
     if (_marginType == MarginType.fixed) {
       price = base + _marginValue;
     } else {
-      // Percentage Logic: Base + (Base * % / 100)
       price = base + (base * _marginValue / 100);
     }
 
-    // 2. Apply Magic Pricing (Psychology)
     if (_useMagicPricing) {
       double remainder = price % 100;
       if (remainder < 50) {
@@ -165,7 +218,6 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
     final businessName = businessNameController.text.trim();
     final hasName = businessName.isNotEmpty && _showBranding;
 
-    // --- 1. HEADLINE ---
     if (_isHinglish) {
       if (hasName) buffer.writeln("👋 *Welcome to $businessName*");
       if (_selectedTone == 'Urgency') {
@@ -191,7 +243,6 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
     }
     buffer.writeln("");
 
-    // --- 2. PRODUCTS ---
     for (int i = 0; i < selectedProducts.length; i++) {
       final p = selectedProducts[i];
       final sellingPrice = _calculateSellingPrice(p.price);
@@ -230,7 +281,6 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
     }
     buffer.writeln("━━━━━━━━━━━━━━━━");
 
-    // --- 3. FOOTER ---
     if (_addTrustBadge) {
       buffer.writeln(
         _isHinglish
@@ -250,7 +300,6 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
       buffer.writeln("👇 *Reply with photo to place order!*");
     }
 
-    // Auto-hashtags
     buffer.writeln(
       "\n#Fashion #Sale #Trending #${_isHinglish ? 'DilSeDesi' : 'Style'}",
     );
@@ -277,10 +326,8 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
         }
       }
 
-      // Backup copy
       await Clipboard.setData(ClipboardData(text: _generatedCaption));
 
-      // Native Share (Attach text directly)
       if (filesToShare.isEmpty) {
         await Share.share(_generatedCaption);
       } else {
@@ -317,8 +364,6 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
     }
   }
 
-  // ─── HELPER WIDGETS ───────────────────────────────────────────────────────
-
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -354,7 +399,7 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBgColor, // WhatsApp-like BG
+      backgroundColor: kBgColor,
       appBar: AppBar(
         title: const Text(
           'Marketing Studio',
@@ -377,6 +422,13 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          // 5. INFO BUTTON to Restart Tour
+          IconButton(
+            key: _infoKey,
+            tooltip: "Guide",
+            icon: const Icon(Iconsax.info_circle, color: kAccentBlue),
+            onPressed: _startTour,
+          ),
           if (selectedProducts.isNotEmpty)
             IconButton(
               onPressed: () {
@@ -393,27 +445,128 @@ class _OneClickWhatsAppPageState extends State<OneClickWhatsAppPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
+              controller: _scrollController,
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
                   _buildSectionTitle("1. Select Products"),
-                  _buildProductShowcase(),
+
+                  // TOUR STEP 1
+                  Showcase(
+                    key: _productKey,
+                    title: "Select Products",
+                    description:
+                        "Tap here to choose products from your inventory.",
+                    overlayColor: Colors.black.withOpacity(0.7),
+                    titleTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: kAccentBlue,
+                      fontSize: 16,
+                    ),
+                    descTextStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontSize: 12,
+                    ),
+                    targetBorderRadius: BorderRadius.circular(20),
+                    child: _buildProductShowcase(),
+                  ),
 
                   _buildSectionTitle("2. Profit & Pricing"),
-                  _buildPricingEngine(),
+
+                  // TOUR STEP 2
+                  Showcase(
+                    key: _pricingKey,
+                    title: "Smart Pricing",
+                    description:
+                        "Set your margin. We auto-calculate the selling price.",
+                    overlayColor: Colors.black.withOpacity(0.7),
+                    titleTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: kAccentBlue,
+                      fontSize: 16,
+                    ),
+                    descTextStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontSize: 12,
+                    ),
+                    targetBorderRadius: BorderRadius.circular(20),
+                    child: _buildPricingEngine(),
+                  ),
 
                   _buildSectionTitle("3. Content & Marketing"),
-                  _buildMarketingTools(),
+
+                  // TOUR STEP 3
+                  Showcase(
+                    key: _marketingKey,
+                    title: "Customize Content",
+                    description:
+                        "Add your business name and choose the message tone.",
+                    overlayColor: Colors.black.withOpacity(0.7),
+                    titleTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: kAccentBlue,
+                      fontSize: 16,
+                    ),
+                    descTextStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontSize: 12,
+                    ),
+                    targetBorderRadius: BorderRadius.circular(20),
+                    child: _buildMarketingTools(),
+                  ),
 
                   _buildSectionTitle("4. Live Preview"),
-                  _buildRealWhatsAppPreview(),
 
-                  const SizedBox(height: 40),
+                  // TOUR STEP 4
+                  Showcase(
+                    key: _previewKey,
+                    title: "Live Preview",
+                    description:
+                        "See exactly how your WhatsApp message will look.",
+                    overlayColor: Colors.black.withOpacity(0.7),
+                    titleTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: kAccentBlue,
+                      fontSize: 16,
+                    ),
+                    descTextStyle: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      fontSize: 12,
+                    ),
+                    targetBorderRadius: BorderRadius.circular(12),
+                    child: _buildRealWhatsAppPreview(),
+                  ),
+
+                  // 🌟 FIX: Extra padding to allow scrolling the last item to the center
+                  const SizedBox(height: 200),
                 ],
               ),
             ),
           ),
-          _buildBottomDock(),
+
+          // TOUR STEP 5 (Fixed)
+          Showcase(
+            key: _shareKey,
+            title: "Broadcast",
+            description:
+                "Tap here to share images and text to WhatsApp instantly!",
+            overlayColor: Colors.black.withOpacity(0.7),
+            titleTextStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: kAccentBlue,
+              fontSize: 16,
+            ),
+            descTextStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.black,
+              fontSize: 12,
+            ),
+            child: _buildBottomDock(),
+          ),
         ],
       ),
     );

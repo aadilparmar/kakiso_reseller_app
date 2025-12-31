@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
@@ -16,16 +18,41 @@ const Color kFeeColor = Color(0xFFF59E0B); // Amber
 const Color kBgColor = Color(0xFFF8FAFC);
 const Color kSurface = Colors.white;
 
-class PriceMarginToolPage extends StatefulWidget {
+// 1. WRAPPER FOR TOUR
+class PriceMarginToolPage extends StatelessWidget {
   const PriceMarginToolPage({super.key});
 
   @override
-  State<PriceMarginToolPage> createState() => _PriceMarginToolPageState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      builder: (context) => const _PriceMarginToolContent(),
+      autoPlay: false,
+      blurValue: 1,
+      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      scrollDuration: const Duration(milliseconds: 400),
+    );
+  }
 }
 
-class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
+class _PriceMarginToolContent extends StatefulWidget {
+  const _PriceMarginToolContent();
+
+  @override
+  State<_PriceMarginToolContent> createState() =>
+      _PriceMarginToolContentState();
+}
+
+class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
   // --- STATE ---
   final List<ProductModel> _selectedProducts = [];
+  final _localStorage = GetStorage();
+
+  // 2. SHOWCASE KEYS
+  final GlobalKey _addKey = GlobalKey();
+  final GlobalKey _calculatorKey = GlobalKey();
+  final GlobalKey _strategyKey = GlobalKey();
+  final GlobalKey _goalKey = GlobalKey();
+  final GlobalKey _shareKey = GlobalKey();
 
   // The Core Variables
   double _sellingPrice = 0.0;
@@ -45,6 +72,34 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
   final TextEditingController _profitCtrl = TextEditingController();
   final TextEditingController _marginCtrl = TextEditingController();
   final TextEditingController _goalCtrl = TextEditingController(text: "5000");
+
+  @override
+  void initState() {
+    super.initState();
+    // 3. TRIGGER TOUR
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndStartTour());
+  }
+
+  void _checkAndStartTour() {
+    bool hasShown = _localStorage.read('has_shown_profit_tool_tour') ?? false;
+    if (!hasShown) {
+      _startTour();
+      _localStorage.write('has_shown_profit_tool_tour', true);
+    }
+  }
+
+  void _startTour() {
+    ShowCaseWidget.of(context).startShowCase([
+      _addKey,
+      if (_selectedProducts.isNotEmpty) ...[
+        _calculatorKey,
+        _strategyKey,
+        _goalKey,
+        _shareKey,
+      ] else
+        _addKey, // If empty, only show add button
+    ]);
+  }
 
   @override
   void dispose() {
@@ -170,10 +225,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     setState(() => _isSharing = true);
 
     try {
-      // 1. Generate "Deal Alert" Caption
       final buffer = StringBuffer();
-
-      // Hook
       buffer.writeln("🔥 *STEAL DEAL ALERT!* 🔥");
       if (_selectedProducts.length > 1) {
         buffer.writeln("📦 *${_selectedProducts.length} Item Combo Pack*");
@@ -182,7 +234,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
       }
       buffer.writeln("");
 
-      // Pricing Psychology
       if (_sellingPrice < _marketValue) {
         buffer.writeln("❌ Market Price: ~₹${_marketValue.toStringAsFixed(0)}~");
       }
@@ -191,7 +242,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
       );
       buffer.writeln("");
 
-      // Features
       if (_resellerAbsorbsShipping) {
         buffer.writeln("🚚 *Free Home Delivery Included*");
       } else {
@@ -207,7 +257,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
 
       buffer.writeln("\n👇 *Reply 'BOOK' to grab this deal!*");
 
-      // 2. Download Images
       List<XFile> filesToShare = [];
       for (var product in _selectedProducts) {
         if (product.image.isNotEmpty) {
@@ -216,7 +265,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         }
       }
 
-      // 3. Share using Native Sheet
       await Share.shareXFiles(filesToShare, text: buffer.toString());
     } catch (e) {
       debugPrint("Share error: $e");
@@ -252,6 +300,12 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          // RESTART TOUR BUTTON
+          IconButton(
+            tooltip: "Guide",
+            icon: const Icon(Iconsax.info_circle, color: kAccentColor),
+            onPressed: _startTour,
+          ),
           IconButton(
             icon: const Icon(Iconsax.refresh, color: kAccentColor),
             onPressed: () {
@@ -270,29 +324,123 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. PRODUCT STACK
-            _buildProductStack(),
+            // 4. WRAP WIDGETS IN SHOWCASE
+
+            // Step 1: Add Products
+            Showcase(
+              key: _addKey,
+              title: "Step 1: Add Products",
+              description: "Tap here to select items you want to sell.",
+              overlayColor: Colors.black.withOpacity(0.7),
+              titleTextStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: kAccentColor,
+                fontSize: 16,
+              ),
+              descTextStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+                fontSize: 12,
+              ),
+              targetBorderRadius: BorderRadius.circular(20),
+              child: _buildProductStack(),
+            ),
             const SizedBox(height: 20),
 
             if (_selectedProducts.isNotEmpty) ...[
-              // 2. MAIN CALCULATOR
-              _buildMainDashboard(),
+              // Step 2: Calculator
+              Showcase(
+                key: _calculatorKey,
+                title: "Profit Calculator",
+                description:
+                    "Adjust the selling price to see your real-time profit and margin.",
+                overlayColor: Colors.black.withOpacity(0.7),
+                titleTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: kAccentColor,
+                  fontSize: 16,
+                ),
+                descTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontSize: 12,
+                ),
+                targetBorderRadius: BorderRadius.circular(24),
+                child: _buildMainDashboard(),
+              ),
               const SizedBox(height: 16),
 
-              // 3. COST BREAKDOWN (Mini)
+              // Cost Summary (No tour needed)
               _buildCostSummary(),
               const SizedBox(height: 20),
 
-              // 4. STRATEGY BUTTONS
-              _buildStrategyPad(),
+              // Step 3: Strategy
+              Showcase(
+                key: _strategyKey,
+                title: "Smart Pricing",
+                description:
+                    "Use 'Quick Sell' for volume or 'Max Profit' for premium earnings.",
+                overlayColor: Colors.black.withOpacity(0.7),
+                titleTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: kAccentColor,
+                  fontSize: 16,
+                ),
+                descTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontSize: 12,
+                ),
+                targetBorderRadius: BorderRadius.circular(12),
+                child: _buildStrategyPad(),
+              ),
               const SizedBox(height: 20),
 
-              // 5. GOAL TRACKER (EMHANCED)
-              _buildEnhancedGoalTracker(),
+              // Step 4: Goal
+              Showcase(
+                key: _goalKey,
+                title: "Goal Tracker",
+                description:
+                    "Set a monthly earning goal. We'll tell you how many items to sell per week.",
+                overlayColor: Colors.black.withOpacity(0.7),
+                titleTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: kAccentColor,
+                  fontSize: 16,
+                ),
+                descTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontSize: 12,
+                ),
+                targetBorderRadius: BorderRadius.circular(20),
+                child: _buildEnhancedGoalTracker(),
+              ),
               const SizedBox(height: 24),
 
-              // 6. DEAL BROADCASTER (SHARE)
-              _buildDealBroadcaster(),
+              // Step 5: Share
+              Showcase(
+                key: _shareKey,
+                title: "Broadcast Deal",
+                description:
+                    "Instantly share this deal with images and price calculated for you.",
+                overlayColor: Colors.black.withOpacity(0.7),
+                titleTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: kAccentColor,
+                  fontSize: 16,
+                ),
+                descTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                  fontSize: 12,
+                ),
+                targetBorderRadius: BorderRadius.circular(20),
+                child: _buildDealBroadcaster(),
+              ),
+
+              // Padding for scrolling
+              const SizedBox(height: 100),
             ],
           ],
         ),
@@ -381,7 +529,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
                     onTap: () {
                       setState(() {
                         _selectedProducts.removeAt(i);
-                        // Recalc logic
                         if (_selectedProducts.isEmpty)
                           _sellingPrice = 0;
                         else
@@ -428,7 +575,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
       ),
       child: Column(
         children: [
-          // HERO INPUT
           const Text(
             "CUSTOMER PAYS",
             style: TextStyle(
@@ -475,10 +621,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
               ),
             ],
           ),
-
           const SizedBox(height: 24),
-
-          // PROFIT & MARGIN
           Row(
             children: [
               Expanded(
@@ -536,10 +679,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          // Shipping Toggle
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -571,7 +711,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
                   onChanged: (v) {
                     setState(() {
                       _resellerAbsorbsShipping = v;
-                      _syncControllers(source: 'all'); // Recalc totals
+                      _syncControllers(source: 'all');
                     });
                   },
                 ),
@@ -682,7 +822,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     );
   }
 
-  // ─── ENHANCED GOAL TRACKER ────────────────────────────────────────────────
   Widget _buildEnhancedGoalTracker() {
     bool isLoss = _netProfit <= 0;
 
@@ -701,7 +840,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -731,7 +869,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
                 ],
               ),
               const Spacer(),
-              // Goal Input
               Container(
                 width: 90,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -758,9 +895,7 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
               ),
             ],
           ),
-
           const Divider(height: 24),
-
           if (isLoss)
             Center(
               child: Container(
@@ -781,7 +916,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
           else
             Row(
               children: [
-                // Stat 1: Total Units
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,7 +942,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
                 ),
                 Container(width: 1, height: 40, color: Colors.grey.shade200),
                 const SizedBox(width: 16),
-                // Stat 2: Weekly Breakdown
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -840,7 +973,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     );
   }
 
-  // ─── DEAL BROADCASTER (New Feature) ───────────────────────────────────────
   Widget _buildDealBroadcaster() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -926,9 +1058,6 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  //  MULTI PRODUCT PICKER
-  // ---------------------------------------------------------------------------
   Future<void> _pickProducts() async {
     final List<ProductModel>? picked = await showModalBottomSheet(
       context: context,
@@ -940,9 +1069,15 @@ class _PriceMarginToolPageState extends State<PriceMarginToolPage> {
     if (picked != null && picked.isNotEmpty) {
       setState(() {
         _selectedProducts.addAll(picked);
-        // Default 20% margin
         _sellingPrice = _totalCost * 1.20;
         _syncControllers(source: 'all');
+      });
+      // 🌟 Re-check tour to show next steps if needed
+      // Delay to let UI rebuild
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_localStorage.read('has_shown_profit_tool_tour') == true) {
+          // Optionally prompt to continue tour here if needed
+        }
       });
     }
   }

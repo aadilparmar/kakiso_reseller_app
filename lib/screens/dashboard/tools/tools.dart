@@ -3,10 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart'; // 1. IMPORT GET STORAGE
+import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
-// 2. IMPORT SHOWCASEVIEW
 import 'package:showcaseview/showcaseview.dart';
 
 // --- MODEL IMPORTS ---
@@ -31,30 +30,21 @@ import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 
 // ───────────────────── THEME COLORS (LIGHT MODE) ─────────────────────
 
-// Primary accents
 const Color accentColor = Color(0xFF2563EB); // Blue
 const Color accentPurple = Color(0xFF7C3AED);
-
-// Backgrounds
-const Color bgTop = Color(0xFFF1F5F9); // Light cool gray
+const Color bgTop = Color(0xFFF1F5F9);
 const Color bgBottom = Color(0xFFFFFFFF);
-
-// Surfaces
 const Color surfaceColor = Colors.white;
 const Color cardBorderColor = Color(0xFFE5E7EB);
-
-// Text
 const Color textPrimary = Color(0xFF111827);
 const Color textSecondary = Color(0xFF6B7280);
 const Color textMuted = Color(0xFF9CA3AF);
-
-// Others
 const Color chipBg = Color(0xFFF3F4F6);
 const Color dividerColor = Color(0xFFE5E7EB);
 
 final CartController cartController = Get.put(CartController());
 
-// 3. WRAPPER WIDGET FOR TOUR
+// 1. WRAPPER WIDGET FOR TOUR
 class ToolsSection extends StatelessWidget {
   final UserData userData;
 
@@ -64,6 +54,10 @@ class ToolsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShowCaseWidget(
       builder: (context) => _ToolsSectionContent(userData: userData),
+      autoPlay: false,
+      blurValue: 1,
+      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      scrollDuration: const Duration(milliseconds: 300),
     );
   }
 }
@@ -81,7 +75,7 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
   final _storage = const FlutterSecureStorage();
   final _localStorage = GetStorage();
 
-  // 4. SHOWCASE KEYS
+  // 2. SHOWCASE KEYS
   final GlobalKey _summaryKey = GlobalKey();
   final GlobalKey _filterKey = GlobalKey();
   final GlobalKey _searchKey = GlobalKey();
@@ -91,13 +85,11 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
   String query = '';
   String selectedChip = 'All';
 
-  // IDs of tools that are LIVE (available now)
   final Set<String> _liveToolIds = {
     'whatsapp_share',
     'reseller_catalog',
     'trending',
     'price_margin',
-    // New Catalog Tools
     'smart_catalog',
     'collage_maker',
     'pdf_generator',
@@ -105,7 +97,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
     'bulk_downloader',
   };
 
-  // IDs of tools that should redirect to NavigationMenu Index 3 (Catalog)
   final Set<String> _catalogRedirectIds = {
     'smart_catalog',
     'collage_maker',
@@ -120,7 +111,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
 
     // Tools list initialization
     tools = [
-      // --- NEW TOOLS (Catalog Based) ---
       Tool(
         id: 'smart_catalog',
         title: 'Unlimited Smart Catalogs',
@@ -165,8 +155,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         enabled: true,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
-
-      // --- EXISTING TOOLS ---
       Tool(
         id: 'whatsapp_share',
         title: 'Marketing Studio',
@@ -177,7 +165,7 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
       ),
       Tool(
         id: 'reseller_catalog',
-        title: 'Category CSV Exporter',
+        title: 'Quick CSV Export',
         subtitle: 'Download standard product catalogs in CSV/Excel.',
         iconData: Iconsax.document_download,
         enabled: true,
@@ -199,8 +187,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         enabled: true,
         pageBuilder: (_) => const TrendingProductsDashboardPage(),
       ),
-
-      // --- COMING SOON ---
       Tool(
         id: 'auto_video',
         title: 'Auto video generator',
@@ -225,7 +211,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
-
       Tool(
         id: 'ai_caption',
         title: 'AI caption generator',
@@ -234,7 +219,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
-
       Tool(
         id: 'broadcast',
         title: 'Broadcast marketing tools',
@@ -245,29 +229,31 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
       ),
     ];
 
-    // 5. TRIGGER TOUR
+    // 3. TRIGGER TOUR
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndStartTour());
   }
 
   void _checkAndStartTour() {
-    bool hasShown = _localStorage.read('has_shown_tools_tour_v1') ?? false;
+    bool hasShown = _localStorage.read('has_shown_tools_tour_v2') ?? false;
 
     if (!hasShown) {
-      ShowCaseWidget.of(
-        context,
-      ).startShowCase([_summaryKey, _filterKey, _searchKey, _firstToolKey]);
-      _localStorage.write('has_shown_tools_tour_v1', true);
+      _startTour();
+      _localStorage.write('has_shown_tools_tour_v2', true);
     }
+  }
+
+  void _startTour() {
+    ShowCaseWidget.of(
+      context,
+    ).startShowCase([_summaryKey, _filterKey, _searchKey, _firstToolKey]);
   }
 
   // ───────────────────────── FILTER LOGIC ─────────────────────────
 
   List<Tool> get filteredTools {
     final q = query.trim().toLowerCase();
-
     Iterable<Tool> data = tools;
 
-    // Filter by Chip Selection
     if (selectedChip == 'Live') {
       data = tools.where((t) => _liveToolIds.contains(t.id));
     } else if (selectedChip == 'Coming Soon') {
@@ -292,7 +278,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
       data = tools.where((t) => t.id.contains('trending'));
     }
 
-    // Filter by Search Query
     if (q.isNotEmpty) {
       data = data.where((t) {
         return t.title.toLowerCase().contains(q) ||
@@ -575,6 +560,13 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
               ),
             ),
             const Spacer(),
+
+            // 🌟 4. RESTART TOUR BUTTON
+            IconButton(
+              tooltip: "Guide",
+              icon: const Icon(Iconsax.info_circle, color: accentColor),
+              onPressed: _startTour,
+            ),
 
             // --- CART ICON WITH BADGE ---
             Stack(

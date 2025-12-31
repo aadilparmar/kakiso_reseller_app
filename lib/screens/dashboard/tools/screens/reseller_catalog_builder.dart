@@ -8,6 +8,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const Color kAccentColor = Color(0xFF2563EB); // Royal Blue
@@ -17,14 +19,31 @@ const Color kTextBlack = Color(0xFF0F172A); // Slate 900
 const Color kTextGrey = Color(0xFF64748B); // Slate 500
 const Color kBorderColor = Color(0xFFE2E8F0);
 
-class ResellerCatalogPage extends StatefulWidget {
+// 1. WRAPPER FOR TOUR
+class ResellerCatalogPage extends StatelessWidget {
   const ResellerCatalogPage({super.key});
 
   @override
-  State<ResellerCatalogPage> createState() => _ResellerCatalogPageState();
+  Widget build(BuildContext context) {
+    return ShowCaseWidget(
+      builder: (context) => const _ResellerCatalogContent(),
+      autoPlay: false,
+      blurValue: 1,
+      enableAutoScroll: true, // 🌟 Enable auto-scroll
+      scrollDuration: const Duration(milliseconds: 300),
+    );
+  }
 }
 
-class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
+class _ResellerCatalogContent extends StatefulWidget {
+  const _ResellerCatalogContent();
+
+  @override
+  State<_ResellerCatalogContent> createState() =>
+      _ResellerCatalogContentState();
+}
+
+class _ResellerCatalogContentState extends State<_ResellerCatalogContent> {
   // --- STATE ---
   List<CategoryModel> _categories = [];
   CategoryModel? _selectedCategory;
@@ -36,6 +55,12 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
   // Search
   final TextEditingController _searchCtrl = TextEditingController();
   List<CategoryModel> _filteredCategories = [];
+  final _localStorage = GetStorage();
+
+  // 2. SHOWCASE KEYS
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _listKey = GlobalKey();
+  final GlobalKey _exportKey = GlobalKey();
 
   @override
   void initState() {
@@ -46,8 +71,6 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
     try {
-      // Assuming ApiService has a method to fetch categories.
-      // If not, ensure you add it to your ApiService.
       final data = await ApiService.fetchCategories();
 
       if (mounted) {
@@ -56,11 +79,29 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
           _filteredCategories = data;
           _isLoading = false;
         });
+        // 3. TRIGGER TOUR AFTER DATA LOAD
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _checkAndStartTour(),
+        );
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       debugPrint("Error loading categories: $e");
     }
+  }
+
+  void _checkAndStartTour() {
+    bool hasShown = _localStorage.read('has_shown_csv_tour') ?? false;
+    if (!hasShown && _filteredCategories.isNotEmpty) {
+      _startTour();
+      _localStorage.write('has_shown_csv_tour', true);
+    }
+  }
+
+  void _startTour() {
+    ShowCaseWidget.of(
+      context,
+    ).startShowCase([_searchKey, _listKey, _exportKey]);
   }
 
   void _filterCategories(String query) {
@@ -97,14 +138,12 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       bool hasMore = true;
 
       while (hasMore) {
-        // Update UI to show progress
         if (mounted) {
           setState(() {
             _loadingMessage = "Fetching Page $page...";
           });
         }
 
-        // Call API with category filter
         final fetched = await ApiService.fetchProducts(page: page, perPage: 50);
 
         if (fetched.isEmpty) {
@@ -112,7 +151,6 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
         } else {
           allProducts.addAll(fetched);
           page++;
-          // Safety break for extremely large cats or API loops
           if (page > 50) hasMore = false;
         }
       }
@@ -121,7 +159,6 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
         throw "No products found in this category.";
       }
 
-      // 2. Generate CSV
       if (mounted) {
         setState(() {
           _loadingMessage = "Generating CSV (${allProducts.length} items)...";
@@ -147,7 +184,6 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
   }
 
   Future<void> _generateComprehensiveCsv(List<ProductModel> products) async {
-    // 1. Define ALL Headers based on ProductModel
     List<String> headers = [
       "ID",
       "Name",
@@ -162,15 +198,12 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       "Brand Logo",
       "Short Description",
       "Description",
-      // Images
-      "All Images (Pipe Separated)",
+      "All Images",
       "Main Image",
-      // Meta / Tax
       "HSN Code",
       "GST",
       "Unique Code",
       "EAN Barcode",
-      // Shipping / Manufacturing
       "Shipping Fee",
       "Country of Origin",
       "Manufactured By",
@@ -178,33 +211,27 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       "Marketed By",
       "Dispatch Time",
       "Package Includes",
-      // Dimensions (Package)
       "Length",
       "Width",
       "Height",
       "Weight",
       "Gross Weight",
-      // Dimensions (Item)
       "Item Length",
       "Item Width",
       "Item Height",
       "Item Weight",
-      // Details
       "Net Contents",
       "Highlights",
       "Care Instructions",
       "Disclaimer",
       "Warranty",
-      // Attributes & Keywords
       "Keywords",
-      "Attributes (JSON-like)",
+      "Attributes",
     ];
 
     String csvContent = headers.join(",") + "\n";
 
-    // 2. Map Data
     for (var p in products) {
-      // Attributes formatting: "Size: M | Color: Red"
       String attrString = p.attributes
           .map((a) => "${a.name}:[${a.options.join('/')}]")
           .join(" | ");
@@ -212,28 +239,23 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       List<String> row = [
         p.id.toString(),
         _escapeCsv(p.name),
-        "simple", // Assuming simple for now
+        "simple",
         _escapeCsv(p.userSku ?? ""),
         p.regularPrice,
-        p.price, // This is usually the sale price in WooCommerce logic
+        p.price,
         p.discountPercentage?.toString() ?? "0",
         "active",
         p.categoryIds.join("|"),
         _escapeCsv(p.brandName ?? ""),
         _escapeCsv(p.brandLogoUrl ?? ""),
         _escapeCsv(p.shortDescription),
-        _escapeCsv(p.description), // Full description including HTML
-        // Images
+        _escapeCsv(p.description),
         _escapeCsv(p.images.join("|")),
         _escapeCsv(p.image),
-
-        // Meta
         _escapeCsv(p.hsnCode ?? ""),
         _escapeCsv(p.gst ?? ""),
         _escapeCsv(p.uniqueCode ?? ""),
         _escapeCsv(p.eanBarcode ?? ""),
-
-        // Shipping/Mfg
         _escapeCsv(p.shippingFee ?? ""),
         _escapeCsv(p.countryOfOrigin ?? ""),
         _escapeCsv(p.manufacturedBy ?? ""),
@@ -241,28 +263,20 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
         _escapeCsv(p.marketedBy ?? ""),
         _escapeCsv(p.dispatchTime ?? ""),
         _escapeCsv(p.packageIncludes ?? ""),
-
-        // Dims
         _escapeCsv(p.length ?? ""),
         _escapeCsv(p.width ?? ""),
         _escapeCsv(p.height ?? ""),
         _escapeCsv(p.weight ?? ""),
         _escapeCsv(p.packageGrossWeight ?? ""),
-
-        // Item Dims
         _escapeCsv(p.itemLength ?? ""),
         _escapeCsv(p.itemWidth ?? ""),
         _escapeCsv(p.itemHeight ?? ""),
         _escapeCsv(p.itemWeight ?? ""),
-
-        // Extra details
         _escapeCsv(p.netContents ?? ""),
         _escapeCsv(p.highlights ?? ""),
         _escapeCsv(p.careInstruction ?? ""),
         _escapeCsv(p.disclaimer ?? ""),
         _escapeCsv(p.warranty ?? ""),
-
-        // Keywords & Attrs
         _escapeCsv(p.keywords.join(",")),
         _escapeCsv(attrString),
       ];
@@ -270,7 +284,6 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       csvContent += row.join(",") + "\n";
     }
 
-    // 3. Save & Share
     final directory = await getTemporaryDirectory();
     final fileName =
         "Category_${_selectedCategory!.name.replaceAll(' ', '_')}_Export.csv";
@@ -308,6 +321,13 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          // RESTART BUTTON
+          IconButton(
+            icon: const Icon(Iconsax.info_circle, color: kAccentColor),
+            onPressed: _startTour,
+          ),
+        ],
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -332,42 +352,60 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
       ),
       body: Column(
         children: [
-          // 1. SEARCH
+          // 4. SEARCH BAR WITH SHOWCASE
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kBorderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            child: Showcase(
+              key: _searchKey,
+              title: "Search Niche",
+              description:
+                  "Quickly find the specific category you want to export.",
+              overlayColor: Colors.black.withOpacity(0.7),
+              titleTextStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: kAccentColor,
+                fontSize: 16,
               ),
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: "Search categories...",
-                  hintStyle: TextStyle(
-                    color: Colors.grey.shade400,
-                    fontSize: 13,
-                  ),
-                  prefixIcon: const Icon(
-                    Iconsax.search_normal,
-                    size: 18,
-                    color: kTextGrey,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
+              descTextStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+                fontSize: 12,
+              ),
+              targetBorderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kBorderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                onChanged: _filterCategories,
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: "Search categories...",
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: const Icon(
+                      Iconsax.search_normal,
+                      size: 18,
+                      color: kTextGrey,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  onChanged: _filterCategories,
+                ),
               ),
             ),
           ),
@@ -381,18 +419,22 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
                 : _filteredCategories.isEmpty
                 ? _buildEmptyState()
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      80,
+                    ), // extra padding for bottom dock
                     itemCount: _filteredCategories.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final cat = _filteredCategories[index];
                       final isSelected = _selectedCategory?.id == cat.id;
-                      return _CategoryCatalogCard(
+                      final card = _CategoryCatalogCard(
                         category: cat,
                         isSelected: isSelected,
                         onTap: () {
                           setState(() {
-                            // Toggle selection
                             if (isSelected) {
                               _selectedCategory = null;
                             } else {
@@ -401,12 +443,52 @@ class _ResellerCatalogPageState extends State<ResellerCatalogPage> {
                           });
                         },
                       );
+
+                      // 5. HIGHLIGHT ONLY FIRST ITEM
+                      if (index == 0) {
+                        return Showcase(
+                          key: _listKey,
+                          title: "Select Category",
+                          description:
+                              "Tap a category to select it for export.",
+                          overlayColor: Colors.black.withOpacity(0.7),
+                          titleTextStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: kAccentColor,
+                            fontSize: 16,
+                          ),
+                          descTextStyle: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                            fontSize: 12,
+                          ),
+                          targetBorderRadius: BorderRadius.circular(16),
+                          child: card,
+                        );
+                      }
+                      return card;
                     },
                   ),
           ),
 
-          // 3. BOTTOM DOCK
-          _buildBottomDock(),
+          // 6. BOTTOM DOCK WITH SHOWCASE
+          Showcase(
+            key: _exportKey,
+            title: "Export Data",
+            description: "Tap here to generate and download the CSV file.",
+            overlayColor: Colors.black.withOpacity(0.7),
+            titleTextStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: kAccentColor,
+              fontSize: 16,
+            ),
+            descTextStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.black,
+              fontSize: 12,
+            ),
+            child: _buildBottomDock(),
+          ),
         ],
       ),
     );
@@ -528,7 +610,6 @@ class _CategoryCatalogCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // SELECTION RADIO
             Container(
               width: 24,
               height: 24,
@@ -547,8 +628,6 @@ class _CategoryCatalogCard extends StatelessWidget {
                   : null,
             ),
             const SizedBox(width: 16),
-
-            // IMAGE
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Container(
@@ -564,8 +643,6 @@ class _CategoryCatalogCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-
-            // DETAILS
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,7 +679,6 @@ class _CategoryCatalogCard extends StatelessWidget {
                 ],
               ),
             ),
-
             if (category.parent != 0)
               Padding(
                 padding: const EdgeInsets.only(left: 8.0),

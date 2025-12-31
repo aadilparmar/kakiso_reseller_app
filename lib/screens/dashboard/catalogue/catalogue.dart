@@ -43,8 +43,11 @@ class CatalogueSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShowCaseWidget(
-      // FIX: Pass the function directly, do not wrap in Builder()
       builder: (context) => _CatalogueSectionContent(userData: userData),
+      autoPlay: false,
+      blurValue: 1,
+      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      scrollDuration: const Duration(milliseconds: 300),
     );
   }
 }
@@ -132,20 +135,22 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
     // Check if tour has been shown
     bool hasShownTour =
-        _localStorage.read('has_shown_catalogue_tour_v1') ?? false;
+        _localStorage.read('has_shown_catalogue_tour_v2') ?? false;
 
     if (!hasShownTour) {
-      // Ensure we have context and the controller has items (so list keys exist)
-      if (mounted && catalogueController.myCatalogues.isNotEmpty) {
-        ShowCaseWidget.of(
-          context,
-        ).startShowCase([_addCatalogKey, _shareKey, _toolsKey]);
-        _localStorage.write('has_shown_catalogue_tour_v1', true);
-      } else if (mounted) {
-        // If list is empty, just show the add button tour
-        ShowCaseWidget.of(context).startShowCase([_addCatalogKey]);
-        _localStorage.write('has_shown_catalogue_tour_v1', true);
-      }
+      _startTour();
+      _localStorage.write('has_shown_catalogue_tour_v2', true);
+    }
+  }
+
+  void _startTour() {
+    if (catalogueController.myCatalogues.isNotEmpty) {
+      ShowCaseWidget.of(
+        context,
+      ).startShowCase([_addCatalogKey, _shareKey, _toolsKey]);
+    } else {
+      // If list is empty, just show the add button tour
+      ShowCaseWidget.of(context).startShowCase([_addCatalogKey]);
     }
   }
 
@@ -1221,6 +1226,12 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               ),
             ),
             const Spacer(),
+            // 🌟 5. RESTART TOUR BUTTON ADDED
+            IconButton(
+              tooltip: "Guide",
+              icon: const Icon(Iconsax.info_circle, color: accentColor),
+              onPressed: _startTour,
+            ),
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -1302,9 +1313,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
       ),
-      // ✅ FIX: SafeArea added here to prevent body content from going behind bottom nav
       body: SafeArea(
-        top: false, // Keep top full bleed (covered by AppBar)
+        top: false,
         child: Stack(
           children: [
             // 1. MAIN CONTENT

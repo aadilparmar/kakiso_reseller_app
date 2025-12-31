@@ -3,10 +3,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart'; // 1. IMPORT GET STORAGE
+import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
-// 2. IMPORT SHOWCASEVIEW
 import 'package:showcaseview/showcaseview.dart';
 
 // --- MODELS & SERVICES ---
@@ -19,7 +18,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
-// 3. WRAPPER FOR SHOWCASE
+// 1. WRAPPER FOR SHOWCASE
 class CategoriesSection extends StatelessWidget {
   final UserData userData;
   const CategoriesSection({super.key, required this.userData});
@@ -28,6 +27,10 @@ class CategoriesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShowCaseWidget(
       builder: (context) => _CategoriesSectionContent(userData: userData),
+      autoPlay: false,
+      blurValue: 1,
+      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      scrollDuration: const Duration(milliseconds: 300),
     );
   }
 }
@@ -50,7 +53,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
   final ScrollController _rightScrollController = ScrollController();
   final _localStorage = GetStorage();
 
-  // 4. SHOWCASE KEYS
+  // 2. SHOWCASE KEYS
   final GlobalKey _leftRailKey = GlobalKey();
   final GlobalKey _rightContentKey = GlobalKey();
 
@@ -92,7 +95,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
           }
         });
 
-        // 5. TRIGGER TOUR AFTER DATA LOADS
+        // 3. TRIGGER TOUR AFTER DATA LOADS
         _checkAndStartTour();
       }
     } catch (e) {
@@ -107,19 +110,20 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
 
   void _checkAndStartTour() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Check if we have categories to show the tour on
       if (_allCategoriesFlat.isEmpty) return;
 
       bool hasShownTour =
-          _localStorage.read('has_shown_categories_tour_v1') ?? false;
+          _localStorage.read('has_shown_categories_tour_v2') ?? false;
 
       if (!hasShownTour) {
-        ShowCaseWidget.of(
-          context,
-        ).startShowCase([_leftRailKey, _rightContentKey]);
-        _localStorage.write('has_shown_categories_tour_v1', true);
+        _startTour();
+        _localStorage.write('has_shown_categories_tour_v2', true);
       }
     });
+  }
+
+  void _startTour() {
+    ShowCaseWidget.of(context).startShowCase([_leftRailKey, _rightContentKey]);
   }
 
   // --- HIERARCHY LOGIC ---
@@ -577,6 +581,12 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
             ),
           ),
           const Spacer(),
+          // 🌟 4. RESTART TOUR BUTTON ADDED HERE
+          IconButton(
+            tooltip: "Guide",
+            icon: const Icon(Iconsax.info_circle, color: accentColor),
+            onPressed: _startTour,
+          ),
           Stack(
             clipBehavior: Clip.none,
             children: [
