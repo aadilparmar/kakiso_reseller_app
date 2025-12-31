@@ -10,6 +10,7 @@ import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/models/tools.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
+import 'package:kakiso_reseller_app/navigation_menu.dart'; // Added for Catalog Navigation
 
 // --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
@@ -72,6 +73,22 @@ class _ToolsSectionState extends State<ToolsSection> {
     'reseller_catalog',
     'trending',
     'price_margin',
+    // New Catalog Tools
+    'smart_catalog',
+    'collage_maker',
+    'pdf_generator',
+    'csv_builder_pro',
+    'bulk_downloader',
+  };
+
+  // IDs of tools that should redirect to NavigationMenu Index 3 (Catalog)
+  // These mimic the Drawer's "My Catalog" behavior
+  final Set<String> _catalogRedirectIds = {
+    'smart_catalog',
+    'collage_maker',
+    'pdf_generator',
+    'csv_builder_pro',
+    'bulk_downloader',
   };
 
   @override
@@ -80,6 +97,54 @@ class _ToolsSectionState extends State<ToolsSection> {
 
     // Tools list: some live, some coming soon
     tools = [
+      // --- NEW TOOLS (Catalog Based) ---
+      Tool(
+        id: 'smart_catalog',
+        title: 'Unlimited Smart Catalogs',
+        subtitle:
+            'Create, customize, and share unlimited product catalogs instantly.',
+        iconData: Iconsax.book_1,
+        enabled: true,
+        // We handle the navigation logic in onTap, so this builder is a fallback
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'collage_maker',
+        title: 'Product Collage Maker',
+        subtitle:
+            'Combine multiple product images into stunning marketing collages.',
+        iconData: Iconsax.gallery,
+        enabled: true,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'pdf_generator',
+        title: 'PDF Catalog Generator',
+        subtitle:
+            'Generate professional PDF brochures with your branding and pricing.',
+        iconData: Iconsax.document_text,
+        enabled: true,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'csv_builder_pro',
+        title: 'Advanced CSV Creator',
+        subtitle:
+            'Export custom CSVs compatible with Amazon, Flipkart, and Shopify.',
+        iconData: Iconsax.document_code,
+        enabled: true,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'bulk_downloader',
+        title: 'Bulk Image Downloader',
+        subtitle: 'Download high-quality product assets in a single click.',
+        iconData: Iconsax.gallery_import,
+        enabled: true,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+
+      // --- EXISTING TOOLS ---
       Tool(
         id: 'whatsapp_share',
         title: 'Marketing Studio',
@@ -90,8 +155,8 @@ class _ToolsSectionState extends State<ToolsSection> {
       ),
       Tool(
         id: 'reseller_catalog',
-        title: 'CSV export tool',
-        subtitle: 'Download product catalogs in CSV/Excel for bulk upload.',
+        title: 'Quick CSV Export',
+        subtitle: 'Download standard product catalogs in CSV/Excel.',
         iconData: Iconsax.document_download,
         enabled: true,
         pageBuilder: (_) => const ResellerCatalogPage(),
@@ -112,6 +177,8 @@ class _ToolsSectionState extends State<ToolsSection> {
         enabled: true,
         pageBuilder: (_) => const TrendingProductsDashboardPage(),
       ),
+
+      // --- COMING SOON ---
       Tool(
         id: 'auto_video',
         title: 'Auto video generator',
@@ -182,7 +249,8 @@ class _ToolsSectionState extends State<ToolsSection> {
         (t) =>
             t.id.contains('whatsapp') ||
             t.id.contains('broadcast') ||
-            t.id.contains('caption'),
+            t.id.contains('caption') ||
+            t.id.contains('collage'),
       );
     } else if (selectedChip == 'Insights') {
       data = tools.where((t) => t.id.contains('trending'));
@@ -726,8 +794,21 @@ class _ToolsSectionState extends State<ToolsSection> {
                               isLive: isLive,
                               onTap: () {
                                 if (isLive) {
-                                  // Navigate to live tool screen
-                                  Get.to(() => tool.pageBuilder(context));
+                                  // Check if it's a catalog tool that requires full redirection
+                                  // (Mimics Drawer's "Get.offAll" behavior)
+                                  if (_catalogRedirectIds.contains(tool.id)) {
+                                    Get.offAll(
+                                      () => NavigationMenu(
+                                        userData: widget.userData,
+                                        initialIndex: 3, // Catalog Index
+                                      ),
+                                      // 🔴 THIS IS THE FIX: Passing the argument!
+                                      arguments: {'active_tool_guide': tool.id},
+                                    );
+                                  } else {
+                                    // Standard Navigation (Push)
+                                    Get.to(() => tool.pageBuilder(context));
+                                  }
                                 } else {
                                   // Show coming soon modal
                                   _showComingSoonSheet(tool);

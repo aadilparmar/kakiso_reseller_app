@@ -9,7 +9,7 @@ import 'package:kakiso_reseller_app/utils/constants.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
-import 'package:kakiso_reseller_app/services/notification_services.dart'; // 🔹 IMPORT SERVICE
+import 'package:kakiso_reseller_app/services/notification_services.dart';
 
 // --- 1. MODEL ---
 enum NotificationType { order, offer, info, alert, product }
@@ -21,8 +21,6 @@ class NotificationModel {
   final DateTime timestamp;
   final NotificationType type;
   bool isRead;
-
-  // Link notification to a product
   final String? productImage;
   final ProductModel? linkedProduct;
 
@@ -46,7 +44,6 @@ class NotificationController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Start the automatic notifier
     _startProductNotificationTimer();
   }
 
@@ -67,9 +64,7 @@ class NotificationController extends GetxController {
 
     if (lowerTitle.contains('order')) {
       type = NotificationType.order;
-    } else if (lowerTitle.contains('offer') ||
-        title.contains('%') ||
-        lowerTitle.contains('save')) {
+    } else if (lowerTitle.contains('offer') || title.contains('%')) {
       type = NotificationType.offer;
     } else if (lowerTitle.contains('alert') || lowerTitle.contains('deal')) {
       type = NotificationType.alert;
@@ -94,74 +89,58 @@ class NotificationController extends GetxController {
 
   // --- SMART GENERATOR LOGIC ---
   void _startProductNotificationTimer() {
-    // 1. Run immediately after 5 seconds to test
+    // Run immediately after 5 seconds
     Future.delayed(const Duration(seconds: 5), _generateSmartNotification);
 
-    // 2. Schedule for every 5 minutes
-    _timer = Timer.periodic(const Duration(minutes: 5), (timer) {
+    // Schedule for every 5 minutess
+    _timer = Timer.periodic(const Duration(minutes: 20), (timer) {
       _generateSmartNotification();
     });
   }
 
   void _generateSmartNotification() {
     try {
-      // Get products from Home Controller
       final homeController = Get.isRegistered<HomeProductsController>()
           ? Get.find<HomeProductsController>()
           : Get.put(HomeProductsController());
 
       final products = homeController.allProducts;
-      if (products.isEmpty) return;
 
-      final random = Random();
-      final product = products[random.nextInt(products.length)];
-
-      // --- DYNAMIC CONTENT ---
       String title = '';
       String body = '';
       NotificationType type = NotificationType.info;
+      String? image;
+      ProductModel? linkedProduct;
 
-      double price = double.tryParse(product.price) ?? 0;
-      int discount = product.discountPercentage ?? 0;
-
-      // Logic
-      if (discount > 15) {
-        type = NotificationType.offer;
-        List<String> titles = [
-          "🎉 Price Drop Alert!",
-          "Flat $discount% OFF 💥",
-          "Mega Savings on ${product.name}",
-        ];
-        List<String> bodies = [
-          "Get this look for just ₹${product.price}. Limited time offer!",
-          "Don't miss out! Price dropped to ₹${product.price}.",
-        ];
-        title = titles[random.nextInt(titles.length)];
-        body = bodies[random.nextInt(bodies.length)];
-      } else if (price < 800) {
-        type = NotificationType.alert;
-        List<String> titles = [
-          "🔥 Steal Deal Under ₹800",
-          "Budget Buy: ${product.name}",
-        ];
-        List<String> bodies = [
-          "Grab this premium quality item for only ₹${product.price}.",
-          "Perfect for your budget store collection.",
-        ];
-        title = titles[random.nextInt(titles.length)];
-        body = bodies[random.nextInt(bodies.length)];
+      if (products.isEmpty) {
+        title = "🚀 Welcome to Kakiso!";
+        body = "Your business journey starts here. Check out new arrivals.";
+        type = NotificationType.info;
       } else {
-        type = NotificationType.product;
-        List<String> titles = ["✨ New Arrival", "Trending: ${product.name}"];
-        List<String> bodies = [
-          "Refresh your catalog with our latest ${product.name}.",
-          "A perfect addition to your collection.",
-        ];
-        title = titles[random.nextInt(titles.length)];
-        body = bodies[random.nextInt(bodies.length)];
+        final random = Random();
+        final product = products[random.nextInt(products.length)];
+        linkedProduct = product;
+        image = product.image;
+
+        double price = double.tryParse(product.price) ?? 0;
+        int discount = product.discountPercentage ?? 0;
+
+        if (discount > 15) {
+          type = NotificationType.offer;
+          title = "🎉 Mega Offer on ${product.name}";
+          body = "Flat $discount% OFF! Grab it for just ₹${product.price}.";
+        } else if (price < 800 && price > 0) {
+          type = NotificationType.alert;
+          title = "🔥 Steal Deal Under ₹800";
+          body = "Budget buy: ${product.name} is selling fast.";
+        } else {
+          type = NotificationType.product;
+          title = "✨ Trending Now: ${product.name}";
+          body = "Refresh your catalog with this new arrival.";
+        }
       }
 
-      // 1. Add to In-App List
+      // Add to List
       final newNotification = NotificationModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: title,
@@ -169,20 +148,37 @@ class NotificationController extends GetxController {
         timestamp: DateTime.now(),
         type: type,
         isRead: false,
-        productImage: product.image,
-        linkedProduct: product,
+        productImage: image,
+        linkedProduct: linkedProduct,
       );
 
       notifications.insert(0, newNotification);
 
-      // 2. 🔹 TRIGGER PHONE SYSTEM NOTIFICATION
+      // Trigger System Notification
       NotificationService().showNotification(title: title, body: body);
+
+      // Trigger In-App Snackbar
+      Get.snackbar(
+        title,
+        body,
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.white.withOpacity(0.9),
+        colorText: Colors.black,
+        margin: const EdgeInsets.all(10),
+        duration: const Duration(seconds: 4),
+        icon: image != null
+            ? Image.network(image, width: 40, height: 40, fit: BoxFit.cover)
+            : const Icon(Iconsax.notification, color: accentColor),
+        onTap: (_) {
+          if (linkedProduct != null)
+            Get.to(() => ProductDetailsPage(product: linkedProduct!));
+        },
+      );
     } catch (e) {
       debugPrint("Notification Error: $e");
     }
   }
 
-  // --- ACTIONS ---
   void markAsRead(String id) {
     final index = notifications.indexWhere((n) => n.id == id);
     if (index != -1) {
@@ -190,7 +186,6 @@ class NotificationController extends GetxController {
       item.isRead = true;
       notifications[index] = item;
       notifications.refresh();
-
       if (item.linkedProduct != null) {
         Get.to(() => ProductDetailsPage(product: item.linkedProduct!));
       }
@@ -314,12 +309,12 @@ class NotificationScreen extends StatelessWidget {
             border: Border.all(
               color: item.isRead
                   ? Colors.grey.shade200
-                  : accentColor.withValues(alpha: 0.3),
+                  : accentColor.withOpacity(0.3),
               width: item.isRead ? 1 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withOpacity(0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),

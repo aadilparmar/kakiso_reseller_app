@@ -39,7 +39,8 @@ class CatalogueSection extends StatefulWidget {
   State<CatalogueSection> createState() => _CatalogueSectionState();
 }
 
-class _CatalogueSectionState extends State<CatalogueSection> {
+class _CatalogueSectionState extends State<CatalogueSection>
+    with SingleTickerProviderStateMixin {
   final _storage = const FlutterSecureStorage();
 
   final CatalogueController catalogueController = Get.put(
@@ -51,11 +52,49 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
   String _searchQuery = '';
   CatalogueSort _currentSort = CatalogueSort.newest;
-
   final TextEditingController _searchController = TextEditingController();
 
   bool _isGeneratingPdf = false;
   bool _isGeneratingCsv = false;
+
+  // 🔹 GUIDE MODE VARIABLES
+  String? _activeGuideTool; // e.g., 'pdf_generator', 'collage_maker'
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // 1. SETUP PULSE ANIMATION FOR GUIDE
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // 2. CHECK IF NAVIGATED FROM TOOLS PAGE
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.arguments != null &&
+          Get.arguments is Map &&
+          Get.arguments['active_tool_guide'] != null) {
+        setState(() {
+          _activeGuideTool = Get.arguments['active_tool_guide'];
+        });
+
+        // Clear arguments so it doesn't persist on reload
+        Get.arguments['active_tool_guide'] = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   // --- LOGOUT DIALOG ---
   Future<void> _showLogoutConfirmation() async {
@@ -386,17 +425,13 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       return;
     }
 
-    // ⚡ CHECK IF PRODUCT COUNT > 30 ⚡
     if (cat.products.length > 30) {
       _showProductSelectionSheet(cat);
       return;
     }
-
-    // Normal flow for <= 30 items
     _showMarginInputAndGenerate(cat, cat.products.toList());
   }
 
-  // 🔹 New: Dialog to let user pick products if > 30
   void _showProductSelectionSheet(CatalogueModel cat) {
     showModalBottomSheet(
       context: context,
@@ -406,7 +441,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         catalogue: cat,
         onConfirm: (selectedProducts) {
           Navigator.pop(ctx);
-          // Proceed to margin input with the filtered list
           if (selectedProducts.isEmpty) {
             Get.snackbar("Error", "No products selected!");
             return;
@@ -417,7 +451,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  // 🔹 Extracted: The final Margin Input -> Generate logic
   void _showMarginInputAndGenerate(
     CatalogueModel cat,
     List<ProductModel> productsToPrint,
@@ -514,7 +547,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         try {
           await PdfService.createAndShareCatalog(
             categoryName: cat.name,
-            products: products, // Use the passed list (filtered or all)
+            products: products,
             businessName: businessName,
             extraMargin: extraMargin,
           );
@@ -630,8 +663,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
 
   Future<void> _processShare(CatalogueModel cat, double marginPercent) async {
     if (cat.products.isEmpty) return;
-
-    // Warn user if too many products (Optimistic Warning)
     if (cat.products.length > 30) {
       Get.snackbar(
         "Large Catalog",
@@ -642,7 +673,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
       );
     }
 
-    // Prepare the caption text
     final buffer = StringBuffer();
     buffer.writeln("📦 *${cat.name}*");
     if (cat.description.isNotEmpty) buffer.writeln(cat.description);
@@ -662,13 +692,11 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     }
     buffer.writeln("– ${cat.name}");
 
-    // Copy text to clipboard
     await Clipboard.setData(ClipboardData(text: buffer.toString()));
 
     Get.showOverlay(
       asyncFunction: () async {
         try {
-          // Download ALL images with NO limit
           final xFiles = await _downloadProductImages(cat);
 
           if (xFiles.isEmpty) {
@@ -681,7 +709,6 @@ class _CatalogueSectionState extends State<CatalogueSection> {
             return;
           }
 
-          // Share all images
           await Share.shareXFiles(xFiles, text: "");
 
           Get.snackbar(
@@ -707,33 +734,25 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  // --- UPDATED IMAGE DOWNLOADER (PARALLEL & NO LIMIT) ---
   Future<List<XFile>> _downloadProductImages(CatalogueModel cat) async {
-    // 1. Filter products that actually have an image URL
     final productsWithImage = cat.products
         .where((p) => p.image.isNotEmpty)
-        .toList(); // Removed .take(10) to support 50-100+
+        .toList();
 
     if (productsWithImage.isEmpty) return [];
 
     final tempDir = await getTemporaryDirectory();
     final List<Future<XFile?>> futures = [];
 
-    // 2. Queue up downloads concurrently (Much faster than loop)
     for (int i = 0; i < productsWithImage.length; i++) {
       futures.add(
         _downloadSingleImage(productsWithImage[i].image, tempDir, cat.id, i),
       );
     }
-
-    // 3. Wait for all downloads to finish
     final results = await Future.wait(futures);
-
-    // 4. Return only successful downloads
     return results.whereType<XFile>().toList();
   }
 
-  // Helper for single image download with error handling
   Future<XFile?> _downloadSingleImage(
     String url,
     Directory dir,
@@ -748,9 +767,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         await file.writeAsBytes(resp.bodyBytes, flush: true);
         return XFile(file.path);
       }
-    } catch (_) {
-      // If one image fails, we just skip it, don't crash the whole process
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -779,7 +796,7 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     );
   }
 
-  // Generic Button helper
+  // 🔹 SMART BUTTON BUILDER with PULSE Logic
   Widget _buildCatalogueActionButton({
     required IconData icon,
     required String label,
@@ -788,15 +805,46 @@ class _CatalogueSectionState extends State<CatalogueSection> {
     Color? bgColor,
     bool outlined = false,
   }) {
-    final Color effectiveColor = color ?? accentColor;
-    final Color effectiveBg = bgColor ?? Colors.white;
-    return SizedBox(
+    // 1. Determine if this button is the "target" of the active guide
+    bool isTarget = false;
+    bool isOtherDimmed = false;
+
+    if (_activeGuideTool != null) {
+      // Mapping logic
+      if (_activeGuideTool == 'collage_maker' && label == "Collage") {
+        isTarget = true;
+      } else if (_activeGuideTool == 'pdf_generator' && label == "PDF") {
+        isTarget = true;
+      } else if (_activeGuideTool == 'csv_builder_pro' && label == "CSV") {
+        isTarget = true;
+      } else if (_activeGuideTool == 'bulk_downloader' && label == "Download") {
+        isTarget = true;
+      } else {
+        // If guide is active but this isn't the target, dim it
+        isOtherDimmed = true;
+      }
+    }
+
+    Color effectiveColor = color ?? accentColor;
+    Color effectiveBg = bgColor ?? Colors.white;
+
+    // Apply Highlight Styles
+    if (isTarget) {
+      effectiveColor = Colors.white;
+      effectiveBg = accentColor; // Invert for emphasis
+    } else if (isOtherDimmed) {
+      effectiveColor = effectiveColor.withOpacity(0.3);
+      effectiveBg = effectiveBg.withOpacity(0.5);
+    }
+
+    Widget button = SizedBox(
       height: 34,
       child: outlined
           ? OutlinedButton.icon(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: effectiveColor.withOpacity(0.5)),
+                backgroundColor: isTarget ? effectiveBg : null,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
@@ -834,22 +882,34 @@ class _CatalogueSectionState extends State<CatalogueSection> {
               ),
             ),
     );
+
+    // Apply Animation if Target
+    if (isTarget) {
+      return ScaleTransition(scale: _pulseAnimation, child: button);
+    }
+
+    return button;
   }
 
-  // HELPER: Small Icon Button for Socials
   Widget _buildSocialIconButton({
     required IconData icon,
     required Color color,
     required Color bgColor,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-        child: Icon(icon, size: 18, color: color),
+    // If a tool guide is active (e.g. PDF), dim these social icons
+    double opacity = _activeGuideTool != null ? 0.3 : 1.0;
+
+    return Opacity(
+      opacity: opacity,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+          child: Icon(icon, size: 18, color: color),
+        ),
       ),
     );
   }
@@ -952,343 +1012,533 @@ class _CatalogueSectionState extends State<CatalogueSection> {
         icon: const Icon(Iconsax.folder_add, color: Colors.white),
         label: const Text("New Catalog", style: TextStyle(color: Colors.white)),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Obx(
-            () => CatalogueHeader(
-              totalCatalogues: catalogueController.myCatalogues.length,
-              totalProducts: catalogueController.myCatalogues.fold(
-                0,
-                (sum, cat) => sum + cat.products.length,
+          // 1. MAIN CONTENT
+          Column(
+            children: [
+              Obx(
+                () => CatalogueHeader(
+                  totalCatalogues: catalogueController.myCatalogues.length,
+                  totalProducts: catalogueController.myCatalogues.fold(
+                    0,
+                    (sum, cat) => sum + cat.products.length,
+                  ),
+                ),
               ),
-            ),
-          ),
-          CatalogueSearchAndSortBar(
-            searchController: _searchController,
-            searchQuery: _searchQuery,
-            onSearchChanged: (value) => setState(() => _searchQuery = value),
-            currentSort: _currentSort,
-            onSortChanged: (value) => setState(() => _currentSort = value),
-          ),
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-          Expanded(
-            child: Obx(() {
-              final items = _buildFilteredSortedList();
-              if (catalogueController.myCatalogues.isEmpty) {
-                return CatalogueEmptyState(
-                  onCreatePressed: _openCreateCatalogueDialog,
-                );
-              }
-              if (items.isEmpty) return const CatalogueSearchEmptyState();
-              return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final cat = items[index];
-                  return GestureDetector(
-                    onTap: () =>
-                        Get.to(() => CatalogueDetailsPage(catalogueId: cat.id)),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+              CatalogueSearchAndSortBar(
+                searchController: _searchController,
+                searchQuery: _searchQuery,
+                onSearchChanged: (value) =>
+                    setState(() => _searchQuery = value),
+                currentSort: _currentSort,
+                onSortChanged: (value) => setState(() => _currentSort = value),
+              ),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              Expanded(
+                child: Obx(() {
+                  final items = _buildFilteredSortedList();
+                  if (catalogueController.myCatalogues.isEmpty) {
+                    return CatalogueEmptyState(
+                      onCreatePressed: _openCreateCatalogueDialog,
+                    );
+                  }
+                  if (items.isEmpty) return const CatalogueSearchEmptyState();
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final cat = items[index];
+                      // 🌟 If Guide is active, only fully show the first item
+                      // The rest are slightly dimmed to focus user on the example
+                      final bool isGuideActive = _activeGuideTool != null;
+                      final bool isFirstItem = index == 0;
+                      final double cardOpacity = (isGuideActive && !isFirstItem)
+                          ? 0.3
+                          : 1.0;
+
+                      return Opacity(
+                        opacity: cardOpacity,
+                        child: GestureDetector(
+                          onTap: () => Get.to(
+                            () => CatalogueDetailsPage(catalogueId: cat.id),
                           ),
-                        ],
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            decoration: const BoxDecoration(
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(18),
-                              ),
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                              ),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Iconsax.folder_2,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    cat.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                const Icon(
-                                  Iconsax.arrow_right_3,
-                                  size: 18,
-                                  color: Colors.white,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
+                              border: Border.all(color: Colors.grey.shade200),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (cat.description.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 6.0),
-                                    child: Text(
-                                      cat.description,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 11,
-                                        color: Color(0xFF4B5563),
-                                      ),
-                                    ),
-                                  ),
-
-                                SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE0F2FE),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Iconsax.bag_2,
-                                            size: 13,
-                                            color: Color(0xFF1D4ED8),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            "${cat.products.length} items",
-                                            style: const TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF1D4ED8),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF5F3FF),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: const [
-                                          Icon(
-                                            Iconsax.star1,
-                                            size: 13,
-                                            color: Color(0xFF8B5CF6),
-                                          ),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            "My Catalog",
-                                            style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: Color(0xFF6D28D9),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    _buildCatalogueActionButton(
-                                      icon: Iconsax.trash,
-                                      label: "Delete",
-                                      onTap: () => catalogueController
-                                          .deleteCatalogue(cat.id),
-                                      outlined: true,
-                                      color: Colors.red,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Divider(
-                            height: 14,
-                            thickness: 0.7,
-                            color: Color(0xFFE5E7EB),
-                          ),
-                          Row(
-                            children: [
-                              Icon(
-                                Iconsax.flash_1,
-                                color: accentColor,
-                                size: 22,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                "Reseller Tools",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 16,
-                                  color: Color(0xFF86198F), // Darker Purple
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                // --- SOCIAL ICONS ROW ---
+                                // HEADER GRADIENT
                                 Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
+                                  decoration: const BoxDecoration(
+                                    borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(18),
+                                    ),
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFF8B5CF6),
+                                        Color(0xFFEC4899),
+                                      ],
                                     ),
                                   ),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 2,
+                                    horizontal: 14,
+                                    vertical: 10,
                                   ),
                                   child: Row(
-                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // WhatsApp
-                                      _buildSocialIconButton(
-                                        icon: Iconsax.message_text,
-                                        color: const Color(0xFF25D366),
-                                        bgColor: const Color(0xFFDCFCE7),
-                                        onTap: () =>
-                                            _openShareMarginDialog(cat),
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Iconsax.folder_2,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      // Facebook
-                                      _buildSocialIconButton(
-                                        icon: Icons.facebook,
-                                        color: const Color(0xFF1877F2),
-                                        bgColor: const Color(0xFFDBEAFE),
-                                        onTap: () =>
-                                            _openShareMarginDialog(cat),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          cat.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      // Instagram (Camera icon used)
-                                      _buildSocialIconButton(
-                                        icon: Iconsax.camera,
-                                        color: const Color(0xFFE1306C),
-                                        bgColor: const Color(0xFFFCE7F3),
-                                        onTap: () =>
-                                            _openShareMarginDialog(cat),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      _buildSocialIconButton(
-                                        icon: Icons.share,
-                                        color: const Color(0xFFE1306C),
-                                        bgColor: const Color(0xFFFCE7F3),
-                                        onTap: () =>
-                                            _openShareMarginDialog(cat),
+                                      const Icon(
+                                        Iconsax.arrow_right_3,
+                                        size: 18,
+                                        color: Colors.white,
                                       ),
                                     ],
                                   ),
                                 ),
 
-                                // 🌟 COLLAGE STUDIO
-                                _buildCatalogueActionButton(
-                                  icon: Iconsax.magicpen,
-                                  label: "Collage",
-                                  onTap: () => _openCollageStudio(cat),
-                                  bgColor: const Color(0xFFFFFBEB),
-                                  color: const Color(0xFFF59E0B),
-                                ),
-                                // 🌟 COLLAGE STUDIO
-                                _buildCatalogueActionButton(
-                                  icon: Iconsax.document_download,
-                                  label: "Download",
-                                  onTap: () => _openCollageStudio(cat),
-                                  bgColor: const Color(0xFFFFFBEB),
-                                  color: const Color.fromARGB(
-                                    255,
-                                    11,
-                                    105,
-                                    245,
+                                // CONTENT
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    10,
+                                    14,
+                                    6,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (cat.description.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 6.0,
+                                          ),
+                                          child: Text(
+                                            cat.description,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              color: Color(0xFF4B5563),
+                                            ),
+                                          ),
+                                        ),
+                                      SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE0F2FE),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Iconsax.bag_2,
+                                                  size: 13,
+                                                  color: Color(0xFF1D4ED8),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  "${cat.products.length} items",
+                                                  style: const TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF1D4ED8),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF5F3FF),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Row(
+                                              children: const [
+                                                Icon(
+                                                  Iconsax.star1,
+                                                  size: 13,
+                                                  color: Color(0xFF8B5CF6),
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  "My Catalog",
+                                                  style: TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Color(0xFF6D28D9),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          // Delete is always dimmed if guide active
+                                          Opacity(
+                                            opacity: isGuideActive ? 0.3 : 1.0,
+                                            child: _buildCatalogueActionButton(
+                                              icon: Iconsax.trash,
+                                              label: "Delete",
+                                              onTap: () => catalogueController
+                                                  .deleteCatalogue(cat.id),
+                                              outlined: true,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                // 📊 CSV EXPORT
-                                _buildCatalogueActionButton(
-                                  icon: Iconsax.document_text,
-                                  label: "CSV",
-                                  onTap: () => _openCsvExportDialog(cat),
-                                  bgColor: const Color(0xFFECFDF5),
-                                  color: const Color(0xFF059669),
+                                const Divider(
+                                  height: 14,
+                                  thickness: 0.7,
+                                  color: Color(0xFFE5E7EB),
                                 ),
-                                // 📄 PDF
-                                _buildCatalogueActionButton(
-                                  icon: Iconsax.document_code,
-                                  label: "PDF",
-                                  onTap: () => _openPdfMarginDialog(cat),
-                                  bgColor: const Color(0xFFF5F3FF),
-                                  color: const Color(0xFF7C3AED),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Iconsax.flash_1,
+                                      color: accentColor,
+                                      size: 22,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Reseller Tools",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                        color: Color(0xFF86198F),
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 6),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    6,
+                                    12,
+                                    10,
+                                  ),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      // --- SOCIAL ICONS ---
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey.shade200,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _buildSocialIconButton(
+                                              icon: Iconsax.message_text,
+                                              color: const Color(0xFF25D366),
+                                              bgColor: const Color(0xFFDCFCE7),
+                                              onTap: () =>
+                                                  _openShareMarginDialog(cat),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            _buildSocialIconButton(
+                                              icon: Icons.facebook,
+                                              color: const Color(0xFF1877F2),
+                                              bgColor: const Color(0xFFDBEAFE),
+                                              onTap: () =>
+                                                  _openShareMarginDialog(cat),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            _buildSocialIconButton(
+                                              icon: Iconsax.camera,
+                                              color: const Color(0xFFE1306C),
+                                              bgColor: const Color(0xFFFCE7F3),
+                                              onTap: () =>
+                                                  _openShareMarginDialog(cat),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            _buildSocialIconButton(
+                                              icon: Icons.share,
+                                              color: const Color(0xFFE1306C),
+                                              bgColor: const Color(0xFFFCE7F3),
+                                              onTap: () =>
+                                                  _openShareMarginDialog(cat),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // 🌟 ACTION BUTTONS (Smart Highlighted)
+                                      _buildCatalogueActionButton(
+                                        icon: Iconsax.magicpen,
+                                        label: "Collage",
+                                        onTap: () => _openCollageStudio(cat),
+                                        bgColor: const Color(0xFFFFFBEB),
+                                        color: const Color(0xFFF59E0B),
+                                      ),
+                                      _buildCatalogueActionButton(
+                                        icon: Iconsax.document_download,
+                                        label: "Download",
+                                        onTap: () => _openCollageStudio(cat),
+                                        bgColor: const Color(0xFFFFFBEB),
+                                        color: const Color.fromARGB(
+                                          255,
+                                          11,
+                                          105,
+                                          245,
+                                        ),
+                                      ),
+                                      _buildCatalogueActionButton(
+                                        icon: Iconsax.document_text,
+                                        label: "CSV",
+                                        onTap: () => _openCsvExportDialog(cat),
+                                        bgColor: const Color(0xFFECFDF5),
+                                        color: const Color(0xFF059669),
+                                      ),
+                                      _buildCatalogueActionButton(
+                                        icon: Iconsax.document_code,
+                                        label: "PDF",
+                                        onTap: () => _openPdfMarginDialog(cat),
+                                        bgColor: const Color(0xFFF5F3FF),
+                                        color: const Color(0xFF7C3AED),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   );
-                },
-              );
-            }),
+                }),
+              ),
+            ],
           ),
+
+          // 2. ⚡ GUIDE OVERLAY (If Active)
+          if (_activeGuideTool != null)
+            _buildGuideOverlay(
+              toolId: _activeGuideTool!,
+              onDismiss: () => setState(() => _activeGuideTool = null),
+            ),
         ],
+      ),
+    );
+  }
+
+  // 🔹 GUIDE OVERLAY WIDGET
+  Widget _buildGuideOverlay({
+    required String toolId,
+    required VoidCallback onDismiss,
+  }) {
+    String title = "Tool Guide";
+    String message = "Select a catalog to use this tool.";
+    IconData icon = Iconsax.info_circle;
+
+    switch (toolId) {
+      case 'collage_maker':
+        title = "Collage Maker";
+        message =
+            "Tap the 'Collage' button on any catalog below to start creating amazing images!";
+        icon = Iconsax.magicpen;
+        break;
+      case 'pdf_generator':
+        title = "PDF Generator";
+        message =
+            "Tap the 'PDF' button on a catalog to generate a professional brochure.";
+        icon = Iconsax.document_text;
+        break;
+      case 'csv_builder_pro':
+        title = "CSV Export";
+        message =
+            "Tap 'CSV' to download a file ready for Amazon, Shopify, or Excel.";
+        icon = Iconsax.document_code;
+        break;
+      case 'bulk_downloader':
+        title = "Bulk Download";
+        message = "Tap 'Download' to save all product images to your gallery.";
+        icon = Iconsax.document_download;
+        break;
+      case 'smart_catalog':
+        title = "Smart Catalog";
+        message = "Click 'New Catalog' or manage existing ones here.";
+        icon = Iconsax.folder_add;
+        break;
+    }
+
+    return Positioned(
+      bottom: 20,
+      left: 16,
+      right: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOutBack,
+          builder: (context, val, child) {
+            return Transform.translate(
+              offset: Offset(0, 50 * (1 - val)),
+              child: Opacity(opacity: val, child: child),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Animated Icon
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        message,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 13,
+                          fontFamily: 'Poppins',
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: onDismiss,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: const Text(
+                            "Got it!",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Close X
+                GestureDetector(
+                  onTap: onDismiss,
+                  child: Icon(
+                    Icons.close,
+                    color: Colors.white.withOpacity(0.5),
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

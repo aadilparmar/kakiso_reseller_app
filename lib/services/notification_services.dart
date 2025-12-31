@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+// 🔴 CRITICAL: Ensure this path matches exactly where your notification.dart file is.
+// If your file is in 'lib/screens/dashboard/notifications/notification.dart', change this line!
 import 'package:kakiso_reseller_app/screens/dashboard/home/notification/notification.dart';
 
 class NotificationService {
@@ -18,22 +22,16 @@ class NotificationService {
         'high_importance_channel',
         'High Importance Notifications',
         description: 'This channel is used for important notifications.',
-        importance: Importance.high,
+        importance: Importance.max,
         playSound: true,
       );
 
   Future<void> initialize() async {
     try {
-      // 1. Request Permissions
-      await _firebaseMessaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-      // 2. Setup Init Settings
+      // 1. Setup Local Notification Settings
+      // 🔴 CHANGE: Use 'notification_icon' (matches the file you added to drawable)
       const AndroidInitializationSettings androidSettings =
-          AndroidInitializationSettings('ic_launcher');
+          AndroidInitializationSettings('notification_icon');
 
       const DarwinInitializationSettings iosSettings =
           DarwinInitializationSettings(
@@ -47,7 +45,6 @@ class NotificationService {
         iOS: iosSettings,
       );
 
-      // 3. Initialize Plugin
       await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
@@ -55,14 +52,26 @@ class NotificationService {
         },
       );
 
-      // 4. Create Channel
-      await _localNotifications
+      // 2. Create Channel
+      final platform = _localNotifications
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.createNotificationChannel(_androidChannel);
+          >();
 
-      // 5. Listeners for Firebase
+      await platform?.createNotificationChannel(_androidChannel);
+
+      // 3. Request Permissions
+      if (Platform.isAndroid) {
+        await platform?.requestNotificationsPermission();
+      }
+
+      await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // 4. Foreground Listener
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         RemoteNotification? notification = message.notification;
         AndroidNotification? android = message.notification?.android;
@@ -76,6 +85,7 @@ class NotificationService {
         _addToInAppController(message);
       });
 
+      // 5. Background Tap Listener
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         Get.to(() => const NotificationScreen());
         _addToInAppController(message);
@@ -85,14 +95,14 @@ class NotificationService {
     }
   }
 
-  // 🔹 NEW: Public method to trigger Local Notification manually
+  // 🔹 Trigger System Notification
   Future<void> showNotification({
     required String title,
     required String body,
     String? payload,
   }) async {
     await _localNotifications.show(
-      DateTime.now().millisecond, // Unique ID
+      DateTime.now().millisecond,
       title,
       body,
       NotificationDetails(
@@ -100,11 +110,11 @@ class NotificationService {
           _androidChannel.id,
           _androidChannel.name,
           channelDescription: _androidChannel.description,
-          icon: 'ic_launcher',
-          importance: Importance.high,
+          icon: 'notification_icon', // 🔴 MUST MATCH FILENAME IN DRAWABLE
+          importance: Importance.max,
           priority: Priority.high,
           color: const Color(0xFF6C63FF),
-          styleInformation: BigTextStyleInformation(body), // Allows long text
+          styleInformation: BigTextStyleInformation(body),
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
