@@ -181,7 +181,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard> {
                                 ),
                               ),
                               child: Text(
-                                'Min.Profit ~ ₹${profit.toStringAsFixed(0)}',
+                                'Min. Profit ~ ₹${profit.toStringAsFixed(0)}',
                                 textScaleFactor: 1.0, // Lock font scaling
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -236,7 +236,7 @@ class _HorizontalProductCardState extends State<HorizontalProductCard> {
                                         children: [
                                           Flexible(
                                             child: Text(
-                                              'Resell${widget.rsp}',
+                                              'Resell ${widget.rsp}',
                                               textScaleFactor:
                                                   1.0, // Lock font scaling
                                               maxLines: 1,

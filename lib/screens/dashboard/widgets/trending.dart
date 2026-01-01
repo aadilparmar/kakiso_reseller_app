@@ -341,6 +341,15 @@ class _TrendingProductsState extends State<TrendingProducts>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Container(
+                      width: 4,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEB2A7E),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     const Flexible(
                       child: Text(
                         'Trending on',
@@ -363,7 +372,7 @@ class _TrendingProductsState extends State<TrendingProducts>
                         ).createShader(rect);
                       },
                       child: const Text(
-                        'KakiSo',
+                        'KaKiSo',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,

@@ -159,20 +159,30 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Flexible(
-                      child: Text(
-                        'Fresh Drops',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                          fontFamily: 'Poppins',
+                    Expanded(
+                      child: ShaderMask(
+                        shaderCallback: (rect) {
+                          return const LinearGradient(
+                            colors: [
+                              Color.fromARGB(255, 236, 80, 72),
+                              Color.fromARGB(255, 246, 131, 92),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ).createShader(rect);
+                        },
+                        child: const Text(
+                          'Fresh Drops 🔥',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            fontFamily: 'Poppins',
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text('🔥', style: TextStyle(fontSize: 20)),
                   ],
                 ),
               ),

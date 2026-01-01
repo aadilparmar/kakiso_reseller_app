@@ -1,3 +1,4 @@
+// lib/buisness_details.dart
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/checkout/checkout.dart';
-// 🔹 Import Final Checkout Page
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -138,10 +138,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       if (!mounted) return;
 
       final String savedState = (data['state'] as String?)?.trim() ?? '';
+
       final String savedLine1 = (data['addressLine1'] as String?)?.trim() ?? '';
       final String savedLine2 = (data['addressLine2'] as String?)?.trim() ?? '';
-      final String savedAddressCombined =
-          (data['address'] as String?)?.trim() ?? '';
 
       setState(() {
         _businessNameCtrl.text = data['businessName'] ?? _businessNameCtrl.text;
@@ -150,15 +149,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _whatsappCtrl.text = data['whatsapp'] ?? '';
         _emailCtrl.text = data['email'] ?? _emailCtrl.text;
 
-        if (savedLine1.isNotEmpty || savedLine2.isNotEmpty) {
-          _addressLine1Ctrl.text = savedLine1;
-          _addressLine2Ctrl.text = savedLine2;
-        } else if (savedAddressCombined.isNotEmpty) {
-          _addressLine1Ctrl.text = savedAddressCombined;
-          _addressLine2Ctrl.text = '';
-        }
+        _addressLine1Ctrl.text = savedLine1;
+        _addressLine2Ctrl.text = savedLine2;
 
         _cityCtrl.text = data['city'] ?? '';
+
         if (savedState.isNotEmpty && _indianStates.contains(savedState)) {
           _selectedState = savedState;
         } else {
@@ -188,8 +183,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       if (remoteData == null || !mounted) return;
 
       final String remoteState = (remoteData['state'] as String?)?.trim() ?? '';
-      final String remoteAddress =
-          (remoteData['address'] as String?)?.trim() ?? '';
+
+      // These keys now come from the updated fetch logic which checks reseller meta first
+      final String remoteLine1 =
+          (remoteData['addressLine1'] as String?)?.trim() ?? '';
+      final String remoteLine2 =
+          (remoteData['addressLine2'] as String?)?.trim() ?? '';
 
       setState(() {
         _businessNameCtrl.text =
@@ -199,9 +198,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _whatsappCtrl.text = remoteData['whatsapp'] ?? _whatsappCtrl.text;
         _emailCtrl.text = remoteData['email'] ?? _emailCtrl.text;
 
-        if (_addressLine1Ctrl.text.trim().isEmpty && remoteAddress.isNotEmpty) {
-          _addressLine1Ctrl.text = remoteAddress;
-        }
+        _addressLine1Ctrl.text = remoteLine1;
+        _addressLine2Ctrl.text = remoteLine2;
+
         _cityCtrl.text = remoteData['city'] ?? _cityCtrl.text;
 
         if (remoteState.isNotEmpty && _indianStates.contains(remoteState)) {
@@ -278,8 +277,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           : _whatsappCtrl.text.trim(),
       "email": _emailCtrl.text.trim(),
       "address": combinedAddress,
-      "addressLine1": line1,
-      "addressLine2": line2,
+      "addressLine1": line1, // Will update 'reseller_store_address'
+      "addressLine2": line2, // Will update 'reseller_store_locality'
       "city": _cityCtrl.text.trim(),
       "state": _selectedState ?? _stateCtrl.text.trim(),
       "country": 'India',
@@ -290,11 +289,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     try {
       await _storage.write(key: _storageKey, value: jsonEncode(payload));
       if (_currentUser?.userId != null) {
+        // This single call now updates BOTH Billing and Reseller Meta
         await ApiService.updateBusinessDetails(
-          userId: _currentUser!.userId,
-          data: payload,
-        );
-        await ApiService.updateResellerBusinessMeta(
           userId: _currentUser!.userId,
           data: payload,
         );
@@ -340,7 +336,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       return;
     }
 
-    // 🔹 Build the Full Address String once
     final line1 = _addressLine1Ctrl.text.trim();
     final line2 = _addressLine2Ctrl.text.trim();
     final city = _cityCtrl.text.trim();
@@ -356,26 +351,18 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     ].where((s) => s.isNotEmpty).join(', ');
     if (pin.isNotEmpty) fullFormattedAddress += ' - $pin';
 
-    // 🔹 LOGIC CHECK: Ship to business?
     if (_shipToBusinessAddress) {
-      // DIRECTLY GO TO FINAL CHECKOUT
-      // We use the Business Name as the Label and the Business Address for BOTH fields
-
       Get.to(
         () => FinalCheckoutPage(
           userData: _currentUser,
-          // Billing Info
           businessAddressLabel: _businessNameCtrl.text.trim(),
           businessAddressText: fullFormattedAddress,
-          // Shipping Info (SAME AS BILLING)
           customerAddressLabel: "${_ownerNameCtrl.text.trim()} (Self)",
           customerAddressText: fullFormattedAddress,
-          // Flag to update UI
           isSelfShip: true,
         ),
       );
     } else {
-      // Normal Flow: Select Customer Address
       Get.to(() => CustomerAddressPage(userData: _currentUser));
     }
   }

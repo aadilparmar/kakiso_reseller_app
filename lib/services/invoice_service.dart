@@ -6,7 +6,6 @@ import 'package:printing/printing.dart';
 import 'package:kakiso_reseller_app/models/order.dart';
 
 class InvoiceService {
-  // --- MINIMALIST DESIGN THEME ---
   static const PdfColor _primaryColor = PdfColors.deepPurple700;
   static const PdfColor _textColor = PdfColors.black;
   static const PdfColor _subTextColor = PdfColors.grey700;
@@ -14,8 +13,6 @@ class InvoiceService {
 
   static Future<void> generateAndPrintInvoice(Order order) async {
     final pdf = pw.Document();
-
-    // Standard Helvetica is clean and professional
     final fontRegular = pw.Font.helvetica();
     final fontBold = pw.Font.helveticaBold();
 

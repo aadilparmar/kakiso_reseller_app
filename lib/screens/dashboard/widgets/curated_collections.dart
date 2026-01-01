@@ -49,23 +49,36 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Row(
             children: [
-              const Text(
-                "Curated",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  color: Colors.black,
+              Container(
+                width: 4,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEB2A7E),
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                "Collections",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  color: Colors.grey.shade400,
+              const SizedBox(width: 8),
+              Expanded(
+                child: ShaderMask(
+                  shaderCallback: (rect) {
+                    return const LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 210, 26, 238),
+                        Color.fromARGB(255, 82, 16, 235),
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(rect);
+                  },
+                  child: const Text(
+                    'Cultured Collection',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
                 ),
               ),
             ],

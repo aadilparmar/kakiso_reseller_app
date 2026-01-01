@@ -76,30 +76,26 @@ class _StorySectionState extends State<StorySection>
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Featured',
-                textScaleFactor: 1.0, // Lock font scaling
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Flexible(
-                child: Text(
-                  'Categories',
-                  textScaleFactor: 1.0, // Lock font scaling
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFFEC4899),
+              Expanded(
+                child: ShaderMask(
+                  shaderCallback: (rect) {
+                    return const LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 198, 72, 236),
+                        Color(0xFF8B5CF6),
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(rect);
+                  },
+                  child: const Text(
+                    'Featured Categories',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                    ),
                   ),
                 ),
               ),
