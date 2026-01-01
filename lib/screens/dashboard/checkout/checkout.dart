@@ -317,12 +317,12 @@ class FinalCheckoutPage extends StatelessWidget {
           _priceRow('Total you will pay', resellerPayAmount, isBold: true),
           const Divider(height: 24),
 
-          const Text(
-            'Amount in Invoice (to collect from customer) (Including GST)',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
           const SizedBox(height: 6),
-          _priceRow('Customer will pay', customerCollectAmount, isBold: true),
+          _priceRow(
+            'Amount in Invoice (Including GST)',
+            customerCollectAmount,
+            isBold: true,
+          ),
           const SizedBox(height: 10),
 
           Container(
@@ -470,7 +470,6 @@ class FinalCheckoutPage extends StatelessWidget {
       final double baseSubTotal = cartController.totalPrice;
       final double totalCharges = shippingFee + platformFee + convenienceFee;
 
-      double marginTotal = 0;
       for (final item in items) {
         final double basePrice = double.tryParse(item.product.price) ?? 0;
         final double? selling = cartController.getSellingPrice(item.product.id);
@@ -479,11 +478,9 @@ class FinalCheckoutPage extends StatelessWidget {
             : basePrice;
         double perUnitMargin = perUnit - basePrice;
         if (perUnitMargin < 0) perUnitMargin = 0;
-        marginTotal += perUnitMargin * item.quantity;
       }
 
       final double resellerPayAmount = baseSubTotal + totalCharges;
-      final double customerCollectAmount = resellerPayAmount + marginTotal;
 
       return Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -505,7 +502,7 @@ class FinalCheckoutPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'You will pay (products + charges)',
+                    'You will pay',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 2),
@@ -517,10 +514,6 @@ class FinalCheckoutPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    'Kakiso will collect from your customer: ₹${customerCollectAmount.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                  ),
                 ],
               ),
             ),
