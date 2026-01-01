@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added for input formatters
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -14,11 +15,7 @@ import 'package:kakiso_reseller_app/utils/constants.dart';
 // 🔹 STEP: Customer Address (Step 3)
 
 class CustomerAddressPage extends StatefulWidget {
-  /// Optional – pass from BusinessDetailsPage if you have it:
-  /// Get.to(() => CustomerAddressPage(userData: widget.userData));
   final UserData? userData;
-
-  /// If true -> opened from drawer (settings mode, no step header + no continue)
   final bool fromDrawer;
 
   const CustomerAddressPage({
@@ -42,27 +39,33 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   final TextEditingController _addressLine2Ctrl = TextEditingController();
   final TextEditingController _addressLine3Ctrl = TextEditingController();
 
+  // City and State controllers (bound to Autocomplete)
   final TextEditingController _cityCtrl = TextEditingController();
+  final TextEditingController _stateCtrl = TextEditingController();
+
   final TextEditingController _countryCtrl = TextEditingController(
     text: 'India',
   );
   final TextEditingController _pincodeCtrl = TextEditingController();
 
+  // Keys to force rebuild Autocomplete widgets when data changes programmatically
+  Key _stateFieldKey = UniqueKey();
+  Key _cityFieldKey = UniqueKey();
+
   // State dropdown selection
-  String? selectedState;
+  String? _selectedState;
+  String? _selectedCity;
 
   bool _isSaving = false;
 
   // ---- STORAGE SETUP ----
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _storageKey = 'customer_addresses';
-
-  // business details storage key (same as in BusinessDetailsPage)
   static const String _businessStorageKey = 'business_details';
 
   // ---- IN-MEMORY LIST OF SAVED ADDRESSES ----
   List<CustomerAddress> _savedAddresses = [];
-  int? _selectedIndex; // which saved address is chosen
+  int? _selectedIndex;
 
   // ---- BUSINESS ADDRESS (for FinalCheckoutPage) ----
   String? _businessAddressLabel;
@@ -70,51 +73,651 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
 
   UserData? get _userData => widget.userData;
 
-  // List of Indian states and UTs for dropdown
-  final List<String> indianStates = [
-    "Andhra Pradesh",
-    "Arunachal Pradesh",
-    "Assam",
-    "Bihar",
-    "Chhattisgarh",
-    "Goa",
-    "Gujarat",
-    "Haryana",
-    "Himachal Pradesh",
-    "Jharkhand",
-    "Karnataka",
-    "Kerala",
-    "Madhya Pradesh",
-    "Maharashtra",
-    "Manipur",
-    "Meghalaya",
-    "Mizoram",
-    "Nagaland",
-    "Odisha",
-    "Punjab",
-    "Rajasthan",
-    "Sikkim",
-    "Tamil Nadu",
-    "Telangana",
-    "Tripura",
-    "Uttar Pradesh",
-    "Uttarakhand",
-    "West Bengal",
-    "Delhi",
-    "Jammu & Kashmir",
-    "Ladakh",
-    "Puducherry",
-    "Chandigarh",
-    "Andaman & Nicobar Islands",
-    "Lakshadweep",
-  ];
+  // 🔹 DATA: Comprehensive State & City Mapping
+  final Map<String, List<String>> _stateCityMap = {
+    'Andaman and Nicobar Islands': [
+      'Port Blair',
+      'Diglipur',
+      'Mayabunder',
+      'Rangat',
+      'Bamboo Flat',
+      'Garacharma',
+    ],
+    'Andhra Pradesh': [
+      'Adoni',
+      'Amaravati',
+      'Anantapur',
+      'Bhimavaram',
+      'Chittoor',
+      'Dharmavaram',
+      'Eluru',
+      'Gudivada',
+      'Guntur',
+      'Hindupur',
+      'Kadapa',
+      'Kakinada',
+      'Kurnool',
+      'Machilipatnam',
+      'Madanapalle',
+      'Nandyal',
+      'Narasaraopet',
+      'Nellore',
+      'Ongole',
+      'Proddatur',
+      'Rajahmundry',
+      'Srikakulam',
+      'Tadepalligudem',
+      'Tenali',
+      'Tirupati',
+      'Vijayawada',
+      'Visakhapatnam',
+      'Vizianagaram',
+    ],
+    'Arunachal Pradesh': [
+      'Itanagar',
+      'Naharlagun',
+      'Pasighat',
+      'Tawang',
+      'Ziro',
+      'Bomdila',
+      'Aalo',
+      'Tezu',
+      'Roing',
+    ],
+    'Assam': [
+      'Barpeta',
+      'Bongaigaon',
+      'Dhubri',
+      'Dibrugarh',
+      'Diphu',
+      'Guwahati',
+      'Jorhat',
+      'Karimganj',
+      'Kokrajhar',
+      'Lanka',
+      'Lumding',
+      'Nagaon',
+      'Nalbari',
+      'North Lakhimpur',
+      'Sibsagar',
+      'Silchar',
+      'Tezpur',
+      'Tinsukia',
+    ],
+    'Bihar': [
+      'Arrah',
+      'Aurangabad',
+      'Begusarai',
+      'Bettiah',
+      'Bhagalpur',
+      'Bihar Sharif',
+      'Buxar',
+      'Chhapra',
+      'Darbhanga',
+      'Dehri',
+      'Gaya',
+      'Hajipur',
+      'Jamalpur',
+      'Katihar',
+      'Kishanganj',
+      'Madhubani',
+      'Motihari',
+      'Munger',
+      'Muzaffarpur',
+      'Patna',
+      'Purnia',
+      'Saharsa',
+      'Samastipur',
+      'Sasaram',
+      'Siwan',
+      'Sitamarhi',
+    ],
+    'Chandigarh': ['Chandigarh'],
+    'Chhattisgarh': [
+      'Ambikapur',
+      'Bhilai',
+      'Bilaspur',
+      'Chirmiri',
+      'Dhamtari',
+      'Durg',
+      'Jagdalpur',
+      'Korba',
+      'Raigarh',
+      'Raipur',
+      'Rajnandgaon',
+    ],
+    'Dadra and Nagar Haveli and Daman and Diu': [
+      'Daman',
+      'Diu',
+      'Silvassa',
+      'Dadra',
+    ],
+    'Delhi': [
+      'Delhi',
+      'New Delhi',
+      'North Delhi',
+      'South Delhi',
+      'East Delhi',
+      'West Delhi',
+      'Dwarka',
+      'Rohini',
+      'Saket',
+      'Vasant Kunj',
+      'Janakpuri',
+      'Laxmi Nagar',
+      'Karol Bagh',
+      'Connaught Place',
+    ],
+    'Goa': [
+      'Mapusa',
+      'Margao',
+      'Mormugao',
+      'Panaji',
+      'Ponda',
+      'Vasco da Gama',
+      'Bicholim',
+      'Curchorem',
+    ],
+    'Gujarat': [
+      'Ahmedabad',
+      'Amreli',
+      'Anand',
+      'Anjar',
+      'Bardoli',
+      'Bharuch',
+      'Bhavnagar',
+      'Bhuj',
+      'Botad',
+      'Dahod',
+      'Deesa',
+      'Gandhidham',
+      'Gandhinagar',
+      'Godhra',
+      'Gondal',
+      'Himmatnagar',
+      'Jamnagar',
+      'Jetpur',
+      'Junagadh',
+      'Kalol',
+      'Mahesana',
+      'Modasa',
+      'Morbi',
+      'Nadiad',
+      'Navsari',
+      'Palanpur',
+      'Patan',
+      'Porbandar',
+      'Rajkot',
+      'Surat',
+      'Surendranagar',
+      'Vadodara',
+      'Valsad',
+      'Vapi',
+      'Veraval',
+    ],
+    'Haryana': [
+      'Ambala',
+      'Bahadurgarh',
+      'Bhiwani',
+      'Charkhi Dadri',
+      'Faridabad',
+      'Fatehabad',
+      'Gurugram',
+      'Hansi',
+      'Hisar',
+      'Jind',
+      'Kaithal',
+      'Karnal',
+      'Kurukshetra',
+      'Narnaul',
+      'Narwana',
+      'Palwal',
+      'Panchkula',
+      'Panipat',
+      'Rewari',
+      'Rohtak',
+      'Sirsa',
+      'Sonipat',
+      'Thanesar',
+      'Tohana',
+      'Yamunanagar',
+    ],
+    'Himachal Pradesh': [
+      'Baddi',
+      'Bilaspur',
+      'Chamba',
+      'Dharamshala',
+      'Hamirpur',
+      'Kullu',
+      'Mandi',
+      'Nahan',
+      'Paonta Sahib',
+      'Shimla',
+      'Solan',
+      'Sundarnagar',
+      'Una',
+    ],
+    'Jammu and Kashmir': [
+      'Anantnag',
+      'Baramulla',
+      'Jammu',
+      'Kathua',
+      'Pulwama',
+      'Sopore',
+      'Srinagar',
+      'Udhampur',
+    ],
+    'Jharkhand': [
+      'Adityapur',
+      'Bokaro',
+      'Chaibasa',
+      'Deoghar',
+      'Dhanbad',
+      'Dumka',
+      'Giridih',
+      'Hazaribagh',
+      'Jamshedpur',
+      'Jhumri Tilaiya',
+      'Mango',
+      'Medininagar',
+      'Phusro',
+      'Ramgarh',
+      'Ranchi',
+      'Sahibganj',
+    ],
+    'Karnataka': [
+      'Bagalkot',
+      'Belagavi',
+      'Ballari',
+      'Bengaluru',
+      'Bidar',
+      'Chikkamagaluru',
+      'Chitradurga',
+      'Davangere',
+      'Dharwad',
+      'Gadag',
+      'Gangavathi',
+      'Hassan',
+      'Hospet',
+      'Hubballi',
+      'Kalaburagi',
+      'Kolar',
+      'Mandya',
+      'Mangaluru',
+      'Mysuru',
+      'Raichur',
+      'Ranebennur',
+      'Robertson Pet',
+      'Shivamogga',
+      'Tumakuru',
+      'Udupi',
+      'Vijayapura',
+    ],
+    'Kerala': [
+      'Alappuzha',
+      'Changanassery',
+      'Cherthala',
+      'Guruvayur',
+      'Kannur',
+      'Kasaragod',
+      'Kayamkulam',
+      'Kochi',
+      'Kollam',
+      'Kottayam',
+      'Kozhikode',
+      'Kunnamkulam',
+      'Malappuram',
+      'Manjeri',
+      'Nedumangad',
+      'Neyyattinkara',
+      'Palakkad',
+      'Payyanur',
+      'Ponnani',
+      'Taliparamba',
+      'Thalassery',
+      'Thiruvananthapuram',
+      'Thrippunithura',
+      'Thrissur',
+      'Tirur',
+      'Vadakara',
+    ],
+    'Ladakh': ['Leh', 'Kargil'],
+    'Lakshadweep': ['Kavaratti', 'Minicoy', 'Andrott'],
+    'Madhya Pradesh': [
+      'Ashoknagar',
+      'Balaghat',
+      'Betul',
+      'Bhind',
+      'Bhopal',
+      'Burhanpur',
+      'Chhatarpur',
+      'Chhindwara',
+      'Damoh',
+      'Datia',
+      'Dewas',
+      'Dhar',
+      'Guna',
+      'Gwalior',
+      'Hoshangabad',
+      'Indore',
+      'Itarsi',
+      'Jabalpur',
+      'Khandwa',
+      'Khargone',
+      'Mandsaur',
+      'Morena',
+      'Murwara',
+      'Nagda',
+      'Neemuch',
+      'Pithampur',
+      'Ratlam',
+      'Rewa',
+      'Sagar',
+      'Satna',
+      'Sehore',
+      'Seoni',
+      'Shahdol',
+      'Shivpuri',
+      'Singrauli',
+      'Ujjain',
+      'Vidisha',
+    ],
+    'Maharashtra': [
+      'Ahmednagar',
+      'Akola',
+      'Amravati',
+      'Aurangabad',
+      'Badlapur',
+      'Barshi',
+      'Bhiwandi',
+      'Bhusawal',
+      'Chandrapur',
+      'Dhule',
+      'Gondia',
+      'Ichalkaranji',
+      'Jalgaon',
+      'Jalna',
+      'Kalyan-Dombivli',
+      'Kolhapur',
+      'Latur',
+      'Malegaon',
+      'Mira-Bhayandar',
+      'Mumbai',
+      'Nagpur',
+      'Nanded',
+      'Nashik',
+      'Navi Mumbai',
+      'Osmanabad',
+      'Panvel',
+      'Parbhani',
+      'Pune',
+      'Sangli',
+      'Satara',
+      'Solapur',
+      'Thane',
+      'Ulhasnagar',
+      'Vasai-Virar',
+      'Wardha',
+      'Yavatmal',
+    ],
+    'Manipur': ['Imphal', 'Thoubal', 'Kakching', 'Ukhrul'],
+    'Meghalaya': ['Shillong', 'Tura', 'Jowai', 'Nongstoin'],
+    'Mizoram': ['Aizawl', 'Lunglei', 'Saiha', 'Champhai'],
+    'Nagaland': [
+      'Dimapur',
+      'Kohima',
+      'Mokokchung',
+      'Tuensang',
+      'Wokha',
+      'Zunheboto',
+    ],
+    'Odisha': [
+      'Balangir',
+      'Balasore',
+      'Baripada',
+      'Bhadrak',
+      'Berhampur',
+      'Bhubaneswar',
+      'Brajrajnagar',
+      'Cuttack',
+      'Jharsuguda',
+      'Jeypore',
+      'Puri',
+      'Rourkela',
+      'Sambalpur',
+    ],
+    'Puducherry': ['Karaikal', 'Mahe', 'Puducherry', 'Yanam', 'Ozhukarai'],
+    'Punjab': [
+      'Abohar',
+      'Amritsar',
+      'Barnala',
+      'Batala',
+      'Bathinda',
+      'Firozpur',
+      'Hoshiarpur',
+      'Jalandhar',
+      'Kapurthala',
+      'Khanna',
+      'Ludhiana',
+      'Malerkotla',
+      'Moga',
+      'Mohali',
+      'Muktsar',
+      'Pathankot',
+      'Patiala',
+      'Phagwara',
+      'Rajpura',
+    ],
+    'Rajasthan': [
+      'Ajmer',
+      'Alwar',
+      'Barmer',
+      'Beawar',
+      'Bharatpur',
+      'Bhilwara',
+      'Bhiwadi',
+      'Bikaner',
+      'Bundi',
+      'Chittorgarh',
+      'Churu',
+      'Dausa',
+      'Dholpur',
+      'Ganganagar',
+      'Hanumangarh',
+      'Hindaun',
+      'Jaipur',
+      'Jaisalmer',
+      'Jhunjhunu',
+      'Jodhpur',
+      'Kishangarh',
+      'Kota',
+      'Nagaur',
+      'Pali',
+      'Sawai Madhopur',
+      'Sikar',
+      'Sirohi',
+      'Tonk',
+      'Udaipur',
+    ],
+    'Sikkim': ['Gangtok', 'Namchi', 'Gyalshing', 'Mangan'],
+    'Tamil Nadu': [
+      'Ambur',
+      'Avadi',
+      'Chennai',
+      'Coimbatore',
+      'Cuddalore',
+      'Dindigul',
+      'Erode',
+      'Hosur',
+      'Kanchipuram',
+      'Karaikudi',
+      'Karur',
+      'Kumbakonam',
+      'Madurai',
+      'Nagercoil',
+      'Neyveli',
+      'Pallavaram',
+      'Pudukkottai',
+      'Rajapalayam',
+      'Salem',
+      'Tambaram',
+      'Thanjavur',
+      'Thoothukudi',
+      'Tiruchirappalli',
+      'Tirunelveli',
+      'Tiruppur',
+      'Tiruvannamalai',
+      'Vellore',
+    ],
+    'Telangana': [
+      'Adilabad',
+      'Hyderabad',
+      'Jagtial',
+      'Karimnagar',
+      'Khammam',
+      'Mahbubnagar',
+      'Mancherial',
+      'Miryalaguda',
+      'Nalgonda',
+      'Nizamabad',
+      'Ramagundam',
+      'Secunderabad',
+      'Siddipet',
+      'Suryapet',
+      'Warangal',
+    ],
+    'Tripura': ['Agartala', 'Dharmanagar', 'Kailasahar', 'Udaipur', 'Ambassa'],
+    'Uttar Pradesh': [
+      'Agra',
+      'Aligarh',
+      'Allahabad',
+      'Amroha',
+      'Ayodhya',
+      'Azamgarh',
+      'Bahraich',
+      'Ballia',
+      'Banda',
+      'Bareilly',
+      'Basti',
+      'Budaun',
+      'Bulandshahr',
+      'Chandausi',
+      'Deoria',
+      'Etah',
+      'Etawah',
+      'Faizabad',
+      'Farrukhabad',
+      'Fatehpur',
+      'Firozabad',
+      'Ghaziabad',
+      'Ghazipur',
+      'Gonda',
+      'Gorakhpur',
+      'Hapur',
+      'Hardoi',
+      'Hathras',
+      'Jaunpur',
+      'Jhansi',
+      'Kanpur',
+      'Kasganj',
+      'Khoshambi',
+      'Lakhimpur',
+      'Lalitpur',
+      'Lucknow',
+      'Mainpuri',
+      'Mathura',
+      'Maunath Bhanjan',
+      'Meerut',
+      'Mirzapur',
+      'Modinagar',
+      'Moradabad',
+      'Muzaffarnagar',
+      'Noida',
+      'Orai',
+      'Pilibhit',
+      'Prayagraj',
+      'Rae Bareli',
+      'Rampur',
+      'Saharanpur',
+      'Sambhal',
+      'Shahjahanpur',
+      'Shamli',
+      'Sitapur',
+      'Sultanpur',
+      'Unnao',
+      'Varanasi',
+    ],
+    'Uttarakhand': [
+      'Dehradun',
+      'Haldwani',
+      'Haridwar',
+      'Kashipur',
+      'Roorkee',
+      'Rudrapur',
+      'Rishikesh',
+      'Nainital',
+    ],
+    'West Bengal': [
+      'Alipurduar',
+      'Asansol',
+      'Baharampur',
+      'Bally',
+      'Balurghat',
+      'Bankura',
+      'Baranagar',
+      'Barasat',
+      'Bardhaman',
+      'Basirhat',
+      'Bhatpara',
+      'Bidhannagar',
+      'Bongaon',
+      'Chandannagar',
+      'Darjeeling',
+      'Durgapur',
+      'Haldia',
+      'Howrah',
+      'Jalpaiguri',
+      'Kamarhati',
+      'Kharagpur',
+      'Kolkata',
+      'Krishnanagar',
+      'Madhyamgram',
+      'Maheshtala',
+      'Malda',
+      'Medinipur',
+      'Naihati',
+      'North Dumdum',
+      'Panihati',
+      'Purulia',
+      'Raiganj',
+      'Rajarhat',
+      'Rajpur Sonarpur',
+      'Ranaghat',
+      'Serampore',
+      'Siliguri',
+      'South Dumdum',
+      'Titagarh',
+      'Uluberia',
+    ],
+  };
+
+  List<String> get _indianStates => _stateCityMap.keys.toList()..sort();
+
+  List<String> get _availableCities {
+    if (_selectedState != null && _stateCityMap.containsKey(_selectedState)) {
+      final cities = List<String>.from(_stateCityMap[_selectedState]!);
+      cities.sort();
+      return cities;
+    }
+    return [];
+  }
 
   @override
   void initState() {
     super.initState();
     _countryCtrl.text = 'India';
     _loadSavedAddresses();
-    _loadBusinessDetails(); // 🔹 load business address for final checkout
+    _loadBusinessDetails();
   }
 
   @override
@@ -125,6 +728,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     _addressLine2Ctrl.dispose();
     _addressLine3Ctrl.dispose();
     _cityCtrl.dispose();
+    _stateCtrl.dispose();
     _countryCtrl.dispose();
     _pincodeCtrl.dispose();
     super.dispose();
@@ -144,8 +748,8 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       name: _customerNameCtrl.text.trim(),
       phone: _customerPhoneCtrl.text.trim(),
       addressLine: fullAddress,
-      city: _cityCtrl.text.trim(),
-      state: selectedState ?? '',
+      city: _selectedCity ?? '',
+      state: _selectedState ?? '',
       country: 'India', // locked to India
       pincode: _pincodeCtrl.text.trim(),
     );
@@ -234,6 +838,26 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   Future<void> _onSaveAddress() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Explicit check for dropdowns (in case Autocomplete field text is valid but no selection tracked)
+    if (_selectedState == null || _selectedState!.isEmpty) {
+      Get.snackbar(
+        'State Required',
+        'Please select a state.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    if (_selectedCity == null || _selectedCity!.isEmpty) {
+      Get.snackbar(
+        'City Required',
+        'Please select a city.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -252,9 +876,17 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       _addressLine1Ctrl.clear();
       _addressLine2Ctrl.clear();
       _addressLine3Ctrl.clear();
+
+      // Reset State/City/Pin
+      _selectedState = null;
+      _stateCtrl.clear();
+      _stateFieldKey = UniqueKey();
+
+      _selectedCity = null;
       _cityCtrl.clear();
+      _cityFieldKey = UniqueKey();
+
       _pincodeCtrl.clear();
-      selectedState = null;
       _countryCtrl.text = 'India';
 
       if (!mounted) return;
@@ -414,6 +1046,98 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
   }
 
   // ----------------- UI -----------------
+
+  // Helper widget to build Searchable Dropdowns (Autocomplete)
+  Widget _buildSearchableDropdown({
+    Key? key,
+    required String label,
+    required String? currentValue,
+    required List<String> options,
+    required Function(String) onSelected,
+    required String? Function(String?) validator,
+    required IconData icon,
+    bool enabled = true,
+  }) {
+    return RawAutocomplete<String>(
+      key: key,
+      initialValue: TextEditingValue(text: currentValue ?? ''),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text == '') {
+          return const Iterable<String>.empty();
+        }
+        return options.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: onSelected,
+      fieldViewBuilder:
+          (context, textEditingController, focusNode, onFieldSubmitted) {
+            // Important: Keep the main controller in sync so we can read from it later
+            if (currentValue != null &&
+                textEditingController.text.isEmpty &&
+                !focusNode.hasFocus) {
+              textEditingController.text = currentValue;
+            }
+            return TextFormField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              enabled: enabled,
+              decoration: InputDecoration(
+                labelText: label,
+                prefixIcon: Icon(icon, size: 18),
+                suffixIcon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: Colors.grey,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+                hintText: 'Search $label',
+                filled: !enabled,
+                fillColor: !enabled ? Colors.grey.withValues(alpha: 0.1) : null,
+              ),
+              validator: validator,
+            );
+          },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4.0,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: MediaQuery.of(context).size.width - 64, // Matches padding
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(
+                      option,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                      ),
+                    ),
+                    onTap: () {
+                      onSelected(option);
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool fromDrawer = widget.fromDrawer;
@@ -556,6 +1280,10 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               keyboardType: TextInputType.phone,
               icon: Iconsax.call,
               hint: '10-digit mobile number',
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(10),
+                FilteringTextInputFormatter.digitsOnly,
+              ],
               validator: (v) {
                 if (v!.trim().isEmpty) return 'Phone number required';
                 if (v.trim().length < 10) return 'Invalid number';
@@ -588,55 +1316,56 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
             ),
             const SizedBox(height: 12),
 
-            // City + State
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    controller: _cityCtrl,
-                    label: 'City',
-                    icon: Iconsax.location5,
-                    hint: 'Eg. Rajkot',
-                    validator: (v) =>
-                        v!.trim().isEmpty ? 'City required' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: selectedState,
-                    isExpanded:
-                        true, // 👈 important: prevent horizontal overflow
-                    items: indianStates
-                        .map(
-                          (s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s,
-                              style: const TextStyle(fontFamily: 'Poppins'),
-                              overflow: TextOverflow
-                                  .ellipsis, // 👈 long names = ellipsis
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      setState(() => selectedState = val);
-                    },
-                    decoration: InputDecoration(
-                      labelText: "State",
-                      prefixIcon: const Icon(Iconsax.map, size: 18),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      isDense: true,
-                    ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'State required' : null,
-                  ),
-                ),
-              ],
+            // State & City (Searchable Dropdowns)
+            // 1. STATE SEARCHABLE DROPDOWN
+            _buildSearchableDropdown(
+              key: _stateFieldKey,
+              label: 'State',
+              icon: Iconsax.map,
+              currentValue: _selectedState,
+              options: _indianStates,
+              onSelected: (String selection) {
+                setState(() {
+                  _selectedState = selection;
+                  _stateCtrl.text = selection;
+                  // Clear City when state changes
+                  _selectedCity = null;
+                  _cityCtrl.clear();
+                  _cityFieldKey = UniqueKey(); // Rebuild City widget
+                });
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) return 'State required';
+                if (!_indianStates.contains(value)) return 'Select valid state';
+                return null;
+              },
             ),
+            const SizedBox(height: 12),
+
+            // 2. CITY SEARCHABLE DROPDOWN
+            _buildSearchableDropdown(
+              key: _cityFieldKey,
+              label: 'City',
+              icon: Iconsax.location5,
+              currentValue: _selectedCity,
+              enabled: _selectedState != null,
+              options: _availableCities,
+              onSelected: (String selection) {
+                setState(() {
+                  _selectedCity = selection;
+                  _cityCtrl.text = selection;
+                });
+              },
+              validator: (value) {
+                if (_selectedState == null)
+                  return null; // handled by state validator
+                if (value == null || value.isEmpty) return 'City required';
+                if (!_availableCities.contains(value))
+                  return 'Select valid city';
+                return null;
+              },
+            ),
+
             const SizedBox(height: 12),
 
             // Country + Pincode
@@ -664,9 +1393,18 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                     keyboardType: TextInputType.number,
                     icon: Iconsax.location_tick,
                     hint: 'Eg. 360001',
+                    inputFormatters: [
+                      LengthLimitingTextInputFormatter(6),
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     validator: (v) {
-                      if (v!.trim().isEmpty) return 'Pincode required';
-                      if (v.trim().length < 6) return 'Invalid pincode';
+                      if (v == null || v.trim().isEmpty)
+                        return 'Pincode required';
+                      // STRICT REGEX: Exactly 6 digits, CANNOT start with 0
+                      final regex = RegExp(r'^[1-9][0-9]{5}$');
+                      if (!regex.hasMatch(v.trim())) {
+                        return 'Invalid Pincode';
+                      }
                       return null;
                     },
                   ),
@@ -946,12 +1684,14 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     int maxLines = 1,
     String? hint,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,

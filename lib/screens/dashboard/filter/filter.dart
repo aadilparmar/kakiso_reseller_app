@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 
+// 🔹 Imports
+import 'package:kakiso_reseller_app/models/categories.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart'; // <--- Added API Service
+
 // ─────────────────────────────────────────────────────────────
 //  FILTER MODEL
 // ─────────────────────────────────────────────────────────────
@@ -13,11 +17,15 @@ class FilterOptions {
   double? maxPrice;
   bool inStockOnly;
 
+  // Store selected Category IDs
+  List<int> selectedCategoryIds;
+
   FilterOptions({
     this.sortType = SortType.relevance,
     this.minPrice,
     this.maxPrice,
     this.inStockOnly = false,
+    this.selectedCategoryIds = const [],
   });
 
   void reset() {
@@ -25,25 +33,30 @@ class FilterOptions {
     minPrice = null;
     maxPrice = null;
     inStockOnly = false;
+    selectedCategoryIds = [];
   }
 
   bool get hasActiveFilters =>
       sortType != SortType.relevance ||
       minPrice != null ||
       maxPrice != null ||
-      inStockOnly;
+      inStockOnly ||
+      selectedCategoryIds.isNotEmpty;
 
   FilterOptions copyWith({
     SortType? sortType,
     double? minPrice,
     double? maxPrice,
     bool? inStockOnly,
+    List<int>? selectedCategoryIds,
   }) {
     return FilterOptions(
       sortType: sortType ?? this.sortType,
       minPrice: minPrice ?? this.minPrice,
       maxPrice: maxPrice ?? this.maxPrice,
       inStockOnly: inStockOnly ?? this.inStockOnly,
+      selectedCategoryIds:
+          selectedCategoryIds ?? List.from(this.selectedCategoryIds),
     );
   }
 }
@@ -55,13 +68,13 @@ class ModernFilterBottomSheet {
   static Future<FilterOptions?> show({
     required BuildContext context,
     required FilterOptions currentFilter,
+    // 🔹 REMOVED: allCategories is no longer required here
     Color accentColor = const Color(0xFFFF6B35),
   }) {
     return showModalBottomSheet<FilterOptions>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      // Use constrained height (e.g. 85% of screen) to look like a proper panel
       builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.85,
         minChildSize: 0.6,
@@ -92,18 +105,23 @@ class _SplitFilterContent extends StatefulWidget {
 }
 
 class _SplitFilterContentState extends State<_SplitFilterContent> {
-  // Sidebar categories
-  final List<String> _categories = ['Sort By', 'Price', 'Availability'];
+  // 🔹 Sidebar categories
+  final List<String> _tabs = ['Sort By', 'Category', 'Price', 'Availability'];
 
-  // Icons for sidebar
-  final List<IconData> _categoryIcons = [
+  final List<IconData> _tabIcons = [
     Iconsax.sort,
+    Iconsax.category,
     Iconsax.wallet_3,
     Iconsax.box_tick,
   ];
 
-  int _selectedIndex = 0; // Which category is selected on left
+  int _selectedIndex = 0;
   late FilterOptions _tempFilter;
+
+  // 🔹 Self-Fetching State
+  List<CategoryModel> _allCategories = [];
+  bool _isLoadingCategories = true;
+  String _errorMessage = '';
 
   // Price controllers
   late TextEditingController _minController;
@@ -113,12 +131,45 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
   void initState() {
     super.initState();
     _tempFilter = widget.currentFilter.copyWith();
+
+    // Initialize Price Controllers
     _minController = TextEditingController(
       text: _tempFilter.minPrice?.toStringAsFixed(0) ?? '',
     );
     _maxController = TextEditingController(
       text: _tempFilter.maxPrice?.toStringAsFixed(0) ?? '',
     );
+
+    // 🔹 Trigger internal fetch
+    _fetchCategoriesInternal();
+  }
+
+  // 🔹 FETCH CATEGORIES INTERNALLY
+  Future<void> _fetchCategoriesInternal() async {
+    setState(() {
+      _isLoadingCategories = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // Calling your existing ApiService
+      final cats = await ApiService.fetchCategories();
+
+      if (mounted) {
+        setState(() {
+          _allCategories = cats;
+          _isLoadingCategories = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Filter Widget Error: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingCategories = false;
+          _errorMessage = "Failed to load categories";
+        });
+      }
+    }
   }
 
   @override
@@ -173,28 +224,24 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       ),
       child: Column(
         children: [
-          // 1. HEADER
           _buildHeader(),
           const Divider(height: 1),
-
-          // 2. MIDDLE (SPLIT VIEW)
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // LEFT SIDEBAR
                 Container(
-                  width: 110, // Fixed width sidebar
+                  width: 110,
                   color: Colors.grey.shade100,
                   child: ListView.builder(
-                    itemCount: _categories.length,
+                    itemCount: _tabs.length,
                     itemBuilder: (context, index) {
                       final isSelected = _selectedIndex == index;
                       return _buildSidebarItem(index, isSelected);
                     },
                   ),
                 ),
-
                 // RIGHT CONTENT
                 Expanded(
                   child: Container(
@@ -205,19 +252,12 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
               ],
             ),
           ),
-
           const Divider(height: 1),
-
-          // 3. BOTTOM ACTIONS
           _buildBottomBar(),
         ],
       ),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // WIDGET BUILDERS
-  // ---------------------------------------------------------------------------
 
   Widget _buildHeader() {
     return Padding(
@@ -258,11 +298,10 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
         });
       },
       child: Container(
-        height: 60, // Fixed height cells
+        height: 60,
         color: isSelected ? Colors.white : Colors.grey.shade100,
         child: Row(
           children: [
-            // Selection Indicator Bar
             Container(
               width: 4,
               height: 60,
@@ -273,7 +312,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _categoryIcons[index],
+                    _tabIcons[index],
                     size: 20,
                     color: isSelected
                         ? widget.accentColor
@@ -281,7 +320,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _categories[index],
+                    _tabs[index],
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
@@ -305,15 +344,17 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       case 0:
         return _buildSortView();
       case 1:
-        return _buildPriceView();
+        return _buildCategoryView(); // 🔹 Uses internal state now
       case 2:
+        return _buildPriceView();
+      case 3:
         return _buildAvailabilityView();
       default:
         return const SizedBox();
     }
   }
 
-  // --- SORT VIEW (Radio List) ---
+  // --- SORT VIEW ---
   Widget _buildSortView() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -358,7 +399,96 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
-  // --- PRICE VIEW (Inputs + Chips) ---
+  // --- 🔹 UPDATED CATEGORY VIEW ---
+  Widget _buildCategoryView() {
+    // 1. Loading State
+    if (_isLoadingCategories) {
+      return Center(
+        child: CircularProgressIndicator(
+          color: widget.accentColor,
+          strokeWidth: 2,
+        ),
+      );
+    }
+
+    // 2. Error State
+    if (_errorMessage.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(height: 8),
+            Text(_errorMessage, style: const TextStyle(color: Colors.grey)),
+            TextButton(
+              onPressed: _fetchCategoriesInternal,
+              child: const Text("Retry"),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 3. Empty State
+    if (_allCategories.isEmpty) {
+      return const Center(
+        child: Text(
+          "No categories found",
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
+    // 4. Success State (List)
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
+      itemCount: _allCategories.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Text(
+              "Select Categories",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          );
+        }
+
+        final category = _allCategories[index - 1];
+        final isSelected = _tempFilter.selectedCategoryIds.contains(
+          category.id,
+        );
+
+        return CheckboxListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 0,
+          ),
+          activeColor: widget.accentColor,
+          dense: true,
+          title: Text(
+            category.name,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          value: isSelected,
+          onChanged: (bool? checked) {
+            setState(() {
+              if (checked == true) {
+                _tempFilter.selectedCategoryIds.add(category.id);
+              } else {
+                _tempFilter.selectedCategoryIds.remove(category.id);
+              }
+            });
+          },
+        );
+      },
+    );
+  }
+
+  // --- PRICE VIEW ---
   Widget _buildPriceView() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -417,7 +547,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
           border: InputBorder.none,
           isDense: true,
         ),
-        onChanged: (_) => setState(() {}), // Trigger validation UI updates
+        onChanged: (_) => setState(() {}),
       ),
     );
   }
@@ -434,9 +564,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive
-              ? widget.accentColor.withValues(alpha: 0.1)
-              : Colors.white,
+          color: isActive ? widget.accentColor.withOpacity(0.1) : Colors.white,
           border: Border.all(
             color: isActive ? widget.accentColor : Colors.grey.shade300,
           ),
@@ -454,7 +582,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
-  // --- AVAILABILITY VIEW (Checkbox) ---
+  // --- AVAILABILITY VIEW ---
   Widget _buildAvailabilityView() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -479,34 +607,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
             ],
           ),
         ),
-        // Normally e-commerce sites show "Exclude out of stock",
-        // but here we toggle `inStockOnly`.
-        // Let's make it clearer:
-        InkWell(
-          onTap: () => setState(
-            () => _tempFilter.inStockOnly = !_tempFilter.inStockOnly,
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  _tempFilter.inStockOnly
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
-                  color: _tempFilter.inStockOnly
-                      ? widget.accentColor
-                      : Colors.grey,
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  "Show In-Stock Only",
-                  style: TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -519,7 +619,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             offset: const Offset(0, -4),
             blurRadius: 10,
           ),

@@ -48,7 +48,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   // --- FILTER RANGE ---
   FilterOptions _activeFilter = FilterOptions();
 
-  // --- CATEGORY FILTER STATE ---
+  // --- CATEGORY FILTER STATE (From top bar) ---
   int? _selectedCategoryId;
   String? _selectedCategoryName;
 
@@ -82,23 +82,33 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     }
   }
 
+  // 🔹 FIX: Updated logic to check Filter categories
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
     try {
       List<ProductModel> products;
 
-      // If a category is selected, load products for that category only
-      if (_selectedCategoryId != null) {
+      // 1. Determine which category ID to use
+      // We prioritize the ID from the "Filter" bottom sheet if available.
+      // If not, we fall back to the ID from the top bar "Category" sheet.
+      int? effectiveCatId = _selectedCategoryId;
+
+      if (_activeFilter.selectedCategoryIds.isNotEmpty) {
+        effectiveCatId = _activeFilter.selectedCategoryIds.first;
+      }
+
+      // 2. Fetch based on ID presence
+      if (effectiveCatId != null) {
         products = await ApiService.fetchProductsByCategory(
-          _selectedCategoryId!,
+          effectiveCatId,
           orderBy: _orderBy,
           order: _order,
           minPrice: _activeFilter.minPrice,
           maxPrice: _activeFilter.maxPrice,
         );
       } else {
-        // Otherwise global product listing
+        // Global fetch
         products = await ApiService.fetchProducts(
           orderBy: _orderBy,
           order: _order,
@@ -119,6 +129,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         );
       });
     } catch (e) {
+      debugPrint("Error loading data: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -132,7 +143,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SafeArea(
-          // Wrap in SafeArea to fix navigation bar overlap
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -198,7 +208,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          // We apply padding inside SafeArea to ensure content isn't hidden
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -286,6 +295,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                           setState(() {
                             _selectedCategoryId = null;
                             _selectedCategoryName = null;
+                            // Clear filter category too to avoid conflict
+                            _activeFilter.selectedCategoryIds.clear();
                           });
                           Navigator.pop(ctx);
                           _loadData();
@@ -332,6 +343,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                 setState(() {
                                   _selectedCategoryId = category.id;
                                   _selectedCategoryName = category.name;
+                                  // Clear filter category so this one takes precedence conceptually
+                                  _activeFilter.selectedCategoryIds.clear();
                                 });
                                 Navigator.pop(ctx);
                                 _loadData();
@@ -364,7 +377,14 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     if (result != null) {
       setState(() {
         _activeFilter = result;
-        _applySortFromFilter(); // ✅ THIS LINE FIXES THE WARNING
+        _applySortFromFilter();
+
+        // Optional: Sync simple category variable for UI consistency
+        if (_activeFilter.selectedCategoryIds.isNotEmpty) {
+          _selectedCategoryId = _activeFilter.selectedCategoryIds.first;
+          // We assume name is unknown here, or you could look it up
+          _selectedCategoryName = "Filtered";
+        }
       });
       _loadData();
     }
@@ -706,7 +726,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                   child: CircularProgressIndicator(color: accentColor),
                 )
               : GridView.builder(
-                  // Add extra padding at bottom so items aren't hidden behind the sticky bottom bar
                   padding: const EdgeInsets.fromLTRB(10, 10, 10, 100),
                   itemCount: _products.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -721,10 +740,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     return VerticalProductCard(
                       product: product,
                       availableCatalogues: catalogueController.catalogueNames,
-
-                      // selection state for highlight
                       isSelected: _selectedProductIds.contains(product.id),
-
                       onSelectionToggle: () {
                         setState(() {
                           if (_selectedProductIds.contains(product.id)) {
@@ -734,8 +750,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                           }
                         });
                       },
-
-                      // SINGLE PRODUCT CATALOGUE LOGIC
                       onCatalogueSelected:
                           (
                             ProductModel product,
@@ -765,7 +779,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                 ),
 
           // 2. BOTTOM TOOLBAR (Sort / Filter / Category)
-          // Only show this if NO bulk selection is active
           if (!hasSelection)
             Positioned(
               left: 0,
@@ -782,11 +795,10 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     ),
                   ],
                 ),
-                // Safe Area wraps the content so it sits above the Home indicator
                 child: SafeArea(
-                  top: false, // only care about bottom
+                  top: false,
                   child: Container(
-                    height: 56, // fixed height for consistency
+                    height: 56,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
@@ -899,7 +911,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
             ),
 
           // 3. STICKY BULK BAR
-          // Replaces the Sort/Filter bar when items are selected
           if (hasSelection)
             Positioned(
               left: 0,

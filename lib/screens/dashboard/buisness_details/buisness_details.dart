@@ -1,7 +1,8 @@
-// lib/buisness_details.dart
+// lib/business_details.dart
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -14,10 +15,7 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class BusinessDetailsPage extends StatefulWidget {
-  final UserData? userData; // optional
-
-  /// If true → opened from drawer (settings mode)
-  /// If false / null → opened from checkout flow
+  final UserData? userData;
   final bool fromDrawer;
 
   const BusinessDetailsPage({
@@ -32,78 +30,680 @@ class BusinessDetailsPage extends StatefulWidget {
 
 class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   final _formKey = GlobalKey<FormState>();
-
-  // local storage
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _storageKey = 'business_details';
 
   UserData? _currentUser;
 
+  // Text Controllers
   final TextEditingController _businessNameCtrl = TextEditingController();
   final TextEditingController _ownerNameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _whatsappCtrl = TextEditingController();
-
-  // Address controllers
   final TextEditingController _addressLine1Ctrl = TextEditingController();
   final TextEditingController _addressLine2Ctrl = TextEditingController();
-  final TextEditingController _cityCtrl = TextEditingController();
+  final TextEditingController _pincodeCtrl = TextEditingController();
+  final TextEditingController _gstinCtrl = TextEditingController();
+
+  // These controllers are now bound to the Autocomplete widgets
   final TextEditingController _stateCtrl = TextEditingController();
+  final TextEditingController _cityCtrl = TextEditingController();
   final TextEditingController _countryCtrl = TextEditingController(
     text: 'India',
   );
-  final TextEditingController _pincodeCtrl = TextEditingController();
-  final TextEditingController _gstinCtrl = TextEditingController();
 
   bool _isWhatsAppSame = true;
   bool _isSaving = false;
   bool _hasSavedDetails = false;
   bool _isRemoteLoading = false;
-
-  // 🔹 Ship to business address option
   bool _shipToBusinessAddress = false;
 
-  final List<String> _indianStates = const [
-    'Andhra Pradesh',
-    'Arunachal Pradesh',
-    'Assam',
-    'Bihar',
-    'Chhattisgarh',
-    'Goa',
-    'Gujarat',
-    'Haryana',
-    'Himachal Pradesh',
-    'Jharkhand',
-    'Karnataka',
-    'Kerala',
-    'Madhya Pradesh',
-    'Maharashtra',
-    'Manipur',
-    'Meghalaya',
-    'Mizoram',
-    'Nagaland',
-    'Odisha',
-    'Punjab',
-    'Rajasthan',
-    'Sikkim',
-    'Tamil Nadu',
-    'Telangana',
-    'Tripura',
-    'Uttar Pradesh',
-    'Uttarakhand',
-    'West Bengal',
-    'Andaman and Nicobar Islands',
-    'Chandigarh',
-    'Dadra and Nagar Haveli and Daman and Diu',
-    'Delhi',
-    'Jammu and Kashmir',
-    'Ladakh',
-    'Lakshadweep',
-    'Puducherry',
-  ];
-
   String? _selectedState;
+  String? _selectedCity;
+
+  // Keys to force rebuild Autocomplete widgets when data changes programmatically
+  Key _stateFieldKey = UniqueKey();
+  Key _cityFieldKey = UniqueKey();
+
+  // 🔹 DATA: Comprehensive State & City Mapping
+  final Map<String, List<String>> _stateCityMap = {
+    'Andaman and Nicobar Islands': [
+      'Port Blair',
+      'Diglipur',
+      'Mayabunder',
+      'Rangat',
+      'Bamboo Flat',
+      'Garacharma',
+    ],
+    'Andhra Pradesh': [
+      'Adoni',
+      'Amaravati',
+      'Anantapur',
+      'Bhimavaram',
+      'Chittoor',
+      'Dharmavaram',
+      'Eluru',
+      'Gudivada',
+      'Guntur',
+      'Hindupur',
+      'Kadapa',
+      'Kakinada',
+      'Kurnool',
+      'Machilipatnam',
+      'Madanapalle',
+      'Nandyal',
+      'Narasaraopet',
+      'Nellore',
+      'Ongole',
+      'Proddatur',
+      'Rajahmundry',
+      'Srikakulam',
+      'Tadepalligudem',
+      'Tenali',
+      'Tirupati',
+      'Vijayawada',
+      'Visakhapatnam',
+      'Vizianagaram',
+    ],
+    'Arunachal Pradesh': [
+      'Itanagar',
+      'Naharlagun',
+      'Pasighat',
+      'Tawang',
+      'Ziro',
+      'Bomdila',
+      'Aalo',
+      'Tezu',
+      'Roing',
+    ],
+    'Assam': [
+      'Barpeta',
+      'Bongaigaon',
+      'Dhubri',
+      'Dibrugarh',
+      'Diphu',
+      'Guwahati',
+      'Jorhat',
+      'Karimganj',
+      'Kokrajhar',
+      'Lanka',
+      'Lumding',
+      'Nagaon',
+      'Nalbari',
+      'North Lakhimpur',
+      'Sibsagar',
+      'Silchar',
+      'Tezpur',
+      'Tinsukia',
+    ],
+    'Bihar': [
+      'Arrah',
+      'Aurangabad',
+      'Begusarai',
+      'Bettiah',
+      'Bhagalpur',
+      'Bihar Sharif',
+      'Buxar',
+      'Chhapra',
+      'Darbhanga',
+      'Dehri',
+      'Gaya',
+      'Hajipur',
+      'Jamalpur',
+      'Katihar',
+      'Kishanganj',
+      'Madhubani',
+      'Motihari',
+      'Munger',
+      'Muzaffarpur',
+      'Patna',
+      'Purnia',
+      'Saharsa',
+      'Samastipur',
+      'Sasaram',
+      'Siwan',
+      'Sitamarhi',
+    ],
+    'Chandigarh': ['Chandigarh'],
+    'Chhattisgarh': [
+      'Ambikapur',
+      'Bhilai',
+      'Bilaspur',
+      'Chirmiri',
+      'Dhamtari',
+      'Durg',
+      'Jagdalpur',
+      'Korba',
+      'Raigarh',
+      'Raipur',
+      'Rajnandgaon',
+    ],
+    'Dadra and Nagar Haveli and Daman and Diu': [
+      'Daman',
+      'Diu',
+      'Silvassa',
+      'Dadra',
+    ],
+    'Delhi': [
+      'Delhi',
+      'New Delhi',
+      'North Delhi',
+      'South Delhi',
+      'East Delhi',
+      'West Delhi',
+      'Dwarka',
+      'Rohini',
+      'Saket',
+      'Vasant Kunj',
+      'Janakpuri',
+      'Laxmi Nagar',
+      'Karol Bagh',
+      'Connaught Place',
+    ],
+    'Goa': [
+      'Mapusa',
+      'Margao',
+      'Mormugao',
+      'Panaji',
+      'Ponda',
+      'Vasco da Gama',
+      'Bicholim',
+      'Curchorem',
+    ],
+    'Gujarat': [
+      'Ahmedabad',
+      'Amreli',
+      'Anand',
+      'Anjar',
+      'Bardoli',
+      'Bharuch',
+      'Bhavnagar',
+      'Bhuj',
+      'Botad',
+      'Dahod',
+      'Deesa',
+      'Gandhidham',
+      'Gandhinagar',
+      'Godhra',
+      'Gondal',
+      'Himmatnagar',
+      'Jamnagar',
+      'Jetpur',
+      'Junagadh',
+      'Kalol',
+      'Mahesana',
+      'Modasa',
+      'Morbi',
+      'Nadiad',
+      'Navsari',
+      'Palanpur',
+      'Patan',
+      'Porbandar',
+      'Rajkot',
+      'Surat',
+      'Surendranagar',
+      'Vadodara',
+      'Valsad',
+      'Vapi',
+      'Veraval',
+    ],
+    'Haryana': [
+      'Ambala',
+      'Bahadurgarh',
+      'Bhiwani',
+      'Charkhi Dadri',
+      'Faridabad',
+      'Fatehabad',
+      'Gurugram',
+      'Hansi',
+      'Hisar',
+      'Jind',
+      'Kaithal',
+      'Karnal',
+      'Kurukshetra',
+      'Narnaul',
+      'Narwana',
+      'Palwal',
+      'Panchkula',
+      'Panipat',
+      'Rewari',
+      'Rohtak',
+      'Sirsa',
+      'Sonipat',
+      'Thanesar',
+      'Tohana',
+      'Yamunanagar',
+    ],
+    'Himachal Pradesh': [
+      'Baddi',
+      'Bilaspur',
+      'Chamba',
+      'Dharamshala',
+      'Hamirpur',
+      'Kullu',
+      'Mandi',
+      'Nahan',
+      'Paonta Sahib',
+      'Shimla',
+      'Solan',
+      'Sundarnagar',
+      'Una',
+    ],
+    'Jammu and Kashmir': [
+      'Anantnag',
+      'Baramulla',
+      'Jammu',
+      'Kathua',
+      'Pulwama',
+      'Sopore',
+      'Srinagar',
+      'Udhampur',
+    ],
+    'Jharkhand': [
+      'Adityapur',
+      'Bokaro',
+      'Chaibasa',
+      'Deoghar',
+      'Dhanbad',
+      'Dumka',
+      'Giridih',
+      'Hazaribagh',
+      'Jamshedpur',
+      'Jhumri Tilaiya',
+      'Mango',
+      'Medininagar',
+      'Phusro',
+      'Ramgarh',
+      'Ranchi',
+      'Sahibganj',
+    ],
+    'Karnataka': [
+      'Bagalkot',
+      'Belagavi',
+      'Ballari',
+      'Bengaluru',
+      'Bidar',
+      'Chikkamagaluru',
+      'Chitradurga',
+      'Davangere',
+      'Dharwad',
+      'Gadag',
+      'Gangavathi',
+      'Hassan',
+      'Hospet',
+      'Hubballi',
+      'Kalaburagi',
+      'Kolar',
+      'Mandya',
+      'Mangaluru',
+      'Mysuru',
+      'Raichur',
+      'Ranebennur',
+      'Robertson Pet',
+      'Shivamogga',
+      'Tumakuru',
+      'Udupi',
+      'Vijayapura',
+    ],
+    'Kerala': [
+      'Alappuzha',
+      'Changanassery',
+      'Cherthala',
+      'Guruvayur',
+      'Kannur',
+      'Kasaragod',
+      'Kayamkulam',
+      'Kochi',
+      'Kollam',
+      'Kottayam',
+      'Kozhikode',
+      'Kunnamkulam',
+      'Malappuram',
+      'Manjeri',
+      'Nedumangad',
+      'Neyyattinkara',
+      'Palakkad',
+      'Payyanur',
+      'Ponnani',
+      'Taliparamba',
+      'Thalassery',
+      'Thiruvananthapuram',
+      'Thrippunithura',
+      'Thrissur',
+      'Tirur',
+      'Vadakara',
+    ],
+    'Ladakh': ['Leh', 'Kargil'],
+    'Lakshadweep': ['Kavaratti', 'Minicoy', 'Andrott'],
+    'Madhya Pradesh': [
+      'Ashoknagar',
+      'Balaghat',
+      'Betul',
+      'Bhind',
+      'Bhopal',
+      'Burhanpur',
+      'Chhatarpur',
+      'Chhindwara',
+      'Damoh',
+      'Datia',
+      'Dewas',
+      'Dhar',
+      'Guna',
+      'Gwalior',
+      'Hoshangabad',
+      'Indore',
+      'Itarsi',
+      'Jabalpur',
+      'Khandwa',
+      'Khargone',
+      'Mandsaur',
+      'Morena',
+      'Murwara',
+      'Nagda',
+      'Neemuch',
+      'Pithampur',
+      'Ratlam',
+      'Rewa',
+      'Sagar',
+      'Satna',
+      'Sehore',
+      'Seoni',
+      'Shahdol',
+      'Shivpuri',
+      'Singrauli',
+      'Ujjain',
+      'Vidisha',
+    ],
+    'Maharashtra': [
+      'Ahmednagar',
+      'Akola',
+      'Amravati',
+      'Aurangabad',
+      'Badlapur',
+      'Barshi',
+      'Bhiwandi',
+      'Bhusawal',
+      'Chandrapur',
+      'Dhule',
+      'Gondia',
+      'Ichalkaranji',
+      'Jalgaon',
+      'Jalna',
+      'Kalyan-Dombivli',
+      'Kolhapur',
+      'Latur',
+      'Malegaon',
+      'Mira-Bhayandar',
+      'Mumbai',
+      'Nagpur',
+      'Nanded',
+      'Nashik',
+      'Navi Mumbai',
+      'Osmanabad',
+      'Panvel',
+      'Parbhani',
+      'Pune',
+      'Sangli',
+      'Satara',
+      'Solapur',
+      'Thane',
+      'Ulhasnagar',
+      'Vasai-Virar',
+      'Wardha',
+      'Yavatmal',
+    ],
+    'Manipur': ['Imphal', 'Thoubal', 'Kakching', 'Ukhrul'],
+    'Meghalaya': ['Shillong', 'Tura', 'Jowai', 'Nongstoin'],
+    'Mizoram': ['Aizawl', 'Lunglei', 'Saiha', 'Champhai'],
+    'Nagaland': [
+      'Dimapur',
+      'Kohima',
+      'Mokokchung',
+      'Tuensang',
+      'Wokha',
+      'Zunheboto',
+    ],
+    'Odisha': [
+      'Balangir',
+      'Balasore',
+      'Baripada',
+      'Bhadrak',
+      'Berhampur',
+      'Bhubaneswar',
+      'Brajrajnagar',
+      'Cuttack',
+      'Jharsuguda',
+      'Jeypore',
+      'Puri',
+      'Rourkela',
+      'Sambalpur',
+    ],
+    'Puducherry': ['Karaikal', 'Mahe', 'Puducherry', 'Yanam', 'Ozhukarai'],
+    'Punjab': [
+      'Abohar',
+      'Amritsar',
+      'Barnala',
+      'Batala',
+      'Bathinda',
+      'Firozpur',
+      'Hoshiarpur',
+      'Jalandhar',
+      'Kapurthala',
+      'Khanna',
+      'Ludhiana',
+      'Malerkotla',
+      'Moga',
+      'Mohali',
+      'Muktsar',
+      'Pathankot',
+      'Patiala',
+      'Phagwara',
+      'Rajpura',
+    ],
+    'Rajasthan': [
+      'Ajmer',
+      'Alwar',
+      'Barmer',
+      'Beawar',
+      'Bharatpur',
+      'Bhilwara',
+      'Bhiwadi',
+      'Bikaner',
+      'Bundi',
+      'Chittorgarh',
+      'Churu',
+      'Dausa',
+      'Dholpur',
+      'Ganganagar',
+      'Hanumangarh',
+      'Hindaun',
+      'Jaipur',
+      'Jaisalmer',
+      'Jhunjhunu',
+      'Jodhpur',
+      'Kishangarh',
+      'Kota',
+      'Nagaur',
+      'Pali',
+      'Sawai Madhopur',
+      'Sikar',
+      'Sirohi',
+      'Tonk',
+      'Udaipur',
+    ],
+    'Sikkim': ['Gangtok', 'Namchi', 'Gyalshing', 'Mangan'],
+    'Tamil Nadu': [
+      'Ambur',
+      'Avadi',
+      'Chennai',
+      'Coimbatore',
+      'Cuddalore',
+      'Dindigul',
+      'Erode',
+      'Hosur',
+      'Kanchipuram',
+      'Karaikudi',
+      'Karur',
+      'Kumbakonam',
+      'Madurai',
+      'Nagercoil',
+      'Neyveli',
+      'Pallavaram',
+      'Pudukkottai',
+      'Rajapalayam',
+      'Salem',
+      'Tambaram',
+      'Thanjavur',
+      'Thoothukudi',
+      'Tiruchirappalli',
+      'Tirunelveli',
+      'Tiruppur',
+      'Tiruvannamalai',
+      'Vellore',
+    ],
+    'Telangana': [
+      'Adilabad',
+      'Hyderabad',
+      'Jagtial',
+      'Karimnagar',
+      'Khammam',
+      'Mahbubnagar',
+      'Mancherial',
+      'Miryalaguda',
+      'Nalgonda',
+      'Nizamabad',
+      'Ramagundam',
+      'Secunderabad',
+      'Siddipet',
+      'Suryapet',
+      'Warangal',
+    ],
+    'Tripura': ['Agartala', 'Dharmanagar', 'Kailasahar', 'Udaipur', 'Ambassa'],
+    'Uttar Pradesh': [
+      'Agra',
+      'Aligarh',
+      'Allahabad',
+      'Amroha',
+      'Ayodhya',
+      'Azamgarh',
+      'Bahraich',
+      'Ballia',
+      'Banda',
+      'Bareilly',
+      'Basti',
+      'Budaun',
+      'Bulandshahr',
+      'Chandausi',
+      'Deoria',
+      'Etah',
+      'Etawah',
+      'Faizabad',
+      'Farrukhabad',
+      'Fatehpur',
+      'Firozabad',
+      'Ghaziabad',
+      'Ghazipur',
+      'Gonda',
+      'Gorakhpur',
+      'Hapur',
+      'Hardoi',
+      'Hathras',
+      'Jaunpur',
+      'Jhansi',
+      'Kanpur',
+      'Kasganj',
+      'Khoshambi',
+      'Lakhimpur',
+      'Lalitpur',
+      'Lucknow',
+      'Mainpuri',
+      'Mathura',
+      'Maunath Bhanjan',
+      'Meerut',
+      'Mirzapur',
+      'Modinagar',
+      'Moradabad',
+      'Muzaffarnagar',
+      'Noida',
+      'Orai',
+      'Pilibhit',
+      'Prayagraj',
+      'Rae Bareli',
+      'Rampur',
+      'Saharanpur',
+      'Sambhal',
+      'Shahjahanpur',
+      'Shamli',
+      'Sitapur',
+      'Sultanpur',
+      'Unnao',
+      'Varanasi',
+    ],
+    'Uttarakhand': [
+      'Dehradun',
+      'Haldwani',
+      'Haridwar',
+      'Kashipur',
+      'Roorkee',
+      'Rudrapur',
+      'Rishikesh',
+      'Nainital',
+    ],
+    'West Bengal': [
+      'Alipurduar',
+      'Asansol',
+      'Baharampur',
+      'Bally',
+      'Balurghat',
+      'Bankura',
+      'Baranagar',
+      'Barasat',
+      'Bardhaman',
+      'Basirhat',
+      'Bhatpara',
+      'Bidhannagar',
+      'Bongaon',
+      'Chandannagar',
+      'Darjeeling',
+      'Durgapur',
+      'Haldia',
+      'Howrah',
+      'Jalpaiguri',
+      'Kamarhati',
+      'Kharagpur',
+      'Kolkata',
+      'Krishnanagar',
+      'Madhyamgram',
+      'Maheshtala',
+      'Malda',
+      'Medinipur',
+      'Naihati',
+      'North Dumdum',
+      'Panihati',
+      'Purulia',
+      'Raiganj',
+      'Rajarhat',
+      'Rajpur Sonarpur',
+      'Ranaghat',
+      'Serampore',
+      'Siliguri',
+      'South Dumdum',
+      'Titagarh',
+      'Uluberia',
+    ],
+  };
+
+  List<String> get _indianStates => _stateCityMap.keys.toList()..sort();
+
+  List<String> get _availableCities {
+    if (_selectedState != null && _stateCityMap.containsKey(_selectedState)) {
+      final cities = List<String>.from(_stateCityMap[_selectedState]!);
+      cities.sort();
+      return cities;
+    }
+    return [];
+  }
 
   @override
   void initState() {
@@ -123,11 +723,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       _currentUser = widget.userData;
       return;
     }
-    try {
-      // if (Get.isRegistered<UserController>()) _currentUser = Get.find<UserController>().user;
-    } catch (e) {
-      debugPrint("Could not auto-fetch user: $e");
-    }
   }
 
   Future<void> _loadSavedDetails() async {
@@ -138,9 +733,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       if (!mounted) return;
 
       final String savedState = (data['state'] as String?)?.trim() ?? '';
-
-      final String savedLine1 = (data['addressLine1'] as String?)?.trim() ?? '';
-      final String savedLine2 = (data['addressLine2'] as String?)?.trim() ?? '';
+      final String savedCity = (data['city'] as String?)?.trim() ?? '';
 
       setState(() {
         _businessNameCtrl.text = data['businessName'] ?? _businessNameCtrl.text;
@@ -148,18 +741,30 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _phoneCtrl.text = data['phone'] ?? '';
         _whatsappCtrl.text = data['whatsapp'] ?? '';
         _emailCtrl.text = data['email'] ?? _emailCtrl.text;
+        _addressLine1Ctrl.text =
+            (data['addressLine1'] as String?)?.trim() ?? '';
+        _addressLine2Ctrl.text =
+            (data['addressLine2'] as String?)?.trim() ?? '';
 
-        _addressLine1Ctrl.text = savedLine1;
-        _addressLine2Ctrl.text = savedLine2;
-
-        _cityCtrl.text = data['city'] ?? '';
-
-        if (savedState.isNotEmpty && _indianStates.contains(savedState)) {
+        if (savedState.isNotEmpty && _stateCityMap.containsKey(savedState)) {
           _selectedState = savedState;
         } else {
           _selectedState = null;
         }
         _stateCtrl.text = _selectedState ?? savedState;
+        // Key change forces rebuild of widget with new initialValue
+        _stateFieldKey = UniqueKey();
+
+        if (_selectedState != null &&
+            _stateCityMap[_selectedState]!.contains(savedCity)) {
+          _selectedCity = savedCity;
+        } else {
+          _selectedCity = null;
+        }
+        _cityCtrl.text = _selectedCity ?? savedCity;
+        // Key change forces rebuild of widget with new initialValue
+        _cityFieldKey = UniqueKey();
+
         _pincodeCtrl.text = data['pincode'] ?? '';
         _gstinCtrl.text = data['gstin'] ?? '';
 
@@ -183,12 +788,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       if (remoteData == null || !mounted) return;
 
       final String remoteState = (remoteData['state'] as String?)?.trim() ?? '';
-
-      // These keys now come from the updated fetch logic which checks reseller meta first
-      final String remoteLine1 =
-          (remoteData['addressLine1'] as String?)?.trim() ?? '';
-      final String remoteLine2 =
-          (remoteData['addressLine2'] as String?)?.trim() ?? '';
+      final String remoteCity = (remoteData['city'] as String?)?.trim() ?? '';
 
       setState(() {
         _businessNameCtrl.text =
@@ -197,21 +797,28 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _phoneCtrl.text = remoteData['phone'] ?? _phoneCtrl.text;
         _whatsappCtrl.text = remoteData['whatsapp'] ?? _whatsappCtrl.text;
         _emailCtrl.text = remoteData['email'] ?? _emailCtrl.text;
+        _addressLine1Ctrl.text =
+            (remoteData['addressLine1'] as String?)?.trim() ?? '';
+        _addressLine2Ctrl.text =
+            (remoteData['addressLine2'] as String?)?.trim() ?? '';
 
-        _addressLine1Ctrl.text = remoteLine1;
-        _addressLine2Ctrl.text = remoteLine2;
-
-        _cityCtrl.text = remoteData['city'] ?? _cityCtrl.text;
-
-        if (remoteState.isNotEmpty && _indianStates.contains(remoteState)) {
+        if (remoteState.isNotEmpty && _stateCityMap.containsKey(remoteState)) {
           _selectedState = remoteState;
-        } else if (_stateCtrl.text.isNotEmpty &&
-            _indianStates.contains(_stateCtrl.text.trim())) {
-          _selectedState = _stateCtrl.text.trim();
-        } else {
+        } else if (_selectedState == null) {
           _selectedState = null;
         }
         _stateCtrl.text = _selectedState ?? remoteState;
+        _stateFieldKey = UniqueKey(); // Refresh State Autocomplete
+
+        if (_selectedState != null &&
+            _stateCityMap[_selectedState]!.contains(remoteCity)) {
+          _selectedCity = remoteCity;
+        } else {
+          _selectedCity = null;
+        }
+        _cityCtrl.text = _selectedCity ?? remoteCity;
+        _cityFieldKey = UniqueKey(); // Refresh City Autocomplete
+
         _pincodeCtrl.text = remoteData['pincode'] ?? _pincodeCtrl.text;
         _gstinCtrl.text = remoteData['gstin'] ?? _gstinCtrl.text;
 
@@ -219,7 +826,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
             _whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text;
         _hasSavedDetails = true;
       });
-
       await _storage.write(key: _storageKey, value: jsonEncode(remoteData));
     } catch (e) {
       debugPrint('Failed to fetch remote business details: $e');
@@ -247,10 +853,21 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
   Future<void> _onSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // STRICT VALIDATION
     if (_selectedState == null || _selectedState!.trim().isEmpty) {
       Get.snackbar(
-        'State required',
+        'State Required',
         'Please select your state.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    if (_selectedCity == null || _selectedCity!.trim().isEmpty) {
+      Get.snackbar(
+        'City Required',
+        'Please select your city.',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -258,6 +875,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     }
 
     _stateCtrl.text = _selectedState!;
+    _cityCtrl.text = _selectedCity!;
+
     setState(() => _isSaving = true);
 
     final String line1 = _addressLine1Ctrl.text.trim();
@@ -277,10 +896,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           : _whatsappCtrl.text.trim(),
       "email": _emailCtrl.text.trim(),
       "address": combinedAddress,
-      "addressLine1": line1, // Will update 'reseller_store_address'
-      "addressLine2": line2, // Will update 'reseller_store_locality'
-      "city": _cityCtrl.text.trim(),
-      "state": _selectedState ?? _stateCtrl.text.trim(),
+      "addressLine1": line1,
+      "addressLine2": line2,
+      "city": _selectedCity,
+      "state": _selectedState,
       "country": 'India',
       "pincode": _pincodeCtrl.text.trim(),
       "gstin": _gstinCtrl.text.trim(),
@@ -289,7 +908,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     try {
       await _storage.write(key: _storageKey, value: jsonEncode(payload));
       if (_currentUser?.userId != null) {
-        // This single call now updates BOTH Billing and Reseller Meta
         await ApiService.updateBusinessDetails(
           userId: _currentUser!.userId,
           data: payload,
@@ -327,7 +945,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         _ownerNameCtrl.text.trim().isNotEmpty &&
         _phoneCtrl.text.trim().isNotEmpty &&
         _addressLine1Ctrl.text.trim().isNotEmpty &&
-        _cityCtrl.text.trim().isNotEmpty &&
+        (_selectedCity != null && _selectedCity!.trim().isNotEmpty) &&
         (_selectedState != null && _selectedState!.trim().isNotEmpty) &&
         _pincodeCtrl.text.trim().isNotEmpty;
 
@@ -338,8 +956,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
     final line1 = _addressLine1Ctrl.text.trim();
     final line2 = _addressLine2Ctrl.text.trim();
-    final city = _cityCtrl.text.trim();
-    final state = (_selectedState ?? _stateCtrl.text).trim();
+    final city = _selectedCity!.trim();
+    final state = _selectedState!.trim();
     final pin = _pincodeCtrl.text.trim();
 
     String fullFormattedAddress = [
@@ -401,7 +1019,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'To proceed with your order, you must first add your business details.\n\nPlease navigate to the Profile Page manually to add them.',
+                'To proceed with your order, you must first add your business details (City, State, Pincode).',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -437,6 +1055,97 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         ),
       ),
       barrierDismissible: true,
+    );
+  }
+
+  // Helper widget to build Searchable Dropdowns (Autocomplete)
+  Widget _buildSearchableDropdown({
+    Key? key,
+    required String label,
+    required String? currentValue,
+    required List<String> options,
+    required Function(String) onSelected,
+    required String? Function(String?) validator,
+    required IconData icon,
+    bool enabled = true,
+  }) {
+    return RawAutocomplete<String>(
+      key: key,
+      initialValue: TextEditingValue(text: currentValue ?? ''),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text == '') {
+          return const Iterable<String>.empty();
+        }
+        return options.where((String option) {
+          return option.toLowerCase().contains(
+            textEditingValue.text.toLowerCase(),
+          );
+        });
+      },
+      onSelected: onSelected,
+      fieldViewBuilder:
+          (context, textEditingController, focusNode, onFieldSubmitted) {
+            // Important: Keep the main controller in sync so we can read from it later
+            if (currentValue != null &&
+                textEditingController.text.isEmpty &&
+                focusNode.hasFocus == false) {
+              textEditingController.text = currentValue;
+            }
+            return TextFormField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              enabled: enabled,
+              decoration: InputDecoration(
+                labelText: label,
+                prefixIcon: Icon(icon, size: 18),
+                suffixIcon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: Colors.grey,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+                hintText: 'Search $label',
+                filled: !enabled,
+                fillColor: !enabled ? Colors.grey.withValues(alpha: 0.1) : null,
+              ),
+              validator: validator,
+            );
+          },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4.0,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: MediaQuery.of(context).size.width - 64, // Matches padding
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final String option = options.elementAt(index);
+                  return ListTile(
+                    title: Text(
+                      option,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                      ),
+                    ),
+                    onTap: () {
+                      onSelected(option);
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -546,6 +1255,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     hint: '10-digit mobile',
                                     icon: Iconsax.call,
                                     keyboardType: TextInputType.phone,
+                                    inputFormatters: [
+                                      LengthLimitingTextInputFormatter(10),
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
                                     validator: (v) => v!.trim().length < 10
                                         ? 'Invalid phone'
                                         : null,
@@ -586,6 +1299,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                       hint: 'WhatsApp contact',
                                       icon: Iconsax.sms,
                                       keyboardType: TextInputType.phone,
+                                      inputFormatters: [
+                                        LengthLimitingTextInputFormatter(10),
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
                                       validator: (v) =>
                                           !_isWhatsAppSame && v!.trim().isEmpty
                                           ? 'Required'
@@ -627,63 +1344,62 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     icon: Iconsax.location,
                                   ),
                                   const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _buildTextField(
-                                          controller: _cityCtrl,
-                                          label: 'City',
-                                          hint: 'Eg. Rajkot',
-                                          icon: Iconsax.location5,
-                                          validator: (v) => v!.trim().isEmpty
-                                              ? 'Required'
-                                              : null,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: DropdownButtonFormField<String>(
-                                          value: _selectedState,
-                                          isExpanded: true,
-                                          items: _indianStates
-                                              .map(
-                                                (s) => DropdownMenuItem(
-                                                  value: s,
-                                                  child: Text(
-                                                    s,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontFamily: 'Poppins',
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                              .toList(),
-                                          onChanged: (val) => setState(() {
-                                            _selectedState = val;
-                                            _stateCtrl.text = val ?? '';
-                                          }),
-                                          decoration: InputDecoration(
-                                            labelText: 'State',
-                                            prefixIcon: const Icon(
-                                              Iconsax.map,
-                                              size: 18,
-                                            ),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                            isDense: true,
-                                          ),
-                                          validator: (v) =>
-                                              v == null ? 'Required' : null,
-                                        ),
-                                      ),
-                                    ],
+
+                                  // 1. STATE SEARCHABLE DROPDOWN
+                                  _buildSearchableDropdown(
+                                    key: _stateFieldKey,
+                                    label: 'State',
+                                    icon: Iconsax.map,
+                                    currentValue: _selectedState,
+                                    options: _indianStates,
+                                    onSelected: (String selection) {
+                                      setState(() {
+                                        _selectedState = selection;
+                                        _stateCtrl.text = selection;
+                                        // Clear City when state changes
+                                        _selectedCity = null;
+                                        _cityCtrl.clear();
+                                        // Force rebuild of City widget to reflect empty state
+                                        _cityFieldKey = UniqueKey();
+                                      });
+                                    },
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty)
+                                        return 'Required';
+                                      if (!_indianStates.contains(value))
+                                        return 'Select valid state';
+                                      return null;
+                                    },
                                   ),
+
                                   const SizedBox(height: 12),
+
+                                  // 2. CITY SEARCHABLE DROPDOWN
+                                  _buildSearchableDropdown(
+                                    key: _cityFieldKey,
+                                    label: 'City',
+                                    icon: Iconsax.location5,
+                                    currentValue: _selectedCity,
+                                    enabled: _selectedState != null,
+                                    options: _availableCities,
+                                    onSelected: (String selection) {
+                                      setState(() {
+                                        _selectedCity = selection;
+                                        _cityCtrl.text = selection;
+                                      });
+                                    },
+                                    validator: (value) {
+                                      if (_selectedState == null) return null;
+                                      if (value == null || value.isEmpty)
+                                        return 'Required';
+                                      if (!_availableCities.contains(value))
+                                        return 'Select valid city';
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 12),
+
                                   Row(
                                     children: [
                                       Expanded(
@@ -712,9 +1428,23 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                           hint: 'Eg. 360001',
                                           icon: Iconsax.location_tick,
                                           keyboardType: TextInputType.number,
-                                          validator: (v) => v!.trim().length < 6
-                                              ? 'Invalid'
-                                              : null,
+                                          inputFormatters: [
+                                            LengthLimitingTextInputFormatter(6),
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                          validator: (v) {
+                                            if (v == null || v.trim().isEmpty)
+                                              return 'Required';
+                                            // STRICT REGEX: Exactly 6 digits, CANNOT start with 0
+                                            final regex = RegExp(
+                                              r'^[1-9][0-9]{5}$',
+                                            );
+                                            if (!regex.hasMatch(v.trim())) {
+                                              return 'Invalid Pincode';
+                                            }
+                                            return null;
+                                          },
                                         ),
                                       ),
                                     ],
@@ -875,7 +1605,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     final line1 = _addressLine1Ctrl.text.trim();
     final line2 = _addressLine2Ctrl.text.trim();
     final city = _cityCtrl.text.trim();
-    final state = (_selectedState ?? _stateCtrl.text).trim();
+    final state = _selectedState ?? _stateCtrl.text.trim();
     final pin = _pincodeCtrl.text.trim();
     String addressLine = [
       line1,
@@ -1138,6 +1868,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     int maxLines = 1,
     void Function(String)? onChanged,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
@@ -1146,6 +1877,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       maxLines: maxLines,
       onChanged: onChanged,
       textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
