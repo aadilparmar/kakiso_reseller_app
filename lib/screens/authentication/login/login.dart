@@ -279,7 +279,7 @@ class _LoginPageState extends State<LoginPage>
                           TextFormField(
                             controller: _emailController,
                             decoration: _inputDecoration(
-                              label: 'Email Id / Mobile Number',
+                              label: 'Email Id',
                               icon: Iconsax.sms,
                             ),
                             keyboardType: TextInputType.emailAddress,

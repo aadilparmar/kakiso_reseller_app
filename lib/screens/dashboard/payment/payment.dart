@@ -708,13 +708,34 @@ class _PaymentPageState extends State<PaymentPage> {
             };
           }
 
-          // ---------- 3. Build Woo line items (CLEAN: No Meta Data) ----------
-          // We only send ID and Quantity to WooCommerce as requested.
+          // ---------- 3. Build Woo line items (WITH META DATA FOR HSN/GST) ----------
+          // 🔹 FIX: Added meta_data here so WooCommerce receives the HSN/GST
           final List<Map<String, dynamic>> lineItems = _cartController.cartItems
               .map<Map<String, dynamic>>((item) {
+                final String hsn =
+                    (item.product.hsnCode != null &&
+                        item.product.hsnCode!.isNotEmpty)
+                    ? item.product.hsnCode!
+                    : '';
+
+                final String gst =
+                    (item.product.gst != null && item.product.gst!.isNotEmpty)
+                    ? item.product.gst!
+                    : '';
+
                 return {
                   'product_id': item.product.id,
                   'quantity': item.quantity,
+                  'meta_data': [
+                    if (hsn.isNotEmpty) {'key': 'hsn_code', 'value': hsn},
+                    if (hsn.isNotEmpty)
+                      {
+                        'key': 'HSN',
+                        'value': hsn,
+                      }, // Sending as both keys just in case
+                    if (gst.isNotEmpty) {'key': 'gst_rate', 'value': gst},
+                    if (gst.isNotEmpty) {'key': 'GST', 'value': '$gst%'},
+                  ],
                 };
               })
               .toList();
@@ -756,10 +777,10 @@ class _PaymentPageState extends State<PaymentPage> {
 
           final String wooOrderId = (wooOrder['id'] ?? '').toString();
 
-          // ---------- 6. CAPTURE HSN & GST FOR LOCAL ORDER ONLY ----------
-          // This ensures your app sees it, but WooCommerce doesn't get cluttered.
+          // ---------- 6. CAPTURE HSN & GST FOR LOCAL ORDER ----------
           final List<OrderItemSnapshot> orderItems = _cartController.cartItems
               .map((item) {
+                // 🔹 FIX: Ensure we fall back to sensible defaults if null
                 final String hsn =
                     (item.product.hsnCode != null &&
                         item.product.hsnCode!.isNotEmpty)
@@ -774,15 +795,15 @@ class _PaymentPageState extends State<PaymentPage> {
                 return OrderItemSnapshot(
                   productId: item.product.id.toString(),
                   name: item.product.name,
-                  hsnCode: hsn, // <--- Captured for local app
-                  gstRate: gst, // <--- Captured for local app
+                  hsnCode: hsn, // Capturing here
+                  gstRate: gst, // Capturing here
                   unitPrice: double.tryParse(item.product.price) ?? 0.0,
                   quantity: item.quantity,
                 );
               })
               .toList();
 
-          // ---------- 7. Create Local Order ----------
+          // ---------- 7. Local order creation ----------
           final order = Order(
             id: wooOrderId.isNotEmpty
                 ? wooOrderId
@@ -797,7 +818,7 @@ class _PaymentPageState extends State<PaymentPage> {
             userName: billingFirstName,
             isPaid: true,
             status: OrderStatus.confirmed,
-            items: orderItems, // Passes the items with HSN/GST
+            items: orderItems,
           );
 
           orderController.addOrder(order);
