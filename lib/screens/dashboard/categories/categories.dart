@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 import 'package:showcaseview/showcaseview.dart';
 
 // --- MODELS & SERVICES ---
@@ -146,92 +146,94 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
     final textScaler = MediaQuery.textScalerOf(context);
     final level2Categories = _getChildren(_selectedParentId);
 
-    return Scaffold(
-      backgroundColor: _bgLeft,
-      drawer: HomeDrawer(
-        userData: widget.userData,
-        selectedTitle: 'Categories',
-        onNavigate: (id) {},
-        onLogoutPressed: () {},
-      ),
-      appBar: _buildModernAppBar(),
-      body: isCategoriesLoading
-          ? const Center(child: CircularProgressIndicator(color: accentColor))
-          : errorMessage != null
-          ? _buildErrorState()
-          : SafeArea(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // LEFT RAIL (Level 1)
-                  _buildLeftRail(textScaler),
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
+        backgroundColor: _bgLeft,
+        drawer: HomeDrawer(
+          userData: widget.userData,
+          selectedTitle: 'Categories',
+          onNavigate: (id) {},
+          onLogoutPressed: () {},
+        ),
+        appBar: _buildModernAppBar(),
+        body: isCategoriesLoading
+            ? const Center(child: CircularProgressIndicator(color: accentColor))
+            : errorMessage != null
+            ? _buildErrorState()
+            : SafeArea(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // LEFT RAIL (Level 1)
+                    _buildLeftRail(textScaler),
 
-                  // RIGHT CONTENT (Level 2 & 3)
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _bgRight,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(-4, 0),
-                          ),
-                        ],
-                      ),
-                      child: RefreshIndicator(
-                        color: accentColor,
-                        onRefresh: _loadCategories,
-                        child: CustomScrollView(
-                          controller: _rightScrollController,
-                          physics: const BouncingScrollPhysics(),
-                          slivers: [
-                            // Title of Level 1 (Top Header)
-                            _buildTitleSliver(),
+                    // RIGHT CONTENT (Level 2 & 3)
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _bgRight,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(-4, 0),
+                            ),
+                          ],
+                        ),
+                        child: RefreshIndicator(
+                          color: accentColor,
+                          onRefresh: _loadCategories,
+                          child: CustomScrollView(
+                            controller: _rightScrollController,
+                            physics: const BouncingScrollPhysics(),
+                            slivers: [
+                              // Title of Level 1 (Top Header)
+                              _buildTitleSliver(),
 
-                            if (level2Categories.isEmpty)
-                              SliverFillRemaining(
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Iconsax.folder_open,
-                                        size: 40,
-                                        color: Colors.grey.shade300,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        "No sub-categories found.",
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
+                              if (level2Categories.isEmpty)
+                                SliverFillRemaining(
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Iconsax.folder_open,
+                                          size: 40,
+                                          color: Colors.grey.shade300,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          "No sub-categories found.",
+                                          style: TextStyle(
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                SliverPadding(
+                                  padding: const EdgeInsets.only(bottom: 50),
+                                  sliver: SliverList(
+                                    delegate: SliverChildBuilderDelegate((
+                                      context,
+                                      index,
+                                    ) {
+                                      final level2Cat = level2Categories[index];
+                                      return _buildLevel2Section(level2Cat);
+                                    }, childCount: level2Categories.length),
                                   ),
                                 ),
-                              )
-                            else
-                              SliverPadding(
-                                padding: const EdgeInsets.only(bottom: 50),
-                                sliver: SliverList(
-                                  delegate: SliverChildBuilderDelegate((
-                                    context,
-                                    index,
-                                  ) {
-                                    final level2Cat = level2Categories[index];
-                                    return _buildLevel2Section(level2Cat);
-                                  }, childCount: level2Categories.length),
-                                ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

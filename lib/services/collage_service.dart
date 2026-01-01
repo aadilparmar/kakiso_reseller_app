@@ -425,7 +425,7 @@ class CollageService {
           ..strokeWidth = 6,
       );
 
-      if (showPrices)
+      if (showPrices) {
         _drawPriceTag(
           canvas,
           _getPrice(items[i], margin),
@@ -433,6 +433,7 @@ class CollageService {
           rect.bottom - 10,
           theme,
         );
+      }
     }
   }
 
@@ -458,7 +459,7 @@ class CollageService {
         ..style = ui.PaintingStyle.stroke
         ..strokeWidth = 10,
     );
-    if (showPrices)
+    if (showPrices) {
       _drawPriceTag(
         canvas,
         _getPrice(items[0], margin),
@@ -467,6 +468,7 @@ class CollageService {
         theme,
         scale: 1.5,
       );
+    }
 
     double gridY = startY + heroH + 40;
     double cellW = (w - 60) / 2;
@@ -483,7 +485,7 @@ class CollageService {
           ..style = ui.PaintingStyle.stroke
           ..strokeWidth = 6,
       );
-      if (showPrices)
+      if (showPrices) {
         _drawPriceTag(
           canvas,
           _getPrice(items[i], margin),
@@ -491,6 +493,7 @@ class CollageService {
           rect.bottom - 10,
           theme,
         );
+      }
     }
   }
 
@@ -509,7 +512,7 @@ class CollageService {
     double heroW = w * 0.65;
     ui.Rect heroRect = ui.Rect.fromLTWH(20, startY + 20, heroW - 30, h - 40);
     _drawImageCover(canvas, images[0], heroRect);
-    if (showPrices)
+    if (showPrices) {
       _drawPriceTag(
         canvas,
         _getPrice(items[0], margin),
@@ -518,6 +521,7 @@ class CollageService {
         theme,
         scale: 1.2,
       );
+    }
 
     double sideW = w - heroW - 40;
     int sideCount = images.length - 1;
@@ -531,7 +535,7 @@ class CollageService {
           sideH - 10,
         );
         _drawImageCover(canvas, images[i], rect);
-        if (showPrices)
+        if (showPrices) {
           _drawPriceTag(
             canvas,
             _getPrice(items[i], margin),
@@ -539,6 +543,7 @@ class CollageService {
             rect.bottom - 5,
             theme,
           );
+        }
       }
     }
   }

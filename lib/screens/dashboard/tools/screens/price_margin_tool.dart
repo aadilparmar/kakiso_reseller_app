@@ -59,7 +59,7 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
   double _targetGoal = 5000.0; // Default goal: Earn 5k
 
   // Fees Configuration
-  double _shippingCost = 100.0;
+  final double _shippingCost = 100.0;
   bool _resellerAbsorbsShipping = false;
   bool _isSharing = false;
 
@@ -529,10 +529,11 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
                     onTap: () {
                       setState(() {
                         _selectedProducts.removeAt(i);
-                        if (_selectedProducts.isEmpty)
+                        if (_selectedProducts.isEmpty) {
                           _sellingPrice = 0;
-                        else
+                        } else {
                           _sellingPrice = _totalCost * 1.2;
+                        }
                         _syncControllers(source: 'all');
                       });
                     },
@@ -1109,11 +1110,12 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
       final items = query.isEmpty
           ? await ApiService.fetchProducts(page: 1, perPage: 30)
           : await ApiService.searchProducts(query);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _products = items;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1121,10 +1123,11 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
 
   void _toggle(ProductModel p) {
     setState(() {
-      if (_selected.contains(p))
+      if (_selected.contains(p)) {
         _selected.remove(p);
-      else
+      } else {
         _selected.add(p);
+      }
     });
   }
 

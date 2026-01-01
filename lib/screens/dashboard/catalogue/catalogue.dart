@@ -8,6 +8,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -679,7 +680,7 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               _escapeCsv(p.name),
               "active",
             ];
-            csvContent += row.join(",") + "\n";
+            csvContent += "${row.join(",")}\n";
           }
 
           final directory = await getTemporaryDirectory();
@@ -1189,485 +1190,502 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      drawer: HomeDrawer(
-        userData: widget.userData,
-        selectedTitle: 'MyCatalog',
-        onNavigate: _handleDrawerNavigation,
-        onLogoutPressed: () {
-          Navigator.pop(context);
-          _showLogoutConfirmation();
-        },
-      ),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            const SizedBox(width: 6),
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Iconsax.menu_1),
-                color: accentColor,
-                iconSize: 30,
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0),
-              child: Image.asset(
-                'assets/logos/login-logo.png',
-                height: 50,
-                width: 100,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const Spacer(),
-            // 🌟 5. RESTART TOUR BUTTON ADDED
-            IconButton(
-              tooltip: "Guide",
-              icon: const Icon(Iconsax.info_circle, color: accentColor),
-              onPressed: _startTour,
-            ),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(Iconsax.shopping_cart),
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F4F6),
+        drawer: HomeDrawer(
+          userData: widget.userData,
+          selectedTitle: 'MyCatalog',
+          onNavigate: _handleDrawerNavigation,
+          onLogoutPressed: () {
+            Navigator.pop(context);
+            _showLogoutConfirmation();
+          },
+        ),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              const SizedBox(width: 6),
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Iconsax.menu_1),
                   color: accentColor,
-                  iconSize: 25,
-                  onPressed: () => Get.to(() => const InventoryPage()),
+                  iconSize: 30,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Obx(() {
-                    final count = cartController.itemCount;
-                    if (count == 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 22,
-                        minHeight: 22,
-                      ),
-                      child: Center(
-                        child: Text(
-                          count > 99 ? '99+' : '$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0),
+                child: Image.asset(
+                  'assets/logos/login-logo.png',
+                  height: 50,
+                  width: 100,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const Spacer(),
+              // 🌟 5. RESTART TOUR BUTTON ADDED
+              IconButton(
+                tooltip: "Guide",
+                icon: const Icon(Iconsax.info_circle, color: accentColor),
+                onPressed: _startTour,
+              ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Iconsax.shopping_cart),
+                    color: accentColor,
+                    iconSize: 25,
+                    onPressed: () => Get.to(() => const InventoryPage()),
+                  ),
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Obx(() {
+                      final count = cartController.itemCount;
+                      if (count == 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 22,
+                          minHeight: 22,
+                        ),
+                        child: Center(
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
-                ),
-              ],
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Iconsax.heart),
-              color: accentColor,
-              iconSize: 25,
-              onPressed: () => Get.to(() => WishlistScreen()),
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-      ),
-      // 5. SHOWCASE FAB
-      floatingActionButton: Showcase(
-        key: _addCatalogKey,
-        title: "Create Catalog",
-        description:
-            "Start here! Create custom collections for your customers.",
-        overlayColor: Colors.black.withOpacity(0.7),
-        titleTextStyle: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: accentColor,
-          fontSize: 16,
-        ),
-        descTextStyle: TextStyle(
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
-          fontSize: 12,
-        ),
-        targetShapeBorder: CircleBorder(),
-        child: FloatingActionButton.extended(
-          backgroundColor: accentColor,
-          onPressed: _openCreateCatalogueDialog,
-          icon: const Icon(Iconsax.folder_add, color: Colors.white),
-          label: const Text(
-            "New Catalog",
-            style: TextStyle(color: Colors.white),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Iconsax.heart),
+                color: accentColor,
+                iconSize: 25,
+                onPressed: () => Get.to(() => WishlistScreen()),
+              ),
+              const SizedBox(width: 16),
+            ],
           ),
         ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Stack(
-          children: [
-            // 1. MAIN CONTENT
-            Column(
-              children: [
-                Obx(
-                  () => CatalogueHeader(
-                    totalCatalogues: catalogueController.myCatalogues.length,
-                    totalProducts: catalogueController.myCatalogues.fold(
-                      0,
-                      (sum, cat) => sum + cat.products.length,
+        // 5. SHOWCASE FAB
+        floatingActionButton: Showcase(
+          key: _addCatalogKey,
+          title: "Create Catalog",
+          description:
+              "Start here! Create custom collections for your customers.",
+          overlayColor: Colors.black.withOpacity(0.7),
+          titleTextStyle: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: accentColor,
+            fontSize: 16,
+          ),
+          descTextStyle: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+            fontSize: 12,
+          ),
+          targetShapeBorder: CircleBorder(),
+          child: FloatingActionButton.extended(
+            backgroundColor: accentColor,
+            onPressed: _openCreateCatalogueDialog,
+            icon: const Icon(Iconsax.folder_add, color: Colors.white),
+            label: const Text(
+              "New Catalog",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Stack(
+            children: [
+              // 1. MAIN CONTENT
+              Column(
+                children: [
+                  Obx(
+                    () => CatalogueHeader(
+                      totalCatalogues: catalogueController.myCatalogues.length,
+                      totalProducts: catalogueController.myCatalogues.fold(
+                        0,
+                        (sum, cat) => sum + cat.products.length,
+                      ),
                     ),
                   ),
-                ),
-                CatalogueSearchAndSortBar(
-                  searchController: _searchController,
-                  searchQuery: _searchQuery,
-                  onSearchChanged: (value) =>
-                      setState(() => _searchQuery = value),
-                  currentSort: _currentSort,
-                  onSortChanged: (value) =>
-                      setState(() => _currentSort = value),
-                ),
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                Expanded(
-                  child: Obx(() {
-                    final items = _buildFilteredSortedList();
-                    if (catalogueController.myCatalogues.isEmpty) {
-                      return CatalogueEmptyState(
-                        onCreatePressed: _openCreateCatalogueDialog,
-                      );
-                    }
-                    if (items.isEmpty) return const CatalogueSearchEmptyState();
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final cat = items[index];
-                        // 🌟 If Guide is active, only fully show the first item
-                        final bool isGuideActive = _activeGuideTool != null;
-                        final bool isFirstItem = index == 0;
-                        final double cardOpacity =
-                            (isGuideActive && !isFirstItem) ? 0.3 : 1.0;
+                  CatalogueSearchAndSortBar(
+                    searchController: _searchController,
+                    searchQuery: _searchQuery,
+                    onSearchChanged: (value) =>
+                        setState(() => _searchQuery = value),
+                    currentSort: _currentSort,
+                    onSortChanged: (value) =>
+                        setState(() => _currentSort = value),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  Expanded(
+                    child: Obx(() {
+                      final items = _buildFilteredSortedList();
+                      if (catalogueController.myCatalogues.isEmpty) {
+                        return CatalogueEmptyState(
+                          onCreatePressed: _openCreateCatalogueDialog,
+                        );
+                      }
+                      if (items.isEmpty)
+                        return const CatalogueSearchEmptyState();
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final cat = items[index];
+                          // 🌟 If Guide is active, only fully show the first item
+                          final bool isGuideActive = _activeGuideTool != null;
+                          final bool isFirstItem = index == 0;
+                          final double cardOpacity =
+                              (isGuideActive && !isFirstItem) ? 0.3 : 1.0;
 
-                        return Opacity(
-                          opacity: cardOpacity,
-                          child: GestureDetector(
-                            onTap: () => Get.to(
-                              () => CatalogueDetailsPage(catalogueId: cat.id),
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                                border: Border.all(color: Colors.grey.shade200),
+                          return Opacity(
+                            opacity: cardOpacity,
+                            child: GestureDetector(
+                              onTap: () => Get.to(
+                                () => CatalogueDetailsPage(catalogueId: cat.id),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // HEADER GRADIENT
-                                  Container(
-                                    decoration: const BoxDecoration(
-                                      borderRadius: BorderRadius.vertical(
-                                        top: Radius.circular(18),
-                                      ),
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Color(0xFF8B5CF6),
-                                          Color(0xFFEC4899),
-                                        ],
-                                      ),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.04),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
                                     ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 10,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(
-                                              0.12,
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Iconsax.folder_2,
-                                            size: 16,
-                                            color: Colors.white,
-                                          ),
+                                  ],
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // HEADER GRADIENT
+                                    Container(
+                                      decoration: const BoxDecoration(
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(18),
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            cat.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Color(0xFF8B5CF6),
+                                            Color(0xFFEC4899),
+                                          ],
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(
+                                                0.12,
+                                              ),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Iconsax.folder_2,
+                                              size: 16,
                                               color: Colors.white,
                                             ),
                                           ),
-                                        ),
-                                        const Icon(
-                                          Iconsax.arrow_right_3,
-                                          size: 18,
-                                          color: Colors.white,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // CONTENT
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      14,
-                                      10,
-                                      14,
-                                      6,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (cat.description.isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 6.0,
-                                            ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
                                             child: Text(
-                                              cat.description,
-                                              maxLines: 2,
+                                              cat.name,
+                                              maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                 fontFamily: 'Poppins',
-                                                fontSize: 11,
-                                                color: Color(0xFF4B5563),
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
                                               ),
                                             ),
                                           ),
-                                        SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFE0F2FE),
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
+                                          const Icon(
+                                            Iconsax.arrow_right_3,
+                                            size: 18,
+                                            color: Colors.white,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // CONTENT
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        14,
+                                        10,
+                                        14,
+                                        6,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (cat.description.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 6.0,
                                               ),
-                                              child: Row(
-                                                children: [
-                                                  const Icon(
-                                                    Iconsax.bag_2,
-                                                    size: 13,
-                                                    color: Color(0xFF1D4ED8),
+                                              child: Text(
+                                                cat.description,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 11,
+                                                  color: Color(0xFF4B5563),
+                                                ),
+                                              ),
+                                            ),
+                                          SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFFE0F2FE,
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    "${cat.products.length} items",
-                                                    style: const TextStyle(
-                                                      fontFamily: 'Poppins',
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Iconsax.bag_2,
+                                                      size: 13,
                                                       color: Color(0xFF1D4ED8),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF5F3FF),
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
-                                              ),
-                                              child: Row(
-                                                children: const [
-                                                  Icon(
-                                                    Iconsax.star1,
-                                                    size: 13,
-                                                    color: Color(0xFF8B5CF6),
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    "My Catalog",
-                                                    style: TextStyle(
-                                                      fontFamily: 'Poppins',
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color: Color(0xFF6D28D9),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      "${cat.products.length} items",
+                                                      style: const TextStyle(
+                                                        fontFamily: 'Poppins',
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Color(
+                                                          0xFF1D4ED8,
+                                                        ),
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                            const Spacer(),
-                                            // Delete is always dimmed if guide active
-                                            Opacity(
-                                              opacity: isGuideActive
-                                                  ? 0.3
-                                                  : 1.0,
-                                              child:
-                                                  _buildCatalogueActionButton(
-                                                    icon: Iconsax.trash,
-                                                    label: "Delete",
-                                                    onTap: () =>
-                                                        catalogueController
-                                                            .deleteCatalogue(
-                                                              cat.id,
-                                                            ),
-                                                    outlined: true,
-                                                    color: Colors.red,
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(
+                                                    0xFFF5F3FF,
                                                   ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Divider(
-                                    height: 14,
-                                    thickness: 0.7,
-                                    color: Color(0xFFE5E7EB),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Iconsax.flash_1,
-                                        color: accentColor,
-                                        size: 22,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                ),
+                                                child: Row(
+                                                  children: const [
+                                                    Icon(
+                                                      Iconsax.star1,
+                                                      size: 13,
+                                                      color: Color(0xFF8B5CF6),
+                                                    ),
+                                                    SizedBox(width: 4),
+                                                    Text(
+                                                      "My Catalog",
+                                                      style: TextStyle(
+                                                        fontFamily: 'Poppins',
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color: Color(
+                                                          0xFF6D28D9,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              // Delete is always dimmed if guide active
+                                              Opacity(
+                                                opacity: isGuideActive
+                                                    ? 0.3
+                                                    : 1.0,
+                                                child:
+                                                    _buildCatalogueActionButton(
+                                                      icon: Iconsax.trash,
+                                                      label: "Delete",
+                                                      onTap: () =>
+                                                          catalogueController
+                                                              .deleteCatalogue(
+                                                                cat.id,
+                                                              ),
+                                                      outlined: true,
+                                                      color: Colors.red,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        "Reseller Tools",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 16,
-                                          color: Color(0xFF86198F),
-                                          fontFamily: 'Poppins',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 6),
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      12,
-                                      6,
-                                      12,
-                                      10,
                                     ),
-                                    child: Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      crossAxisAlignment:
-                                          WrapCrossAlignment.center,
+                                    const Divider(
+                                      height: 14,
+                                      thickness: 0.7,
+                                      color: Color(0xFFE5E7EB),
+                                    ),
+                                    Row(
                                       children: [
-                                        // --- SOCIAL ICONS ---
-                                        // 6. SHOWCASE SHARE
-                                        index == 0
-                                            ? Showcase(
-                                                key: _shareKey,
-                                                title: "Easy Sharing",
-                                                description:
-                                                    "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
-                                                overlayColor: Colors.black
-                                                    .withOpacity(0.7),
-                                                titleTextStyle: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: accentColor,
-                                                  fontSize: 16,
-                                                ),
-                                                descTextStyle: TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.black,
-                                                  fontSize: 12,
-                                                ),
-                                                targetBorderRadius:
-                                                    BorderRadius.circular(20),
-                                                child: _buildSocialRow(cat),
-                                              )
-                                            : _buildSocialRow(cat),
-
-                                        // 7. SHOWCASE TOOLS
-                                        index == 0
-                                            ? Showcase(
-                                                key: _toolsKey,
-                                                title: "Power Tools",
-                                                description:
-                                                    "Generate PDFs, Collages, or CSVs instantly to look professional.",
-                                                overlayColor: Colors.black
-                                                    .withOpacity(0.7),
-                                                titleTextStyle: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: accentColor,
-                                                  fontSize: 16,
-                                                ),
-                                                descTextStyle: TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.black,
-                                                  fontSize: 12,
-                                                ),
-                                                targetBorderRadius:
-                                                    BorderRadius.circular(20),
-                                                child: _buildToolsRow(cat),
-                                              )
-                                            : _buildToolsRow(cat),
+                                        Icon(
+                                          Iconsax.flash_1,
+                                          color: accentColor,
+                                          size: 22,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "Reseller Tools",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 16,
+                                            color: Color(0xFF86198F),
+                                            fontFamily: 'Poppins',
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(height: 6),
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        12,
+                                        6,
+                                        12,
+                                        10,
+                                      ),
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        children: [
+                                          // --- SOCIAL ICONS ---
+                                          // 6. SHOWCASE SHARE
+                                          index == 0
+                                              ? Showcase(
+                                                  key: _shareKey,
+                                                  title: "Easy Sharing",
+                                                  description:
+                                                      "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
+                                                  overlayColor: Colors.black
+                                                      .withOpacity(0.7),
+                                                  titleTextStyle: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: accentColor,
+                                                    fontSize: 16,
+                                                  ),
+                                                  descTextStyle: TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.black,
+                                                    fontSize: 12,
+                                                  ),
+                                                  targetBorderRadius:
+                                                      BorderRadius.circular(20),
+                                                  child: _buildSocialRow(cat),
+                                                )
+                                              : _buildSocialRow(cat),
+
+                                          // 7. SHOWCASE TOOLS
+                                          index == 0
+                                              ? Showcase(
+                                                  key: _toolsKey,
+                                                  title: "Power Tools",
+                                                  description:
+                                                      "Generate PDFs, Collages, or CSVs instantly to look professional.",
+                                                  overlayColor: Colors.black
+                                                      .withOpacity(0.7),
+                                                  titleTextStyle: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: accentColor,
+                                                    fontSize: 16,
+                                                  ),
+                                                  descTextStyle: TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.black,
+                                                    fontSize: 12,
+                                                  ),
+                                                  targetBorderRadius:
+                                                      BorderRadius.circular(20),
+                                                  child: _buildToolsRow(cat),
+                                                )
+                                              : _buildToolsRow(cat),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  }),
-                ),
-              ],
-            ),
-
-            // 2. ⚡ GUIDE OVERLAY
-            if (_activeGuideTool != null)
-              _buildGuideOverlay(
-                toolId: _activeGuideTool!,
-                onDismiss: () => setState(() => _activeGuideTool = null),
+                          );
+                        },
+                      );
+                    }),
+                  ),
+                ],
               ),
-          ],
+
+              // 2. ⚡ GUIDE OVERLAY
+              if (_activeGuideTool != null)
+                _buildGuideOverlay(
+                  toolId: _activeGuideTool!,
+                  onDismiss: () => setState(() => _activeGuideTool = null),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -2235,7 +2253,7 @@ class _CollageStudioSheet extends StatefulWidget {
 
 class _CollageStudioSheetState extends State<_CollageStudioSheet> {
   CollageLayout _selectedLayout = CollageLayout.grid;
-  Color _themeColor = Colors.black;
+  final Color _themeColor = const Color.fromARGB(255, 203, 20, 145);
   Color _bgColor = Colors.white;
   File? _customBgImage;
   bool _showPrices = true;

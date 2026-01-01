@@ -1357,11 +1357,13 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                 });
               },
               validator: (value) {
-                if (_selectedState == null)
+                if (_selectedState == null) {
                   return null; // handled by state validator
+                }
                 if (value == null || value.isEmpty) return 'City required';
-                if (!_availableCities.contains(value))
+                if (!_availableCities.contains(value)) {
                   return 'Select valid city';
+                }
                 return null;
               },
             ),
@@ -1398,8 +1400,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                       FilteringTextInputFormatter.digitsOnly,
                     ],
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty)
+                      if (v == null || v.trim().isEmpty) {
                         return 'Pincode required';
+                      }
                       // STRICT REGEX: Exactly 6 digits, CANNOT start with 0
                       final regex = RegExp(r'^[1-9][0-9]{5}$');
                       if (!regex.hasMatch(v.trim())) {

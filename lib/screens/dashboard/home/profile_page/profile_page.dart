@@ -16,6 +16,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart'; // Ensure this exists or remove if not needed
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
 // CONSTANTS (If you have a global constants file, otherwise defined locally)
 const Color kPrimaryColor = Color(
@@ -108,142 +109,144 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: const Text(
-          "My Account",
-          style: TextStyle(
-            color: Colors.black,
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
+        backgroundColor: kBgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: const Text(
+            "My Account",
+            style: TextStyle(
+              color: Colors.black,
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+            ),
           ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            // 1. HEADER SECTION
-            _buildProfileHeader(),
+        body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              // 1. HEADER SECTION
+              _buildProfileHeader(),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // 2. QUICK ACTION GRID
-            _buildQuickActionGrid(),
+              // 2. QUICK ACTION GRID
+              _buildQuickActionGrid(),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // 3. MENU SECTIONS
-            _buildMenuSection(
-              title: "My Business",
-              items: [
-                _buildMenuItem(
-                  icon: Iconsax.briefcase,
-                  title: "Business Details",
-                  subtitle: "Manage your brand & logo",
-                  onTap: _openBusiness,
-                ),
-                _buildMenuItem(
-                  icon: Iconsax.card_pos,
-                  title: "Bank Details",
-                  subtitle: "For payouts & refunds",
-                  onTap: () {
-                    // Navigate to Bank Page if you have one, or Business Details
-                    _openBusiness();
-                  },
-                ),
-                _buildMenuItem(
-                  icon: Iconsax.chart_21,
-                  title: "My Earnings",
-                  subtitle: "Check your profit margin",
-                  onTap: () {
-                    // Placeholder for earnings
-                    Get.snackbar(
-                      "Coming Soon",
-                      "Earnings dashboard is under development.",
-                    );
-                  },
-                ),
-              ],
-            ),
-
-            _buildMenuSection(
-              title: "Account Settings",
-              items: [
-                _buildMenuItem(
-                  icon: Iconsax.location,
-                  title: "My Addresses",
-                  subtitle: "Manage delivery locations",
-                  onTap: _openAddresses,
-                ),
-                _buildMenuItem(
-                  icon: Iconsax.notification,
-                  title: "Notifications",
-                  subtitle: "Offers, Order updates",
-                  onTap: () {
-                    // Optional: Settings page
-                  },
-                ),
-              ],
-            ),
-
-            _buildMenuSection(
-              title: "Legal & Support",
-              items: [
-                _buildMenuItem(
-                  icon: Iconsax.shield_tick,
-                  title: "Privacy Policy",
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  icon: Iconsax.document_text,
-                  title: "Terms & Conditions",
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  icon: Iconsax.logout,
-                  title: "Log Out",
-                  iconColor: Colors.redAccent,
-                  textColor: Colors.redAccent,
-                  hideArrow: true,
-                  onTap: _confirmLogout,
-                ),
-              ],
-            ),
-
-            // 4. FOOTER
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                  Image.asset(
-                    'assets/logos/login-logo.png', // Ensure this asset exists
-                    height: 30,
-                    color: Colors.grey.shade400,
-                    errorBuilder: (c, o, s) =>
-                        const SizedBox(), // Hide if missing
+              // 3. MENU SECTIONS
+              _buildMenuSection(
+                title: "My Business",
+                items: [
+                  _buildMenuItem(
+                    icon: Iconsax.briefcase,
+                    title: "Business Details",
+                    subtitle: "Manage your brand & logo",
+                    onTap: _openBusiness,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Version 1.0.2",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: Colors.grey.shade400,
-                    ),
+                  _buildMenuItem(
+                    icon: Iconsax.card_pos,
+                    title: "Bank Details",
+                    subtitle: "For payouts & refunds",
+                    onTap: () {
+                      // Navigate to Bank Page if you have one, or Business Details
+                      _openBusiness();
+                    },
+                  ),
+                  _buildMenuItem(
+                    icon: Iconsax.chart_21,
+                    title: "My Earnings",
+                    subtitle: "Check your profit margin",
+                    onTap: () {
+                      // Placeholder for earnings
+                      Get.snackbar(
+                        "Coming Soon",
+                        "Earnings dashboard is under development.",
+                      );
+                    },
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+
+              _buildMenuSection(
+                title: "Account Settings",
+                items: [
+                  _buildMenuItem(
+                    icon: Iconsax.location,
+                    title: "My Addresses",
+                    subtitle: "Manage delivery locations",
+                    onTap: _openAddresses,
+                  ),
+                  _buildMenuItem(
+                    icon: Iconsax.notification,
+                    title: "Notifications",
+                    subtitle: "Offers, Order updates",
+                    onTap: () {
+                      // Optional: Settings page
+                    },
+                  ),
+                ],
+              ),
+
+              _buildMenuSection(
+                title: "Legal & Support",
+                items: [
+                  _buildMenuItem(
+                    icon: Iconsax.shield_tick,
+                    title: "Privacy Policy",
+                    onTap: () {},
+                  ),
+                  _buildMenuItem(
+                    icon: Iconsax.document_text,
+                    title: "Terms & Conditions",
+                    onTap: () {},
+                  ),
+                  _buildMenuItem(
+                    icon: Iconsax.logout,
+                    title: "Log Out",
+                    iconColor: Colors.redAccent,
+                    textColor: Colors.redAccent,
+                    hideArrow: true,
+                    onTap: _confirmLogout,
+                  ),
+                ],
+              ),
+
+              // 4. FOOTER
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'assets/logos/login-logo.png', // Ensure this asset exists
+                      height: 30,
+                      color: Colors.grey.shade400,
+                      errorBuilder: (c, o, s) =>
+                          const SizedBox(), // Hide if missing
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Version 1.0.2",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

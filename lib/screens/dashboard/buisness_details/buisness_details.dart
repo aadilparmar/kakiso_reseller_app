@@ -804,8 +804,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
         if (remoteState.isNotEmpty && _stateCityMap.containsKey(remoteState)) {
           _selectedState = remoteState;
-        } else if (_selectedState == null) {
-          _selectedState = null;
+        } else {
+          _selectedState ??= null;
         }
         _stateCtrl.text = _selectedState ?? remoteState;
         _stateFieldKey = UniqueKey(); // Refresh State Autocomplete
@@ -882,10 +882,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     final String line1 = _addressLine1Ctrl.text.trim();
     final String line2 = _addressLine2Ctrl.text.trim();
     String combinedAddress = line1;
-    if (line2.isNotEmpty)
+    if (line2.isNotEmpty) {
       combinedAddress = combinedAddress.isEmpty
           ? line2
           : '$combinedAddress, $line2';
+    }
 
     final Map<String, dynamic> payload = {
       "businessName": _businessNameCtrl.text.trim(),
@@ -1263,8 +1264,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                         ? 'Invalid phone'
                                         : null,
                                     onChanged: (val) {
-                                      if (_isWhatsAppSame)
+                                      if (_isWhatsAppSame) {
                                         _whatsappCtrl.text = val;
+                                      }
                                     },
                                   ),
                                   const SizedBox(height: 12),
@@ -1275,9 +1277,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                         activeColor: accentColor,
                                         onChanged: (val) => setState(() {
                                           _isWhatsAppSame = val ?? true;
-                                          if (_isWhatsAppSame)
+                                          if (_isWhatsAppSame) {
                                             _whatsappCtrl.text =
                                                 _phoneCtrl.text;
+                                          }
                                         }),
                                       ),
                                       const Expanded(
@@ -1364,10 +1367,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                       });
                                     },
                                     validator: (value) {
-                                      if (value == null || value.isEmpty)
+                                      if (value == null || value.isEmpty) {
                                         return 'Required';
-                                      if (!_indianStates.contains(value))
+                                      }
+                                      if (!_indianStates.contains(value)) {
                                         return 'Select valid state';
+                                      }
                                       return null;
                                     },
                                   ),
@@ -1390,10 +1395,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     },
                                     validator: (value) {
                                       if (_selectedState == null) return null;
-                                      if (value == null || value.isEmpty)
+                                      if (value == null || value.isEmpty) {
                                         return 'Required';
-                                      if (!_availableCities.contains(value))
+                                      }
+                                      if (!_availableCities.contains(value)) {
                                         return 'Select valid city';
+                                      }
                                       return null;
                                     },
                                   ),

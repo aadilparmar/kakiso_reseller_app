@@ -13,6 +13,7 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/privacy_policy.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/terms_and_condition.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  THEME CONSTANTS
@@ -269,445 +270,462 @@ class _RegisterPageState extends State<RegisterPage>
   // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: kBgColor,
-        body: Stack(
-          children: [
-            _buildAmbientBackground(),
-            SafeArea(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0,
-                    vertical: 24,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Image.asset(
-                            'assets/logos/login-logo.png',
-                            height: 40,
-                          ),
-                          const SizedBox(width: 40),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Create your KaKiSo account',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w700,
-                          color: kPrimaryDeep,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Join 22,000+ Indian ReSellers already registered with KaKiSo\'s exclusive product supplier network. No inventory, No risk.',
-                        style: TextStyle(
-                          fontFamily: kFontFamily,
-                          fontSize: 14,
-                          color: Colors.black54,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Form Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 20,
-                              offset: const Offset(0, 12),
+    return DoubleBackToExitWrapper(
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: kBgColor,
+          body: Stack(
+            children: [
+              _buildAmbientBackground(),
+              SafeArea(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24.0,
+                      vertical: 24,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Image.asset(
+                              'assets/logos/login-logo.png',
+                              height: 40,
                             ),
+                            const SizedBox(width: 40),
                           ],
                         ),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryDeep.withValues(alpha: 0.06),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: const Text(
-                                    'New Reseller Sign Up',
-                                    style: TextStyle(
-                                      fontFamily: kFontFamily,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: kPrimaryDeep,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _fullNameController,
-                                decoration: _inputDecoration(
-                                  label: 'Full Name',
-                                  icon: Iconsax.user,
-                                ),
-                                textCapitalization: TextCapitalization.words,
-                                validator: (value) =>
-                                    (value == null || value.trim().length < 3)
-                                    ? 'Enter your full name'
-                                    : null,
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _phoneController,
-                                focusNode: _phoneFocusNode,
-                                autovalidateMode:
-                                    AutovalidateMode.onUserInteraction,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  LengthLimitingTextInputFormatter(10),
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                decoration:
-                                    _inputDecoration(
-                                      label: 'Phone Number',
-                                      icon: Iconsax.call,
-                                    ).copyWith(
-                                      hintText: '10-digit number',
-                                      prefixText: '+91 ',
-                                      prefixStyle: const TextStyle(
-                                        fontFamily: kFontFamily,
-                                        color: Colors.black87,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                validator: (value) {
-                                  final v = value?.trim() ?? '';
-                                  if (v.isEmpty)
-                                    return 'Phone number is required.';
-                                  if (v.length != 10)
-                                    return 'Must be exactly 10 digits.';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _emailController,
-                                decoration: _inputDecoration(
-                                  label: 'Email Address',
-                                  icon: Iconsax.sms,
-                                ),
-                                keyboardType: TextInputType.emailAddress,
-                                autovalidateMode:
-                                    AutovalidateMode.onUserInteraction,
-                                validator: (value) {
-                                  final v = value?.trim() ?? '';
-                                  if (v.isEmpty) return 'Email is required';
-                                  final emailRegex = RegExp(
-                                    r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                                  );
-                                  if (!emailRegex.hasMatch(v))
-                                    return 'Enter valid email';
-                                  final parts = v.split('@');
-                                  if (parts.length == 2) {
-                                    if (_blockedDummyLocalParts.contains(
-                                      parts.first.toLowerCase(),
-                                    ))
-                                      return 'Use your real email';
-                                    if (_blockedDisposableDomains.any(
-                                      (d) =>
-                                          parts.last.toLowerCase().endsWith(d),
-                                    ))
-                                      return 'No temporary emails';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: !_isPasswordVisible,
-                                onChanged: _updatePasswordStrength,
-                                decoration:
-                                    _inputDecoration(
-                                      label: 'Password',
-                                      icon: Iconsax.lock_1,
-                                    ).copyWith(
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _isPasswordVisible
-                                              ? Icons.visibility
-                                              : Icons.visibility_off,
-                                          color: Colors.grey,
-                                        ),
-                                        onPressed: () => setState(
-                                          () => _isPasswordVisible =
-                                              !_isPasswordVisible,
-                                        ),
-                                      ),
-                                    ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty)
-                                    return 'Required';
-                                  if (!(_hasMinLength &&
-                                      _hasUppercase &&
-                                      _hasLowercase &&
-                                      _hasDigits))
-                                    return 'Password is too weak';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF5F7FA),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  children: [
-                                    _buildRequirementRow(
-                                      "At least 6 characters",
-                                      _hasMinLength,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _buildRequirementRow(
-                                      "One uppercase letter (A-Z)",
-                                      _hasUppercase,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _buildRequirementRow(
-                                      "One lowercase letter (a-z)",
-                                      _hasLowercase,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    _buildRequirementRow(
-                                      "One number (0-9)",
-                                      _hasDigits,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _confirmPasswordController,
-                                obscureText: !_isConfirmPasswordVisible,
-                                decoration:
-                                    _inputDecoration(
-                                      label: 'Confirm Password',
-                                      icon: Iconsax.lock,
-                                    ).copyWith(
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _isConfirmPasswordVisible
-                                              ? Icons.visibility
-                                              : Icons.visibility_off,
-                                          color: Colors.grey,
-                                        ),
-                                        onPressed: () => setState(
-                                          () => _isConfirmPasswordVisible =
-                                              !_isConfirmPasswordVisible,
-                                        ),
-                                      ),
-                                    ),
-                                validator: (value) {
-                                  if (value != _passwordController.text)
-                                    return 'Passwords do not match';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                              TextFormField(
-                                controller: _referralController,
-                                decoration: _inputDecoration(
-                                  label: 'Referral Code (Optional)',
-                                  icon: Iconsax.ticket_discount,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                "KaKiSo is offering a promotional rebate on all subscription/transaction charges. This is subject to change in the future.",
-                                textScaleFactor: 1.0,
-                                style: TextStyle(
-                                  fontFamily: kFontFamily,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              GestureDetector(
-                                onTap: () => setState(
-                                  () => _acceptTerms = !_acceptTerms,
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: Checkbox(
-                                        value: _acceptTerms,
-                                        onChanged: (v) => setState(
-                                          () => _acceptTerms = v ?? false,
-                                        ),
-                                        activeColor: kPrimaryDeep,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: RichText(
-                                        text: TextSpan(
-                                          style: const TextStyle(
-                                            fontFamily: kFontFamily,
-                                            fontSize: 12,
-                                            color: Colors.black87,
-                                            height: 1.5,
-                                          ),
-                                          children: [
-                                            const TextSpan(
-                                              text: 'I agree to KaKiSo’s ',
-                                            ),
-                                            TextSpan(
-                                              text: 'Terms & Conditions',
-                                              style: const TextStyle(
-                                                color: kPrimaryDeep,
-                                                fontWeight: FontWeight.w600,
-                                                decoration:
-                                                    TextDecoration.underline,
-                                              ),
-                                              recognizer: TapGestureRecognizer()
-                                                ..onTap = () => Get.to(
-                                                  () => const TermsOfUsePage(),
-                                                ),
-                                            ),
-                                            const TextSpan(text: ' & '),
-                                            TextSpan(
-                                              text: 'Privacy Notice',
-                                              style: const TextStyle(
-                                                color: kPrimaryDeep,
-                                                fontWeight: FontWeight.w600,
-                                                decoration:
-                                                    TextDecoration.underline,
-                                              ),
-                                              recognizer: TapGestureRecognizer()
-                                                ..onTap = () => Get.to(
-                                                  () =>
-                                                      const PrivacyPolicyPage(),
-                                                ),
-                                            ),
-                                            const TextSpan(text: '.'),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _BouncyButton(
-                                onPressed: _isLoading ? () {} : _handleRegister,
-                                child: Container(
-                                  width: double.infinity,
-                                  height: 52,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    gradient: const LinearGradient(
-                                      colors: [kPrimaryDeep, kPrimaryLight],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: kPrimaryDeep.withValues(
-                                          alpha: 0.35,
-                                        ),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 10),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            width: 22,
-                                            height: 22,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2.6,
-                                            ),
-                                          )
-                                        : const Text(
-                                            'Create account',
-                                            style: TextStyle(
-                                              fontFamily: kFontFamily,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                  ),
-                                ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Create your KaKiSo account',
+                          style: TextStyle(
+                            fontFamily: kFontFamily,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w700,
+                            color: kPrimaryDeep,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Join 22,000+ Indian ReSellers already registered with KaKiSo\'s exclusive product supplier network. No inventory, No risk.',
+                          style: TextStyle(
+                            fontFamily: kFontFamily,
+                            fontSize: 14,
+                            color: Colors.black54,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Form Card
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.06),
+                                blurRadius: 20,
+                                offset: const Offset(0, 12),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      GestureDetector(
-                        onTap: _isLoading
-                            ? null
-                            : () => Get.offAll(() => const LoginPage()),
-                        child: Center(
-                          child: RichText(
-                            textScaleFactor: 1.0,
-                            text: const TextSpan(
-                              text: "Already have an account? ",
-                              style: TextStyle(
-                                fontFamily: kFontFamily,
-                                fontSize: 14,
-                                color: Colors.black54,
-                              ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                TextSpan(
-                                  text: "Sign in",
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryDeep.withValues(
+                                        alpha: 0.06,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      'New Reseller Sign Up',
+                                      style: TextStyle(
+                                        fontFamily: kFontFamily,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: kPrimaryDeep,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _fullNameController,
+                                  decoration: _inputDecoration(
+                                    label: 'Full Name',
+                                    icon: Iconsax.user,
+                                  ),
+                                  textCapitalization: TextCapitalization.words,
+                                  validator: (value) =>
+                                      (value == null || value.trim().length < 3)
+                                      ? 'Enter your full name'
+                                      : null,
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _phoneController,
+                                  focusNode: _phoneFocusNode,
+                                  autovalidateMode:
+                                      AutovalidateMode.onUserInteraction,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(10),
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  decoration:
+                                      _inputDecoration(
+                                        label: 'Phone Number',
+                                        icon: Iconsax.call,
+                                      ).copyWith(
+                                        hintText: '10-digit number',
+                                        prefixText: '+91 ',
+                                        prefixStyle: const TextStyle(
+                                          fontFamily: kFontFamily,
+                                          color: Colors.black87,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                  validator: (value) {
+                                    final v = value?.trim() ?? '';
+                                    if (v.isEmpty) {
+                                      return 'Phone number is required.';
+                                    }
+                                    if (v.length != 10) {
+                                      return 'Must be exactly 10 digits.';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _emailController,
+                                  decoration: _inputDecoration(
+                                    label: 'Email Address',
+                                    icon: Iconsax.sms,
+                                  ),
+                                  keyboardType: TextInputType.emailAddress,
+                                  autovalidateMode:
+                                      AutovalidateMode.onUserInteraction,
+                                  validator: (value) {
+                                    final v = value?.trim() ?? '';
+                                    if (v.isEmpty) return 'Email is required';
+                                    final emailRegex = RegExp(
+                                      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                                    );
+                                    if (!emailRegex.hasMatch(v)) {
+                                      return 'Enter valid email';
+                                    }
+                                    final parts = v.split('@');
+                                    if (parts.length == 2) {
+                                      if (_blockedDummyLocalParts.contains(
+                                        parts.first.toLowerCase(),
+                                      )) {
+                                        return 'Use your real email';
+                                      }
+                                      if (_blockedDisposableDomains.any(
+                                        (d) => parts.last
+                                            .toLowerCase()
+                                            .endsWith(d),
+                                      )) {
+                                        return 'No temporary emails';
+                                      }
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: !_isPasswordVisible,
+                                  onChanged: _updatePasswordStrength,
+                                  decoration:
+                                      _inputDecoration(
+                                        label: 'Password',
+                                        icon: Iconsax.lock_1,
+                                      ).copyWith(
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _isPasswordVisible
+                                                ? Icons.visibility
+                                                : Icons.visibility_off,
+                                            color: Colors.grey,
+                                          ),
+                                          onPressed: () => setState(
+                                            () => _isPasswordVisible =
+                                                !_isPasswordVisible,
+                                          ),
+                                        ),
+                                      ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Required';
+                                    }
+                                    if (!(_hasMinLength &&
+                                        _hasUppercase &&
+                                        _hasLowercase &&
+                                        _hasDigits)) {
+                                      return 'Password is too weak';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F7FA),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      _buildRequirementRow(
+                                        "At least 6 characters",
+                                        _hasMinLength,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildRequirementRow(
+                                        "One uppercase letter (A-Z)",
+                                        _hasUppercase,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildRequirementRow(
+                                        "One lowercase letter (a-z)",
+                                        _hasLowercase,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildRequirementRow(
+                                        "One number (0-9)",
+                                        _hasDigits,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _confirmPasswordController,
+                                  obscureText: !_isConfirmPasswordVisible,
+                                  decoration:
+                                      _inputDecoration(
+                                        label: 'Confirm Password',
+                                        icon: Iconsax.lock,
+                                      ).copyWith(
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _isConfirmPasswordVisible
+                                                ? Icons.visibility
+                                                : Icons.visibility_off,
+                                            color: Colors.grey,
+                                          ),
+                                          onPressed: () => setState(
+                                            () => _isConfirmPasswordVisible =
+                                                !_isConfirmPasswordVisible,
+                                          ),
+                                        ),
+                                      ),
+                                  validator: (value) {
+                                    if (value != _passwordController.text) {
+                                      return 'Passwords do not match';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _referralController,
+                                  decoration: _inputDecoration(
+                                    label: 'Referral Code (Optional)',
+                                    icon: Iconsax.ticket_discount,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  "KaKiSo is offering a promotional rebate on all subscription/transaction charges. This is subject to change in the future.",
+                                  textScaleFactor: 1.0,
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: kPrimaryDeep,
+                                    fontFamily: kFontFamily,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                GestureDetector(
+                                  onTap: () => setState(
+                                    () => _acceptTerms = !_acceptTerms,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: Checkbox(
+                                          value: _acceptTerms,
+                                          onChanged: (v) => setState(
+                                            () => _acceptTerms = v ?? false,
+                                          ),
+                                          activeColor: kPrimaryDeep,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: const TextStyle(
+                                              fontFamily: kFontFamily,
+                                              fontSize: 12,
+                                              color: Colors.black87,
+                                              height: 1.5,
+                                            ),
+                                            children: [
+                                              const TextSpan(
+                                                text: 'I agree to KaKiSo’s ',
+                                              ),
+                                              TextSpan(
+                                                text: 'Terms & Conditions',
+                                                style: const TextStyle(
+                                                  color: kPrimaryDeep,
+                                                  fontWeight: FontWeight.w600,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                ),
+                                                recognizer: TapGestureRecognizer()
+                                                  ..onTap = () => Get.to(
+                                                    () =>
+                                                        const TermsOfUsePage(),
+                                                  ),
+                                              ),
+                                              const TextSpan(text: ' & '),
+                                              TextSpan(
+                                                text: 'Privacy Notice',
+                                                style: const TextStyle(
+                                                  color: kPrimaryDeep,
+                                                  fontWeight: FontWeight.w600,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                ),
+                                                recognizer: TapGestureRecognizer()
+                                                  ..onTap = () => Get.to(
+                                                    () =>
+                                                        const PrivacyPolicyPage(),
+                                                  ),
+                                              ),
+                                              const TextSpan(text: '.'),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                _BouncyButton(
+                                  onPressed: _isLoading
+                                      ? () {}
+                                      : _handleRegister,
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(16),
+                                      gradient: const LinearGradient(
+                                        colors: [kPrimaryDeep, kPrimaryLight],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: kPrimaryDeep.withValues(
+                                            alpha: 0.35,
+                                          ),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 10),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2.6,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Create account',
+                                              style: TextStyle(
+                                                fontFamily: kFontFamily,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 30),
-                    ],
+                        const SizedBox(height: 24),
+                        GestureDetector(
+                          onTap: _isLoading
+                              ? null
+                              : () => Get.offAll(() => const LoginPage()),
+                          child: Center(
+                            child: RichText(
+                              textScaleFactor: 1.0,
+                              text: const TextSpan(
+                                text: "Already have an account? ",
+                                style: TextStyle(
+                                  fontFamily: kFontFamily,
+                                  fontSize: 14,
+                                  color: Colors.black54,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: "Sign in",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: kPrimaryDeep,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

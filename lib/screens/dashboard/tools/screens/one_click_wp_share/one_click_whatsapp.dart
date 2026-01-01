@@ -91,9 +91,9 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
 
   // --- MARKETING BOOSTERS ---
   bool _isHinglish = false;
-  bool _addTrustBadge = true;
+  final bool _addTrustBadge = true;
   bool _showBranding = true;
-  String _validityPeriod = 'None';
+  final String _validityPeriod = 'None';
   String _selectedTone = 'Urgency';
 
   @override
@@ -268,14 +268,16 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
           (a) => a.name.toLowerCase().contains('size'),
           orElse: () => ProductAttribute(id: 0, name: '', options: []),
         );
-        if (sizes.options.isNotEmpty)
+        if (sizes.options.isNotEmpty) {
           buffer.writeln("📏 Sizes: ${sizes.options.join(', ')}");
+        }
       }
 
       if (_includeDescription && p.description.isNotEmpty) {
         String cleanDesc = p.description.replaceAll(RegExp(r'<[^>]*>'), '');
-        if (cleanDesc.length > 100)
+        if (cleanDesc.length > 100) {
           cleanDesc = "${cleanDesc.substring(0, 100)}...";
+        }
         buffer.writeln("📝 Details: $cleanDesc");
       }
     }

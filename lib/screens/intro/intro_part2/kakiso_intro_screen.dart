@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  THEME CONSTANTS
@@ -118,49 +119,51 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
       500.0,
     );
 
-    return Scaffold(
-      backgroundColor: kBgColor,
-      body: Stack(
-        children: [
-          // 1. Ambient Background
-          _buildAmbientBackground(),
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
+        backgroundColor: kBgColor,
+        body: Stack(
+          children: [
+            // 1. Ambient Background
+            _buildAmbientBackground(),
 
-          // 2. Foreground Content
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 16),
+            // 2. Foreground Content
+            SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
 
-                // --- HEADER ---
-                _buildHeader(activeIndex),
+                  // --- HEADER ---
+                  _buildHeader(activeIndex),
 
-                const Spacer(),
+                  const Spacer(),
 
-                // --- CAROUSEL ---
-                SizedBox(
-                  height: carouselHeight,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _pages.length,
-                    itemBuilder: (context, index) {
-                      return _buildAnimatedCard(index, activeIndex);
-                    },
+                  // --- CAROUSEL ---
+                  SizedBox(
+                    height: carouselHeight,
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: _pages.length,
+                      itemBuilder: (context, index) {
+                        return _buildAnimatedCard(index, activeIndex);
+                      },
+                    ),
                   ),
-                ),
 
-                const Spacer(),
+                  const Spacer(),
 
-                // --- INDICATOR ---
-                _buildPageIndicator(activeIndex),
-                const SizedBox(height: 24),
+                  // --- INDICATOR ---
+                  _buildPageIndicator(activeIndex),
+                  const SizedBox(height: 24),
 
-                // --- BOTTOM ACTIONS ---
-                _buildBottomActions(activeIndex),
-                const SizedBox(height: 20),
-              ],
+                  // --- BOTTOM ACTIONS ---
+                  _buildBottomActions(activeIndex),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

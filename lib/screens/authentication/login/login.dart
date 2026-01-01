@@ -14,6 +14,7 @@ import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
 // Colors reused from intro
 const Color kPrimaryDeep = Color(0xFF4B3DAF);
@@ -189,300 +190,309 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBgColor,
-      body: Stack(
-        children: [
-          _buildAmbientBackground(),
-          SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24.0,
-                  vertical: 24,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header with back button and logo
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          onPressed: () =>
-                              Get.offAll(() => const KakisoIntroScreen()),
-                          icon: const Icon(
-                            Iconsax.arrow_left_2,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        Image.asset('assets/logos/login-logo.png', height: 40),
-                        const SizedBox(width: 40),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Welcome Text
-                    const Text(
-                      'Welcome back 🙏',
-                      textAlign: TextAlign.left,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
-                        color: kPrimaryDeep,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Sign in to manage your catalogs, orders & profits.',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        color: Colors.black54,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Login Card
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 20,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
+        backgroundColor: kBgColor,
+        body: Stack(
+          children: [
+            _buildAmbientBackground(),
+            SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header with back button and logo
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // "Sign In" heading
-                          const Text(
-                            'Sign In',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: kPrimaryDeep,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Email Field
-                          TextFormField(
-                            controller: _emailController,
-                            decoration: _inputDecoration(
-                              label: 'Email Id',
-                              icon: Iconsax.sms,
-                            ),
-                            keyboardType: TextInputType.emailAddress,
-                            enabled: !_isLoading,
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Password Field
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: !_isPasswordVisible,
-                            decoration:
-                                _inputDecoration(
-                                  label: 'Password',
-                                  icon: Iconsax.lock_1,
-                                ).copyWith(
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _isPasswordVisible
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                      color: kAccentColor,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _isPasswordVisible =
-                                            !_isPasswordVisible;
-                                      });
-                                    },
-                                  ),
-                                ),
-                            enabled: !_isLoading,
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Forgot Password
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => Get.to(
-                                      () => const ForgotPasswordPage(),
-                                    ),
-                              child: const Text(
-                                'Forgot password?',
-                                style: TextStyle(
-                                  color: Color.fromARGB(183, 233, 30, 98),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Sign In Button
-                          _BouncyButton(
-                            onPressed: _isLoading ? () {} : _handleLogin,
-                            child: Container(
-                              width: double.infinity,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [kPrimaryDeep, kPrimaryLight],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: kPrimaryDeep.withValues(alpha: 0.35),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.6,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Sign in',
-                                        style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Sign Up Section - Enhanced Design
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: kPrimaryDeep.withValues(alpha: 0.1),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: kAccentColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Iconsax.user_add,
-                                  color: kAccentColor,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'New to KaKiSo?',
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Join the best reselling platform for dropshipping in India.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
+                          IconButton(
+                            onPressed: () =>
+                                Get.offAll(() => const KakisoIntroScreen()),
+                            icon: const Icon(
+                              Iconsax.arrow_left_2,
                               color: Colors.black54,
-                              fontSize: 12,
-                              height: 1.4,
-                              fontFamily: 'Poppins',
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          _BouncyButton(
-                            onPressed: _isLoading
-                                ? () {}
-                                : () => Get.to(() => const RegisterPage()),
-                            child: Container(
-                              width: double.infinity,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: kAccentColor,
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: kAccentColor.withValues(alpha: 0.15),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
+                          Image.asset(
+                            'assets/logos/login-logo.png',
+                            height: 40,
+                          ),
+                          const SizedBox(width: 40),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Welcome Text
+                      const Text(
+                        'Welcome back 🙏',
+                        textAlign: TextAlign.left,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                          color: kPrimaryDeep,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Sign in to manage your catalogs, orders & profits.',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          color: Colors.black54,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Login Card
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 20,
+                              offset: const Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // "Sign In" heading
+                            const Text(
+                              'Sign In',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: kPrimaryDeep,
                               ),
-                              child: const Center(
-                                child: Text(
-                                  'Create Account',
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Email Field
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: _inputDecoration(
+                                label: 'Email Id',
+                                icon: Iconsax.sms,
+                              ),
+                              keyboardType: TextInputType.emailAddress,
+                              enabled: !_isLoading,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Password Field
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: !_isPasswordVisible,
+                              decoration:
+                                  _inputDecoration(
+                                    label: 'Password',
+                                    icon: Iconsax.lock_1,
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _isPasswordVisible
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: kAccentColor,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _isPasswordVisible =
+                                              !_isPasswordVisible;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                              enabled: !_isLoading,
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Forgot Password
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () => Get.to(
+                                        () => const ForgotPasswordPage(),
+                                      ),
+                                child: const Text(
+                                  'Forgot password?',
                                   style: TextStyle(
-                                    color: kAccentColor,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                                    color: Color.fromARGB(183, 233, 30, 98),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
                                     fontFamily: 'Poppins',
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+
+                            // Sign In Button
+                            _BouncyButton(
+                              onPressed: _isLoading ? () {} : _handleLogin,
+                              child: Container(
+                                width: double.infinity,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [kPrimaryDeep, kPrimaryLight],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: kPrimaryDeep.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.6,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Sign in',
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+
+                      const SizedBox(height: 32),
+
+                      // Sign Up Section - Enhanced Design
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: kPrimaryDeep.withValues(alpha: 0.1),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: kAccentColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Iconsax.user_add,
+                                    color: kAccentColor,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'New to KaKiSo?',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Join the best reselling platform for dropshipping in India.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                                height: 1.4,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _BouncyButton(
+                              onPressed: _isLoading
+                                  ? () {}
+                                  : () => Get.to(() => const RegisterPage()),
+                              child: Container(
+                                width: double.infinity,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: kAccentColor,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: kAccentColor.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Create Account',
+                                    style: TextStyle(
+                                      color: kAccentColor,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

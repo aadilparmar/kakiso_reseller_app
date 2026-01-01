@@ -71,7 +71,7 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
                     ).createShader(rect);
                   },
                   child: const Text(
-                    'Cultured Collection',
+                    'Curated Collections',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,

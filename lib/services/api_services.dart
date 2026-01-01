@@ -497,8 +497,9 @@ class ApiService {
           if (key == 'reseller_store_city') metaCity = value;
           if (key == 'reseller_store_state') metaState = value;
           if (key == 'reseller_store_pincode') metaPincode = value;
-          if (key == 'reseller_store_gstin' || key == 'kakiso_gstin')
+          if (key == 'reseller_store_gstin' || key == 'kakiso_gstin') {
             metaGstin = value;
+          }
           if (key == 'reseller_store_phone') metaPhone = value;
           if (key == 'reseller_store_email') metaEmail = value;
         }

@@ -48,7 +48,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   FilterOptions _activeFilter = FilterOptions();
 
   // Price Filter
-  RangeValues _currentPriceRange = const RangeValues(0, 10000);
+  final RangeValues _currentPriceRange = const RangeValues(0, 10000);
   final double _maxFilterLimit = 20000;
 
   // Bulk Selection
@@ -404,7 +404,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                   const Center(
                     child: Padding(
                       padding: EdgeInsets.all(20),
-                      child: Text("No catalogues found. Create one."),
+                      child: Text("No catalogs found. Create one."),
                     ),
                   )
                 else

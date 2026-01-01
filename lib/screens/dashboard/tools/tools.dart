@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 import 'package:showcaseview/showcaseview.dart';
 
 // --- MODEL IMPORTS ---
@@ -523,414 +524,420 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         .length;
     final comingSoonCount = visibleTools.length - liveCount;
 
-    return Scaffold(
-      drawer: HomeDrawer(
-        userData: widget.userData,
-        selectedTitle: 'Tools',
-        onNavigate: _handleDrawerNavigation,
-        onLogoutPressed: () {
-          Navigator.pop(context);
-          _showLogoutConfirmation();
-        },
-      ),
-      backgroundColor: bgTop,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            SizedBox(width: 6),
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Iconsax.menu_1),
-                color: accentColor,
-                iconSize: 30,
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0),
-              child: Image.asset(
-                'assets/logos/login-logo.png',
-                height: 50,
-                width: 100,
-                fit: BoxFit.contain,
-              ),
-            ),
-            const Spacer(),
-
-            // 🌟 4. RESTART TOUR BUTTON
-            IconButton(
-              tooltip: "Guide",
-              icon: const Icon(Iconsax.info_circle, color: accentColor),
-              onPressed: _startTour,
-            ),
-
-            // --- CART ICON WITH BADGE ---
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(Iconsax.shopping_cart),
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
+        drawer: HomeDrawer(
+          userData: widget.userData,
+          selectedTitle: 'Tools',
+          onNavigate: _handleDrawerNavigation,
+          onLogoutPressed: () {
+            Navigator.pop(context);
+            _showLogoutConfirmation();
+          },
+        ),
+        backgroundColor: bgTop,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              SizedBox(width: 6),
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Iconsax.menu_1),
                   color: accentColor,
-                  iconSize: 25,
-                  onPressed: () => Get.to(() => const InventoryPage()),
+                  iconSize: 30,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Obx(() {
-                    final count = cartController.itemCount;
-                    if (count == 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 22,
-                        minHeight: 22,
-                      ),
-                      child: Center(
-                        child: Text(
-                          count > 99 ? '99+' : '$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0),
+                child: Image.asset(
+                  'assets/logos/login-logo.png',
+                  height: 50,
+                  width: 100,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const Spacer(),
+
+              // 🌟 4. RESTART TOUR BUTTON
+              IconButton(
+                tooltip: "Guide",
+                icon: const Icon(Iconsax.info_circle, color: accentColor),
+                onPressed: _startTour,
+              ),
+
+              // --- CART ICON WITH BADGE ---
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Iconsax.shopping_cart),
+                    color: accentColor,
+                    iconSize: 25,
+                    onPressed: () => Get.to(() => const InventoryPage()),
+                  ),
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Obx(() {
+                      final count = cartController.itemCount;
+                      if (count == 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 22,
+                          minHeight: 22,
+                        ),
+                        child: Center(
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
-                ),
-              ],
-            ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
 
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Iconsax.heart),
-              color: accentColor,
-              iconSize: 25,
-              onPressed: () {
-                Get.to(() => WishlistScreen());
-              },
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [bgTop, bgBottom],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Iconsax.heart),
+                color: accentColor,
+                iconSize: 25,
+                onPressed: () {
+                  Get.to(() => WishlistScreen());
+                },
+              ),
+              const SizedBox(width: 16),
+            ],
           ),
         ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              // ── HEADER ────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tools roadmap',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Poppins',
-                        color: textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Use the tools that are ready today, and see what’s coming next inside Kakiso.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'Poppins',
-                        color: textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Progress-like summary row
-                    // 6. WRAP SUMMARY IN SHOWCASE
-                    Showcase(
-                      key: _summaryKey,
-                      title: "Roadmap Status",
-                      description:
-                          "Quickly see how many tools are live vs coming soon.",
-                      overlayColor: Colors.black.withOpacity(0.7),
-                      titleTextStyle: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
-                        fontSize: 16,
-                      ),
-                      descTextStyle: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        fontSize: 12,
-                      ),
-                      targetBorderRadius: BorderRadius.circular(10),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(999),
-                              gradient: const LinearGradient(
-                                colors: [accentColor, accentPurple],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$liveCount live • $comingSoonCount coming soon',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'Poppins',
-                              color: textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── CHIPS ROW ─────────────────────────────────────────────
-              // 7. WRAP FILTERS IN SHOWCASE
-              Showcase(
-                key: _filterKey,
-                title: "Tool Filters",
-                description:
-                    "Tap to filter tools by category (e.g., Marketing, Automation).",
-                overlayColor: Colors.black.withOpacity(0.7),
-                titleTextStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
-                  fontSize: 16,
-                ),
-                descTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontSize: 12,
-                ),
-                targetBorderRadius: BorderRadius.circular(25),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 2,
-                  ),
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'All',
-                        selected: selectedChip == 'All',
-                        onTap: () => setState(() => selectedChip = 'All'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Live',
-                        selected: selectedChip == 'Live',
-                        onTap: () => setState(() => selectedChip = 'Live'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Coming Soon',
-                        selected: selectedChip == 'Coming Soon',
-                        onTap: () =>
-                            setState(() => selectedChip = 'Coming Soon'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Automation',
-                        selected: selectedChip == 'Automation',
-                        onTap: () =>
-                            setState(() => selectedChip = 'Automation'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Marketing',
-                        selected: selectedChip == 'Marketing',
-                        onTap: () => setState(() => selectedChip = 'Marketing'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Insights',
-                        selected: selectedChip == 'Insights',
-                        onTap: () => setState(() => selectedChip = 'Insights'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── SEARCH BAR ────────────────────────────────────────────
-              // 8. WRAP SEARCH IN SHOWCASE
-              Showcase(
-                key: _searchKey,
-                title: "Search",
-                description: "Type here to find a specific tool instantly.",
-                overlayColor: Colors.black.withOpacity(0.7),
-                titleTextStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
-                  fontSize: 16,
-                ),
-                descTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontSize: 12,
-                ),
-                targetBorderRadius: BorderRadius.circular(14),
-                child: Padding(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [bgTop, bgBottom],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                // ── HEADER ────────────────────────────────────────────────
+                Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 10,
                   ),
-                  child: Container(
-                    height: 46,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: cardBorderColor),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tools roadmap',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Poppins',
+                          color: textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Use the tools that are ready today, and see what’s coming next inside Kakiso.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'Poppins',
+                          color: textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Progress-like summary row
+                      // 6. WRAP SUMMARY IN SHOWCASE
+                      Showcase(
+                        key: _summaryKey,
+                        title: "Roadmap Status",
+                        description:
+                            "Quickly see how many tools are live vs coming soon.",
+                        overlayColor: Colors.black.withOpacity(0.7),
+                        titleTextStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: accentColor,
+                          fontSize: 16,
+                        ),
+                        descTextStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                          fontSize: 12,
+                        ),
+                        targetBorderRadius: BorderRadius.circular(10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(999),
+                                gradient: const LinearGradient(
+                                  colors: [accentColor, accentPurple],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$liveCount live • $comingSoonCount coming soon',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'Poppins',
+                                color: textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── CHIPS ROW ─────────────────────────────────────────────
+                // 7. WRAP FILTERS IN SHOWCASE
+                Showcase(
+                  key: _filterKey,
+                  title: "Tool Filters",
+                  description:
+                      "Tap to filter tools by category (e.g., Marketing, Automation).",
+                  overlayColor: Colors.black.withOpacity(0.7),
+                  titleTextStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                    fontSize: 16,
+                  ),
+                  descTextStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                    fontSize: 12,
+                  ),
+                  targetBorderRadius: BorderRadius.circular(25),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 2,
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Iconsax.search_normal,
-                          color: textMuted,
-                          size: 18,
+                        _FilterChip(
+                          label: 'All',
+                          selected: selectedChip == 'All',
+                          onTap: () => setState(() => selectedChip = 'All'),
                         ),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            style: const TextStyle(
-                              color: textPrimary,
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                            ),
-                            decoration: const InputDecoration(
-                              hintText: 'Search tools...',
-                              hintStyle: TextStyle(
-                                color: textMuted,
-                                fontFamily: 'Poppins',
-                                fontSize: 13,
-                              ),
-                              border: InputBorder.none,
-                            ),
-                            onChanged: (v) => setState(() => query = v),
-                          ),
+                        _FilterChip(
+                          label: 'Live',
+                          selected: selectedChip == 'Live',
+                          onTap: () => setState(() => selectedChip = 'Live'),
                         ),
-                        if (query.isNotEmpty)
-                          GestureDetector(
-                            onTap: () => setState(() => query = ''),
-                            child: const Icon(
-                              Icons.close,
-                              size: 18,
-                              color: textMuted,
-                            ),
-                          ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Coming Soon',
+                          selected: selectedChip == 'Coming Soon',
+                          onTap: () =>
+                              setState(() => selectedChip = 'Coming Soon'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Automation',
+                          selected: selectedChip == 'Automation',
+                          onTap: () =>
+                              setState(() => selectedChip = 'Automation'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Marketing',
+                          selected: selectedChip == 'Marketing',
+                          onTap: () =>
+                              setState(() => selectedChip = 'Marketing'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Insights',
+                          selected: selectedChip == 'Insights',
+                          onTap: () =>
+                              setState(() => selectedChip = 'Insights'),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
 
-              // ── TIMELINE LIST ────────────────────────────────────────
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
+                // ── SEARCH BAR ────────────────────────────────────────────
+                // 8. WRAP SEARCH IN SHOWCASE
+                Showcase(
+                  key: _searchKey,
+                  title: "Search",
+                  description: "Type here to find a specific tool instantly.",
+                  overlayColor: Colors.black.withOpacity(0.7),
+                  titleTextStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                    fontSize: 16,
                   ),
-                  child: visibleTools.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          itemCount: visibleTools.length,
-                          itemBuilder: (context, index) {
-                            final tool = visibleTools[index];
-                            final isFirst = index == 0;
-                            final isLast = index == visibleTools.length - 1;
-                            final isLive = _liveToolIds.contains(tool.id);
-
-                            // 9. WRAP FIRST TOOL IN SHOWCASE
-                            Widget toolCard = _TimelineToolCard(
-                              tool: tool,
-                              isFirst: isFirst,
-                              isLast: isLast,
-                              isLive: isLive,
-                              onTap: () {
-                                if (isLive) {
-                                  // Check if it's a catalog tool that requires full redirection
-                                  // (Mimics Drawer's "Get.offAll" behavior)
-                                  if (_catalogRedirectIds.contains(tool.id)) {
-                                    Get.offAll(
-                                      () => NavigationMenu(
-                                        userData: widget.userData,
-                                        initialIndex: 3, // Catalog Index
-                                      ),
-                                      // Passing the argument for guide overlay
-                                      arguments: {'active_tool_guide': tool.id},
-                                    );
-                                  } else {
-                                    // Standard Navigation (Push)
-                                    Get.to(() => tool.pageBuilder(context));
-                                  }
-                                } else {
-                                  // Show coming soon modal
-                                  _showComingSoonSheet(tool);
-                                }
-                              },
-                            );
-
-                            if (index == 0) {
-                              return Showcase(
-                                key: _firstToolKey,
-                                title: "Explore Tools",
-                                description:
-                                    "Tap any tool to launch it. 'Coming Soon' tools will notify you when ready.",
-                                overlayColor: Colors.black.withOpacity(0.7),
-                                titleTextStyle: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: accentColor,
-                                  fontSize: 16,
+                  descTextStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                    fontSize: 12,
+                  ),
+                  targetBorderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Container(
+                      height: 46,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: surfaceColor,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: cardBorderColor),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Iconsax.search_normal,
+                            color: textMuted,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              style: const TextStyle(
+                                color: textPrimary,
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: 'Search tools...',
+                                hintStyle: TextStyle(
+                                  color: textMuted,
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
                                 ),
-                                descTextStyle: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                  fontSize: 12,
-                                ),
-                                targetBorderRadius: BorderRadius.circular(18),
-                                child: toolCard,
-                              );
-                            }
-
-                            return toolCard;
-                          },
-                        ),
+                                border: InputBorder.none,
+                              ),
+                              onChanged: (v) => setState(() => query = v),
+                            ),
+                          ),
+                          if (query.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => setState(() => query = ''),
+                              child: const Icon(
+                                Icons.close,
+                                size: 18,
+                                color: textMuted,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+
+                // ── TIMELINE LIST ────────────────────────────────────────
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    child: visibleTools.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.builder(
+                            itemCount: visibleTools.length,
+                            itemBuilder: (context, index) {
+                              final tool = visibleTools[index];
+                              final isFirst = index == 0;
+                              final isLast = index == visibleTools.length - 1;
+                              final isLive = _liveToolIds.contains(tool.id);
+
+                              // 9. WRAP FIRST TOOL IN SHOWCASE
+                              Widget toolCard = _TimelineToolCard(
+                                tool: tool,
+                                isFirst: isFirst,
+                                isLast: isLast,
+                                isLive: isLive,
+                                onTap: () {
+                                  if (isLive) {
+                                    // Check if it's a catalog tool that requires full redirection
+                                    // (Mimics Drawer's "Get.offAll" behavior)
+                                    if (_catalogRedirectIds.contains(tool.id)) {
+                                      Get.offAll(
+                                        () => NavigationMenu(
+                                          userData: widget.userData,
+                                          initialIndex: 3, // Catalog Index
+                                        ),
+                                        // Passing the argument for guide overlay
+                                        arguments: {
+                                          'active_tool_guide': tool.id,
+                                        },
+                                      );
+                                    } else {
+                                      // Standard Navigation (Push)
+                                      Get.to(() => tool.pageBuilder(context));
+                                    }
+                                  } else {
+                                    // Show coming soon modal
+                                    _showComingSoonSheet(tool);
+                                  }
+                                },
+                              );
+
+                              if (index == 0) {
+                                return Showcase(
+                                  key: _firstToolKey,
+                                  title: "Explore Tools",
+                                  description:
+                                      "Tap any tool to launch it. 'Coming Soon' tools will notify you when ready.",
+                                  overlayColor: Colors.black.withOpacity(0.7),
+                                  titleTextStyle: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: accentColor,
+                                    fontSize: 16,
+                                  ),
+                                  descTextStyle: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                    fontSize: 12,
+                                  ),
+                                  targetBorderRadius: BorderRadius.circular(18),
+                                  child: toolCard,
+                                );
+                              }
+
+                              return toolCard;
+                            },
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -95,6 +95,7 @@ class ProductInfoHeader extends StatelessWidget {
 
     // 🚀 Loop to spawn 10 hearts
     for (int i = 0; i < 10; i++) {
+      // ignore: use_build_context_synchronously
       _spawnSingleHeart(context, startX, startY);
 
       // Stagger them slightly for a "flow" effect (40ms - 80ms delay)

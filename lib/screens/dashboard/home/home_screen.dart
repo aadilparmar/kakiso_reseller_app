@@ -22,6 +22,7 @@ import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
 // --- WIDGET IMPORTS ---
 import 'widgets/home_drawer.dart';
@@ -254,215 +255,217 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-
-      // --- APP BAR ---
-      appBar: AppBar(
+    return DoubleBackToExitWrapper(
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Iconsax.menu_1),
-                color: accentColor,
-                iconSize: 30,
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0),
-              child: Image.asset(
-                'assets/logos/login-logo.png',
-                height: 50,
-                width: 100,
-                fit: BoxFit.contain,
-              ),
-            ),
 
-            const Spacer(),
-
-            // 1. Notification Icon with Dynamic Badge
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(Iconsax.notification),
+        // --- APP BAR ---
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Iconsax.menu_1),
                   color: accentColor,
-                  iconSize: 25,
-                  onPressed: () => Get.to(
-                    () => const NotificationScreen(),
-                    transition: Transition.rightToLeft,
-                  ),
+                  iconSize: 30,
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Obx(() {
-                    final unreadCount = notificationController.notifications
-                        .where((n) => !n.isRead)
-                        .length;
-
-                    if (unreadCount == 0) return const SizedBox.shrink();
-
-                    return Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                    );
-                  }),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0),
+                child: Image.asset(
+                  'assets/logos/login-logo.png',
+                  height: 50,
+                  width: 100,
+                  fit: BoxFit.contain,
                 ),
-              ],
-            ),
+              ),
 
-            const SizedBox(width: 4),
+              const Spacer(),
 
-            // 2. Cart Icon with Badge
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  icon: const Icon(Iconsax.shopping_cart),
-                  color: accentColor,
-                  iconSize: 25,
-                  onPressed: () => Get.to(() => const InventoryPage()),
-                ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Obx(() {
-                    final count = cartController.itemCount;
-                    if (count == 0) return const SizedBox.shrink();
-                    return Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 20,
-                        minHeight: 20,
-                      ),
-                      child: Center(
-                        child: Text(
-                          count > 99 ? '99+' : '$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-              ],
-            ),
-
-            const SizedBox(width: 4),
-
-            // 3. Wishlist Icon
-            IconButton(
-              icon: const Icon(Iconsax.heart),
-              color: accentColor,
-              iconSize: 25,
-              onPressed: () {
-                Get.to(() => WishlistScreen());
-              },
-            ),
-
-            const SizedBox(width: 16),
-          ],
-        ),
-      ),
-
-      // --- DRAWER ---
-      drawer: HomeDrawer(
-        userData: _userData,
-        selectedTitle: _selectedTitle,
-        onNavigate: _handleNavigation,
-        onLogoutPressed: () {
-          Navigator.pop(context);
-          _showLogoutConfirmation();
-        },
-      ),
-
-      // --- BODY ---
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // SEARCH
-            SearchHeader(
-              readOnly: true,
-              onTap: () {
-                Get.to(
-                  () => const UniversalSearchPage(),
-                  transition: Transition.fadeIn,
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            const VideoBannerCarousel(),
-            // SECTIONS
-            const StorySection(),
-            const SizedBox(height: 16),
-            const RecommendedSection(),
-            const SizedBox(height: 10),
-            const FlashSaleBanner(),
-            const SizedBox(height: 16),
-            const TopRankingSection(),
-            const SizedBox(height: 6),
-            const NewArrivalSection(),
-            const TrendingProducts(),
-            const SizedBox(height: 16),
-            const CuratedCollections(),
-            const SizedBox(height: 16),
-
-            // 🔹 Budget Store Section
-            Obx(() {
-              if (homeProductsController.isLoading.value) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (homeProductsController.errorMessage.isNotEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    homeProductsController.errorMessage.value,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
+              // 1. Notification Icon with Dynamic Badge
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Iconsax.notification),
+                    color: accentColor,
+                    iconSize: 25,
+                    onPressed: () => Get.to(
+                      () => const NotificationScreen(),
+                      transition: Transition.rightToLeft,
                     ),
                   ),
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Obx(() {
+                      final unreadCount = notificationController.notifications
+                          .where((n) => !n.isRead)
+                          .length;
+
+                      if (unreadCount == 0) return const SizedBox.shrink();
+
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 4),
+
+              // 2. Cart Icon with Badge
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Iconsax.shopping_cart),
+                    color: accentColor,
+                    iconSize: 25,
+                    onPressed: () => Get.to(() => const InventoryPage()),
+                  ),
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Obx(() {
+                      final count = cartController.itemCount;
+                      if (count == 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
+                        child: Center(
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 4),
+
+              // 3. Wishlist Icon
+              IconButton(
+                icon: const Icon(Iconsax.heart),
+                color: accentColor,
+                iconSize: 25,
+                onPressed: () {
+                  Get.to(() => WishlistScreen());
+                },
+              ),
+
+              const SizedBox(width: 16),
+            ],
+          ),
+        ),
+
+        // --- DRAWER ---
+        drawer: HomeDrawer(
+          userData: _userData,
+          selectedTitle: _selectedTitle,
+          onNavigate: _handleNavigation,
+          onLogoutPressed: () {
+            Navigator.pop(context);
+            _showLogoutConfirmation();
+          },
+        ),
+
+        // --- BODY ---
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // SEARCH
+              SearchHeader(
+                readOnly: true,
+                onTap: () {
+                  Get.to(
+                    () => const UniversalSearchPage(),
+                    transition: Transition.fadeIn,
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              const VideoBannerCarousel(),
+              // SECTIONS
+              const StorySection(),
+              const SizedBox(height: 16),
+              const RecommendedSection(),
+              const SizedBox(height: 10),
+              const FlashSaleBanner(),
+              const SizedBox(height: 16),
+              const TopRankingSection(),
+              const SizedBox(height: 6),
+              const NewArrivalSection(),
+              const TrendingProducts(),
+              const SizedBox(height: 16),
+              const CuratedCollections(),
+              const SizedBox(height: 16),
+
+              // 🔹 Budget Store Section
+              Obx(() {
+                if (homeProductsController.isLoading.value) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (homeProductsController.errorMessage.isNotEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Text(
+                      homeProductsController.errorMessage.value,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                }
+
+                final products = homeProductsController.allProducts;
+                return BudgetStoreSection(
+                  products: products,
+                  onProductAddedToCart: showCustomCartSnackbar,
                 );
-              }
+              }),
 
-              final products = homeProductsController.allProducts;
-              return BudgetStoreSection(
-                products: products,
-                onProductAddedToCart: showCustomCartSnackbar,
-              );
-            }),
-
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
