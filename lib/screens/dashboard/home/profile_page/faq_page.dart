@@ -30,30 +30,32 @@ class FAQPage extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildFAQItem(
-            "How do I earn money on KaKiSo?",
-            "Browse products, share them on WhatsApp or Facebook with your margin added. When you get an order, place it on KaKiSo. We deliver, you earn!",
-          ),
-          _buildFAQItem(
-            "When will I get my payout?",
-            "Margins are transferred to your bank account every Wednesday for all orders delivered in the previous week.",
-          ),
-          _buildFAQItem(
-            "Is there a return policy?",
-            "Yes! We offer a 7-day easy return policy for defective or incorrect products. Check the product page for specific details.",
-          ),
-          _buildFAQItem(
-            "Do you offer Cash on Delivery (COD)?",
-            "Yes, COD is available for most pin codes across India.",
-          ),
-          _buildFAQItem(
-            "How can I track my order?",
-            "Go to the 'Orders' section in your profile to see real-time tracking updates.",
-          ),
-        ],
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildFAQItem(
+              "How do I earn money on KaKiSo?",
+              "Browse products, share them on WhatsApp or Facebook with your margin added. When you get an order, place it on KaKiSo. We deliver, you earn!",
+            ),
+            _buildFAQItem(
+              "When will I get my payout?",
+              "Margins are transferred to your bank account every Wednesday for all orders delivered in the previous week.",
+            ),
+            _buildFAQItem(
+              "Is there a return policy?",
+              "Yes! We offer a 7-day easy return policy for defective or incorrect products. Check the product page for specific details.",
+            ),
+            _buildFAQItem(
+              "Do you offer Cash on Delivery (COD)?",
+              "Yes, COD is available for most pin codes across India.",
+            ),
+            _buildFAQItem(
+              "How can I track my order?",
+              "Go to the 'Orders' section in your profile to see real-time tracking updates.",
+            ),
+          ],
+        ),
       ),
     );
   }

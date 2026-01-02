@@ -39,77 +39,94 @@ class _BankUpiPageState extends State<BankUpiPage> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionTitle("Bank Account Details"),
-              _buildCard([
-                _buildTextField(
-                  "Account Number",
-                  _accController,
-                  Iconsax.card,
-                  isNumber: true,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField("IFSC Code", _ifscController, Iconsax.bank),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  "Account Holder Name",
-                  _nameController,
-                  Iconsax.user,
-                ),
-              ]),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle("Bank Account Details"),
+                      _buildCard([
+                        _buildTextField(
+                          "Account Number",
+                          _accController,
+                          Iconsax.card,
+                          isNumber: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          "IFSC Code",
+                          _ifscController,
+                          Iconsax.bank,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          "Account Holder Name",
+                          _nameController,
+                          Iconsax.user,
+                        ),
+                      ]),
 
-              const SizedBox(height: 24),
-              _buildSectionTitle("UPI Details"),
-              _buildCard([
-                _buildTextField(
-                  "UPI ID (e.g. name@okhdfcbank)",
-                  _upiController,
-                  Iconsax.scan,
+                      const SizedBox(height: 24),
+                      _buildSectionTitle("UPI Details"),
+                      _buildCard([
+                        _buildTextField(
+                          "UPI ID (e.g. name@okhdfcbank)",
+                          _upiController,
+                          Iconsax.scan,
+                        ),
+                      ]),
+                      // Extra padding at bottom for scrolling past FAB/Buttons if needed
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
-              ]),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        color: Colors.white,
-        child: ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              // TODO: Add your backend save logic here
-              Get.snackbar(
-                "Success",
-                "Bank details saved successfully!",
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-              );
-              Navigator.pop(context);
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2563EB),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const AutoTranslate(
-            child: Text(
-              "Save Details",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 16,
-                color: Colors.white,
               ),
             ),
-          ),
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      // TODO: Add your backend save logic here
+                      Get.snackbar(
+                        "Success",
+                        "Bank details saved successfully!",
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                      );
+                      Navigator.pop(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const AutoTranslate(
+                    child: Text(
+                      "Save Details",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

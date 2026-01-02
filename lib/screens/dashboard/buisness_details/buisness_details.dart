@@ -1,11 +1,15 @@
 // lib/business_details.dart
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image_picker/image_picker.dart'; // Requires image_picker package
+import 'package:path_provider/path_provider.dart'; // Requires path_provider package
+import 'package:path/path.dart' as path; // Requires path package
 
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
@@ -35,6 +39,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
   UserData? _currentUser;
 
+  // Image Picker
+  File? _logoFile;
+  final ImagePicker _picker = ImagePicker();
+
   // Text Controllers
   final TextEditingController _businessNameCtrl = TextEditingController();
   final TextEditingController _ownerNameCtrl = TextEditingController();
@@ -46,7 +54,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   final TextEditingController _pincodeCtrl = TextEditingController();
   final TextEditingController _gstinCtrl = TextEditingController();
 
-  // These controllers are now bound to the Autocomplete widgets
+  // Autocomplete Controllers
   final TextEditingController _stateCtrl = TextEditingController();
   final TextEditingController _cityCtrl = TextEditingController();
   final TextEditingController _countryCtrl = TextEditingController(
@@ -62,11 +70,10 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   String? _selectedState;
   String? _selectedCity;
 
-  // Keys to force rebuild Autocomplete widgets when data changes programmatically
   Key _stateFieldKey = UniqueKey();
   Key _cityFieldKey = UniqueKey();
 
-  // 🔹 DATA: Comprehensive State & City Mapping
+  // 🔹 DATA: State & City Mapping
   final Map<String, List<String>> _stateCityMap = {
     'Andaman and Nicobar Islands': [
       'Port Blair',
@@ -725,6 +732,32 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     }
   }
 
+  // 🔹 LOGO LOGIC
+  Future<void> _pickLogo() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final String fileName =
+          'business_logo_${DateTime.now().millisecondsSinceEpoch}${path.extension(image.path)}';
+      final String localPath = path.join(appDir.path, fileName);
+
+      final File savedImage = await File(image.path).copy(localPath);
+
+      setState(() {
+        _logoFile = savedImage;
+      });
+    } catch (e) {
+      debugPrint('Error picking logo: $e');
+      Get.snackbar(
+        'Error',
+        'Could not pick image',
+        backgroundColor: Colors.red.shade100,
+      );
+    }
+  }
+
   Future<void> _loadSavedDetails() async {
     try {
       final String? jsonStr = await _storage.read(key: _storageKey);
@@ -734,6 +767,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
       final String savedState = (data['state'] as String?)?.trim() ?? '';
       final String savedCity = (data['city'] as String?)?.trim() ?? '';
+
+      // Load Logo
+      final String? logoPath = data['logo_path'];
+      if (logoPath != null && logoPath.isNotEmpty) {
+        final File file = File(logoPath);
+        if (await file.exists()) {
+          setState(() => _logoFile = file);
+        }
+      }
 
       setState(() {
         _businessNameCtrl.text = data['businessName'] ?? _businessNameCtrl.text;
@@ -752,7 +794,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           _selectedState = null;
         }
         _stateCtrl.text = _selectedState ?? savedState;
-        // Key change forces rebuild of widget with new initialValue
         _stateFieldKey = UniqueKey();
 
         if (_selectedState != null &&
@@ -762,7 +803,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           _selectedCity = null;
         }
         _cityCtrl.text = _selectedCity ?? savedCity;
-        // Key change forces rebuild of widget with new initialValue
         _cityFieldKey = UniqueKey();
 
         _pincodeCtrl.text = data['pincode'] ?? '';
@@ -808,7 +848,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           _selectedState ??= null;
         }
         _stateCtrl.text = _selectedState ?? remoteState;
-        _stateFieldKey = UniqueKey(); // Refresh State Autocomplete
+        _stateFieldKey = UniqueKey();
 
         if (_selectedState != null &&
             _stateCityMap[_selectedState]!.contains(remoteCity)) {
@@ -817,7 +857,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           _selectedCity = null;
         }
         _cityCtrl.text = _selectedCity ?? remoteCity;
-        _cityFieldKey = UniqueKey(); // Refresh City Autocomplete
+        _cityFieldKey = UniqueKey();
 
         _pincodeCtrl.text = remoteData['pincode'] ?? _pincodeCtrl.text;
         _gstinCtrl.text = remoteData['gstin'] ?? _gstinCtrl.text;
@@ -826,6 +866,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
             _whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text;
         _hasSavedDetails = true;
       });
+
+      // Merge remote data with local logo path (don't overwrite local logo with null from remote)
+      final String? currentJson = await _storage.read(key: _storageKey);
+      Map<String, dynamic> currentMap = {};
+      if (currentJson != null) currentMap = jsonDecode(currentJson);
+
+      remoteData['logo_path'] =
+          currentMap['logo_path']; // Preserve local logo path
+
       await _storage.write(key: _storageKey, value: jsonEncode(remoteData));
     } catch (e) {
       debugPrint('Failed to fetch remote business details: $e');
@@ -854,7 +903,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   Future<void> _onSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // STRICT VALIDATION
     if (_selectedState == null || _selectedState!.trim().isEmpty) {
       Get.snackbar(
         'State Required',
@@ -904,6 +952,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       "country": 'India',
       "pincode": _pincodeCtrl.text.trim(),
       "gstin": _gstinCtrl.text.trim(),
+      "logo_path": _logoFile?.path, // Saved locally
     };
 
     try {
@@ -1059,7 +1108,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     );
   }
 
-  // Helper widget to build Searchable Dropdowns (Autocomplete)
   Widget _buildSearchableDropdown({
     Key? key,
     required String label,
@@ -1086,7 +1134,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       onSelected: onSelected,
       fieldViewBuilder:
           (context, textEditingController, focusNode, onFieldSubmitted) {
-            // Important: Keep the main controller in sync so we can read from it later
             if (currentValue != null &&
                 textEditingController.text.isEmpty &&
                 focusNode.hasFocus == false) {
@@ -1121,7 +1168,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
             elevation: 4.0,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              width: MediaQuery.of(context).size.width - 64, // Matches padding
+              width: MediaQuery.of(context).size.width - 64,
               constraints: const BoxConstraints(maxHeight: 200),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
@@ -1221,6 +1268,61 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                         key: _formKey,
                         child: Column(
                           children: [
+                            // 📸 1. LOGO SECTION (OPTIONAL)
+                            _buildSectionCard(
+                              title: 'Business Logo',
+                              child: Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: _pickLogo,
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                        image: _logoFile != null
+                                            ? DecorationImage(
+                                                image: FileImage(_logoFile!),
+                                                fit: BoxFit.cover,
+                                              )
+                                            : null,
+                                      ),
+                                      child: _logoFile == null
+                                          ? const Icon(
+                                              Iconsax.camera,
+                                              color: Colors.grey,
+                                              size: 30,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    "Tap to upload logo",
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    "This logo will be displayed on your invoices and generated PDFs.",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
                             _buildSectionCard(
                               title: 'Business Profile',
                               child: Column(
@@ -1347,8 +1449,6 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     icon: Iconsax.location,
                                   ),
                                   const SizedBox(height: 12),
-
-                                  // 1. STATE SEARCHABLE DROPDOWN
                                   _buildSearchableDropdown(
                                     key: _stateFieldKey,
                                     label: 'State',
@@ -1359,27 +1459,20 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                       setState(() {
                                         _selectedState = selection;
                                         _stateCtrl.text = selection;
-                                        // Clear City when state changes
                                         _selectedCity = null;
                                         _cityCtrl.clear();
-                                        // Force rebuild of City widget to reflect empty state
                                         _cityFieldKey = UniqueKey();
                                       });
                                     },
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
+                                      if (value == null || value.isEmpty)
                                         return 'Required';
-                                      }
-                                      if (!_indianStates.contains(value)) {
+                                      if (!_indianStates.contains(value))
                                         return 'Select valid state';
-                                      }
                                       return null;
                                     },
                                   ),
-
                                   const SizedBox(height: 12),
-
-                                  // 2. CITY SEARCHABLE DROPDOWN
                                   _buildSearchableDropdown(
                                     key: _cityFieldKey,
                                     label: 'City',
@@ -1395,18 +1488,14 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                     },
                                     validator: (value) {
                                       if (_selectedState == null) return null;
-                                      if (value == null || value.isEmpty) {
+                                      if (value == null || value.isEmpty)
                                         return 'Required';
-                                      }
-                                      if (!_availableCities.contains(value)) {
+                                      if (!_availableCities.contains(value))
                                         return 'Select valid city';
-                                      }
                                       return null;
                                     },
                                   ),
-
                                   const SizedBox(height: 12),
-
                                   Row(
                                     children: [
                                       Expanded(
@@ -1443,13 +1532,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                                           validator: (v) {
                                             if (v == null || v.trim().isEmpty)
                                               return 'Required';
-                                            // STRICT REGEX: Exactly 6 digits, CANNOT start with 0
                                             final regex = RegExp(
                                               r'^[1-9][0-9]{5}$',
                                             );
-                                            if (!regex.hasMatch(v.trim())) {
+                                            if (!regex.hasMatch(v.trim()))
                                               return 'Invalid Pincode';
-                                            }
                                             return null;
                                           },
                                         ),
@@ -1460,29 +1547,18 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                               ),
                             ),
                             const SizedBox(height: 16),
+                            // 📄 GST SECTION (OPTIONAL - REMOVED VISIBLE 'OPTIONAL' LABEL)
                             _buildSectionCard(
-                              title: 'GST & Compliance (Optional)',
+                              title: 'GST & Compliance',
                               child: Column(
                                 children: [
                                   _buildTextField(
                                     controller: _gstinCtrl,
-                                    label: 'GSTIN (optional)',
+                                    label: 'GSTIN',
                                     hint: 'Eg. 22AAAAA0000A1Z5',
                                     icon: Iconsax.document_text,
                                     textCapitalization:
                                         TextCapitalization.characters,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'If you don’t have GST, you can leave this empty.',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey,
-                                        fontFamily: 'Poppins',
-                                      ),
-                                    ),
                                   ),
                                 ],
                               ),
@@ -1836,7 +1912,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                 ),
               ),
               const SizedBox(width: 6),
-              if (title != 'GST & Compliance (Optional)')
+              if (title != 'GST & Compliance' && title != 'Business Logo')
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,

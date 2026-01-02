@@ -80,92 +80,94 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         elevation: 0.5,
         leading: const BackButton(color: Colors.black),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // 1. HERO SECTION
-            Container(
-              width: double.infinity,
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-              child: Column(
-                children: [
-                  const Text(
-                    "Hello, how can we help?",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // 1. HERO SECTION
+              Container(
+                width: double.infinity,
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                child: Column(
+                  children: [
+                    const Text(
+                      "Hello, how can we help?",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Our team is available 10 AM - 7 PM",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+
+                    // CONTACT CARDS ROW
+                    Row(
+                      children: [
+                        // WhatsApp Card (Highlighted)
+                        Expanded(
+                          child: _buildContactCard(
+                            icon: Iconsax.message,
+                            title: "Chat on WhatsApp",
+                            subtitle: "Fastest Support",
+                            color: const Color(0xFF25D366), // WhatsApp Green
+                            bgColor: const Color(0xFFE8F5E9),
+                            onTap: _launchWhatsApp,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Email Card
+                        Expanded(
+                          child: _buildContactCard(
+                            icon: Iconsax.sms,
+                            title: "Email Us",
+                            subtitle: "Get response in 24h",
+                            color: const Color(0xFF2563EB), // KaKiSo Blue
+                            bgColor: const Color(0xFFE3F2FD),
+                            onTap: _launchEmail,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Footer
+              Column(
+                children: [
+                  Image.asset(
+                    'assets/logos/login-logo.png', // Ensure this exists
+                    height: 30,
+                    color: Colors.grey.shade300,
+                    errorBuilder: (_, __, ___) => const SizedBox(),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    "Our team is available 10 AM - 7 PM",
+                  Text(
+                    "KaKiSo Support",
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 12,
-                      color: Colors.grey,
+                      color: Colors.grey.shade400,
                     ),
                   ),
-                  const SizedBox(height: 25),
-
-                  // CONTACT CARDS ROW
-                  Row(
-                    children: [
-                      // WhatsApp Card (Highlighted)
-                      Expanded(
-                        child: _buildContactCard(
-                          icon: Iconsax.message,
-                          title: "Chat on WhatsApp",
-                          subtitle: "Fastest Support",
-                          color: const Color(0xFF25D366), // WhatsApp Green
-                          bgColor: const Color(0xFFE8F5E9),
-                          onTap: _launchWhatsApp,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Email Card
-                      Expanded(
-                        child: _buildContactCard(
-                          icon: Iconsax.sms,
-                          title: "Email Us",
-                          subtitle: "Get response in 24h",
-                          color: const Color(0xFF2563EB), // KaKiSo Blue
-                          bgColor: const Color(0xFFE3F2FD),
-                          onTap: _launchEmail,
-                        ),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 40),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Footer
-            Column(
-              children: [
-                Image.asset(
-                  'assets/logos/login-logo.png', // Ensure this exists
-                  height: 30,
-                  color: Colors.grey.shade300,
-                  errorBuilder: (_, __, ___) => const SizedBox(),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "KaKiSo Support",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

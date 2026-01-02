@@ -21,38 +21,40 @@ class FeesAndChargesPage extends StatelessWidget {
         elevation: 0.5,
         leading: const BackButton(color: Colors.black),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildCard(
-              "Reseller Commission",
-              "0%",
-              "We charge zero commission on your margin. You keep 100% of what you earn.",
-              Iconsax.money_tick,
-            ),
-            const SizedBox(height: 12),
-            _buildCard(
-              "Shipping Charges",
-              "Free*",
-              "Free shipping on orders above ₹500. Standard charge of ₹40 applies otherwise.",
-              Iconsax.truck_fast,
-            ),
-            const SizedBox(height: 12),
-            _buildCard(
-              "COD Charges",
-              "₹0",
-              "Cash on Delivery is free for your customers.",
-              Iconsax.wallet_money,
-            ),
-            const SizedBox(height: 12),
-            _buildCard(
-              "Return Fee",
-              "₹0",
-              "Returns are free for defective items. Reverse pickup charges may apply for 'change of mind'.",
-              Iconsax.box_remove,
-            ),
-          ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildCard(
+                "Reseller Commission",
+                "0%",
+                "We charge zero commission on your margin. You keep 100% of what you earn.",
+                Iconsax.money_tick,
+              ),
+              const SizedBox(height: 12),
+              _buildCard(
+                "Shipping Charges",
+                "Free*",
+                "Free shipping on orders above ₹500. Standard charge of ₹40 applies otherwise.",
+                Iconsax.truck_fast,
+              ),
+              const SizedBox(height: 12),
+              _buildCard(
+                "COD Charges",
+                "₹0",
+                "Cash on Delivery is free for your customers.",
+                Iconsax.wallet_money,
+              ),
+              const SizedBox(height: 12),
+              _buildCard(
+                "Return Fee",
+                "₹0",
+                "Returns are free for defective items. Reverse pickup charges may apply for 'change of mind'.",
+                Iconsax.box_remove,
+              ),
+            ],
+          ),
         ),
       ),
     );

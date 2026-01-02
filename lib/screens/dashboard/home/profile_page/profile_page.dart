@@ -7,6 +7,7 @@ import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 // MODELS & SERVICES
 import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/notification/notification.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
@@ -20,12 +21,13 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/fees_cha
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/help_support.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/reseller_guide.dart';
 
-// --- 🆕 NEW PAGES IMPORT ---
-// Update these paths based on where you saved the files
+// --- NEW PAGES ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/about_kakiso.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/faq_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/bank_upi_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/rate_kakiso_page.dart';
+
+// --- 🔔 NOTIFICATION SCREEN IMPORT ---
 
 const Color kPrimaryColor = Color(0xFF2563EB);
 const Color kBgColor = Color(0xFFF1F3F6);
@@ -58,39 +60,49 @@ class _ProfilePageState extends State<ProfilePage> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const AutoTranslate(
-                    child: Text(
-                      "Choose Language",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const AutoTranslate(
+                      child: Text(
+                        "Choose Language",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                  ),
-                ],
+                    IconButton(
+                      onPressed: () => Get.back(),
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Divider(),
-            _buildLangOption("English", "en", "A"),
-            _buildLangOption("Hindi", "hi", "अ"),
-            _buildLangOption("Punjabi", "pa", "ੳ"),
-            _buildLangOption("Gujarati", "gu", "અ"),
-            const SizedBox(height: 10),
-          ],
+              const Divider(),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildLangOption("English", "en", "A"),
+                      _buildLangOption("Hindi", "hi", "अ"),
+                      _buildLangOption("Punjabi", "pa", "ੳ"),
+                      _buildLangOption("Gujarati", "gu", "અ"),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
       isScrollControlled: true,
@@ -179,57 +191,62 @@ class _ProfilePageState extends State<ProfilePage> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AutoTranslate(
-              child: Text(
-                "Log Out?",
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const AutoTranslate(
-              child: Text(
-                "Are you sure you want to exit?",
-                style: TextStyle(fontFamily: 'Poppins', color: kTextSecondary),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Get.back(),
-                    child: const AutoTranslate(child: Text("Cancel")),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AutoTranslate(
+                child: Text(
+                  "Log Out?",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      Get.back();
-                      await SessionService.clearSession();
-                      Get.offAll(() => const KakisoIntroScreen());
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
+              ),
+              const SizedBox(height: 12),
+              const AutoTranslate(
+                child: Text(
+                  "Are you sure you want to exit?",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    color: kTextSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Get.back(),
+                      child: const AutoTranslate(child: Text("Cancel")),
                     ),
-                    child: const AutoTranslate(
-                      child: Text(
-                        "Log Out",
-                        style: TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Get.back();
+                        await SessionService.clearSession();
+                        Get.offAll(() => const KakisoIntroScreen());
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                      ),
+                      child: const AutoTranslate(
+                        child: Text(
+                          "Log Out",
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -237,6 +254,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // 📱 RESPONSIVE HELPER VARIABLES
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isTablet = screenWidth > 600;
+
     return DoubleBackToExitWrapper(
       child: Scaffold(
         backgroundColor: kBgColor,
@@ -256,113 +277,134 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           actions: [
+            // 🔔 LINKED NOTIFICATION ICON
             IconButton(
               icon: const Icon(Iconsax.notification, color: kTextPrimary),
-              onPressed: () {},
+              onPressed: () {
+                // Navigate to Notification Screen
+                Get.to(
+                  () => const NotificationScreen(),
+                  transition: Transition.rightToLeft,
+                );
+              },
             ),
             const SizedBox(width: 10),
           ],
         ),
-        body: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildActionBanner(),
-              const SizedBox(height: 12),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isTablet ? 700 : double.infinity,
+                    ),
+                    child: Column(
+                      children: [
+                        _buildHeader(),
+                        _buildActionBanner(),
+                        const SizedBox(height: 12),
 
-              _buildHelpGrid(),
+                        _buildHelpGrid(),
 
-              const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-              _buildSectionTitle("Business Hub"),
-              _buildListContainer([
-                _buildListItem(
-                  icon: Iconsax.location,
-                  title: "My Addresses",
-                  onTap: () => Get.to(
-                    () => CustomerAddressPage(
-                      userData: widget.userData,
-                      fromDrawer: true,
+                        _buildSectionTitle("Business Hub"),
+                        _buildListContainer([
+                          _buildListItem(
+                            icon: Iconsax.location,
+                            title: "My Addresses",
+                            onTap: () => Get.to(
+                              () => CustomerAddressPage(
+                                userData: widget.userData,
+                                fromDrawer: true,
+                              ),
+                            ),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.briefcase,
+                            title: "My Business Details",
+                            onTap: () => Get.to(
+                              () => BusinessDetailsPage(
+                                userData: widget.userData,
+                                fromDrawer: true,
+                              ),
+                            ),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.chart_square,
+                            title: "Fees & Charges",
+                            subtitle: "Commission & Shipping info",
+                            onTap: () =>
+                                Get.to(() => const FeesAndChargesPage()),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.bank,
+                            title: "Bank & UPI Details",
+                            subtitle: "Add details for payouts",
+                            onTap: () => Get.to(() => const BankUpiPage()),
+                          ),
+                        ]),
+
+                        const SizedBox(height: 12),
+
+                        _buildSectionTitle("Support & Info"),
+                        _buildListContainer([
+                          _buildListItem(
+                            icon: Iconsax.book_1,
+                            title: "Reseller Guides",
+                            subtitle: "Learn how to earn",
+                            onTap: () =>
+                                Get.to(() => const ResellerGuidePage()),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.headphone,
+                            title: "Help & Support",
+                            subtitle: "Contact us",
+                            onTap: () => Get.to(() => const HelpSupportPage()),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.message_question,
+                            title: "FAQs",
+                            onTap: () => Get.to(() => const FAQPage()),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.info_circle,
+                            title: "About KaKiSo",
+                            onTap: () => Get.to(() => const AboutKakisoPage()),
+                          ),
+                        ]),
+
+                        const SizedBox(height: 12),
+
+                        _buildSectionTitle("Others"),
+                        _buildListContainer([
+                          _buildListItem(
+                            icon: Iconsax.star1,
+                            title: "Rate KaKiSo",
+                            onTap: () => Get.to(() => const RateKakisoPage()),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.logout,
+                            title: "Log Out",
+                            textColor: Colors.redAccent,
+                            iconColor: Colors.redAccent,
+                            hideChevron: true,
+                            onTap: _confirmLogout,
+                          ),
+                        ]),
+
+                        const SizedBox(height: 20),
+
+                        // ❤️ THE "MADE WITH LOVE" FOOTER
+                        _buildMadeWithLove(),
+                      ],
                     ),
                   ),
                 ),
-                _buildListItem(
-                  icon: Iconsax.briefcase,
-                  title: "My Business Details",
-                  onTap: () => Get.to(
-                    () => BusinessDetailsPage(
-                      userData: widget.userData,
-                      fromDrawer: true,
-                    ),
-                  ),
-                ),
-                _buildListItem(
-                  icon: Iconsax.chart_square,
-                  title: "Fees & Charges",
-                  subtitle: "Commission & Shipping info",
-                  onTap: () => Get.to(() => const FeesAndChargesPage()),
-                ),
-
-                // 🆕 UPDATED LINK: Points to BankUpiPage
-                _buildListItem(
-                  icon: Iconsax.bank,
-                  title: "Bank & UPI Details",
-                  subtitle: "Add details for payouts",
-                  onTap: () => Get.to(() => const BankUpiPage()),
-                ),
-              ]),
-
-              const SizedBox(height: 12),
-
-              _buildSectionTitle("Support & Info"),
-              _buildListContainer([
-                _buildListItem(
-                  icon: Iconsax.book_1,
-                  title: "Reseller Guides",
-                  subtitle: "Learn how to earn",
-                  onTap: () => Get.to(() => const ResellerGuidePage()),
-                ),
-                _buildListItem(
-                  icon: Iconsax.headphone,
-                  title: "Help & Support",
-                  subtitle: "Contact us",
-                  onTap: () => Get.to(() => const HelpSupportPage()),
-                ),
-                // 🆕 UPDATED LINK: Points to FAQPage
-                _buildListItem(
-                  icon: Iconsax.message_question,
-                  title: "FAQs",
-                  onTap: () => Get.to(() => const FAQPage()),
-                ),
-                // 🆕 UPDATED LINK: Points to AboutKakisoPage
-                _buildListItem(
-                  icon: Iconsax.info_circle,
-                  title: "About KaKiSo",
-                  onTap: () => Get.to(() => const AboutKakisoPage()),
-                ),
-              ]),
-
-              const SizedBox(height: 12),
-
-              _buildSectionTitle("Others"),
-              _buildListContainer([
-                // 🆕 UPDATED LINK: Points to RateKakisoPage (removed dialog)
-                _buildListItem(
-                  icon: Iconsax.star1,
-                  title: "Rate KaKiSo",
-                  onTap: () => Get.to(() => const RateKakisoPage()),
-                ),
-                _buildListItem(
-                  icon: Iconsax.logout,
-                  title: "Log Out",
-                  textColor: Colors.redAccent,
-                  iconColor: Colors.redAccent,
-                  hideChevron: true,
-                  onTap: _confirmLogout,
-                ),
-              ]),
-              const SizedBox(height: 40),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -593,6 +635,78 @@ class _ProfilePageState extends State<ProfilePage> {
       trailing: hideChevron
           ? null
           : const Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey),
+    );
+  }
+
+  // 🇮🇳 THE BEAUTIFUL FOOTER 🇮🇳
+  Widget _buildMadeWithLove() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            AutoTranslate(
+              child: Text(
+                "Made with ",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Iconsax.heart5, color: Colors.redAccent, size: 14),
+            const SizedBox(width: 2),
+            AutoTranslate(
+              child: Text(
+                " for ",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+
+            // "Bharat" Gradient Text
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                // Saffron to Green Gradient
+                colors: [Color(0xFFFF9933), Color(0xFF138808)],
+                tileMode: TileMode.mirror,
+              ).createShader(bounds),
+              child: const Text(
+                "Bharat",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors
+                      .white, // Color must be white for ShaderMask to apply
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Text("🇮🇳", style: TextStyle(fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "KaKiSo App v1.0.0",
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 10,
+            color: Colors.grey.shade400,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 40), // Bottom padding for aesthetics
+      ],
     );
   }
 }

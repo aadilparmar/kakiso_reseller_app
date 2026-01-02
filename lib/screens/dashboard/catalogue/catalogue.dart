@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -951,12 +952,32 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     Get.showOverlay(
       asyncFunction: () async {
         try {
+          // 1. FETCH LOGO & DETAILS FROM STORAGE
+          String? logoPath;
+          String? phone;
+          String? address;
+
+          // Read the same key used in BusinessDetailsPage
+          String? jsonStr = await _storage.read(key: 'business_details');
+
+          if (jsonStr != null) {
+            final data = jsonDecode(jsonStr);
+            logoPath = data['logo_path']; // <--- THE LOGO PATH
+            phone = data['phone'];
+            address = data['city'];
+          }
+
+          // 2. PASS TO PDF SERVICE
           await PdfService.createAndShareCatalog(
             categoryName: cat.name,
             products: products,
             businessName: businessName,
             extraMargin: extraMargin,
+            logoPath: logoPath, // <--- Now passing logo
+            businessPhone: phone, // <--- Now passing phone
+            businessAddress: address, // <--- Now passing address
           );
+
           Get.snackbar(
             "",
             "",
