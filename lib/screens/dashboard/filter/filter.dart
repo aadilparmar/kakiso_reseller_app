@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
-
-// 🔹 Imports
 import 'package:kakiso_reseller_app/models/categories.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
@@ -102,7 +100,6 @@ class _SplitFilterContent extends StatefulWidget {
 }
 
 class _SplitFilterContentState extends State<_SplitFilterContent> {
-  // 🔹 Sidebar categories
   final List<String> _tabs = ['Category', 'Price', 'Availability'];
   final List<IconData> _tabIcons = [
     Iconsax.category,
@@ -113,12 +110,10 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
   int _selectedIndex = 0;
   late FilterOptions _tempFilter;
 
-  // 🔹 Self-Fetching State
   List<CategoryModel> _allCategories = [];
   bool _isLoadingCategories = true;
   String _errorMessage = '';
 
-  // Price controllers
   late TextEditingController _minController;
   late TextEditingController _maxController;
 
@@ -145,7 +140,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
 
     try {
       final cats = await ApiService.fetchCategories();
-      // 🔹 Build Hierarchy Tree
       final tree = CategoryModel.buildTree(cats);
 
       if (mounted) {
@@ -234,7 +228,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // LEFT SIDEBAR
+                // SIDEBAR
                 Container(
                   width: 100,
                   color: const Color(0xFFF9F9F9),
@@ -246,7 +240,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
                     },
                   ),
                 ),
-                // RIGHT CONTENT
+                // CONTENT
                 Expanded(
                   child: Container(
                     color: Colors.white,
@@ -347,9 +341,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  🎨 IMPROVED UI: HIERARCHICAL CATEGORY VIEW
-  // ─────────────────────────────────────────────────────────────
   Widget _buildCategoryView() {
     if (_isLoadingCategories) {
       return Center(
@@ -398,7 +389,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
           ),
         ),
         const SizedBox(height: 12),
-        // Render root categories
         ..._allCategories.map((category) => _buildCategoryTree(category)),
       ],
     );
@@ -409,16 +399,12 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       category.id,
     );
     final bool hasChildren = category.children.isNotEmpty;
-
-    // Indentation calculation
     final double indent = depth * 16.0;
 
-    // 🔹 CASE 1: PARENT NODE (Has Children)
     if (hasChildren) {
       return Padding(
         padding: EdgeInsets.only(left: indent, bottom: 8),
         child: Theme(
-          // Remove default borders from ExpansionTile
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: Container(
             decoration: BoxDecoration(
@@ -433,7 +419,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
             child: ExpansionTile(
               tilePadding: const EdgeInsets.symmetric(horizontal: 8),
               childrenPadding: EdgeInsets.zero,
-              // Custom Leading Checkbox
               leading: Transform.scale(
                 scale: 1.1,
                 child: Checkbox(
@@ -455,7 +440,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
                   color: isSelected ? widget.accentColor : Colors.black87,
                 ),
               ),
-              // Recursively render children
               children: category.children.map((child) {
                 return _buildCategoryTree(child, depth: depth + 1);
               }).toList(),
@@ -465,7 +449,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       );
     }
 
-    // 🔹 CASE 2: LEAF NODE (No Children)
     return Padding(
       padding: EdgeInsets.only(left: indent, bottom: 4),
       child: InkWell(
@@ -473,7 +456,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
         borderRadius: BorderRadius.circular(8),
         child: Container(
           decoration: BoxDecoration(
-            // Visual Connector for nested items
             border: depth > 0
                 ? const Border(
                     left: BorderSide(color: Color(0xFFEEEEEE), width: 2),
@@ -483,8 +465,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           child: Row(
             children: [
-              if (depth > 0)
-                const SizedBox(width: 8), // Extra spacing for connector
+              if (depth > 0) const SizedBox(width: 8),
               Transform.scale(
                 scale: 1.0,
                 child: Checkbox(
@@ -519,13 +500,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  SORT VIEW
-  // ─────────────────────────────────────────────────────────────
-
-  // ─────────────────────────────────────────────────────────────
-  //  PRICE VIEW
-  // ─────────────────────────────────────────────────────────────
   Widget _buildPriceView() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -640,9 +614,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  AVAILABILITY VIEW
-  // ─────────────────────────────────────────────────────────────
   Widget _buildAvailabilityView() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -661,9 +632,9 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
           child: CheckboxListTile(
             value: _tempFilter.inStockOnly,
             activeColor: widget.accentColor,
-            title: const Text("Include Out of Stock items"),
+            title: const Text("In Stock Only"),
             subtitle: const Text(
-              "Show items that are currently unavailable",
+              "Show only items that are ready to ship",
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             onChanged: (v) => setState(() => _tempFilter.inStockOnly = v!),
@@ -673,9 +644,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  BOTTOM BAR
-  // ─────────────────────────────────────────────────────────────
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.all(16),

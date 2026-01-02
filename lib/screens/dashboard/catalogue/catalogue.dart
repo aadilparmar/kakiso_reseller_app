@@ -34,6 +34,9 @@ import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogu
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_empty_state.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_empty_state.dart';
 
+// NEW IMPORT FOR STATE ACCESS
+import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
+
 const Color accentColor = Color(0xFF2563EB); // Royal Blue
 
 // 2. WRAPPER WIDGET TO INIT SHOWCASE
@@ -343,14 +346,14 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
     Get.showOverlay(
       asyncFunction: () async {
+        // ignore: unused_local_variable
         int successCount = 0;
-        String savePath = "";
 
         try {
           Directory? directory;
           if (Platform.isAndroid) {
             directory = Directory(
-              '/storage/emulated/0/Download/Kakiso_Catalogues/${cat.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}',
+              '/storage/emulated/0/Download/Kakiso_Catalogues/01_KaKiSo${cat.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ' ')}',
             );
           } else {
             final docDir = await getApplicationDocumentsDirectory();
@@ -362,7 +365,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           if (!await directory.exists()) {
             await directory.create(recursive: true);
           }
-          savePath = directory.path;
 
           for (int i = 0; i < cat.products.length; i++) {
             final p = cat.products[i];
@@ -389,7 +391,7 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
           Get.snackbar(
             "Download Complete",
-            "Saved $successCount images to:\n$savePath",
+            "Saved to Gallery",
             backgroundColor: Colors.green,
             colorText: Colors.white,
             duration: const Duration(seconds: 5),
@@ -1574,18 +1576,90 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                                 opacity: isGuideActive
                                                     ? 0.3
                                                     : 1.0,
-                                                child:
-                                                    _buildCatalogueActionButton(
-                                                      icon: Iconsax.trash,
-                                                      label: "Delete",
-                                                      onTap: () =>
-                                                          catalogueController
-                                                              .deleteCatalogue(
-                                                                cat.id,
+                                                child: // ... inside ListView.builder ... inside Opacity ...
+                                                _buildCatalogueActionButton(
+                                                  icon: Iconsax.trash,
+                                                  label: "Delete",
+                                                  onTap: () {
+                                                    // ✨ NEW: Confirmation Dialog
+                                                    Get.dialog(
+                                                      AlertDialog(
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                16,
                                                               ),
-                                                      outlined: true,
-                                                      color: Colors.red,
-                                                    ),
+                                                        ),
+                                                        title: const Text(
+                                                          "Delete Catalog",
+                                                          style: TextStyle(
+                                                            fontFamily:
+                                                                'Poppins',
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                        content: Text(
+                                                          "Are you sure you want to delete '${cat.name}'? This cannot be undone.",
+                                                          style:
+                                                              const TextStyle(
+                                                                fontFamily:
+                                                                    'Poppins',
+                                                              ),
+                                                        ),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () =>
+                                                                Get.back(), // Close dialog
+                                                            child: const Text(
+                                                              "Cancel",
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors.grey,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () {
+                                                              // 1. Clear session state
+                                                              VerticalProductCard
+                                                                  .sessionAddedToCatalog
+                                                                  .removeWhere(
+                                                                    (
+                                                                      key,
+                                                                      value,
+                                                                    ) =>
+                                                                        value ==
+                                                                        cat.name,
+                                                                  );
+
+                                                              // 2. Delete from controller
+                                                              catalogueController
+                                                                  .deleteCatalogue(
+                                                                    cat.id,
+                                                                  );
+
+                                                              // 3. Close dialog
+                                                              Get.back();
+                                                            },
+                                                            child: const Text(
+                                                              "Delete",
+                                                              style: TextStyle(
+                                                                color:
+                                                                    Colors.red,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                  outlined: true,
+                                                  color: Colors.red,
+                                                ),
                                               ),
                                             ],
                                           ),

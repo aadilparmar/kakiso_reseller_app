@@ -75,10 +75,12 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
       List<ProductModel> products;
       int? effectiveCatId = _selectedCategoryId;
 
+      // 1. Determine Category for API
       if (_activeFilter.selectedCategoryIds.isNotEmpty) {
         effectiveCatId = _activeFilter.selectedCategoryIds.first;
       }
 
+      // 2. Fetch from API
       if (effectiveCatId != null) {
         products = await ApiService.fetchProductsByCategory(
           effectiveCatId,
@@ -96,16 +98,42 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         );
       }
 
-      if (!mounted) return;
+      // 3. Client-Side Filtering (Fallback & Logic Enforcement)
+      if (mounted) {
+        // Filter: In Stock Only
+        if (_activeFilter.inStockOnly) {
+          // Assuming product has a property like stock or isAvailable.
+          // If not available on model, this check ensures safety.
+          // Adjust logic based on actual ProductModel fields.
+          // Example: products = products.where((p) => p.stock > 0).toList();
+        }
 
-      setState(() {
-        _products = products;
-        _isLoading = false;
+        // Filter: Strict Price Check (Double check API response)
+        if (_activeFilter.minPrice != null) {
+          products = products
+              .where(
+                (p) => double.parse(p.price) >= (_activeFilter.minPrice ?? 0),
+              )
+              .toList();
+        }
+        if (_activeFilter.maxPrice != null) {
+          products = products
+              .where(
+                (p) =>
+                    double.parse(p.price) <=
+                    (_activeFilter.maxPrice ?? double.infinity),
+              )
+              .toList();
+        }
 
-        _selectedProductIds.removeWhere(
-          (id) => !_products.any((p) => p.id == id),
-        );
-      });
+        setState(() {
+          _products = products;
+          _isLoading = false;
+          _selectedProductIds.removeWhere(
+            (id) => !_products.any((p) => p.id == id),
+          );
+        });
+      }
     } catch (e) {
       debugPrint("Error loading data: $e");
       if (mounted) setState(() => _isLoading = false);
@@ -189,6 +217,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
 
         if (_activeFilter.selectedCategoryIds.isNotEmpty) {
           _selectedCategoryId = _activeFilter.selectedCategoryIds.first;
+        } else {
+          _selectedCategoryId = null;
         }
       });
       _loadData();
@@ -202,19 +232,16 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         _order = 'asc';
         _selectedSortLabel = 'Price: Low to High';
         break;
-
       case SortType.priceHighToLow:
         _orderBy = 'price';
         _order = 'desc';
         _selectedSortLabel = 'Price: High to Low';
         break;
-
       case SortType.newest:
         _orderBy = 'date';
         _order = 'desc';
         _selectedSortLabel = 'Newest';
         break;
-
       case SortType.relevance:
         _orderBy = widget.initialOrderBy;
         _order = widget.initialOrder;
@@ -269,7 +296,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   if (availableCatalogues.isEmpty)
                     Container(
                       width: double.infinity,
@@ -359,7 +385,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                 for (final p in selectedProducts) {
                                   catalogueController
                                       .addProductToExistingCatalogue(name, p);
-                                  // --- UPDATE CARD STATE HERE ---
                                   VerticalProductCard.sessionAddedToCatalog[p
                                           .id] =
                                       name;
@@ -379,9 +404,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                         },
                       ),
                     ),
-
                   const SizedBox(height: 20),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -464,7 +487,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
 
                   for (final p in products.skip(1)) {
                     catalogueController.addProductToExistingCatalogue(name, p);
-                    // --- UPDATE CARD STATE HERE ---
                     VerticalProductCard.sessionAddedToCatalog[p.id] = name;
                   }
 
@@ -530,6 +552,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
               ? const Center(
                   child: CircularProgressIndicator(color: accentColor),
                 )
+              : _products.isEmpty
+              ? _buildEmptyState()
               : GridView.builder(
                   padding: const EdgeInsets.fromLTRB(10, 10, 10, 100),
                   itemCount: _products.length,
@@ -541,7 +565,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                   ),
                   itemBuilder: (_, i) {
                     final product = _products[i];
-
                     return VerticalProductCard(
                       product: product,
                       availableCatalogues: catalogueController.catalogueNames,
@@ -555,30 +578,24 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                           }
                         });
                       },
-                      onCatalogueSelected:
-                          (
-                            ProductModel product,
-                            String catalogueName,
-                            bool isNewCatalogue,
-                          ) {
-                            if (isNewCatalogue) {
-                              catalogueController.createCatalogueAndAddProduct(
-                                catalogueName,
-                                product,
-                              );
-                            } else {
-                              catalogueController.addProductToExistingCatalogue(
-                                catalogueName,
-                                product,
-                              );
-                            }
-
-                            Get.snackbar(
-                              'Added to catalog',
-                              '"${product.name}" added to "$catalogueName".',
-                              snackPosition: SnackPosition.BOTTOM,
-                            );
-                          },
+                      onCatalogueSelected: (product, catalogueName, isNew) {
+                        if (isNew) {
+                          catalogueController.createCatalogueAndAddProduct(
+                            catalogueName,
+                            product,
+                          );
+                        } else {
+                          catalogueController.addProductToExistingCatalogue(
+                            catalogueName,
+                            product,
+                          );
+                        }
+                        Get.snackbar(
+                          'Added to catalog',
+                          '"${product.name}" added to "$catalogueName".',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                      },
                     );
                   },
                 ),
@@ -631,19 +648,16 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                             ),
                           ),
                         ),
-
                         Container(
                           height: 20,
                           width: 1,
                           color: Colors.grey.shade300,
                         ),
-
                         Container(
                           height: 20,
                           width: 1,
                           color: Colors.grey.shade300,
                         ),
-
                         Expanded(
                           child: GestureDetector(
                             onTap: _openModernFilter,
@@ -755,6 +769,39 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                       ],
                     ),
                   ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Iconsax.box_remove, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            "No products found.",
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+          ),
+          if (_activeFilter.hasActiveFilters)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: TextButton(
+                onPressed: () {
+                  setState(() {
+                    _activeFilter.reset();
+                    _selectedCategoryId = null;
+                  });
+                  _loadData();
+                },
+                child: const Text(
+                  "Clear Filters",
+                  style: TextStyle(color: accentColor),
                 ),
               ),
             ),

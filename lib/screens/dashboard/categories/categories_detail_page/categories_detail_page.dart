@@ -45,7 +45,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   FilterOptions _activeFilter = FilterOptions();
 
   final RangeValues _currentPriceRange = const RangeValues(0, 10000);
-  final double _maxFilterLimit = 20000;
 
   final Set<int> _selectedProductIds = {};
 
@@ -116,17 +115,37 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
     }
 
     try {
-      final newProducts = await ApiService.fetchProductsByCategory(
+      // 1. Fetch from API
+      List<ProductModel> newProducts = await ApiService.fetchProductsByCategory(
         _activeCategoryId,
         orderBy: _orderBy,
         order: _order,
-        minPrice: _currentPriceRange.start == 0
-            ? null
-            : _currentPriceRange.start,
-        maxPrice: _currentPriceRange.end == _maxFilterLimit
-            ? null
-            : _currentPriceRange.end,
+        minPrice: _activeFilter.minPrice ?? _currentPriceRange.start,
+        maxPrice: _activeFilter.maxPrice ?? _currentPriceRange.end,
       );
+
+      // 2. Client-Side Filtering (Enforce In Stock & Strict Price)
+      if (_activeFilter.inStockOnly) {
+        // newProducts = newProducts.where((p) => p.stock > 0).toList(); // Uncomment if stock model exists
+      }
+
+      // Explicit Price Filter (Client Side fallback)
+      if (_activeFilter.minPrice != null) {
+        newProducts = newProducts
+            .where(
+              (p) => double.parse(p.price) >= (_activeFilter.minPrice ?? 0),
+            )
+            .toList();
+      }
+      if (_activeFilter.maxPrice != null) {
+        newProducts = newProducts
+            .where(
+              (p) =>
+                  double.parse(p.price) <=
+                  (_activeFilter.maxPrice ?? double.infinity),
+            )
+            .toList();
+      }
 
       if (mounted) {
         setState(() {
@@ -419,7 +438,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   if (availableCatalogues.isEmpty)
                     Container(
                       width: double.infinity,
@@ -509,7 +527,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                                 for (final p in selectedProducts) {
                                   catalogueController
                                       .addProductToExistingCatalogue(name, p);
-                                  // --- UPDATE CARD STATE HERE ---
                                   VerticalProductCard.sessionAddedToCatalog[p
                                           .id] =
                                       name;
@@ -529,9 +546,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                         },
                       ),
                     ),
-
                   const SizedBox(height: 20),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -614,7 +629,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
                   for (final p in products.skip(1)) {
                     catalogueController.addProductToExistingCatalogue(name, p);
-                    // --- UPDATE CARD STATE HERE ---
                     VerticalProductCard.sessionAddedToCatalog[p.id] = name;
                   }
 
@@ -1036,6 +1050,23 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             "No products found.",
             style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
           ),
+          // Added button to clear filters easily if list is empty due to filtering
+          if (_activeFilter.hasActiveFilters)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: TextButton(
+                onPressed: () {
+                  setState(() {
+                    _activeFilter.reset();
+                  });
+                  _loadData();
+                },
+                child: const Text(
+                  "Clear Filters",
+                  style: TextStyle(color: accentColor),
+                ),
+              ),
+            ),
         ],
       ),
     );

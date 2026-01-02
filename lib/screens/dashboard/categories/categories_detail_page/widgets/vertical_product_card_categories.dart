@@ -658,14 +658,14 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                      ),
-                                      child: isVisuallySelected
-                                          ? Row(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    child: isVisuallySelected
+                                        ? FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment.center,
                                               children: [
@@ -676,22 +676,30 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                 ),
                                                 const SizedBox(width: 4),
                                                 Text(
-                                                  "Added to $addedCatalogName",
-                                                  maxLines: 5,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  // Smart Logic: If name is too long, just show "Added" to prevent UI breaking
+                                                  (addedCatalogName != null &&
+                                                          addedCatalogName
+                                                                  .length >
+                                                              12)
+                                                      ? "Added"
+                                                      : "Added to $addedCatalogName",
                                                   style: const TextStyle(
-                                                    fontSize: 13,
+                                                    fontSize:
+                                                        11, // Much more readable than 5
                                                     fontWeight: FontWeight.w600,
                                                     color: Colors.white,
+                                                    fontFamily: 'Poppins',
                                                   ),
                                                 ),
                                               ],
-                                            )
-                                          : const Row(
+                                            ),
+                                          )
+                                        : FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment.center,
-                                              children: [
+                                              children: const [
                                                 Icon(
                                                   Iconsax.book_1,
                                                   size: 14,
@@ -704,11 +712,12 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.w600,
                                                     color: kAccentColor,
+                                                    fontFamily: 'Poppins',
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                    ),
+                                          ),
                                   ),
                                 ),
                               ),
