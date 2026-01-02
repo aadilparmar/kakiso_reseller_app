@@ -456,22 +456,10 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                               color: Colors.grey.shade400,
                                             ),
                                           ),
-                                          const SizedBox(width: 2),
-                                          // 🗣️ WRAPPED
-                                          const AutoTranslate(
-                                            child: Text(
-                                              "MRP",
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ),
                                         ],
                                       ],
                                     ),
                                     const SizedBox(height: 2),
-
                                     // Resell + Profit
                                     Row(
                                       children: [

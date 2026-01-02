@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_vertical_products_screen.dart';
+import 'package:kakiso_reseller_app/models/product.dart'; // Import ProductModel
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/product_picker_screen.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -221,48 +223,30 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
                         ),
                       ),
                     )
-                  // 🧾 GRID OF PRODUCTS
+                  // ──────────────────────────────────────────
+                  // 🧾 RICH GRID OF PRODUCTS
+                  // ──────────────────────────────────────────
                   : GridView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: filteredProducts.length,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            childAspectRatio: 0.52,
+                            childAspectRatio: 0.58, // Matched ratio
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
                           ),
                       itemBuilder: (context, index) {
                         final product = filteredProducts[index];
-                        return Stack(
-                          children: [
-                            CatalogueVerticalProductCard(product: product),
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: GestureDetector(
-                                onTap: () {
-                                  controller.removeProductFromCatalogue(
-                                    widget.catalogueId,
-                                    product.id
-                                        .toString(), // ✅ int, matches controller
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    size: 16,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        return _CatalogueItemCard(
+                          product: product,
+                          onRemove: () {
+                            HapticFeedback.mediumImpact();
+                            controller.removeProductFromCatalogue(
+                              widget.catalogueId,
+                              product.id.toString(),
+                            );
+                          },
                         );
                       },
                     ),
@@ -271,5 +255,302 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
         ),
       );
     });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  LOCAL WIDGET: RICH CARD (Designed for Catalogue Details)
+// ─────────────────────────────────────────────────────────────
+class _CatalogueItemCard extends StatelessWidget {
+  final ProductModel product;
+  final VoidCallback onRemove;
+
+  const _CatalogueItemCard({required this.product, required this.onRemove});
+
+  // --- HELPER CONSTANTS & METHODS ---
+  static const Color kPrimaryColor = Color(0xFF4A317E);
+  static const Color kAccentColor = Color(0xFFEB2A7E);
+  static const Color kGreen = Color(0xFF16A34A);
+  static const Color kBlack = Color(0xFF1F2937);
+
+  double? _parsePrice(String value) {
+    try {
+      final cleaned = value.replaceAll(RegExp(r'[^0-9.]'), '');
+      if (cleaned.isEmpty) return null;
+      return double.parse(cleaned);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // --- PRICE CALCULATIONS ---
+    final double? basePrice = _parsePrice(product.price);
+    final double? resellPrice = basePrice != null ? (basePrice * 1.3) : null;
+    final double? mrpPrice = product.regularPrice.isNotEmpty
+        ? _parsePrice(product.regularPrice)
+        : null;
+    final double? profit = (resellPrice != null && basePrice != null)
+        ? (resellPrice - basePrice)
+        : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 1. IMAGE SECTION (65%)
+            Expanded(
+              flex: 65,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    product.image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade100,
+                      child: const Icon(Iconsax.image, color: Colors.grey),
+                    ),
+                  ),
+                  // Gradient
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 40,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.1),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // DISCOUNT BADGE
+                  if (product.discountPercentage != null &&
+                      product.discountPercentage! > 0)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: kAccentColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          "${product.discountPercentage}% OFF",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // 2. DETAILS SECTION (35%)
+            Expanded(
+              flex: 35,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // INFO
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              width: constraints.maxWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Name
+                                  Text(
+                                    product.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: kBlack,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  // Buy Price
+                                  Row(
+                                    children: [
+                                      const AutoTranslate(
+                                        child: Text(
+                                          "Buy ",
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        "₹${product.price}",
+                                        style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: kPrimaryColor,
+                                        ),
+                                      ),
+                                      if (mrpPrice != null &&
+                                          mrpPrice != basePrice) ...[
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          "₹${mrpPrice.toStringAsFixed(0)}",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            decoration:
+                                                TextDecoration.lineThrough,
+                                            color: Colors.grey.shade400,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  // Resell & Profit
+                                  Row(
+                                    children: [
+                                      const AutoTranslate(
+                                        child: Text(
+                                          "Resell ",
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF88878B),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        "₹${resellPrice?.toStringAsFixed(0)}",
+                                        style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF88878B),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (profit != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDCFCE7),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Iconsax.trend_up,
+                                                size: 10,
+                                                color: kGreen,
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                "+₹${profit.toStringAsFixed(0)}",
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: kGreen,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // BUTTON (REMOVE)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 32,
+                      child: OutlinedButton(
+                        onPressed: onRemove,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.red.shade200),
+                          foregroundColor: Colors.red,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              "Remove",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -192,13 +192,12 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     Navigator.pop(context, _tempFilter);
   }
 
+  // UPDATED: Now clears filters and immediately closes the sheet
   void _handleClear() {
     HapticFeedback.lightImpact();
-    setState(() {
-      _tempFilter.reset();
-      _minController.clear();
-      _maxController.clear();
-    });
+    // Create a fresh filter object with default values (cleared state)
+    final resetFilter = FilterOptions();
+    Navigator.pop(context, resetFilter);
   }
 
   void _toggleCategorySelection(int categoryId, bool? isSelected) {

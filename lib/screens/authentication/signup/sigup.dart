@@ -56,6 +56,9 @@ class _RegisterPageState extends State<RegisterPage>
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
+  // Timer for Password Visibility
+  Timer? _passwordVisibilityTimer;
+
   // Loading & Terms
   bool _isLoading = false;
   bool _acceptTerms = false;
@@ -74,7 +77,10 @@ class _RegisterPageState extends State<RegisterPage>
   final _confirmPasswordController = TextEditingController();
   final _referralController = TextEditingController();
 
+  // Focus Nodes
   final FocusNode _phoneFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode(); // Added for password logic
+
   late final AnimationController _bgController;
 
   // GraphQL Client
@@ -91,6 +97,13 @@ class _RegisterPageState extends State<RegisterPage>
 
     final HttpLink httpLink = HttpLink(_graphqlUrl);
     _client = GraphQLClient(link: httpLink, cache: GraphQLCache());
+
+    // Listener: Hide password immediately if user leaves the field
+    _passwordFocusNode.addListener(() {
+      if (!_passwordFocusNode.hasFocus && _isPasswordVisible) {
+        _forceHidePassword();
+      }
+    });
   }
 
   @override
@@ -103,13 +116,51 @@ class _RegisterPageState extends State<RegisterPage>
     _confirmPasswordController.dispose();
     _referralController.dispose();
     _phoneFocusNode.dispose();
+    _passwordFocusNode.dispose(); // Dispose new node
+    _passwordVisibilityTimer?.cancel(); // Cancel timer
     super.dispose();
   }
 
   // ─────────────────────────────────────────────────────────
-  //  PASSWORD STRENGTH CHECKER
+  //  PASSWORD VISIBILITY LOGIC
   // ─────────────────────────────────────────────────────────
-  void _updatePasswordStrength(String value) {
+
+  // Helper to force hide and kill timer
+  void _forceHidePassword() {
+    if (!mounted) return;
+    setState(() {
+      _isPasswordVisible = false;
+    });
+    _passwordVisibilityTimer?.cancel();
+  }
+
+  // Logic to toggle visibility with 20s timer
+  void _togglePasswordVisibility() {
+    if (_isPasswordVisible) {
+      // If currently visible, hide it and cancel timer
+      _forceHidePassword();
+    } else {
+      // Show it
+      setState(() {
+        _isPasswordVisible = true;
+      });
+      // Start 20s timer to auto-hide
+      _passwordVisibilityTimer?.cancel();
+      _passwordVisibilityTimer = Timer(const Duration(seconds: 20), () {
+        _forceHidePassword();
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  PASSWORD STRENGTH CHECKER & TYPING LOGIC
+  // ─────────────────────────────────────────────────────────
+  void _onPasswordChanged(String value) {
+    // SECURITY: If user types while password is visible, hide it immediately
+    if (_isPasswordVisible) {
+      _forceHidePassword();
+    }
+
     setState(() {
       _hasMinLength = value.length >= 6 && value.length <= 20;
       _hasUppercase = value.contains(RegExp(r'[A-Z]'));
@@ -453,8 +504,9 @@ class _RegisterPageState extends State<RegisterPage>
                                 const SizedBox(height: 14),
                                 TextFormField(
                                   controller: _passwordController,
+                                  focusNode: _passwordFocusNode, // ATTACHED
                                   obscureText: !_isPasswordVisible,
-                                  onChanged: _updatePasswordStrength,
+                                  onChanged: _onPasswordChanged, // MODIFIED
                                   decoration:
                                       _inputDecoration(
                                         label: 'Password',
@@ -467,10 +519,8 @@ class _RegisterPageState extends State<RegisterPage>
                                                 : Icons.visibility_off,
                                             color: Colors.grey,
                                           ),
-                                          onPressed: () => setState(
-                                            () => _isPasswordVisible =
-                                                !_isPasswordVisible,
-                                          ),
+                                          onPressed:
+                                              _togglePasswordVisibility, // MODIFIED
                                         ),
                                       ),
                                   validator: (value) {

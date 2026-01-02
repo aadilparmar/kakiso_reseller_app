@@ -252,7 +252,7 @@ class ProductInfoHeader extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
-                  "₹${product.regularPrice}MRP ",
+                  "₹${product.regularPrice}",
                   style: TextStyle(
                     fontSize: 14,
                     decoration: TextDecoration.lineThrough,

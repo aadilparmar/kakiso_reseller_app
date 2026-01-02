@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For HapticFeedback
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/wishlist_controller.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -33,7 +33,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
   // --- DESIGN CONSTANTS ---
   static const Color kPrimaryColor = Color(0xFF4A317E);
   static const Color kAccentColor = Color(0xFFEB2A7E);
-  static const Color kBgColor = Color(0xFFF9FAFB);
+  static const Color kBgColor = Color(0xFFF3F4F6);
 
   // --- SNACKBAR STATE ---
   OverlayEntry? _currentSnackbar;
@@ -127,7 +127,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Text(
-                                  "Great Choice!",
+                                  "Moved to Cart",
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -137,7 +137,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  "${product.name} is now in your cart.",
+                                  "${product.name} is ready for checkout.",
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -168,7 +168,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                               ),
                             ),
                             child: const Text(
-                              "Checkout",
+                              "View Cart",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -202,7 +202,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
         slivers: [
           // --- APP BAR ---
           SliverAppBar(
-            backgroundColor: kBgColor,
+            backgroundColor: Colors.white,
             elevation: 0,
             floating: true,
             pinned: true,
@@ -224,34 +224,63 @@ class _WishlistScreenState extends State<WishlistScreen> {
             actions: [_buildCartBadge(), const SizedBox(width: 12)],
           ),
 
-          // --- CONTENT ---
+          // --- RESPONSIVE GRID CONTENT ---
           Obx(() {
             if (wishlistController.wishlistItems.isEmpty) {
               return SliverFillRemaining(child: _buildEmptyState());
             }
 
             return SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.55, // Taller for more content
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                ),
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final product = wishlistController.wishlistItems[index];
-                  return _HighConversionCard(
-                    product: product,
-                    onRemove: () =>
-                        wishlistController.removeFromWishlist(product.id),
-                    onAddToCart: () {
-                      HapticFeedback.mediumImpact();
-                      cartController.addToCart(product);
-                      _showConversionSnackbar(product);
-                    },
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  // ⚡ RESPONSIVE LOGIC:
+                  // Calculate width of one card (assuming 2 columns with 16 spacing)
+                  final double screenWidth = constraints.crossAxisExtent;
+                  final double itemWidth = (screenWidth - 48) / 2;
+
+                  // We need at least 135px for the details section (Name, Price, Button)
+                  // The card is split 65% (Image) / 35% (Details).
+                  // So TotalHeight * 0.35 must be >= 135px.
+                  // TotalHeight >= 135 / 0.35 = 385px.
+
+                  // However, we don't want it to look huge on tablets.
+                  // So we clamp the ratio nicely.
+                  final double requiredHeight = 385;
+                  final double ratio = itemWidth / requiredHeight;
+
+                  // Clamp ratio to avoid extreme stretching on weird screens
+                  final double finalRatio = ratio.clamp(0.45, 0.65);
+
+                  return SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: finalRatio,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final product = wishlistController.wishlistItems[index];
+
+                      // PERFORMANCE: RepaintBoundary + Const Constructor
+                      return RepaintBoundary(
+                        child: _WishlistResellerCard(
+                          key: ValueKey(product.id),
+                          product: product,
+                          onRemove: () {
+                            HapticFeedback.lightImpact();
+                            wishlistController.removeFromWishlist(product.id);
+                          },
+                          onAddToCart: () {
+                            HapticFeedback.mediumImpact();
+                            cartController.addToCart(product);
+                            _showConversionSnackbar(product);
+                          },
+                        ),
+                      );
+                    }, childCount: wishlistController.wishlistItems.length),
                   );
-                }, childCount: wishlistController.wishlistItems.length),
+                },
               ),
             );
           }),
@@ -340,7 +369,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            "Looks like you haven't found your style yet.\nStart exploring now!",
+            "Items you save will appear here.\nStart exploring our collections!",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey,
@@ -374,132 +403,176 @@ class _WishlistScreenState extends State<WishlistScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// HIGH CONVERSION CARD
-// Designed to trigger buying behavior
+// HELPER: PRICE CALCULATOR (Performance Optimization)
 // -----------------------------------------------------------------------------
-class _HighConversionCard extends StatelessWidget {
+class _PriceInfo {
+  final double price;
+  final double regularPrice;
+  final double resellPrice;
+  final double? profit;
+  final bool hasDiscount;
+
+  _PriceInfo({
+    required this.price,
+    required this.regularPrice,
+    required this.resellPrice,
+    this.profit,
+    required this.hasDiscount,
+  });
+
+  factory _PriceInfo.fromProduct(ProductModel product) {
+    double parse(String v) =>
+        double.tryParse(v.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+
+    final double price = parse(product.price);
+    final double regularPrice = product.regularPrice.isNotEmpty
+        ? parse(product.regularPrice)
+        : 0;
+
+    final double resellPrice = price * 1.3;
+    final double? profit = (resellPrice > price) ? (resellPrice - price) : null;
+    final bool hasDiscount = regularPrice > price;
+
+    return _PriceInfo(
+      price: price,
+      regularPrice: regularPrice,
+      resellPrice: resellPrice,
+      profit: profit,
+      hasDiscount: hasDiscount,
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// RICH RESELLER CARD (OPTIMIZED)
+// -----------------------------------------------------------------------------
+class _WishlistResellerCard extends StatelessWidget {
   final ProductModel product;
   final VoidCallback onRemove;
   final VoidCallback onAddToCart;
 
-  const _HighConversionCard({
+  const _WishlistResellerCard({
+    super.key,
     required this.product,
     required this.onRemove,
     required this.onAddToCart,
   });
 
+  // CONSTANTS
+  static const Color kPrimaryColor = Color(0xFF4A317E);
+  static const Color kAccentColor = Color(0xFFEB2A7E);
+  static const Color kGreen = Color(0xFF16A34A);
+  static const Color kBlack = Color(0xFF1F2937);
+
   @override
   Widget build(BuildContext context) {
-    // --- PARSING PRICES ---
-    final double price =
-        double.tryParse(product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
-    final double regularPrice = product.regularPrice.isNotEmpty
-        ? double.tryParse(
-                product.regularPrice.replaceAll(RegExp(r'[^0-9.]'), ''),
-              ) ??
-              0
-        : 0;
-    final bool hasDiscount = regularPrice > price;
-    final double savings = regularPrice - price;
+    // Calculate prices once per build (lightweight now)
+    final prices = _PriceInfo.fromProduct(product);
 
-    return GestureDetector(
-      onTap: () {
-        Get.to(
-          () => ProductDetailsPage(product: product),
-          transition: Transition.fadeIn,
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          // Deep shadow for pop effect
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4A317E).withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // =========================
-            // 1. IMAGE AREA (Flex 55%)
-            // =========================
+            // 1. IMAGE SECTION (65%)
             Expanded(
-              flex: 55,
+              flex: 65,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Hero(
-                    tag: 'wishlist_${product.id}',
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
-                      child: Image.network(
-                        product.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Center(child: Icon(Iconsax.image)),
-                      ),
+                  // PERFORMANCE: Explicit Cache Width (Thumbnail size)
+                  Image.network(
+                    product.image,
+                    fit: BoxFit.cover,
+                    cacheWidth: 350, // Huge RAM saver
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade100,
+                      child: const Icon(Iconsax.image, color: Colors.grey),
                     ),
                   ),
 
-                  // URGENCY BADGE (Top Left)
+                  // Gradient Overlay
                   Positioned(
-                    top: 8,
-                    left: 8,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 40,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Iconsax.flash_1, color: Colors.orange, size: 10),
-                          SizedBox(width: 4),
-                          Text(
-                            "Selling Fast",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ],
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.1),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
-                  // REMOVE BUTTON (Top Right - Glassmorphism)
+                  // DISCOUNT BADGE
+                  if (product.discountPercentage != null &&
+                      product.discountPercentage! > 0)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: kAccentColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          "${product.discountPercentage}% OFF",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // REMOVE BUTTON (Top Right)
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: 6,
+                    right: 6,
                     child: GestureDetector(
                       onTap: onRemove,
-                      child: ClipOval(
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              shape: BoxShape.circle,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 4,
                             ),
-                            child: const Icon(
-                              Icons.close,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          size: 14,
+                          color: Colors.red,
                         ),
                       ),
                     ),
@@ -508,153 +581,177 @@ class _HighConversionCard extends StatelessWidget {
               ),
             ),
 
-            // =========================
-            // 2. INFO AREA (Flex 45%)
-            // =========================
+            // 2. DETAILS SECTION (35%)
             Expanded(
-              flex: 45,
+              flex: 35,
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // A. Name & Reviews
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        // Fake Rating for Social Proof (Optional)
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 12,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "4.8 (120+ sold)",
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade500,
-                                fontFamily: 'Poppins',
+                    // INFO
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              width: constraints.maxWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Name
+                                  Text(
+                                    product.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: kBlack,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+
+                                  // Buy Price
+                                  Row(
+                                    children: [
+                                      const AutoTranslate(
+                                        child: Text(
+                                          "Buy ",
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        "₹${prices.price.toStringAsFixed(0)}",
+                                        style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: kPrimaryColor,
+                                        ),
+                                      ),
+                                      if (prices.hasDiscount) ...[
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "₹${prices.regularPrice.toStringAsFixed(0)}",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            decoration:
+                                                TextDecoration.lineThrough,
+                                            color: Colors.grey.shade400,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+
+                                  // Resell & Profit
+                                  Row(
+                                    children: [
+                                      const AutoTranslate(
+                                        child: Text(
+                                          "Resell ",
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF88878B),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        "₹${prices.resellPrice.toStringAsFixed(0)}",
+                                        style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF88878B),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (prices.profit != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 1,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFDCFCE7),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Iconsax.trend_up,
+                                                size: 10,
+                                                color: kGreen,
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                "+₹${prices.profit!.toStringAsFixed(0)}",
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: kGreen,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
 
-                    // B. Price Section
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              "₹${price.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                                color: Color(0xFF4A317E),
-                              ),
-                            ),
-                            if (hasDiscount) ...[
-                              const SizedBox(width: 6),
-                              Text(
-                                "₹${regularPrice.toStringAsFixed(0)}",
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 11,
-                                  decoration: TextDecoration.lineThrough,
-                                  color: Colors.grey.shade400,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (hasDiscount)
-                          Text(
-                            "Save ₹${savings.toStringAsFixed(0)} today",
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF16A34A), // Green
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    // C. BIG CTA BUTTON
-                    // This is the key "Convince" element. Not a small icon, but a full button.
+                    // BUTTON (ADD TO CART)
                     SizedBox(
                       width: double.infinity,
-                      height: 36,
+                      height: 32,
                       child: ElevatedButton(
                         onPressed: onAddToCart,
-                        style:
-                            ElevatedButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              backgroundColor:
-                                  Colors.transparent, // For gradient
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ).copyWith(
-                              // Gradient Background workaround
-                              backgroundColor:
-                                  MaterialStateProperty.resolveWith(
-                                    (states) => null,
-                                  ),
-                            ),
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF4A317E), Color(0xFF8B5CF6)],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Iconsax.shopping_bag,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 6),
-                                Text(
-                                  "Add to Cart",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                              ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Iconsax.shopping_bag,
+                              size: 14,
+                              color: Colors.white,
                             ),
-                          ),
+                            SizedBox(width: 6),
+                            Text(
+                              "Move to Cart",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
