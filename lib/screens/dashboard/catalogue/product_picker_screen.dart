@@ -23,7 +23,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
   final CatalogueController catalogueController =
       Get.find<CatalogueController>();
 
-  // --- OPTIMIZED STATE MANAGEMENT ---
   final List<ProductModel> _products = [];
   List<CategoryModel> _categories = [];
 
@@ -31,24 +30,18 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
   bool _isLoadingCategories = true;
   bool _isLoadingMore = false;
 
-  // Pagination
-  int _activeCategoryId = 0; // 0 = All
+  int _activeCategoryId = 0;
   bool _hasMore = true;
 
-  // Scroll Controller
   final ScrollController _scrollController = ScrollController();
-
-  // Search
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    // OPTIMIZATION: Fire both requests. Don't await one to start the other.
     _fetchCategories();
     _loadProducts(refresh: true);
-
     _scrollController.addListener(_onScroll);
   }
 
@@ -60,8 +53,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
   }
 
   void _onScroll() {
-    // OPTIMIZATION: Increased threshold to 500.
-    // Loads next page BEFORE user hits bottom.
     if (_scrollController.hasClients &&
         _scrollController.position.extentAfter < 500 &&
         !_isLoading &&
@@ -93,14 +84,12 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
         _products.clear();
       });
     } else {
-      if (_isLoadingMore) return; // Prevent double firing
+      if (_isLoadingMore) return;
       setState(() => _isLoadingMore = true);
     }
 
     try {
       List<ProductModel> newProducts = [];
-
-      // OPTIMIZATION: Minimal logic inside the async gap
       if (_activeCategoryId == 0) {
         newProducts = await ApiService.fetchAllProductsPaginated(
           perPage: 20,
@@ -110,7 +99,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
       } else {
         newProducts = await ApiService.fetchProductsByCategory(
           _activeCategoryId,
-          // page: _page, // Add this if your API supports category pagination
         );
       }
 
@@ -141,11 +129,8 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
     setState(() {
       _activeCategoryId = id;
     });
-    // Immediate reload for new category
     _loadProducts(refresh: true);
   }
-
-  // --- UI COMPONENTS ---
 
   Widget _buildInfoBanner(int alreadyCount) {
     return Container(
@@ -216,7 +201,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
 
   Widget _buildCategoryList() {
     if (_isLoadingCategories && _categories.isEmpty) {
-      // Shimmer or empty placeholder could go here
       return const SizedBox(height: 110);
     }
 
@@ -241,10 +225,8 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
               ),
             );
           }
-
           final cat = _categories[index - 1];
           final isSelected = _activeCategoryId == cat.id;
-
           return GestureDetector(
             onTap: () => _onCategorySelected(cat.id),
             child: _buildCategoryItem(
@@ -280,7 +262,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
             ),
             image: (imageUrl != null && imageUrl.isNotEmpty)
                 ? DecorationImage(
-                    // OPTIMIZATION: Cache small icons
                     image: NetworkImage(imageUrl),
                     fit: BoxFit.cover,
                   )
@@ -319,7 +300,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
   Widget build(BuildContext context) {
     return Obx(() {
       final catalogue = catalogueController.getById(widget.catalogueId);
-
       if (catalogue == null) {
         return Scaffold(
           backgroundColor: const Color(0xFFF9FAFB),
@@ -331,13 +311,30 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
       final alreadyInCatalogue = catalogue.products;
       final alreadyCount = alreadyInCatalogue.length;
 
-      // Search Filtering (Local)
       final query = _searchQuery.trim().toLowerCase();
       final List<ProductModel> displayedList = query.isEmpty
           ? _products
           : _products
                 .where((p) => p.name.toLowerCase().contains(query))
                 .toList();
+
+      // RESPONSIVE LOGIC
+      final size = MediaQuery.of(context).size;
+      final double itemWidth =
+          (size.width - 48) / 2; // Approximate width of one card
+      // Use textScaleFactor (deprecated in newer Flutter, use textScaler if available, but for compatibility:)
+      final double textScale = MediaQuery.of(context).textScaleFactor;
+
+      // Calculate aspect ratio: Base height + text padding buffer
+      // As font gets larger, aspect ratio must decrease (card gets taller)
+      double aspectRatio = 0.58;
+      if (textScale > 1.2) aspectRatio = 0.50;
+      if (itemWidth > 250) aspectRatio = 0.70; // Tablet optimization
+
+      // Calculate cross axis count for tablets
+      int crossAxisCount = 2;
+      if (size.width > 600) crossAxisCount = 3;
+      if (size.width > 900) crossAxisCount = 4;
 
       return Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
@@ -363,7 +360,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
             _buildSearchBar(),
             _buildCategoryList(),
             const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
             Expanded(
               child: _isLoading
                   ? const Center(
@@ -399,17 +395,16 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
                       onRefresh: () async => _loadProducts(refresh: true),
                       child: GridView.builder(
                         controller: _scrollController,
-                        // OPTIMIZATION: Pre-calculate count to avoid jitter
                         itemCount:
-                            displayedList.length + (_isLoadingMore ? 2 : 0),
+                            displayedList.length +
+                            (_isLoadingMore ? crossAxisCount : 0),
                         padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.58,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                            ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          childAspectRatio: aspectRatio,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                        ),
                         itemBuilder: (context, index) {
                           if (index >= displayedList.length) {
                             return const Center(
@@ -419,14 +414,11 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
                               ),
                             );
                           }
-
                           final product = displayedList[index];
                           final bool isInCatalogue = alreadyInCatalogue.any(
                             (p) => p.id == product.id,
                           );
 
-                          // OPTIMIZATION: RepaintBoundary stops the card from
-                          // redrawing when other parts of the screen update.
                           return RepaintBoundary(
                             child: _PickerProductCard(
                               product: product,
@@ -469,9 +461,6 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  LOCAL WIDGET: RICH CARD (OPTIMIZED)
-// ─────────────────────────────────────────────────────────────
 class _PickerProductCard extends StatelessWidget {
   final ProductModel product;
   final bool isAdded;
@@ -483,7 +472,6 @@ class _PickerProductCard extends StatelessWidget {
     required this.onTap,
   });
 
-  // CONSTANTS
   static const Color kPrimaryColor = Color(0xFF4A317E);
   static const Color kAccentColor = Color(0xFFEB2A7E);
   static const Color kGreen = Color(0xFF16A34A);
@@ -501,7 +489,6 @@ class _PickerProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Logic
     final double? basePrice = _parsePrice(product.price);
     final double? resellPrice = basePrice != null ? (basePrice * 1.3) : null;
     final double? mrpPrice = product.regularPrice.isNotEmpty
@@ -537,15 +524,12 @@ class _PickerProductCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. IMAGE SECTION (65%)
+              // 1. IMAGE SECTION - Uses flexible instead of strict fixed logic for better adaptability
               Expanded(
-                flex: 65,
+                flex: 60,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // OPTIMIZATION: cacheWidth 350
-                    // This forces Flutter to decode image at smaller size (thumbnail)
-                    // saving MASSIVE amounts of RAM and GPU work on scrolling.
                     Image.network(
                       product.image,
                       fit: BoxFit.cover,
@@ -559,7 +543,6 @@ class _PickerProductCard extends StatelessWidget {
                         return Container(color: Colors.grey.shade50);
                       },
                     ),
-
                     Positioned(
                       bottom: 0,
                       left: 0,
@@ -578,7 +561,6 @@ class _PickerProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
-
                     if (isAdded)
                       Positioned(
                         top: 8,
@@ -597,7 +579,6 @@ class _PickerProductCard extends StatelessWidget {
                           ),
                         ),
                       ),
-
                     if (product.discountPercentage != null &&
                         product.discountPercentage! > 0)
                       Positioned(
@@ -627,9 +608,9 @@ class _PickerProductCard extends StatelessWidget {
                 ),
               ),
 
-              // 2. DETAILS SECTION (35%)
+              // 2. DETAILS SECTION
               Expanded(
-                flex: 35,
+                flex: 40, // Increased text space slightly for responsiveness
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Column(
@@ -638,126 +619,105 @@ class _PickerProductCard extends StatelessWidget {
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            return FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: SizedBox(
-                                width: constraints.maxWidth,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                            // Using Wrap/Flex logic inside LayoutBuilder is safer for text scaling
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: kBlack,
+                                  ),
+                                ),
+                                const Spacer(), // Pushes prices down
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Text(
-                                      product.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: kBlack,
+                                    const AutoTranslate(
+                                      child: Text(
+                                        "Buy ",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B7280),
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const AutoTranslate(
-                                          child: Text(
-                                            "Buy ",
-                                            style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w500,
-                                              color: Color(0xFF6B7280),
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          "₹${product.price}",
-                                          style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: kPrimaryColor,
-                                          ),
-                                        ),
-                                        if (mrpPrice != null &&
-                                            mrpPrice != basePrice) ...[
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            "₹${mrpPrice.toStringAsFixed(0)}",
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              decoration:
-                                                  TextDecoration.lineThrough,
-                                              color: Colors.grey.shade400,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
+                                    Text(
+                                      "₹${product.price}",
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: kPrimaryColor,
+                                      ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const AutoTranslate(
-                                          child: Text(
-                                            "Resell ",
-                                            style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Color(0xFF88878B),
-                                            ),
-                                          ),
+                                    if (mrpPrice != null &&
+                                        mrpPrice != basePrice)
+                                      Text(
+                                        " ₹${mrpPrice.toStringAsFixed(0)}",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          decoration:
+                                              TextDecoration.lineThrough,
+                                          color: Colors.grey.shade400,
                                         ),
-                                        Text(
-                                          "₹${resellPrice?.toStringAsFixed(0)}",
-                                          style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xFF88878B),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        if (profit != null)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFDCFCE7),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Iconsax.trend_up,
-                                                  size: 10,
-                                                  color: kGreen,
-                                                ),
-                                                const SizedBox(width: 2),
-                                                Text(
-                                                  "+₹${profit.toStringAsFixed(0)}",
-                                                  style: const TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: kGreen,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
+                                      ),
                                   ],
                                 ),
-                              ),
+                                const SizedBox(height: 2),
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    const AutoTranslate(
+                                      child: Text(
+                                        "Resell ",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF88878B),
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      "₹${resellPrice?.toStringAsFixed(0)} ",
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF88878B),
+                                      ),
+                                    ),
+                                    if (profit != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFDCFCE7),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          "+₹${profit.toStringAsFixed(0)}",
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: kGreen,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
                             );
                           },
                         ),
                       ),
+                      const SizedBox(height: 6),
                       SizedBox(
                         width: double.infinity,
                         height: 32,

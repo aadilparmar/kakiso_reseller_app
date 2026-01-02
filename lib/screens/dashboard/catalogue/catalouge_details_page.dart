@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For HapticFeedback
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
-import 'package:kakiso_reseller_app/models/product.dart'; // Import ProductModel
+import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/product_picker_screen.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -20,7 +20,6 @@ class CatalogueDetailsPage extends StatefulWidget {
 
 class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
   final CatalogueController controller = Get.find<CatalogueController>();
-
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -52,9 +51,7 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
             Expanded(
               child: TextField(
                 controller: _searchController,
-                onChanged: (value) {
-                  setState(() => _searchQuery = value);
-                },
+                onChanged: (value) => setState(() => _searchQuery = value),
                 decoration: const InputDecoration(
                   hintText: "Search products in this catalog...",
                   border: InputBorder.none,
@@ -89,7 +86,6 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
         );
       }
 
-      // Filter products by search query
       final query = _searchQuery.trim().toLowerCase();
       final allProducts = catalogue.products;
       final filteredProducts = query.isEmpty
@@ -100,6 +96,16 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
 
       final hasProducts = allProducts.isNotEmpty;
       final isSearchActive = query.isNotEmpty;
+
+      // RESPONSIVE CALCULATIONS
+      final size = MediaQuery.of(context).size;
+      final textScale = MediaQuery.of(context).textScaleFactor;
+
+      int crossAxisCount = size.width > 600 ? (size.width > 900 ? 4 : 3) : 2;
+      double aspectRatio = 0.58;
+      // Adjust ratio for text scaling
+      if (textScale > 1.1) aspectRatio = 0.52;
+      if (textScale > 1.3) aspectRatio = 0.48;
 
       return Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
@@ -157,7 +163,6 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
             const Divider(height: 1, color: Color(0xFFE5E7EB)),
             Expanded(
               child: !hasProducts
-                  // 🌥 REAL EMPTY STATE (no products at all)
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -188,7 +193,6 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
                       ),
                     )
                   : filteredProducts.isEmpty && isSearchActive
-                  // 🔍 SEARCH EMPTY STATE
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24.0),
@@ -223,19 +227,15 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
                         ),
                       ),
                     )
-                  // ──────────────────────────────────────────
-                  // 🧾 RICH GRID OF PRODUCTS
-                  // ──────────────────────────────────────────
                   : GridView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: filteredProducts.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.58, // Matched ratio
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                          ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        childAspectRatio: aspectRatio,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                      ),
                       itemBuilder: (context, index) {
                         final product = filteredProducts[index];
                         return _CatalogueItemCard(
@@ -258,16 +258,12 @@ class _CatalogueDetailsPageState extends State<CatalogueDetailsPage> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  LOCAL WIDGET: RICH CARD (Designed for Catalogue Details)
-// ─────────────────────────────────────────────────────────────
 class _CatalogueItemCard extends StatelessWidget {
   final ProductModel product;
   final VoidCallback onRemove;
 
   const _CatalogueItemCard({required this.product, required this.onRemove});
 
-  // --- HELPER CONSTANTS & METHODS ---
   static const Color kPrimaryColor = Color(0xFF4A317E);
   static const Color kAccentColor = Color(0xFFEB2A7E);
   static const Color kGreen = Color(0xFF16A34A);
@@ -285,7 +281,6 @@ class _CatalogueItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // --- PRICE CALCULATIONS ---
     final double? basePrice = _parsePrice(product.price);
     final double? resellPrice = basePrice != null ? (basePrice * 1.3) : null;
     final double? mrpPrice = product.regularPrice.isNotEmpty
@@ -313,9 +308,8 @@ class _CatalogueItemCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. IMAGE SECTION (65%)
             Expanded(
-              flex: 65,
+              flex: 60,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -327,7 +321,6 @@ class _CatalogueItemCard extends StatelessWidget {
                       child: const Icon(Iconsax.image, color: Colors.grey),
                     ),
                   ),
-                  // Gradient
                   Positioned(
                     bottom: 0,
                     left: 0,
@@ -346,7 +339,6 @@ class _CatalogueItemCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // DISCOUNT BADGE
                   if (product.discountPercentage != null &&
                       product.discountPercentage! > 0)
                     Positioned(
@@ -375,145 +367,110 @@ class _CatalogueItemCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // 2. DETAILS SECTION (35%)
             Expanded(
-              flex: 35,
+              flex: 40,
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // INFO
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          return FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: SizedBox(
-                              width: constraints.maxWidth,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: kBlack,
+                                ),
+                              ),
+                              const Spacer(),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  // Name
-                                  Text(
-                                    product.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: kBlack,
+                                  const AutoTranslate(
+                                    child: Text(
+                                      "Buy ",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF6B7280),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  // Buy Price
-                                  Row(
-                                    children: [
-                                      const AutoTranslate(
-                                        child: Text(
-                                          "Buy ",
-                                          style: TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF6B7280),
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        "₹${product.price}",
-                                        style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: kPrimaryColor,
-                                        ),
-                                      ),
-                                      if (mrpPrice != null &&
-                                          mrpPrice != basePrice) ...[
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          "₹${mrpPrice.toStringAsFixed(0)}",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            decoration:
-                                                TextDecoration.lineThrough,
-                                            color: Colors.grey.shade400,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                                  Text(
+                                    "₹${product.price}",
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: kPrimaryColor,
+                                    ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  // Resell & Profit
-                                  Row(
-                                    children: [
-                                      const AutoTranslate(
-                                        child: Text(
-                                          "Resell ",
-                                          style: TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF88878B),
-                                          ),
-                                        ),
+                                  if (mrpPrice != null && mrpPrice != basePrice)
+                                    Text(
+                                      " ₹${mrpPrice.toStringAsFixed(0)}",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        decoration: TextDecoration.lineThrough,
+                                        color: Colors.grey.shade400,
                                       ),
-                                      Text(
-                                        "₹${resellPrice?.toStringAsFixed(0)}",
-                                        style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFF88878B),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      if (profit != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFDCFCE7),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              const Icon(
-                                                Iconsax.trend_up,
-                                                size: 10,
-                                                color: kGreen,
-                                              ),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                "+₹${profit.toStringAsFixed(0)}",
-                                                style: const TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: kGreen,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                    ),
                                 ],
                               ),
-                            ),
+                              const SizedBox(height: 2),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  const AutoTranslate(
+                                    child: Text(
+                                      "Resell ",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF88878B),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    "₹${resellPrice?.toStringAsFixed(0)} ",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF88878B),
+                                    ),
+                                  ),
+                                  if (profit != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCFCE7),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        "+₹${profit.toStringAsFixed(0)}",
+                                        style: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: kGreen,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                           );
                         },
                       ),
                     ),
-
-                    // BUTTON (REMOVE)
+                    const SizedBox(height: 6),
                     SizedBox(
                       width: double.infinity,
                       height: 32,

@@ -71,7 +71,7 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     with SingleTickerProviderStateMixin {
   final _storage = const FlutterSecureStorage();
   final _localStorage = GetStorage();
-
+  static int? _lastProcessedTimestamp;
   final CatalogueController catalogueController = Get.put(
     CatalogueController(),
     permanent: true,
@@ -248,13 +248,27 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   }
 
   void _checkForNavArguments() {
-    if (Get.arguments != null &&
-        Get.arguments is Map &&
-        Get.arguments['active_tool_guide'] != null) {
-      setState(() {
-        _activeGuideTool = Get.arguments['active_tool_guide'];
-      });
-      Get.arguments['active_tool_guide'] = null;
+    final args = Get.arguments;
+
+    // 1. Check if arguments exist and are valid
+    if (args != null && args is Map) {
+      final String? toolId = args['active_tool_guide'];
+      final int? timestamp = args['guide_timestamp'];
+
+      // 2. logic: Only show if we have an ID AND it's a new timestamp we haven't seen
+      if (toolId != null && timestamp != null) {
+        if (timestamp != _lastProcessedTimestamp) {
+          // New event! Update timestamp and show guide
+          _lastProcessedTimestamp = timestamp;
+
+          setState(() {
+            _activeGuideTool = toolId;
+          });
+
+          // Optional: Clear args map to be safe, though static check handles the logic now
+          args['active_tool_guide'] = null;
+        }
+      }
     }
   }
 

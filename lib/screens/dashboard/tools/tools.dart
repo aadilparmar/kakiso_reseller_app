@@ -923,6 +923,8 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                                         ),
                                         arguments: {
                                           'active_tool_guide': tool.id,
+                                          'guide_timestamp': DateTime.now()
+                                              .millisecondsSinceEpoch, // 👈 ADD THIS LINE
                                         },
                                       );
                                     } else {

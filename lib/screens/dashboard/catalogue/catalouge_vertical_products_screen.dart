@@ -9,8 +9,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class CatalogueVerticalProductCard extends StatelessWidget {
   final ProductModel product;
-
-  /// Optional: custom tap handler (for catalogue / picker selection)
   final VoidCallback? onTap;
 
   const CatalogueVerticalProductCard({
@@ -103,8 +101,6 @@ class CatalogueVerticalProductCard extends StatelessWidget {
         : Get.put(CartController());
 
     return GestureDetector(
-      // If onTap is passed from outside (catalogue), use that.
-      // Otherwise, behave like normal product card (open details).
       onTap:
           onTap ??
           () {
@@ -129,13 +125,12 @@ class CatalogueVerticalProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // IMAGE & BADGES
+            // IMAGE
             Expanded(
               flex: 55,
               child: Stack(
                 children: [
                   Hero(
-                    // Different hero tag so it doesn't collide
                     tag: 'catalogue_product_${product.id}',
                     child: Container(
                       width: double.infinity,
@@ -155,59 +150,58 @@ class CatalogueVerticalProductCard extends StatelessWidget {
               ),
             ),
 
-            // INFO + PRICE
+            // INFO
             Expanded(
-              flex: 25,
+              flex: 45, // Gave more room to text content
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1F2937),
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
+                        height: 1.2,
+                      ),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (product.regularPrice.isNotEmpty &&
-                                product.regularPrice != product.price)
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (product.regularPrice.isNotEmpty &&
+                                  product.regularPrice != product.price)
+                                Text(
+                                  "₹${product.regularPrice}",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    decoration: TextDecoration.lineThrough,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                ),
                               Text(
-                                "₹${product.regularPrice}",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  decoration: TextDecoration.lineThrough,
-                                  color: Colors.grey.shade400,
+                                "₹${product.price}",
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF4A317E),
                                 ),
                               ),
-                            Text(
-                              "₹${product.price}",
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF4A317E),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         InkWell(
                           onTap: () {
@@ -216,7 +210,9 @@ class CatalogueVerticalProductCard extends StatelessWidget {
                           },
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(
+                              8,
+                            ), // Larger touch target
                             decoration: BoxDecoration(
                               color: Colors.black,
                               borderRadius: BorderRadius.circular(10),
