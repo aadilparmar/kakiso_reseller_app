@@ -277,10 +277,14 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildSectionTitle("Business Hub"),
               _buildListContainer([
                 _buildListItem(
-                  icon: Iconsax.chart_square,
-                  title: "Fees & Charges",
-                  subtitle: "Commission & Shipping info",
-                  onTap: () => Get.to(() => const FeesAndChargesPage()),
+                  icon: Iconsax.location,
+                  title: "My Addresses",
+                  onTap: () => Get.to(
+                    () => CustomerAddressPage(
+                      userData: widget.userData,
+                      fromDrawer: true,
+                    ),
+                  ),
                 ),
                 _buildListItem(
                   icon: Iconsax.briefcase,
@@ -292,6 +296,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ),
+                _buildListItem(
+                  icon: Iconsax.chart_square,
+                  title: "Fees & Charges",
+                  subtitle: "Commission & Shipping info",
+                  onTap: () => Get.to(() => const FeesAndChargesPage()),
+                ),
+
                 // 🆕 UPDATED LINK: Points to BankUpiPage
                 _buildListItem(
                   icon: Iconsax.bank,
@@ -335,16 +346,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
               _buildSectionTitle("Others"),
               _buildListContainer([
-                _buildListItem(
-                  icon: Iconsax.location,
-                  title: "My Addresses",
-                  onTap: () => Get.to(
-                    () => CustomerAddressPage(
-                      userData: widget.userData,
-                      fromDrawer: true,
-                    ),
-                  ),
-                ),
                 // 🆕 UPDATED LINK: Points to RateKakisoPage (removed dialog)
                 _buildListItem(
                   icon: Iconsax.star1,

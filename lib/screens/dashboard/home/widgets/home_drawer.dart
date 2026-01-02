@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For Haptic Feedback
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-// 1. IMPORT AUTO TRANSLATE
 import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 // MODELS
@@ -15,12 +14,20 @@ import 'package:kakiso_reseller_app/navigation_menu.dart';
 // CONTROLLERS
 import 'package:kakiso_reseller_app/controllers/order_controller.dart';
 
-// SCREENS
+// SCREENS - DASHBOARD & FEATURES
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/order_management/orders_page.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
+
+// 🆕 NEW PAGES IMPORT
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/bank_upi_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/faq_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/about_kakiso.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/rate_kakiso_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/fees_charges.dart'; // Added
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/help_support.dart'; // Added
 
 // SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
@@ -79,11 +86,10 @@ class _HomeDrawerState extends State<HomeDrawer> {
   @override
   Widget build(BuildContext context) {
     final Color primary = accentColor;
-    // Sophisticated background color
     const Color backgroundColor = Color(0xFFF2F4F7);
 
     return Drawer(
-      backgroundColor: Colors.transparent, // Important for custom shapes
+      backgroundColor: Colors.transparent,
       elevation: 0,
       width: 320,
       child: Container(
@@ -96,7 +102,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
         ),
         child: Stack(
           children: [
-            // 1. DECORATIVE BACKGROUND ELEMENTS
+            // 1. DECORATIVE BACKGROUND
             Positioned(
               top: -80,
               right: -60,
@@ -107,8 +113,8 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      primary.withValues(alpha: 0.15),
-                      primary.withValues(alpha: 0.0),
+                      primary.withOpacity(0.15),
+                      primary.withOpacity(0.0),
                     ],
                   ),
                 ),
@@ -118,10 +124,8 @@ class _HomeDrawerState extends State<HomeDrawer> {
             // 2. MAIN CONTENT
             Column(
               children: [
-                // --- A. THE GREETING HEADER ---
                 _buildGreetingHeader(primary),
 
-                // --- B. THE "FLOATING ISLAND" MENU ---
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -133,7 +137,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
+                          color: Colors.black.withOpacity(0.03),
                           blurRadius: 20,
                           offset: const Offset(0, -5),
                         ),
@@ -150,7 +154,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 2. DASHBOARD
+                            // --- DASHBOARD SECTION ---
                             _buildSectionTitle("DASHBOARD"),
                             _buildMenuItem(
                               context,
@@ -158,6 +162,23 @@ class _HomeDrawerState extends State<HomeDrawer> {
                               activeIcon: Iconsax.personalcard5,
                               title: "Business Details",
                               id: "BusinessDetails",
+                              primary: primary,
+                            ),
+                            // ✅ ADDED: Fees & Charges
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.chart_square,
+                              activeIcon: Iconsax.chart_square5,
+                              title: "Fees & Charges",
+                              id: "FeesCharges",
+                              primary: primary,
+                            ),
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.bank,
+                              activeIcon: Iconsax.bank5,
+                              title: "Bank & UPI Details",
+                              id: "BankUpi",
                               primary: primary,
                             ),
                             _buildMenuItem(
@@ -175,7 +196,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
                               title: "Orders",
                               id: "Orders",
                               primary: primary,
-                              // Simple red dot indicator
                               trailing: Container(
                                 width: 8,
                                 height: 8,
@@ -184,7 +204,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.red.withValues(alpha: 0.3),
+                                      color: Colors.red.withOpacity(0.3),
                                       blurRadius: 4,
                                     ),
                                   ],
@@ -194,7 +214,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
                             const SizedBox(height: 25),
 
-                            // 3. INVENTORY
+                            // --- INVENTORY SECTION ---
                             _buildSectionTitle("INVENTORY"),
                             _buildMenuItem(
                               context,
@@ -219,8 +239,19 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
                             const SizedBox(height: 25),
 
-                            // 4. SUPPORT & INFO (FAQ / About)
-                            _buildSectionTitle("SUPPORT"),
+                            // --- SUPPORT & OTHERS SECTION ---
+                            _buildSectionTitle("SUPPORT & OTHERS"),
+
+                            // ✅ ADDED: Help & Support
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.headphone,
+                              activeIcon: Iconsax.headphone5,
+                              title: "Help & Support",
+                              id: "HelpSupport",
+                              primary: primary,
+                            ),
+
                             _buildMenuItem(
                               context,
                               icon: Iconsax.message_question,
@@ -228,9 +259,8 @@ class _HomeDrawerState extends State<HomeDrawer> {
                               title: "FAQ",
                               id: "FAQ",
                               primary: primary,
-                              isSpecialAction: true,
-                              onSpecialTap: () => _showFAQSheet(context),
                             ),
+
                             _buildMenuItem(
                               context,
                               icon: Iconsax.info_circle,
@@ -238,12 +268,18 @@ class _HomeDrawerState extends State<HomeDrawer> {
                               title: "About KaKiSo",
                               id: "About",
                               primary: primary,
-                              isSpecialAction: true,
-                              onSpecialTap: () =>
-                                  _showAboutSheet(context, primary),
                             ),
 
-                            const SizedBox(height: 50), // Extra scroll space
+                            _buildMenuItem(
+                              context,
+                              icon: Iconsax.star1,
+                              activeIcon: Iconsax.star1,
+                              title: "Rate Us",
+                              id: "RateUs",
+                              primary: primary,
+                            ),
+
+                            const SizedBox(height: 50),
                           ],
                         ),
                       ),
@@ -251,7 +287,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   ),
                 ),
 
-                // --- C. FOOTER ---
                 _buildFooter(context),
               ],
             ),
@@ -261,17 +296,14 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // ------------------------------------------------------------------
-  // --- A. GREETING & HEADER (Restored Visuals) ---
-  // ------------------------------------------------------------------
+  // --- WIDGET HELPERS ---
+
   Widget _buildGreetingHeader(Color primary) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // The Greeting
-          // 🗣️ WRAPPED
           AutoTranslate(
             child: Text(
               _getGreeting(),
@@ -284,9 +316,10 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
           const SizedBox(height: 4),
-          // User Name (Big & Bold) - Usually names are not translated, keeping as is
           Text(
-            widget.userData.name.split(' ').first,
+            widget.userData.name.isNotEmpty
+                ? widget.userData.name.split(' ').first
+                : "User",
             style: const TextStyle(
               fontSize: 32,
               color: Colors.black87,
@@ -298,7 +331,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
           ),
           const SizedBox(height: 20),
 
-          // Profile "Card" Floating on the background
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -306,7 +338,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
+                  color: Colors.black.withOpacity(0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -319,13 +351,13 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: primary.withValues(alpha: 0.3),
+                      color: primary.withOpacity(0.3),
                       width: 2,
                     ),
                   ),
                   child: CircleAvatar(
                     radius: 20,
-                    backgroundColor: primary.withValues(alpha: 0.1),
+                    backgroundColor: primary.withOpacity(0.1),
                     backgroundImage: widget.userData.profilePicUrl.isNotEmpty
                         ? NetworkImage(widget.userData.profilePicUrl)
                         : null,
@@ -339,7 +371,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🗣️ WRAPPED
                       AutoTranslate(
                         child: Text(
                           "Logged in as",
@@ -372,14 +403,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // ------------------------------------------------------------------
-  // --- B. FLOATING ISLAND CONTENT ---
-  // ------------------------------------------------------------------
-
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),
-      // 🗣️ WRAPPED
       child: AutoTranslate(
         child: Text(
           title,
@@ -403,8 +429,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
     required String id,
     required Color primary,
     Widget? trailing,
-    bool isSpecialAction = false,
-    VoidCallback? onSpecialTap,
   }) {
     final bool isSelected = widget.selectedTitle == id;
 
@@ -413,10 +437,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        // Active: Subtle primary tint. Inactive: Transparent
-        color: isSelected
-            ? primary.withValues(alpha: 0.08)
-            : Colors.transparent,
+        color: isSelected ? primary.withOpacity(0.08) : Colors.transparent,
       ),
       child: Material(
         color: Colors.transparent,
@@ -424,12 +445,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
           borderRadius: BorderRadius.circular(16),
           onTap: () {
             HapticFeedback.lightImpact();
-            if (isSpecialAction && onSpecialTap != null) {
-              Navigator.pop(context); // Close drawer first
-              onSpecialTap();
-            } else {
-              _handleNavigation(context, id);
-            }
+            _handleNavigation(context, id);
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -442,7 +458,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  // 🗣️ WRAPPED
                   child: AutoTranslate(
                     child: Text(
                       title,
@@ -460,7 +475,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   ),
                 ),
                 if (trailing != null) trailing,
-                if (isSelected && !isSpecialAction)
+                if (isSelected)
                   Icon(Iconsax.arrow_right_3, size: 16, color: primary),
               ],
             ),
@@ -470,19 +485,23 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
+  // --- NAVIGATION LOGIC ---
   void _handleNavigation(BuildContext context, String uniqueId) {
-    Navigator.pop(context);
+    Navigator.pop(context); // Close Drawer first
 
-    // Safety check
-    if (uniqueId == 'Orders' && !Get.isRegistered<OrderController>()) {
-      Get.put(OrderController(), permanent: true);
-    }
-
-    if (uniqueId == 'MyCatalog') {
+    // Core Dashboard & Orders
+    if (uniqueId == 'Orders') {
+      if (!Get.isRegistered<OrderController>()) {
+        Get.put(OrderController(), permanent: true);
+      }
+      Get.to(() => OrdersPage(userData: widget.userData));
+    } else if (uniqueId == 'MyCatalog') {
       Get.offAll(
         () => NavigationMenu(userData: widget.userData, initialIndex: 3),
       );
-    } else if (uniqueId == 'BusinessDetails') {
+    }
+    // Business & Profile
+    else if (uniqueId == 'BusinessDetails') {
       Get.to(
         () => BusinessDetailsPage(userData: widget.userData, fromDrawer: true),
       );
@@ -490,8 +509,24 @@ class _HomeDrawerState extends State<HomeDrawer> {
       Get.to(
         () => CustomerAddressPage(userData: widget.userData, fromDrawer: true),
       );
-    } else if (uniqueId == 'Orders') {
-      Get.to(() => OrdersPage(userData: widget.userData));
+    } else if (uniqueId == 'BankUpi') {
+      Get.to(() => const BankUpiPage());
+    }
+    // ✅ NEW: Fees & Charges
+    else if (uniqueId == 'FeesCharges') {
+      Get.to(() => const FeesAndChargesPage());
+    }
+    // Support & Info
+    else if (uniqueId == 'FAQ') {
+      Get.to(() => const FAQPage());
+    }
+    // ✅ NEW: Help & Support
+    else if (uniqueId == 'HelpSupport') {
+      Get.to(() => const HelpSupportPage());
+    } else if (uniqueId == 'About') {
+      Get.to(() => const AboutKakisoPage());
+    } else if (uniqueId == 'RateUs') {
+      Get.to(() => const RateKakisoPage());
     } else {
       widget.onNavigate(uniqueId);
     }
@@ -521,7 +556,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
             child: Icon(Iconsax.category, size: 18, color: primary),
           ),
-          // 🗣️ WRAPPED
           title: const AutoTranslate(
             child: Text(
               'Categories',
@@ -533,11 +567,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
           children: parentCategories.map((parent) {
-            _categories.where((c) => c.parent == parent.id).toList();
             return ListTile(
               dense: true,
               contentPadding: const EdgeInsets.only(left: 20, right: 16),
-              // 🗣️ WRAPPED
               title: AutoTranslate(
                 child: Text(
                   parent.name,
@@ -569,12 +601,9 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // ------------------------------------------------------------------
-  // --- C. FOOTER ---
-  // ------------------------------------------------------------------
   Widget _buildFooter(BuildContext context) {
     return Container(
-      color: Colors.white, // Continues the "Island" white
+      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Column(
         children: [
@@ -589,16 +618,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.08),
+                color: Colors.red.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
+                border: Border.all(color: Colors.red.withOpacity(0.1)),
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Iconsax.logout, size: 18, color: Colors.redAccent),
                   SizedBox(width: 8),
-                  // 🗣️ WRAPPED
                   AutoTranslate(
                     child: Text(
                       'Log Out',
@@ -615,7 +643,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
           const SizedBox(height: 10),
-          // 🗣️ WRAPPED
           AutoTranslate(
             child: Text(
               "Version 1.0.2 • Made with ❤️",
@@ -631,190 +658,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
     );
   }
 
-  // ------------------------------------------------------------------
-  // --- D. BOTTOM SHEETS (FAQ & ABOUT) ---
-  // ------------------------------------------------------------------
-
-  void _showFAQSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (_, controller) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: ListView(
-            controller: controller,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // 🗣️ WRAPPED
-              const AutoTranslate(
-                child: Text(
-                  "Frequently Asked Questions",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildFAQItem(
-                "How do I track my order?",
-                "Go to the Orders section. Tap any order to view detailed status tracking.",
-              ),
-              _buildFAQItem(
-                "How do I change my address?",
-                "Navigate to 'Addresses'. You can add, edit, or delete customer addresses.",
-              ),
-              _buildFAQItem(
-                "What is the return policy?",
-                "Returns are accepted within 7 days of delivery for damaged items.",
-              ),
-              _buildFAQItem(
-                "Can I edit my business details?",
-                "Yes! Go to 'Business Details' to update your shop name and logo.",
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFAQItem(String question, String answer) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: ExpansionTile(
-        // 🗣️ WRAPPED
-        title: AutoTranslate(
-          child: Text(
-            question,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              fontFamily: 'Poppins',
-            ),
-          ),
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 🗣️ WRAPPED
-          AutoTranslate(
-            child: Text(
-              answer,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 13,
-                height: 1.5,
-                fontFamily: 'Poppins',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAboutSheet(BuildContext context, Color primary) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 30),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: primary.withValues(alpha: 0.1),
-              ),
-              child: Icon(Iconsax.building_3, size: 40, color: primary),
-            ),
-            const SizedBox(height: 20),
-            // 🗣️ WRAPPED
-            const AutoTranslate(
-              child: Text(
-                "KaKiSo Reseller",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // 🗣️ WRAPPED
-            AutoTranslate(
-              child: Text(
-                "Empowering resellers to grow their business with zero investment. We provide high-quality products at wholesale rates.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            const Divider(),
-            const SizedBox(height: 10),
-            // 🗣️ WRAPPED
-            const AutoTranslate(
-              child: Text(
-                "© 2024 KaKiSo Inc. All rights reserved.",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------------
-  // --- E. LOGOUT DIALOG ---
-  // ------------------------------------------------------------------
   Future<void> _showLogoutConfirmDialog() async {
     final result = await Get.dialog<bool>(
       AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        // 🗣️ WRAPPED
         title: const AutoTranslate(
           child: Text(
             'Log out?',
@@ -824,7 +673,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
         ),
-        // 🗣️ WRAPPED
         content: const AutoTranslate(
           child: Text(
             'Are you sure you want to log out from your account?',
@@ -839,7 +687,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            // 🗣️ WRAPPED
             child: const AutoTranslate(
               child: Text(
                 'Cancel',
@@ -860,7 +707,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
               ),
             ),
             onPressed: () => Get.back(result: true),
-            // 🗣️ WRAPPED
             child: const AutoTranslate(
               child: Text(
                 'Yes, Log Out',
