@@ -24,8 +24,8 @@ class CatalogueHeader extends StatelessWidget {
             "My Catalogs",
             style: TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
             ),
           ),
           Text(

@@ -7,6 +7,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
 import 'package:showcaseview/showcaseview.dart';
+// 1. IMPORT AUTO TRANSLATE
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 // --- MODELS & SERVICES ---
 import 'package:kakiso_reseller_app/models/categories.dart';
@@ -29,7 +31,7 @@ class CategoriesSection extends StatelessWidget {
       builder: (context) => _CategoriesSectionContent(userData: userData),
       autoPlay: false,
       blurValue: 1,
-      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 300),
     );
   }
@@ -148,18 +150,11 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
     final textScaler = mediaQuery.textScaler;
     final screenWidth = mediaQuery.size.width;
 
-    // Calculate dynamic rail width based on text scale, but cap it so it doesn't take over small screens
-    // Base is 85, scales with font, capped between 85 and 30% of screen width (or 110 max)
     final double railWidth = (85 * textScaler.scale(1))
         .clamp(85.0, 120.0)
         .clamp(0.0, screenWidth * 0.35);
 
-    // Calculate available width for the right side content
     final double rightContentWidth = screenWidth - railWidth;
-
-    // Determine grid columns dynamically:
-    // If we have < 240px space, 2 columns is tight but 3 is impossible.
-    // Ideally aim for ~100-110px per item.
     final int crossAxisCount = (rightContentWidth / 110).floor().clamp(2, 5);
 
     final level2Categories = _getChildren(_selectedParentId);
@@ -220,10 +215,13 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
                                           color: Colors.grey.shade300,
                                         ),
                                         const SizedBox(height: 12),
-                                        Text(
-                                          "No sub-categories found.",
-                                          style: TextStyle(
-                                            color: Colors.grey[400],
+                                        // 🗣️ WRAPPED
+                                        AutoTranslate(
+                                          child: Text(
+                                            "No sub-categories found.",
+                                            style: TextStyle(
+                                              color: Colors.grey[400],
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -335,17 +333,20 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            cat.name,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10, // Scales automatically
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: isSelected ? _textDark : Colors.grey,
+                          // 🗣️ WRAPPED CATEGORY NAME
+                          AutoTranslate(
+                            child: Text(
+                              cat.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isSelected ? _textDark : Colors.grey,
+                              ),
                             ),
                           ),
                         ],
@@ -357,7 +358,6 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
             ),
           );
 
-          // 6. WRAP FIRST LEFT ITEM IN SHOWCASE
           if (index == 0) {
             return Showcase(
               key: _leftRailKey,
@@ -391,29 +391,34 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
   Widget _buildTitleSliver() {
     final parent = _getSelectedParent();
 
-    // 7. WRAP RIGHT CONTENT TITLE IN SHOWCASE
     Widget content = Container(
       color: _bgRight,
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            parent?.name ?? "Categories",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: _textDark,
-              fontFamily: 'Poppins',
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              parent?.name ?? "Categories",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: _textDark,
+                fontFamily: 'Poppins',
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            "Explore collections",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[500],
-              fontFamily: 'Poppins',
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              "Explore collections",
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+                fontFamily: 'Poppins',
+              ),
             ),
           ),
         ],
@@ -467,22 +472,28 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    level2Cat.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                      fontFamily: 'Poppins',
+                  // 🗣️ WRAPPED
+                  child: AutoTranslate(
+                    child: Text(
+                      level2Cat.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
                   ),
                 ),
-                const Text(
-                  "View All",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: accentColor,
+                // 🗣️ WRAPPED
+                const AutoTranslate(
+                  child: Text(
+                    "View All",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: accentColor,
+                    ),
                   ),
                 ),
                 const Icon(
@@ -502,8 +513,8 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: displayItems.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount, // 🌟 Responsive Column Count
-            childAspectRatio: 0.75, // Standard ratio for image + text
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: 0.75,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
           ),
@@ -558,16 +569,19 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            cat.name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
-              height: 1.1,
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              cat.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+                height: 1.1,
+              ),
             ),
           ),
         ],
@@ -593,7 +607,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          // 🌟 Responsive Logo Container
+          // 検 Responsive Logo Container
           Flexible(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 100),
@@ -605,7 +619,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
             ),
           ),
           const Spacer(),
-          // 🌟 4. RESTART TOUR BUTTON ADDED HERE
+          // 検 4. RESTART TOUR BUTTON ADDED HERE
           IconButton(
             tooltip: "Guide",
             icon: const Icon(Iconsax.info_circle, color: accentColor),
@@ -672,8 +686,13 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
         children: [
           const Icon(Iconsax.wifi, size: 40, color: Colors.red),
           const SizedBox(height: 10),
-          const Text("Connection Failed"),
-          TextButton(onPressed: _loadCategories, child: const Text("Retry")),
+          // 🗣️ WRAPPED
+          const AutoTranslate(child: Text("Connection Failed")),
+          TextButton(
+            onPressed: _loadCategories,
+            // 🗣️ WRAPPED
+            child: const AutoTranslate(child: Text("Retry")),
+          ),
         ],
       ),
     );

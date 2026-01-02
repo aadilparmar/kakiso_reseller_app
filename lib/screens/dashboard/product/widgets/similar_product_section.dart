@@ -56,10 +56,10 @@ class _SimilarProductsSectionState extends State<SimilarProductsSection> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 0, vertical: 12),
           child: Text(
-            "Similar Products",
+            "Explore More Products",
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w500,
               fontFamily: 'Poppins',
               color: Colors.black87,
             ),

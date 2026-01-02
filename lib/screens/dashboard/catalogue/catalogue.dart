@@ -1687,7 +1687,7 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                         Text(
                                           "Reseller Tools",
                                           style: TextStyle(
-                                            fontWeight: FontWeight.w800,
+                                            fontWeight: FontWeight.w500,
                                             fontSize: 16,
                                             color: Color(0xFF86198F),
                                             fontFamily: 'Poppins',

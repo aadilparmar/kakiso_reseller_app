@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/sigup.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
@@ -100,6 +101,14 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
   void _goToRegister() {
     Get.off(
       () => const RegisterPage(),
+      transition: Transition.rightToLeftWithFade,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  void _goToLogin() {
+    Get.off(
+      () => const LoginPage(),
       transition: Transition.rightToLeftWithFade,
       duration: const Duration(milliseconds: 500),
     );
@@ -385,7 +394,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
 
           // Secondary "Sign In" Link
           GestureDetector(
-            onTap: _goToRegister,
+            onTap: _goToLogin,
             child: RichText(
               textScaleFactor: 1.0,
               text: const TextSpan(

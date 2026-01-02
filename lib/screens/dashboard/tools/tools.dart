@@ -9,6 +9,9 @@ import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
 import 'package:showcaseview/showcaseview.dart';
 
+// 1. IMPORT THE PACKAGE
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
+
 // --- MODEL IMPORTS ---
 import 'package:kakiso_reseller_app/models/tools.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
@@ -57,7 +60,7 @@ class ToolsSection extends StatelessWidget {
       builder: (context) => _ToolsSectionContent(userData: userData),
       autoPlay: false,
       blurValue: 1,
-      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 300),
     );
   }
@@ -299,25 +302,31 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18.0),
         ),
-        title: const Text(
-          'Logout',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Poppins',
-            fontSize: 20,
-            color: textPrimary,
+        title: const AutoTranslate(
+          child: Text(
+            'Logout',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
+              fontSize: 20,
+              color: textPrimary,
+            ),
           ),
         ),
-        content: const Text(
-          'Do you want to log out?',
-          style: TextStyle(fontFamily: 'Poppins', color: textSecondary),
+        content: const AutoTranslate(
+          child: Text(
+            'Do you want to log out?',
+            style: TextStyle(fontFamily: 'Poppins', color: textSecondary),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: textSecondary, fontFamily: 'Poppins'),
+            child: const AutoTranslate(
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: textSecondary, fontFamily: 'Poppins'),
+              ),
             ),
           ),
           TextButton(
@@ -326,12 +335,14 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
               await _storage.delete(key: 'authToken');
               Get.offAll(() => const LoginPage());
             },
-            child: const Text(
-              'Logout',
-              style: TextStyle(
-                color: accentColor,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
+            child: const AutoTranslate(
+              child: Text(
+                'Logout',
+                style: TextStyle(
+                  color: accentColor,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
               ),
             ),
           ),
@@ -389,10 +400,8 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      // ignore: deprecated_member_use
-                      accentColor.withValues(alpha: 0.06),
-                      // ignore: deprecated_member_use
-                      accentPurple.withValues(alpha: 0.06),
+                      accentColor.withOpacity(0.06),
+                      accentPurple.withOpacity(0.06),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(50),
@@ -402,13 +411,16 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                   children: const [
                     Icon(Iconsax.flash_1, size: 16, color: accentColor),
                     SizedBox(width: 6),
-                    Text(
-                      'Coming soon',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: accentColor,
-                        fontFamily: 'Poppins',
+                    // 🗣️ WRAPPED
+                    AutoTranslate(
+                      child: Text(
+                        'Coming soon',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: accentColor,
+                          fontFamily: 'Poppins',
+                        ),
                       ),
                     ),
                   ],
@@ -423,10 +435,8 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          // ignore: deprecated_member_use
-                          accentColor.withValues(alpha: 0.18),
-                          // ignore: deprecated_member_use
-                          accentPurple.withValues(alpha: 0.30),
+                          accentColor.withOpacity(0.18),
+                          accentPurple.withOpacity(0.30),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -434,8 +444,7 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          // ignore: deprecated_member_use
-                          color: accentColor.withValues(alpha: 0.18),
+                          color: accentColor.withOpacity(0.18),
                           blurRadius: 18,
                           offset: const Offset(0, 6),
                         ),
@@ -448,22 +457,28 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          tool.title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Poppins',
-                            color: textPrimary,
+                        // 🗣️ WRAPPED TITLE
+                        AutoTranslate(
+                          child: Text(
+                            tool.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
+                              color: textPrimary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          tool.subtitle,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontFamily: 'Poppins',
-                            color: textSecondary,
+                        // 🗣️ WRAPPED SUBTITLE
+                        AutoTranslate(
+                          child: Text(
+                            tool.subtitle,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontFamily: 'Poppins',
+                              color: textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -472,14 +487,17 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                 ],
               ),
               const SizedBox(height: 18),
-              const Text(
-                'We’re building this tool for you. Once it’s live, you’ll be able to run powerful automations directly from Kakiso – without leaving your phone.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontFamily: 'Poppins',
-                  color: textSecondary,
-                  height: 1.4,
+              // 🗣️ WRAPPED DESCRIPTION
+              const AutoTranslate(
+                child: Text(
+                  'We’re building this tool for you. Once it’s live, you’ll be able to run powerful automations directly from Kakiso – without leaving your phone.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'Poppins',
+                    color: textSecondary,
+                    height: 1.4,
+                  ),
                 ),
               ),
               const SizedBox(height: 22),
@@ -488,12 +506,15 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                 child: ElevatedButton.icon(
                   onPressed: () => Navigator.pop(ctx),
                   icon: const Icon(Iconsax.tick_circle, size: 18),
-                  label: const Text(
-                    'Nice, waiting for it',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Poppins',
+                  // 🗣️ WRAPPED LABEL
+                  label: const AutoTranslate(
+                    child: Text(
+                      'Nice, waiting for it',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -552,7 +573,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
-              // 🌟 Responsive Logo (Use Flexible/ConstrainedBox)
               Flexible(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 100),
@@ -568,14 +588,12 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
               ),
               const Spacer(),
 
-              // 🌟 4. RESTART TOUR BUTTON
               IconButton(
                 tooltip: "Guide",
                 icon: const Icon(Iconsax.info_circle, color: accentColor),
                 onPressed: _startTour,
               ),
 
-              // --- CART ICON WITH BADGE ---
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -653,29 +671,33 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Tools roadmap',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Poppins',
-                          color: textPrimary,
+                      // 🗣️ WRAPPED
+                      const AutoTranslate(
+                        child: Text(
+                          'Tools roadmap',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                            color: textPrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Use the tools that are ready today, and see what’s coming next inside Kakiso.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'Poppins',
-                          color: textSecondary,
-                          height: 1.4,
+                      // 🗣️ WRAPPED
+                      const AutoTranslate(
+                        child: Text(
+                          'Use the tools that are ready today, and see what’s coming next inside Kakiso.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'Poppins',
+                            color: textSecondary,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
 
-                      // Progress-like summary row
-                      // 6. WRAP SUMMARY IN SHOWCASE
                       Showcase(
                         key: _summaryKey,
                         title: "Roadmap Status",
@@ -706,12 +728,15 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              '$liveCount live • $comingSoonCount coming soon',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontFamily: 'Poppins',
-                                color: textMuted,
+                            // 🗣️ WRAPPED DYNAMIC TEXT
+                            AutoTranslate(
+                              child: Text(
+                                '$liveCount live • $comingSoonCount coming soon',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'Poppins',
+                                  color: textMuted,
+                                ),
                               ),
                             ),
                           ],
@@ -722,7 +747,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                 ),
 
                 // ── CHIPS ROW ─────────────────────────────────────────────
-                // 7. WRAP FILTERS IN SHOWCASE
                 Showcase(
                   key: _filterKey,
                   title: "Tool Filters",
@@ -793,7 +817,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                 ),
 
                 // ── SEARCH BAR ────────────────────────────────────────────
-                // 8. WRAP SEARCH IN SHOWCASE
                 Showcase(
                   key: _searchKey,
                   title: "Search",
@@ -816,7 +839,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                       vertical: 10,
                     ),
                     child: Container(
-                      // 🌟 Responsive: minHeight instead of fixed height
                       constraints: const BoxConstraints(minHeight: 46),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
@@ -840,14 +862,15 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                                 fontSize: 13,
                               ),
                               decoration: const InputDecoration(
-                                hintText: 'Search tools...',
+                                hintText:
+                                    'Search tools...', // Hint translation varies by implementation, leaving standard
                                 hintStyle: TextStyle(
                                   color: textMuted,
                                   fontFamily: 'Poppins',
                                   fontSize: 13,
                                 ),
                                 border: InputBorder.none,
-                                isDense: true, // helps with vertical alignment
+                                isDense: true,
                               ),
                               onChanged: (v) => setState(() => query = v),
                             ),
@@ -877,7 +900,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                     child: visibleTools.isEmpty
                         ? _buildEmptyState()
                         : ListView.builder(
-                            // 🌟 Add padding at bottom for safety
                             padding: const EdgeInsets.only(bottom: 20),
                             itemCount: visibleTools.length,
                             itemBuilder: (context, index) {
@@ -886,7 +908,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                               final isLast = index == visibleTools.length - 1;
                               final isLive = _liveToolIds.contains(tool.id);
 
-                              // 9. WRAP FIRST TOOL IN SHOWCASE
                               Widget toolCard = _TimelineToolCard(
                                 tool: tool,
                                 isFirst: isFirst,
@@ -894,25 +915,20 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                                 isLive: isLive,
                                 onTap: () {
                                   if (isLive) {
-                                    // Check if it's a catalog tool that requires full redirection
-                                    // (Mimics Drawer's "Get.offAll" behavior)
                                     if (_catalogRedirectIds.contains(tool.id)) {
                                       Get.offAll(
                                         () => NavigationMenu(
                                           userData: widget.userData,
-                                          initialIndex: 3, // Catalog Index
+                                          initialIndex: 3,
                                         ),
-                                        // Passing the argument for guide overlay
                                         arguments: {
                                           'active_tool_guide': tool.id,
                                         },
                                       );
                                     } else {
-                                      // Standard Navigation (Push)
                                       Get.to(() => tool.pageBuilder(context));
                                     }
                                   } else {
-                                    // Show coming soon modal
                                     _showComingSoonSheet(tool);
                                   }
                                 },
@@ -962,22 +978,28 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         children: const [
           Icon(Iconsax.lamp_on, size: 56, color: Color(0xFFCBD5F5)),
           SizedBox(height: 12),
-          Text(
-            'No tools found',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Poppins',
-              color: textPrimary,
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              'No tools found',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+                color: textPrimary,
+              ),
             ),
           ),
           SizedBox(height: 4),
-          Text(
-            'Try updating your search or filters.',
-            style: TextStyle(
-              fontSize: 12,
-              fontFamily: 'Poppins',
-              color: textSecondary,
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              'Try updating your search or filters.',
+              style: TextStyle(
+                fontSize: 12,
+                fontFamily: 'Poppins',
+                color: textSecondary,
+              ),
             ),
           ),
         ],
@@ -1001,11 +1023,9 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ignore: deprecated_member_use
-    final Color bg = selected ? accentColor.withValues(alpha: 0.10) : chipBg;
+    final Color bg = selected ? accentColor.withOpacity(0.10) : chipBg;
     final Color border = selected
-        // ignore: deprecated_member_use
-        ? accentColor.withValues(alpha: 0.8)
+        ? accentColor.withOpacity(0.8)
         : cardBorderColor;
     final Color text = selected ? accentColor : textSecondary;
 
@@ -1026,13 +1046,16 @@ class _FilterChip extends StatelessWidget {
               const Icon(Iconsax.verify5, size: 14, color: accentColor),
               const SizedBox(width: 4),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: text,
-                fontFamily: 'Poppins',
+            // 🗣️ WRAPPED CHIP LABEL
+            AutoTranslate(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: text,
+                  fontFamily: 'Poppins',
+                ),
               ),
             ),
           ],
@@ -1061,34 +1084,24 @@ class _TimelineToolCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color dotOuterColor = isLive
         ? accentColor
-        // ignore: deprecated_member_use
-        : accentPurple.withValues(alpha: 0.9);
+        : accentPurple.withOpacity(0.9);
     final Color dotGlowColor = isLive
-        // ignore: deprecated_member_use
-        ? accentColor.withValues(alpha: 0.40)
-        : accentPurple.withValues(alpha: 0.40);
+        ? accentColor.withOpacity(0.40)
+        : accentPurple.withOpacity(0.40);
 
     final List<Color> cardGradient = [surfaceColor, surfaceColor];
 
     final List<Color> iconGradient = isLive
-        ? [
-            accentColor.withValues(alpha: 0.10),
-            accentColor.withValues(alpha: 0.30),
-          ]
-        : [
-            accentPurple.withValues(alpha: 0.10),
-            accentPurple.withValues(alpha: 0.30),
-          ];
+        ? [accentColor.withOpacity(0.10), accentColor.withOpacity(0.30)]
+        : [accentPurple.withOpacity(0.10), accentPurple.withOpacity(0.30)];
 
     final String badgeText = isLive ? 'Available now' : 'Coming soon';
     final Color badgeColor = isLive
-        ? accentColor.withValues(alpha: 0.08)
-        : accentPurple.withValues(alpha: 0.08);
+        ? accentColor.withOpacity(0.08)
+        : accentPurple.withOpacity(0.08);
 
     final Color badgeTextColor = isLive ? accentColor : accentPurple;
 
-    // 🌟 IntrinsicHeight ensures the Timeline (left column) grows
-    // to match the height of the Content (right card) exactly.
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1143,13 +1156,12 @@ class _TimelineToolCard extends StatelessWidget {
                   border: Border.all(color: cardBorderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
+                      color: Colors.black.withOpacity(0.04),
                       blurRadius: 14,
                       offset: const Offset(0, 8),
                     ),
                   ],
                 ),
-                // 🌟 Dynamic Padding
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1177,33 +1189,35 @@ class _TimelineToolCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            tool.title,
-                            // Allow wrapping if needed for huge fonts
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Poppins',
-                              color: textPrimary,
+                          // 🗣️ WRAPPED TITLE
+                          AutoTranslate(
+                            child: Text(
+                              tool.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Poppins',
+                                color: textPrimary,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            tool.subtitle,
-                            // Removed maxLines to let text flow on larger fonts
-                            // or keep it but allow scaling.
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'Poppins',
-                              color: textSecondary,
-                              height: 1.3,
+                          // 🗣️ WRAPPED SUBTITLE
+                          AutoTranslate(
+                            child: Text(
+                              tool.subtitle,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'Poppins',
+                                color: textSecondary,
+                                height: 1.3,
+                              ),
                             ),
                           ),
-                          // 🌟 Replaced Spacer with fixed gap to prevent overflow
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -1227,13 +1241,16 @@ class _TimelineToolCard extends StatelessWidget {
                                       color: badgeTextColor,
                                     ),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      badgeText,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                        fontFamily: 'Poppins',
-                                        color: badgeTextColor,
+                                    // 🗣️ WRAPPED BADGE TEXT
+                                    AutoTranslate(
+                                      child: Text(
+                                        badgeText,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          fontFamily: 'Poppins',
+                                          color: badgeTextColor,
+                                        ),
                                       ),
                                     ),
                                   ],

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+// 1. IMPORT THE PACKAGE
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
+
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/controllers/wishlist_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
@@ -109,7 +112,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
         margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         borderRadius: 12,
-        backgroundColor: kBlack.withValues(alpha: 0.95),
+        backgroundColor: kBlack.withOpacity(0.95),
         colorText: Colors.white,
         snackStyle: SnackStyle.FLOATING,
         titleText: Row(
@@ -134,14 +137,17 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             ),
             const SizedBox(width: 12),
             const Expanded(
-              child: Text(
-                "Added to Cart successfully!",
-                textScaler: TextScaler.noScaling,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
+              // 🗣️ WRAPPED
+              child: AutoTranslate(
+                child: Text(
+                  "Added to Cart successfully!",
+                  textScaler: TextScaler.noScaling,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -199,14 +205,14 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
           border: Border.all(
             color: isVisuallySelected
                 ? kPrimaryColor
-                : Colors.grey.withValues(alpha: 0.2),
+                : Colors.grey.withOpacity(0.2),
             width: isVisuallySelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
               color: isVisuallySelected
-                  ? kPrimaryColor.withValues(alpha: 0.15)
-                  : Colors.black.withValues(alpha: 0.05),
+                  ? kPrimaryColor.withOpacity(0.15)
+                  : Colors.black.withOpacity(0.05),
               blurRadius: isVisuallySelected ? 12 : 8,
               offset: const Offset(0, 4),
             ),
@@ -262,7 +268,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
                             colors: [
-                              Colors.black.withValues(alpha: 0.1),
+                              Colors.black.withOpacity(0.1),
                               Colors.transparent,
                             ],
                           ),
@@ -286,7 +292,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                             borderRadius: BorderRadius.circular(4),
                             boxShadow: [
                               BoxShadow(
-                                color: kAccentColor.withValues(alpha: 0.4),
+                                color: kAccentColor.withOpacity(0.4),
                                 blurRadius: 4,
                               ),
                             ],
@@ -318,7 +324,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                               shape: BoxShape.circle,
                               color: isVisuallySelected
                                   ? kPrimaryColor
-                                  : Colors.white.withValues(alpha: 0.9),
+                                  : Colors.white.withOpacity(0.9),
                               border: Border.all(
                                 color: isVisuallySelected
                                     ? kPrimaryColor
@@ -355,7 +361,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
+                                  color: Colors.black.withOpacity(0.1),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -417,13 +423,16 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                     // Pricing
                                     Row(
                                       children: [
-                                        Text(
-                                          "Buy ",
-                                          style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF6B7280),
+                                        // 🗣️ WRAPPED
+                                        const AutoTranslate(
+                                          child: Text(
+                                            "Buy ",
+                                            style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF6B7280),
+                                            ),
                                           ),
                                         ),
                                         Text(
@@ -448,11 +457,14 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                             ),
                                           ),
                                           const SizedBox(width: 2),
-                                          Text(
-                                            "MRP",
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey.shade400,
+                                          // 🗣️ WRAPPED
+                                          const AutoTranslate(
+                                            child: Text(
+                                              "MRP",
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -464,17 +476,20 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                     Row(
                                       children: [
                                         if (resellPrice != null)
-                                          Text(
-                                            "Resell ",
-                                            style: const TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Color.fromARGB(
-                                                255,
-                                                136,
-                                                135,
-                                                139,
+                                          // 🗣️ WRAPPED
+                                          const AutoTranslate(
+                                            child: Text(
+                                              "Resell ",
+                                              style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color.fromARGB(
+                                                  255,
+                                                  136,
+                                                  135,
+                                                  139,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -505,9 +520,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                               borderRadius:
                                                   BorderRadius.circular(4),
                                               border: Border.all(
-                                                color: kGreen.withValues(
-                                                  alpha: 0.2,
-                                                ),
+                                                color: kGreen.withOpacity(0.2),
                                               ),
                                             ),
                                             child: Row(
@@ -595,13 +608,16 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                     size: 16,
                                                   ),
                                                   SizedBox(width: 4),
-                                                  Text(
-                                                    "Added to Cart",
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: Colors.white,
+                                                  // 🗣️ WRAPPED
+                                                  AutoTranslate(
+                                                    child: Text(
+                                                      "Added to Cart",
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Colors.white,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -616,13 +632,16 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                     color: kPrimaryColor,
                                                   ),
                                                   SizedBox(width: 4),
-                                                  Text(
-                                                    "Cart",
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: kPrimaryColor,
+                                                  // 🗣️ WRAPPED
+                                                  AutoTranslate(
+                                                    child: Text(
+                                                      "Cart",
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: kPrimaryColor,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -675,20 +694,22 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                   color: Colors.white,
                                                 ),
                                                 const SizedBox(width: 4),
-                                                Text(
-                                                  // Smart Logic: If name is too long, just show "Added" to prevent UI breaking
-                                                  (addedCatalogName != null &&
-                                                          addedCatalogName
-                                                                  .length >
-                                                              12)
-                                                      ? "Added"
-                                                      : "Added to $addedCatalogName",
-                                                  style: const TextStyle(
-                                                    fontSize:
-                                                        11, // Much more readable than 5
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.white,
-                                                    fontFamily: 'Poppins',
+                                                // 🗣️ WRAPPED
+                                                AutoTranslate(
+                                                  child: Text(
+                                                    (addedCatalogName != null &&
+                                                            addedCatalogName
+                                                                    .length >
+                                                                12)
+                                                        ? "Added"
+                                                        : "Added to $addedCatalogName",
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.white,
+                                                      fontFamily: 'Poppins',
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -706,13 +727,17 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                                   color: kAccentColor,
                                                 ),
                                                 SizedBox(width: 4),
-                                                Text(
-                                                  "Catalog",
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: kAccentColor,
-                                                    fontFamily: 'Poppins',
+                                                // 🗣️ WRAPPED
+                                                AutoTranslate(
+                                                  child: Text(
+                                                    "Catalog",
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: kAccentColor,
+                                                      fontFamily: 'Poppins',
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -765,14 +790,17 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                     ),
                   ),
                 ),
-                const Text(
-                  'Add to Catalog',
-                  textScaler: TextScaler.noScaling,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF1F2937),
+                // 🗣️ WRAPPED
+                const AutoTranslate(
+                  child: Text(
+                    'Add to Catalog',
+                    textScaler: TextScaler.noScaling,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF1F2937),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -794,7 +822,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
+                                color: Colors.black.withOpacity(0.05),
                                 blurRadius: 10,
                               ),
                             ],
@@ -806,10 +834,13 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          "No catalogues found",
-                          textScaler: TextScaler.noScaling,
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                        // 🗣️ WRAPPED
+                        const AutoTranslate(
+                          child: Text(
+                            "No catalogs found",
+                            textScaler: TextScaler.noScaling,
+                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
                         ),
                       ],
                     ),
@@ -830,7 +861,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: kPrimaryColor.withValues(alpha: 0.08),
+                            color: kPrimaryColor.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
@@ -876,9 +907,12 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                       _showCreateNewCatalogueDialog(context);
                     },
                     icon: const Icon(Iconsax.add_circle, size: 20),
-                    label: const Text(
-                      'Create New Catalogue',
-                      textScaler: TextScaler.noScaling,
+                    // 🗣️ WRAPPED
+                    label: const AutoTranslate(
+                      child: Text(
+                        'Create New Catalog',
+                        textScaler: TextScaler.noScaling,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kPrimaryColor,
@@ -910,12 +944,15 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text(
-            'New Catalogue',
-            textScaler: TextScaler.noScaling,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w500,
+          // 🗣️ WRAPPED
+          title: const AutoTranslate(
+            child: Text(
+              'New Catalog',
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           content: TextField(
@@ -923,7 +960,8 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             autofocus: true,
             style: const TextStyle(fontFamily: 'Poppins'),
             decoration: InputDecoration(
-              labelText: 'Catalogue Name',
+              // 🗣️ WRAPPED LABEL
+              label: const AutoTranslate(child: Text('Catalog Name')),
               hintText: 'e.g. Diwali Offers',
               filled: true,
               fillColor: const Color.fromARGB(185, 250, 250, 250),
@@ -942,7 +980,8 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               style: TextButton.styleFrom(foregroundColor: Colors.grey),
-              child: const Text('Cancel'),
+              // 🗣️ WRAPPED
+              child: const AutoTranslate(child: Text('Cancel')),
             ),
             ElevatedButton(
               onPressed: () {
@@ -960,7 +999,8 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Create'),
+              // 🗣️ WRAPPED
+              child: const AutoTranslate(child: Text('Create')),
             ),
           ],
         );
