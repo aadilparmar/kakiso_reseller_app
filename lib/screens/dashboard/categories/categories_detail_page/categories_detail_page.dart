@@ -28,68 +28,65 @@ class CategoryDetailsPage extends StatefulWidget {
 }
 
 class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
-  // --- STATE ---
-
-  // Active ID (Starts as the main category, changes if a sub-category is clicked)
   late int _activeCategoryId;
-
-  // Products
   List<ProductModel> _products = [];
   bool _isLoadingProducts = true;
+  bool _isLoadingMore = false;
 
-  // Sub-Categories (Children of the main category)
+  bool _hasMore = true;
+  final ScrollController _scrollController = ScrollController();
+
   List<CategoryModel> _subCategories = [];
   bool _isLoadingSubCats = true;
 
-  // Filter & Sort
   String _selectedSortLabel = 'Popular';
   String _orderBy = 'popularity';
   String _order = 'desc';
   FilterOptions _activeFilter = FilterOptions();
 
-  // Price Filter
   final RangeValues _currentPriceRange = const RangeValues(0, 10000);
   final double _maxFilterLimit = 20000;
 
-  // Bulk Selection
   final Set<int> _selectedProductIds = {};
 
-  // Controllers
   final catalogueController = Get.put(CatalogueController(), permanent: true);
 
-  // Snackbar
   OverlayEntry? _currentSnackbar;
 
   @override
   void initState() {
     super.initState();
-    // Initialize active ID to the passed category
     _activeCategoryId = widget.categoryId;
-
+    _scrollController.addListener(_onScroll);
     _loadData();
   }
 
   void _loadData() {
-    _fetchSubCategories(); // Load the horizontal list (Children of Parent)
-    _fetchCategoryProducts(); // Load products for current active ID
+    _fetchSubCategories();
+    _fetchCategoryProducts(refresh: true);
   }
 
   @override
   void dispose() {
     _removeSnackbar();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  // --- API CALLS ---
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingProducts &&
+        !_isLoadingMore &&
+        _hasMore) {
+      _fetchCategoryProducts(refresh: false);
+    }
+  }
 
   Future<void> _fetchSubCategories() async {
     setState(() => _isLoadingSubCats = true);
     try {
-      // 1. Fetch all categories (or use a specific API if available)
       final allCats = await ApiService.fetchCategories();
-
-      // 2. Filter for children of the MAIN category (widget.categoryId)
-      // This list remains constant regardless of which child is selected
       final children = allCats
           .where((c) => c.parent == widget.categoryId)
           .toList();
@@ -105,11 +102,21 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
     }
   }
 
-  Future<void> _fetchCategoryProducts() async {
-    setState(() => _isLoadingProducts = true);
+  Future<void> _fetchCategoryProducts({bool refresh = false}) async {
+    if (refresh) {
+      setState(() {
+        _isLoadingProducts = true;
+        _hasMore = true;
+        _products.clear();
+      });
+    } else {
+      setState(() {
+        _isLoadingMore = true;
+      });
+    }
+
     try {
-      // Use _activeCategoryId (which might be the parent OR a child)
-      final products = await ApiService.fetchProductsByCategory(
+      final newProducts = await ApiService.fetchProductsByCategory(
         _activeCategoryId,
         orderBy: _orderBy,
         order: _order,
@@ -123,33 +130,44 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
       if (mounted) {
         setState(() {
-          _products = products;
+          if (newProducts.isEmpty) {
+            _hasMore = false;
+          } else {
+            if (refresh) {
+              _products = newProducts;
+            } else {
+              _products.addAll(newProducts);
+            }
+          }
+
           _isLoadingProducts = false;
-          // Clear selections that are no longer visible
+          _isLoadingMore = false;
+
           _selectedProductIds.removeWhere(
             (id) => !_products.any((p) => p.id == id),
           );
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingProducts = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingProducts = false;
+          _isLoadingMore = false;
+        });
+      }
     }
   }
 
-  // --- HANDLERS ---
-
   void _onSubCategorySelected(int id) {
-    if (_activeCategoryId == id) return; // No change
+    if (_activeCategoryId == id) return;
 
     setState(() {
       _activeCategoryId = id;
-      _isLoadingProducts = true; // Show loader immediately
     });
 
-    _fetchCategoryProducts();
+    _fetchCategoryProducts(refresh: true);
   }
 
-  // --- PREMIUM SNACKBAR ---
   void _removeSnackbar() {
     _currentSnackbar?.remove();
     _currentSnackbar = null;
@@ -291,7 +309,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
     );
   }
 
-  // --- SORT & FILTER UI ---
   void _openSortSheet() {
     Get.bottomSheet(
       Container(
@@ -337,7 +354,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
           _order = apiOrder;
         });
         Get.back();
-        _fetchCategoryProducts();
+        _fetchCategoryProducts(refresh: true);
       },
     );
   }
@@ -352,18 +369,19 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
       setState(() {
         _activeFilter = result;
       });
-      _fetchCategoryProducts();
+      _fetchCategoryProducts(refresh: true);
     }
   }
 
-  // --- BULK ACTION ---
   void _openBulkAddToCatalogueSheet() {
+    if (_selectedProductIds.isEmpty) return;
+
     final selectedProducts = _products
         .where((p) => _selectedProductIds.contains(p.id))
-        .toList();
-    if (selectedProducts.isEmpty) return;
+        .toList(growable: false);
 
     final availableCatalogues = catalogueController.catalogueNames;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -374,80 +392,253 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
           child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                Text(
-                  'Add ${selectedProducts.length} items to...',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  Text(
+                    'Add ${selectedProducts.length} products to catalog',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Poppins',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                if (availableCatalogues.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text("No catalogs found. Create one."),
-                    ),
-                  )
-                else
-                  ...availableCatalogues.map(
-                    (name) => ListTile(
-                      leading: const Icon(Iconsax.folder),
-                      title: Text(name),
-                      onTap: () {
-                        for (final p in selectedProducts) {
-                          catalogueController.addProductToExistingCatalogue(
-                            name,
-                            p,
+                  if (availableCatalogues.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade100),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Iconsax.folder_open,
+                            size: 30,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            "No catalogs found",
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 13,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Create a new catalog to start saving products.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 11,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: availableCatalogues.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, index) {
+                          final name = availableCatalogues[index];
+                          return Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade100),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Iconsax.book,
+                                  color: accentColor,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14,
+                                ),
+                              ),
+                              subtitle: const Text(
+                                "Tap to add selected products",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Iconsax.arrow_right_3,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                              onTap: () {
+                                for (final p in selectedProducts) {
+                                  catalogueController
+                                      .addProductToExistingCatalogue(name, p);
+                                  // --- UPDATE CARD STATE HERE ---
+                                  VerticalProductCard.sessionAddedToCatalog[p
+                                          .id] =
+                                      name;
+                                }
+                                Navigator.pop(ctx);
+                                _showPremiumSnackbar(
+                                  title: 'Added to catalog',
+                                  subtitle:
+                                      '${selectedProducts.length} products added to "$name".',
+                                );
+                                setState(() {
+                                  _selectedProductIds.clear();
+                                });
+                              },
+                            ),
                           );
-                        }
+                        },
+                      ),
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
                         Navigator.pop(ctx);
-                        _showPremiumSnackbar(
-                          title: 'Success',
-                          subtitle: 'Added to $name',
-                        );
-                        setState(() => _selectedProductIds.clear());
+                        _showCreateNewCatalogueDialogForBulk(selectedProducts);
                       },
+                      icon: const Icon(Iconsax.add_circle, size: 20),
+                      label: const Text('Create New Catalog'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
                     ),
                   ),
-
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    // Quick inline creation logic for brevity
-                    catalogueController.createCatalogueAndAddProduct(
-                      "New Collection",
-                      selectedProducts.first,
-                    );
-                    _showPremiumSnackbar(
-                      title: 'Success',
-                      subtitle: 'Created "New Collection"',
-                    );
-                  },
-                  child: const Text("Create New Catalog"),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showCreateNewCatalogueDialogForBulk(List<ProductModel> products) {
+    final TextEditingController nameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'New Catalog',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          content: TextField(
+            controller: nameController,
+            autofocus: true,
+            style: const TextStyle(fontFamily: 'Poppins'),
+            decoration: InputDecoration(
+              labelText: 'Catalog Name',
+              hintText: 'e.g. Festive Collection',
+              filled: true,
+              fillColor: const Color.fromARGB(185, 250, 250, 250),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+                borderSide: BorderSide(color: accentColor),
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty && products.isNotEmpty) {
+                  final first = products.first;
+                  catalogueController.createCatalogueAndAddProduct(name, first);
+                  VerticalProductCard.sessionAddedToCatalog[first.id] = name;
+
+                  for (final p in products.skip(1)) {
+                    catalogueController.addProductToExistingCatalogue(name, p);
+                    // --- UPDATE CARD STATE HERE ---
+                    VerticalProductCard.sessionAddedToCatalog[p.id] = name;
+                  }
+
+                  Navigator.pop(ctx);
+                  _showPremiumSnackbar(
+                    title: 'Catalog created',
+                    subtitle: '${products.length} products added to "$name".',
+                  );
+
+                  setState(() {
+                    _selectedProductIds.clear();
+                  });
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Create'),
+            ),
+          ],
         );
       },
     );
@@ -456,6 +647,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final bool hasSelection = _selectedProductIds.isNotEmpty;
+    final selectedCount = _selectedProductIds.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -481,7 +673,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
           children: [
             Column(
               children: [
-                // --- 1. SUB-CATEGORIES LIST (Updated Logic) ---
                 if (!_isLoadingSubCats && _subCategories.isNotEmpty)
                   Container(
                     height: 110,
@@ -493,11 +684,9 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                         vertical: 12,
                       ),
                       scrollDirection: Axis.horizontal,
-                      // +1 for the "All" button
                       itemCount: _subCategories.length + 1,
                       separatorBuilder: (_, __) => const SizedBox(width: 16),
                       itemBuilder: (context, index) {
-                        // --- "ALL" BUTTON ---
                         if (index == 0) {
                           final isSelected =
                               _activeCategoryId == widget.categoryId;
@@ -549,7 +738,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                           );
                         }
 
-                        // --- SUB-CATEGORY ITEMS ---
                         final subCat = _subCategories[index - 1];
                         final isSelected = _activeCategoryId == subCat.id;
 
@@ -575,7 +763,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                                     onError: (_, __) {},
                                   ),
                                 ),
-                                // Show fallback icon if image fails or is empty
                                 child: subCat.imageUrl.isEmpty
                                     ? const Icon(Iconsax.image)
                                     : null,
@@ -606,7 +793,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                     ),
                   ),
 
-                // --- 2. SORT & FILTER BAR ---
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(
@@ -669,7 +855,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                 ),
                 const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-                // --- 3. PRODUCT GRID ---
                 Expanded(
                   child: _isLoadingProducts
                       ? const Center(
@@ -677,123 +862,160 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
                         )
                       : _products.isEmpty
                       ? _buildEmptyState()
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(10),
-                          itemCount: _products.length,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.58,
-                                mainAxisSpacing: 3,
-                                crossAxisSpacing: 3,
+                      : Column(
+                          children: [
+                            Expanded(
+                              child: GridView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(10),
+                                itemCount: _products.length,
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      childAspectRatio: 0.58,
+                                      mainAxisSpacing: 3,
+                                      crossAxisSpacing: 3,
+                                    ),
+                                itemBuilder: (context, index) {
+                                  final product = _products[index];
+                                  return VerticalProductCard(
+                                    product: product,
+                                    availableCatalogues:
+                                        catalogueController.catalogueNames,
+                                    isSelected: _selectedProductIds.contains(
+                                      product.id,
+                                    ),
+                                    onSelectionToggle: () {
+                                      setState(() {
+                                        if (_selectedProductIds.contains(
+                                          product.id,
+                                        )) {
+                                          _selectedProductIds.remove(
+                                            product.id,
+                                          );
+                                        } else {
+                                          _selectedProductIds.add(product.id);
+                                        }
+                                      });
+                                    },
+                                    onCatalogueSelected:
+                                        (product, catalogueName, isNew) {
+                                          if (isNew) {
+                                            catalogueController
+                                                .createCatalogueAndAddProduct(
+                                                  catalogueName,
+                                                  product,
+                                                );
+                                          } else {
+                                            catalogueController
+                                                .addProductToExistingCatalogue(
+                                                  catalogueName,
+                                                  product,
+                                                );
+                                          }
+                                          _showPremiumSnackbar(
+                                            title: 'Added to catalog',
+                                            subtitle:
+                                                '"${product.name}" added to "$catalogueName".',
+                                            imageUrl: product.image,
+                                          );
+                                        },
+                                  );
+                                },
                               ),
-                          itemBuilder: (context, index) {
-                            final product = _products[index];
-                            return VerticalProductCard(
-                              product: product,
-                              availableCatalogues:
-                                  catalogueController.catalogueNames,
-                              isSelected: _selectedProductIds.contains(
-                                product.id,
+                            ),
+                            if (_isLoadingMore)
+                              const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: accentColor,
+                                  ),
+                                ),
                               ),
-                              onSelectionToggle: () {
-                                setState(() {
-                                  if (_selectedProductIds.contains(
-                                    product.id,
-                                  )) {
-                                    _selectedProductIds.remove(product.id);
-                                  } else {
-                                    _selectedProductIds.add(product.id);
-                                  }
-                                });
-                              },
-                              onCatalogueSelected: (product, catalogueName, isNew) {
-                                if (isNew) {
-                                  catalogueController
-                                      .createCatalogueAndAddProduct(
-                                        catalogueName,
-                                        product,
-                                      );
-                                } else {
-                                  catalogueController
-                                      .addProductToExistingCatalogue(
-                                        catalogueName,
-                                        product,
-                                      );
-                                }
-                                _showPremiumSnackbar(
-                                  title: 'Added to catalog',
-                                  subtitle:
-                                      '"${product.name}" added to "$catalogueName".',
-                                  imageUrl: product.image,
-                                );
-                              },
-                            );
-                          },
+                          ],
                         ),
                 ),
                 if (hasSelection) const SizedBox(height: 70),
               ],
             ),
 
-            // --- 4. FLOATING BULK BAR ---
             if (hasSelection)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
+                        offset: const Offset(0, -2),
                       ),
                     ],
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Icon(
-                          Iconsax.tick_circle,
-                          color: accentColor,
-                          size: 18,
-                        ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '${_selectedProductIds.length} products selected',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Icon(
+                              Iconsax.tick_circle,
+                              color: accentColor,
+                              size: 18,
+                            ),
                           ),
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: _openBulkAddToCatalogueSheet,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '$selectedCount products selected',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Add to Catalog',
-                          style: TextStyle(color: Colors.white, fontSize: 12),
-                        ),
+                          ElevatedButton(
+                            onPressed: _openBulkAddToCatalogueSheet,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accentColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: const Text(
+                              'Add to Catalog',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

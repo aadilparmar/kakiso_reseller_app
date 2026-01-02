@@ -4,19 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
-// CONTROLLERS
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
-
-// MODELS
 import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:kakiso_reseller_app/models/categories.dart';
-
-// WIDGETS
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/filter/filter.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-
-// SERVICES & UTILS
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -40,25 +32,19 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
-  // --- SORT STATE ---
   late String _orderBy;
   late String _order;
   String _selectedSortLabel = 'Newest';
 
-  // --- FILTER RANGE ---
   FilterOptions _activeFilter = FilterOptions();
 
-  // --- CATEGORY FILTER STATE (From top bar) ---
   int? _selectedCategoryId;
-  String? _selectedCategoryName;
 
-  // Catalogue controller
   final CatalogueController catalogueController = Get.put(
     CatalogueController(),
     permanent: true,
   );
 
-  // Bulk selection
   final Set<int> _selectedProductIds = {};
 
   @override
@@ -82,23 +68,17 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     }
   }
 
-  // 🔹 FIX: Updated logic to check Filter categories
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
     try {
       List<ProductModel> products;
-
-      // 1. Determine which category ID to use
-      // We prioritize the ID from the "Filter" bottom sheet if available.
-      // If not, we fall back to the ID from the top bar "Category" sheet.
       int? effectiveCatId = _selectedCategoryId;
 
       if (_activeFilter.selectedCategoryIds.isNotEmpty) {
         effectiveCatId = _activeFilter.selectedCategoryIds.first;
       }
 
-      // 2. Fetch based on ID presence
       if (effectiveCatId != null) {
         products = await ApiService.fetchProductsByCategory(
           effectiveCatId,
@@ -108,7 +88,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           maxPrice: _activeFilter.maxPrice,
         );
       } else {
-        // Global fetch
         products = await ApiService.fetchProducts(
           orderBy: _orderBy,
           order: _order,
@@ -123,7 +102,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         _products = products;
         _isLoading = false;
 
-        // Clean selection for products not in current list
         _selectedProductIds.removeWhere(
           (id) => !_products.any((p) => p.id == id),
         );
@@ -134,7 +112,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     }
   }
 
-  // --- SORT SHEET ---
   void _openSortSheet() {
     Get.bottomSheet(
       Container(
@@ -196,175 +173,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     );
   }
 
-  // --- CATEGORY SHEET ---
-  void _openCategorySheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: FutureBuilder<List<CategoryModel>>(
-                future: ApiService.fetchCategories(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return SizedBox(
-                      height: 220,
-                      child: Center(
-                        child: CircularProgressIndicator(color: accentColor),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return SizedBox(
-                      height: 220,
-                      child: Center(
-                        child: Text(
-                          'Failed to load categories',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            color: Colors.red.shade400,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final categories = snapshot.data ?? [];
-
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const Text(
-                        'Filter by Category',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // All Products (no category)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.grey.shade100,
-                          child: const Icon(
-                            Iconsax.global,
-                            size: 16,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        title: const Text(
-                          'All Products',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: _selectedCategoryId == null
-                            ? const Icon(
-                                Icons.check,
-                                color: accentColor,
-                                size: 18,
-                              )
-                            : null,
-                        onTap: () {
-                          setState(() {
-                            _selectedCategoryId = null;
-                            _selectedCategoryName = null;
-                            // Clear filter category too to avoid conflict
-                            _activeFilter.selectedCategoryIds.clear();
-                          });
-                          Navigator.pop(ctx);
-                          _loadData();
-                        },
-                      ),
-
-                      const Divider(height: 16),
-
-                      Flexible(
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: categories.length,
-                          itemBuilder: (_, index) {
-                            final category = categories[index];
-                            final isSelected =
-                                _selectedCategoryId == category.id;
-
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Colors.grey.shade100,
-                                child: const Icon(
-                                  Iconsax.category,
-                                  size: 16,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              title: Text(
-                                category.name,
-                                style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              trailing: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: accentColor,
-                                      size: 18,
-                                    )
-                                  : null,
-                              onTap: () {
-                                setState(() {
-                                  _selectedCategoryId = category.id;
-                                  _selectedCategoryName = category.name;
-                                  // Clear filter category so this one takes precedence conceptually
-                                  _activeFilter.selectedCategoryIds.clear();
-                                });
-                                Navigator.pop(ctx);
-                                _loadData();
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // --- FILTER SHEET ---
   Future<void> _openModernFilter() async {
     final result = await ModernFilterBottomSheet.show(
       context: context,
@@ -379,11 +187,8 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
         _activeFilter = result;
         _applySortFromFilter();
 
-        // Optional: Sync simple category variable for UI consistency
         if (_activeFilter.selectedCategoryIds.isNotEmpty) {
           _selectedCategoryId = _activeFilter.selectedCategoryIds.first;
-          // We assume name is unknown here, or you could look it up
-          _selectedCategoryName = "Filtered";
         }
       });
       _loadData();
@@ -418,7 +223,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     }
   }
 
-  // --- BULK ADD TO CATALOGUE SHEET ---
   void _openBulkAddToCatalogueSheet() {
     if (_selectedProductIds.isEmpty) return;
 
@@ -555,6 +359,10 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                                 for (final p in selectedProducts) {
                                   catalogueController
                                       .addProductToExistingCatalogue(name, p);
+                                  // --- UPDATE CARD STATE HERE ---
+                                  VerticalProductCard.sessionAddedToCatalog[p
+                                          .id] =
+                                      name;
                                 }
                                 Navigator.pop(ctx);
                                 Get.snackbar(
@@ -603,7 +411,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     );
   }
 
-  // --- CREATE NEW CATALOGUE DIALOG (BULK) ---
   void _showCreateNewCatalogueDialogForBulk(List<ProductModel> products) {
     final TextEditingController nameController = TextEditingController();
 
@@ -653,9 +460,12 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                 if (name.isNotEmpty && products.isNotEmpty) {
                   final first = products.first;
                   catalogueController.createCatalogueAndAddProduct(name, first);
+                  VerticalProductCard.sessionAddedToCatalog[first.id] = name;
 
                   for (final p in products.skip(1)) {
                     catalogueController.addProductToExistingCatalogue(name, p);
+                    // --- UPDATE CARD STATE HERE ---
+                    VerticalProductCard.sessionAddedToCatalog[p.id] = name;
                   }
 
                   Navigator.pop(ctx);
@@ -690,10 +500,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     final hasSelection = _selectedProductIds.isNotEmpty;
     final selectedCount = _selectedProductIds.length;
 
-    // Label for category chip
-    final String categoryLabel = _selectedCategoryName ?? 'Categories';
-    final bool categoryActive = _selectedCategoryId != null;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
@@ -720,7 +526,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
       ),
       body: Stack(
         children: [
-          // 1. MAIN CONTENT (Product Grid)
           _isLoading
               ? const Center(
                   child: CircularProgressIndicator(color: accentColor),
@@ -778,7 +583,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                   },
                 ),
 
-          // 2. BOTTOM TOOLBAR (Sort / Filter / Category)
           if (!hasSelection)
             Positioned(
               left: 0,
@@ -802,7 +606,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        // SORT
                         Expanded(
                           child: GestureDetector(
                             onTap: _openSortSheet,
@@ -835,43 +638,12 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                           color: Colors.grey.shade300,
                         ),
 
-                        // CATEGORY
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: _openCategorySheet,
-                            behavior: HitTestBehavior.opaque,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Iconsax.category, size: 18),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    categoryLabel,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                      color: categoryActive
-                                          ? accentColor
-                                          : Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
                         Container(
                           height: 20,
                           width: 1,
                           color: Colors.grey.shade300,
                         ),
 
-                        // FILTER
                         Expanded(
                           child: GestureDetector(
                             onTap: _openModernFilter,
@@ -910,7 +682,6 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
               ),
             ),
 
-          // 3. STICKY BULK BAR
           if (hasSelection)
             Positioned(
               left: 0,

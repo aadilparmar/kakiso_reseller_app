@@ -4,7 +4,7 @@ import 'package:iconsax/iconsax.dart';
 
 // 🔹 Imports
 import 'package:kakiso_reseller_app/models/categories.dart';
-import 'package:kakiso_reseller_app/services/api_services.dart'; // <--- Added API Service
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  FILTER MODEL
@@ -16,8 +16,6 @@ class FilterOptions {
   double? minPrice;
   double? maxPrice;
   bool inStockOnly;
-
-  // Store selected Category IDs
   List<int> selectedCategoryIds;
 
   FilterOptions({
@@ -68,7 +66,6 @@ class ModernFilterBottomSheet {
   static Future<FilterOptions?> show({
     required BuildContext context,
     required FilterOptions currentFilter,
-    // 🔹 REMOVED: allCategories is no longer required here
     Color accentColor = const Color(0xFFFF6B35),
   }) {
     return showModalBottomSheet<FilterOptions>(
@@ -106,10 +103,8 @@ class _SplitFilterContent extends StatefulWidget {
 
 class _SplitFilterContentState extends State<_SplitFilterContent> {
   // 🔹 Sidebar categories
-  final List<String> _tabs = ['Sort By', 'Category', 'Price', 'Availability'];
-
+  final List<String> _tabs = ['Category', 'Price', 'Availability'];
   final List<IconData> _tabIcons = [
-    Iconsax.sort,
     Iconsax.category,
     Iconsax.wallet_3,
     Iconsax.box_tick,
@@ -132,7 +127,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     super.initState();
     _tempFilter = widget.currentFilter.copyWith();
 
-    // Initialize Price Controllers
     _minController = TextEditingController(
       text: _tempFilter.minPrice?.toStringAsFixed(0) ?? '',
     );
@@ -140,11 +134,9 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       text: _tempFilter.maxPrice?.toStringAsFixed(0) ?? '',
     );
 
-    // 🔹 Trigger internal fetch
     _fetchCategoriesInternal();
   }
 
-  // 🔹 FETCH CATEGORIES INTERNALLY
   Future<void> _fetchCategoriesInternal() async {
     setState(() {
       _isLoadingCategories = true;
@@ -152,17 +144,17 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     });
 
     try {
-      // Calling your existing ApiService
       final cats = await ApiService.fetchCategories();
+      // 🔹 Build Hierarchy Tree
+      final tree = CategoryModel.buildTree(cats);
 
       if (mounted) {
         setState(() {
-          _allCategories = cats;
+          _allCategories = tree;
           _isLoadingCategories = false;
         });
       }
     } catch (e) {
-      debugPrint("Filter Widget Error: $e");
       if (mounted) {
         setState(() {
           _isLoadingCategories = false;
@@ -215,6 +207,18 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     });
   }
 
+  void _toggleCategorySelection(int categoryId, bool? isSelected) {
+    setState(() {
+      if (isSelected == true) {
+        if (!_tempFilter.selectedCategoryIds.contains(categoryId)) {
+          _tempFilter.selectedCategoryIds.add(categoryId);
+        }
+      } else {
+        _tempFilter.selectedCategoryIds.remove(categoryId);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -225,15 +229,15 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       child: Column(
         children: [
           _buildHeader(),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // LEFT SIDEBAR
                 Container(
-                  width: 110,
-                  color: Colors.grey.shade100,
+                  width: 100,
+                  color: const Color(0xFFF9F9F9),
                   child: ListView.builder(
                     itemCount: _tabs.length,
                     itemBuilder: (context, index) {
@@ -252,7 +256,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
           _buildBottomBar(),
         ],
       ),
@@ -261,27 +265,27 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-              Icon(Iconsax.setting_4, color: widget.accentColor, size: 22),
+              Icon(Iconsax.filter, color: widget.accentColor, size: 22),
               const SizedBox(width: 8),
               const Text(
-                "Filters",
+                "Filter",
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
           ),
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close),
+            icon: const Icon(Icons.close_rounded, color: Colors.grey),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -297,40 +301,31 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
           _selectedIndex = index;
         });
       },
-      child: Container(
-        height: 60,
-        color: isSelected ? Colors.white : Colors.grey.shade100,
-        child: Row(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 70,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : const Color(0xFFF9F9F9),
+          border: isSelected
+              ? Border(left: BorderSide(width: 4, color: widget.accentColor))
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 4,
-              height: 60,
-              color: isSelected ? widget.accentColor : Colors.transparent,
+            Icon(
+              _tabIcons[index],
+              size: 22,
+              color: isSelected ? widget.accentColor : Colors.grey.shade500,
             ),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _tabIcons[index],
-                    size: 20,
-                    color: isSelected
-                        ? widget.accentColor
-                        : Colors.grey.shade600,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _tabs[index],
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: isSelected ? Colors.black87 : Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 6),
+            Text(
+              _tabs[index],
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? Colors.black87 : Colors.grey.shade600,
               ),
             ),
           ],
@@ -342,66 +337,20 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
   Widget _buildRightContent() {
     switch (_selectedIndex) {
       case 0:
-        return _buildSortView();
+        return _buildCategoryView();
       case 1:
-        return _buildCategoryView(); // 🔹 Uses internal state now
-      case 2:
         return _buildPriceView();
-      case 3:
+      case 2:
         return _buildAvailabilityView();
       default:
         return const SizedBox();
     }
   }
 
-  // --- SORT VIEW ---
-  Widget _buildSortView() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
-          "Sort By",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        _buildRadioOption("Relevance", SortType.relevance),
-        _buildRadioOption("Price (Low to High)", SortType.priceLowToHigh),
-        _buildRadioOption("Price (High to Low)", SortType.priceHighToLow),
-        _buildRadioOption("Newest First", SortType.newest),
-      ],
-    );
-  }
-
-  Widget _buildRadioOption(String label, SortType value) {
-    final isSelected = _tempFilter.sortType == value;
-    return InkWell(
-      onTap: () => setState(() => _tempFilter.sortType = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? widget.accentColor : Colors.grey,
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- 🔹 UPDATED CATEGORY VIEW ---
+  // ─────────────────────────────────────────────────────────────
+  //  🎨 IMPROVED UI: HIERARCHICAL CATEGORY VIEW
+  // ─────────────────────────────────────────────────────────────
   Widget _buildCategoryView() {
-    // 1. Loading State
     if (_isLoadingCategories) {
       return Center(
         child: CircularProgressIndicator(
@@ -411,7 +360,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       );
     }
 
-    // 2. Error State
     if (_errorMessage.isNotEmpty) {
       return Center(
         child: Column(
@@ -429,7 +377,6 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       );
     }
 
-    // 3. Empty State
     if (_allCategories.isEmpty) {
       return const Center(
         child: Text(
@@ -439,84 +386,174 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       );
     }
 
-    // 4. Success State (List)
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
-      itemCount: _allCategories.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Text(
-              "Select Categories",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          );
-        }
-
-        final category = _allCategories[index - 1];
-        final isSelected = _tempFilter.selectedCategoryIds.contains(
-          category.id,
-        );
-
-        return CheckboxListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 0,
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      children: [
+        Text(
+          "Select Categories",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
           ),
-          activeColor: widget.accentColor,
-          dense: true,
-          title: Text(
-            category.name,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-          value: isSelected,
-          onChanged: (bool? checked) {
-            setState(() {
-              if (checked == true) {
-                _tempFilter.selectedCategoryIds.add(category.id);
-              } else {
-                _tempFilter.selectedCategoryIds.remove(category.id);
-              }
-            });
-          },
-        );
-      },
+        ),
+        const SizedBox(height: 12),
+        // Render root categories
+        ..._allCategories.map((category) => _buildCategoryTree(category)),
+      ],
     );
   }
 
-  // --- PRICE VIEW ---
+  Widget _buildCategoryTree(CategoryModel category, {int depth = 0}) {
+    final bool isSelected = _tempFilter.selectedCategoryIds.contains(
+      category.id,
+    );
+    final bool hasChildren = category.children.isNotEmpty;
+
+    // Indentation calculation
+    final double indent = depth * 16.0;
+
+    // 🔹 CASE 1: PARENT NODE (Has Children)
+    if (hasChildren) {
+      return Padding(
+        padding: EdgeInsets.only(left: indent, bottom: 8),
+        child: Theme(
+          // Remove default borders from ExpansionTile
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: Container(
+            decoration: BoxDecoration(
+              color: depth == 0 ? Colors.grey.shade50 : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: depth == 0
+                  ? Border.all(color: Colors.grey.shade200)
+                  : const Border(
+                      left: BorderSide(color: Color(0xFFEEEEEE), width: 2),
+                    ),
+            ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+              childrenPadding: EdgeInsets.zero,
+              // Custom Leading Checkbox
+              leading: Transform.scale(
+                scale: 1.1,
+                child: Checkbox(
+                  activeColor: widget.accentColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  value: isSelected,
+                  onChanged: (val) =>
+                      _toggleCategorySelection(category.id, val),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              title: Text(
+                category.name,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? widget.accentColor : Colors.black87,
+                ),
+              ),
+              // Recursively render children
+              children: category.children.map((child) {
+                return _buildCategoryTree(child, depth: depth + 1);
+              }).toList(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 🔹 CASE 2: LEAF NODE (No Children)
+    return Padding(
+      padding: EdgeInsets.only(left: indent, bottom: 4),
+      child: InkWell(
+        onTap: () => _toggleCategorySelection(category.id, !isSelected),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          decoration: BoxDecoration(
+            // Visual Connector for nested items
+            border: depth > 0
+                ? const Border(
+                    left: BorderSide(color: Color(0xFFEEEEEE), width: 2),
+                  )
+                : null,
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          child: Row(
+            children: [
+              if (depth > 0)
+                const SizedBox(width: 8), // Extra spacing for connector
+              Transform.scale(
+                scale: 1.0,
+                child: Checkbox(
+                  activeColor: widget.accentColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  value: isSelected,
+                  onChanged: (val) =>
+                      _toggleCategorySelection(category.id, val),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  category.name,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isSelected
+                        ? FontWeight.w500
+                        : FontWeight.normal,
+                    color: isSelected ? Colors.black87 : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  SORT VIEW
+  // ─────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────
+  //  PRICE VIEW
+  // ─────────────────────────────────────────────────────────────
   Widget _buildPriceView() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: [
         const Text(
-          "Custom Price Range",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          "Price Range",
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Row(
           children: [
             Expanded(child: _buildPriceField("Min", _minController)),
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text("to", style: TextStyle(color: Colors.grey)),
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Icon(Icons.arrow_right_alt, color: Colors.grey),
             ),
             Expanded(child: _buildPriceField("Max", _maxController)),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 30),
         const Text(
           "Quick Select",
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 10,
+          runSpacing: 10,
           children: [
             _buildPriceChip('Under ₹500', '0', '500'),
             _buildPriceChip('₹500 - ₹1000', '500', '1000'),
@@ -529,26 +566,36 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
   }
 
   Widget _buildPriceField(String hint, TextEditingController controller) {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      alignment: Alignment.center,
-      child: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixText: "₹ ",
-          border: InputBorder.none,
-          isDense: true,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          hint.toUpperCase(),
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
         ),
-        onChanged: (_) => setState(() {}),
-      ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            decoration: const InputDecoration(
+              prefixText: "₹ ",
+              border: InputBorder.none,
+              isDense: true,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+      ],
     );
   }
 
@@ -561,57 +608,74 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
           _maxController.text = max;
         });
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? widget.accentColor.withOpacity(0.1) : Colors.white,
+          color: isActive ? widget.accentColor : Colors.white,
           border: Border.all(
             color: isActive ? widget.accentColor : Colors.grey.shade300,
           ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: widget.accentColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
-            color: isActive ? widget.accentColor : Colors.black87,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            fontSize: 13,
+            color: isActive ? Colors.white : Colors.black87,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
       ),
     );
   }
 
-  // --- AVAILABILITY VIEW ---
+  // ─────────────────────────────────────────────────────────────
+  //  AVAILABILITY VIEW
+  // ─────────────────────────────────────────────────────────────
   Widget _buildAvailabilityView() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: [
         const Text(
           "Availability",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
-        InkWell(
-          onTap: () => setState(
-            () => _tempFilter.inStockOnly = !_tempFilter.inStockOnly,
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-          child: Row(
-            children: [
-              Checkbox(
-                value: _tempFilter.inStockOnly,
-                activeColor: widget.accentColor,
-                onChanged: (v) => setState(() => _tempFilter.inStockOnly = v!),
-              ),
-              const Expanded(child: Text("Include Out of Stock items")),
-            ],
+          child: CheckboxListTile(
+            value: _tempFilter.inStockOnly,
+            activeColor: widget.accentColor,
+            title: const Text("Include Out of Stock items"),
+            subtitle: const Text(
+              "Show items that are currently unavailable",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            onChanged: (v) => setState(() => _tempFilter.inStockOnly = v!),
           ),
         ),
       ],
     );
   }
 
-  // --- BOTTOM BAR ---
+  // ─────────────────────────────────────────────────────────────
+  //  BOTTOM BAR
+  // ─────────────────────────────────────────────────────────────
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -619,43 +683,46 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             offset: const Offset(0, -4),
-            blurRadius: 10,
+            blurRadius: 16,
           ),
         ],
       ),
       child: Row(
         children: [
           Expanded(
+            flex: 1,
             child: TextButton(
               onPressed: _handleClear,
               child: const Text(
-                "Clear All",
+                "Reset",
                 style: TextStyle(
                   color: Colors.grey,
                   fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                  fontSize: 15,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
+            flex: 2,
             child: ElevatedButton(
               onPressed: _handleApply,
               style: ElevatedButton.styleFrom(
                 backgroundColor: widget.accentColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                elevation: 0,
+                elevation: 4,
+                shadowColor: widget.accentColor.withOpacity(0.4),
               ),
               child: const Text(
-                "Apply",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                "Apply Filters",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
             ),
           ),

@@ -543,7 +543,7 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
           titleSpacing: 0,
           title: Row(
             children: [
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Builder(
                 builder: (context) => IconButton(
                   icon: const Icon(Iconsax.menu_1),
@@ -552,13 +552,18 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 4.0),
-                child: Image.asset(
-                  'assets/logos/login-logo.png',
-                  height: 50,
-                  width: 100,
-                  fit: BoxFit.contain,
+              // 🌟 Responsive Logo (Use Flexible/ConstrainedBox)
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 100),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 4.0),
+                    child: Image.asset(
+                      'assets/logos/login-logo.png',
+                      height: 50,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
               ),
               const Spacer(),
@@ -811,7 +816,8 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                       vertical: 10,
                     ),
                     child: Container(
-                      height: 46,
+                      // 🌟 Responsive: minHeight instead of fixed height
+                      constraints: const BoxConstraints(minHeight: 46),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: surfaceColor,
@@ -841,6 +847,7 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                                   fontSize: 13,
                                 ),
                                 border: InputBorder.none,
+                                isDense: true, // helps with vertical alignment
                               ),
                               onChanged: (v) => setState(() => query = v),
                             ),
@@ -870,6 +877,8 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
                     child: visibleTools.isEmpty
                         ? _buildEmptyState()
                         : ListView.builder(
+                            // 🌟 Add padding at bottom for safety
+                            padding: const EdgeInsets.only(bottom: 20),
                             itemCount: visibleTools.length,
                             itemBuilder: (context, index) {
                               final tool = visibleTools[index];
@@ -1078,8 +1087,9 @@ class _TimelineToolCard extends StatelessWidget {
 
     final Color badgeTextColor = isLive ? accentColor : accentPurple;
 
-    return SizedBox(
-      height: 120,
+    // 🌟 IntrinsicHeight ensures the Timeline (left column) grows
+    // to match the height of the Content (right card) exactly.
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1139,11 +1149,10 @@ class _TimelineToolCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
+                // 🌟 Dynamic Padding
+                padding: const EdgeInsets.all(12),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       width: 46,
@@ -1165,11 +1174,13 @@ class _TimelineToolCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             tool.title,
-                            maxLines: 1,
+                            // Allow wrapping if needed for huge fonts
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 14,
@@ -1181,7 +1192,9 @@ class _TimelineToolCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             tool.subtitle,
-                            maxLines: 2,
+                            // Removed maxLines to let text flow on larger fonts
+                            // or keep it but allow scaling.
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 11,
@@ -1190,7 +1203,8 @@ class _TimelineToolCard extends StatelessWidget {
                               height: 1.3,
                             ),
                           ),
-                          const Spacer(),
+                          // 🌟 Replaced Spacer with fixed gap to prevent overflow
+                          const SizedBox(height: 12),
                           Row(
                             children: [
                               Container(
@@ -1231,10 +1245,13 @@ class _TimelineToolCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
-                      Iconsax.arrow_right_3,
-                      size: 18,
-                      color: textMuted,
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Icon(
+                        Iconsax.arrow_right_3,
+                        size: 18,
+                        color: textMuted,
+                      ),
                     ),
                   ],
                 ),

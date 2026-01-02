@@ -19,8 +19,8 @@ class VerticalProductCard extends StatefulWidget {
   final bool isSelected;
   final VoidCallback? onSelectionToggle;
 
-  // --- SESSION PERSISTENCE ---
-  static final Map<int, String> _sessionAddedToCatalog = {};
+  // --- SESSION PERSISTENCE (Changed to Public) ---
+  static final Map<int, String> sessionAddedToCatalog = {};
 
   const VerticalProductCard({
     super.key,
@@ -43,20 +43,17 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
   static const Color kGreen = Color(0xFF16A34A);
   static const double kRadius = 16.0;
 
-  // --- LOCAL STATE ---
-  // bool isLiked = false;
-
   final CartController cartController = Get.isRegistered<CartController>()
       ? Get.find<CartController>()
       : Get.put(CartController());
 
-  // Add this line to access your Wishlist logic
   final WishlistController wishlistController =
       Get.isRegistered<WishlistController>()
       ? Get.find<WishlistController>()
       : Get.put(WishlistController());
 
-  final GlobalKey _heartKey = GlobalKey(); // Add this key
+  final GlobalKey _heartKey = GlobalKey();
+
   // --- ACTIONS ---
   void _handleAddToCart() {
     HapticFeedback.lightImpact();
@@ -71,47 +68,35 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
 
   void _triggerCatalogSuccess(String catalogName) {
     setState(() {
-      VerticalProductCard._sessionAddedToCatalog[widget.product.id] =
+      VerticalProductCard.sessionAddedToCatalog[widget.product.id] =
           catalogName;
     });
   }
 
   void _toggleHeart() {
     HapticFeedback.selectionClick();
-
-    // Check status BEFORE toggling to know if we are adding or removing
     bool isAlreadyLiked = wishlistController.isInWishlist(widget.product.id);
-
-    // Toggle the actual data
     wishlistController.toggleWishlist(widget.product);
-
-    // If we just ADDED it (it wasn't liked before), play the animation
     if (!isAlreadyLiked) {
       _triggerFlyingHeartAnimation();
     }
   }
 
   void _triggerFlyingHeartAnimation() {
-    // 1. Find the position of the heart button on the screen
     final RenderBox? box =
         _heartKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
-
     final Offset position = box.localToGlobal(Offset.zero);
-
-    // 2. Insert the floating animation into the Overlay
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
-
     entry = OverlayEntry(
       builder: (context) => _FlyingHeartAnimation(
         startPosition: position,
         onComplete: () {
-          entry.remove(); // Remove from memory when animation finishes
+          entry.remove();
         },
       ),
     );
-
     overlay.insert(entry);
   }
 
@@ -151,8 +136,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
             const Expanded(
               child: Text(
                 "Added to Cart successfully!",
-                // ignore: deprecated_member_use
-                textScaleFactor: 1.0,
+                textScaler: TextScaler.noScaling,
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: 'Poppins',
@@ -183,12 +167,13 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
   @override
   Widget build(BuildContext context) {
     // --- LOGIC: CATALOG / SELECTION STATE ---
-    final bool isAddedToCatalog = VerticalProductCard._sessionAddedToCatalog
+    final bool isAddedToCatalog = VerticalProductCard.sessionAddedToCatalog
         .containsKey(widget.product.id);
     final bool isVisuallySelected = widget.isSelected || isAddedToCatalog;
-    // Get the stored catalog name (e.g., "Diwali Offers")
+
     final String? addedCatalogName =
-        VerticalProductCard._sessionAddedToCatalog[widget.product.id];
+        VerticalProductCard.sessionAddedToCatalog[widget.product.id];
+
     // --- PRICE CALCULATIONS ---
     final double? basePrice = _parsePrice(widget.product.price);
     final double? resellPrice = basePrice != null ? (basePrice * 1.3) : null;
@@ -352,7 +337,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                       ),
 
                     // Wishlist Heart
-                    // Wishlist Heart
                     Positioned(
                       bottom: 8,
                       right: 8,
@@ -364,7 +348,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                           );
 
                           return Container(
-                            key: _heartKey, // <--- ATTACH THE KEY HERE
+                            key: _heartKey,
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -400,12 +384,10 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                     vertical: 4,
                   ),
                   child: Column(
-                    // FORCE FULL WIDTH ALIGNMENT
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // --- A. TEXT CONTENT (Flexible) ---
-                      // This section takes all available space above buttons
+                      // --- A. TEXT CONTENT ---
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
@@ -470,7 +452,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                             "MRP",
                                             style: TextStyle(
                                               fontSize: 13,
-
                                               color: Colors.grey.shade400,
                                             ),
                                           ),
@@ -559,8 +540,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         ),
                       ),
 
-                      // --- B. BUTTONS (Fixed Height, Full Width) ---
-                      // We use a fixed height container here so buttons never shrink to 0
+                      // --- B. BUTTONS ---
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: SizedBox(
@@ -599,7 +579,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                       ),
                                     ),
                                     child: FittedBox(
-                                      // Only scale content, not the button
                                       fit: BoxFit.scaleDown,
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
@@ -607,7 +586,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                         ),
                                         child: isAdded
                                             ? const Row(
-                                                // UPDATED: Now shows "Added" text
                                                 mainAxisAlignment:
                                                     MainAxisAlignment.center,
                                                 children: [
@@ -681,7 +659,6 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                                     ),
                                   ),
                                   child: FittedBox(
-                                    // Only scale content, not the button
                                     fit: BoxFit.scaleDown,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
@@ -750,7 +727,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     );
   }
 
-  // --- CATALOGUE BOTTOM SHEET (UNCHANGED) ---
+  // --- CATALOGUE BOTTOM SHEET ---
   void _onAddToCataloguePressed(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -781,7 +758,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                 ),
                 const Text(
                   'Add to Catalog',
-                  textScaleFactor: 1.0,
+                  textScaler: TextScaler.noScaling,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -822,7 +799,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         const SizedBox(height: 12),
                         const Text(
                           "No catalogues found",
-                          textScaleFactor: 1.0,
+                          textScaler: TextScaler.noScaling,
                           style: TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                       ],
@@ -855,7 +832,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                         ),
                         title: Text(
                           name,
-                          textScaleFactor: 1.0,
+                          textScaler: TextScaler.noScaling,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -892,7 +869,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                     icon: const Icon(Iconsax.add_circle, size: 20),
                     label: const Text(
                       'Create New Catalogue',
-                      textScaleFactor: 1.0,
+                      textScaler: TextScaler.noScaling,
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kPrimaryColor,
@@ -913,7 +890,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
     );
   }
 
-  // --- CREATE CATALOGUE DIALOG (UNCHANGED) ---
+  // --- CREATE CATALOGUE DIALOG ---
   void _showCreateNewCatalogueDialog(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
 
@@ -926,7 +903,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
           ),
           title: const Text(
             'New Catalogue',
-            textScaleFactor: 1.0,
+            textScaler: TextScaler.noScaling,
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w500,
@@ -963,7 +940,7 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
                   widget.onCatalogueSelected(widget.product, name, true);
-                  _triggerCatalogSuccess(name); // Pass 'name' here
+                  _triggerCatalogSuccess(name);
                   Navigator.pop(ctx);
                 }
               },
@@ -1019,20 +996,16 @@ class _FlyingHeartAnimationState extends State<_FlyingHeartAnimation>
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        _buildHeart(0, -100, 0), // Center heart (goes straight up)
-        _buildHeart(200, -80, -20), // Left heart (slight angle)
-        _buildHeart(400, -80, 20), // Right heart (slight angle)
+        _buildHeart(0, -100, 0),
+        _buildHeart(200, -80, -20),
+        _buildHeart(400, -80, 20),
       ],
     );
   }
 
   Widget _buildHeart(int delay, double dropHeight, double offsetX) {
-    // Delayed animation for a "trail" effect
     final Animation<double> positionAnimation =
-        Tween<double>(
-          begin: 0,
-          end: dropHeight, // Moves UP (negative Y)
-        ).animate(
+        Tween<double>(begin: 0, end: dropHeight).animate(
           CurvedAnimation(
             parent: _controller,
             curve: Interval(delay / 1000, 1.0, curve: Curves.easeOutQuad),
@@ -1050,17 +1023,16 @@ class _FlyingHeartAnimationState extends State<_FlyingHeartAnimation>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        // If animation hasn't started for this particle, hide it
         if (_controller.value < delay / 1000) return const SizedBox.shrink();
 
         return Positioned(
-          left: widget.startPosition.dx + offsetX, // Adjust X
-          top: widget.startPosition.dy + positionAnimation.value, // Move Y
+          left: widget.startPosition.dx + offsetX,
+          top: widget.startPosition.dy + positionAnimation.value,
           child: Opacity(
             opacity: opacityAnimation.value,
             child: const Icon(
               Iconsax.heart5,
-              color: Color(0xFFEB2A7E), // kAccentColor
+              color: Color(0xFFEB2A7E),
               size: 20,
             ),
           ),

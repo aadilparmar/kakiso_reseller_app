@@ -143,7 +143,25 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
 
   @override
   Widget build(BuildContext context) {
-    final textScaler = MediaQuery.textScalerOf(context);
+    // Responsive Calculations
+    final mediaQuery = MediaQuery.of(context);
+    final textScaler = mediaQuery.textScaler;
+    final screenWidth = mediaQuery.size.width;
+
+    // Calculate dynamic rail width based on text scale, but cap it so it doesn't take over small screens
+    // Base is 85, scales with font, capped between 85 and 30% of screen width (or 110 max)
+    final double railWidth = (85 * textScaler.scale(1))
+        .clamp(85.0, 120.0)
+        .clamp(0.0, screenWidth * 0.35);
+
+    // Calculate available width for the right side content
+    final double rightContentWidth = screenWidth - railWidth;
+
+    // Determine grid columns dynamically:
+    // If we have < 240px space, 2 columns is tight but 3 is impossible.
+    // Ideally aim for ~100-110px per item.
+    final int crossAxisCount = (rightContentWidth / 110).floor().clamp(2, 5);
+
     final level2Categories = _getChildren(_selectedParentId);
 
     return DoubleBackToExitWrapper(
@@ -165,7 +183,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // LEFT RAIL (Level 1)
-                    _buildLeftRail(textScaler),
+                    _buildLeftRail(railWidth),
 
                     // RIGHT CONTENT (Level 2 & 3)
                     Expanded(
@@ -221,7 +239,10 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
                                       index,
                                     ) {
                                       final level2Cat = level2Categories[index];
-                                      return _buildLevel2Section(level2Cat);
+                                      return _buildLevel2Section(
+                                        level2Cat,
+                                        crossAxisCount,
+                                      );
                                     }, childCount: level2Categories.length),
                                   ),
                                 ),
@@ -238,12 +259,11 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
   }
 
   // --- LEFT RAIL (LEVEL 1) ---
-  Widget _buildLeftRail(TextScaler textScaler) {
+  Widget _buildLeftRail(double width) {
     final parents = _getParents();
-    final double railWidth = (85 * textScaler.scale(1)).clamp(85, 110);
 
     return SizedBox(
-      width: railWidth,
+      width: width,
       child: ListView.separated(
         padding: const EdgeInsets.only(top: 20, bottom: 80),
         itemCount: parents.length,
@@ -321,7 +341,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 10, // Scales automatically
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.normal,
@@ -381,8 +401,8 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
           Text(
             parent?.name ?? "Categories",
             style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
               color: _textDark,
               fontFamily: 'Poppins',
             ),
@@ -423,7 +443,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
   }
 
   // --- LEVEL 2 SECTION (TEXT HEADER + GRID WITH PARENT AS FIRST ITEM) ---
-  Widget _buildLevel2Section(CategoryModel level2Cat) {
+  Widget _buildLevel2Section(CategoryModel level2Cat, int crossAxisCount) {
     final level3Categories = _getChildren(level2Cat.id);
 
     // Combine items: First item is Level 2 (Parent), followed by Level 3 (Children)
@@ -481,8 +501,8 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: displayItems.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount, // 🌟 Responsive Column Count
             childAspectRatio: 0.75, // Standard ratio for image + text
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
@@ -573,13 +593,15 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4.0),
-            child: Image.asset(
-              'assets/logos/login-logo.png',
-              height: 50,
-              width: 100,
-              fit: BoxFit.contain,
+          // 🌟 Responsive Logo Container
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 100),
+              child: Image.asset(
+                'assets/logos/login-logo.png',
+                height: 50,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
           const Spacer(),

@@ -5,10 +5,14 @@ import 'package:iconsax/iconsax.dart';
 
 // --- IMPORTS ---
 import 'package:kakiso_reseller_app/models/categories.dart';
+import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
+
+// SCREEN IMPORTS
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/search_header.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/categories_detail_page.dart';
-import 'package:kakiso_reseller_app/services/api_services.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class UniversalSearchPage extends StatefulWidget {
   const UniversalSearchPage({super.key});
@@ -20,8 +24,6 @@ class UniversalSearchPage extends StatefulWidget {
 class _UniversalSearchPageState extends State<UniversalSearchPage> {
   // Data Store
   List<CategoryModel> _allCategoriesCache = [];
-
-  // Results
   List<SearchResultItem> _searchResults = [];
 
   // State
@@ -29,39 +31,36 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
   bool _hasSearched = false;
   Timer? _debounce;
 
+  // Controller
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _preloadCategories();
   }
 
-  // 1. Fetch Categories for Mapping
   Future<void> _preloadCategories() async {
     try {
       final cats = await ApiService.fetchCategories();
-      if (mounted) {
-        setState(() {
-          _allCategoriesCache = cats;
-        });
-      }
-    } catch (_) {
-      // Fail silently, will retry during search
-    }
+      if (mounted) setState(() => _allCategoriesCache = cats);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
-  // --- SEARCH ENGINE ---
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    _debounce = Timer(const Duration(milliseconds: 400), () {
+    // Increased debounce to 800ms to allow typing full 10-digit SKUs
+    _debounce = Timer(const Duration(milliseconds: 800), () {
       if (query.trim().isNotEmpty) {
-        _performSmartSearch(query);
+        _performHybridSearch(query);
       } else {
         setState(() {
           _searchResults = [];
@@ -71,72 +70,169 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
     });
   }
 
-  Future<void> _performSmartSearch(String query) async {
+  // ─────────────────────────────────────────────────────────────
+  //  🔥 HYBRID SEARCH ENGINE (Full 10-digit Support)
+  // ─────────────────────────────────────────────────────────────
+  Future<void> _performHybridSearch(String query) async {
     setState(() {
       _isLoading = true;
       _hasSearched = true;
     });
 
-    try {
-      // Ensure we have categories for lookup
-      if (_allCategoriesCache.isEmpty) {
+    // Use the full trimmed query. No truncation.
+    final cleanQuery = query.trim().toLowerCase();
+
+    // 1. Ensure Cache is Populated
+    if (_allCategoriesCache.isEmpty) {
+      try {
         _allCategoriesCache = await ApiService.fetchCategories();
+      } catch (_) {}
+    }
+
+    try {
+      // 2. Prepare Parallel Search Tasks
+      List<Future<List<ProductModel>>> tasks = [
+        // A. Standard Search (Name, Description, partial SKU if indexed)
+        ApiService.searchProducts(query),
+
+        // B. SKU Search (EXACT match for full 10-digit codes)
+        ApiService.fetchProductsBySku(query),
+      ];
+
+      // C. ID Search (Only if query is strictly numeric)
+      // This helps if the user types "1402" expecting ID 1402
+      if (int.tryParse(cleanQuery) != null) {
+        tasks.add(
+          ApiService.fetchProductByIdSafe(cleanQuery).then((product) {
+            return product != null ? [product] : [];
+          }),
+        );
       }
 
-      final lowercaseQuery = query.toLowerCase();
-      // Using a Map ensures we don't show the same category twice
-      final Map<int, SearchResultItem> uniqueResultsMap = {};
+      // 3. Execute All Searches
+      final results = await Future.wait(tasks);
 
-      // ---------------------------------------------------------
-      // A. Match Category Names DIRECTLY
-      // ---------------------------------------------------------
-      final matchingCategories = _allCategoriesCache.where((cat) {
-        return cat.name.toLowerCase().contains(lowercaseQuery);
+      // 4. Merge & Deduplicate Results
+      final Map<int, ProductModel> uniqueProductsMap = {};
+
+      for (var productList in results) {
+        for (var product in productList) {
+          // Use ID as key to prevent duplicates
+          uniqueProductsMap[product.id] = product;
+        }
+      }
+
+      List<ProductModel> allFoundProducts = uniqueProductsMap.values.toList();
+
+      // 5. Build Result Map for UI
+      final Map<int, SearchResultItem> finalResultsMap = {};
+
+      // --- Match Categories by Name ---
+      final matchingCats = _allCategoriesCache.where((cat) {
+        return cat.name.toLowerCase().contains(cleanQuery);
       });
-
-      for (var cat in matchingCategories) {
-        uniqueResultsMap[cat.id] = SearchResultItem(
+      for (var cat in matchingCats) {
+        finalResultsMap[cat.id] = SearchResultItem(
           category: cat,
           matchType: MatchType.categoryName,
         );
       }
 
-      // ---------------------------------------------------------
-      // B. Match Product Names -> Link to ALL Categories
-      // ---------------------------------------------------------
-      final matchingProducts = await ApiService.searchProducts(query);
+      // --- Process Products ---
+      for (var product in allFoundProducts) {
+        String matchLabel = product.name;
+        bool isExactMatch = false;
 
-      for (var product in matchingProducts) {
-        // Iterate through ALL category IDs this product belongs to
+        final String pId = product.id.toString();
+        final String pSku = (product.userSku ?? '').toLowerCase();
+        final String pCode = (product.uniqueCode ?? '').toLowerCase();
+
+        // STRICT MATCHING LOGIC (No length limits)
+        if (pId == cleanQuery) {
+          matchLabel = "ID: $pId";
+          isExactMatch = true;
+        } else if (pSku == cleanQuery) {
+          matchLabel = "SKU: ${product.userSku}";
+          isExactMatch = true;
+        } else if (pCode == cleanQuery) {
+          matchLabel = "Code: ${product.uniqueCode}";
+          isExactMatch = true;
+        } else if (pSku.contains(cleanQuery)) {
+          // Partial SKU match - Allowed for any length
+          matchLabel = "SKU: ${product.userSku}";
+          isExactMatch = true;
+        }
+
+        // Helper to add to map
+        void addToMap(int key, CategoryModel cat, bool isVirtual) {
+          SearchResultItem item =
+              finalResultsMap[key] ??
+              SearchResultItem(
+                category: cat,
+                matchType: MatchType.productContent,
+                matchedProductExample: matchLabel,
+                isExactMatch: isExactMatch,
+                isVirtual: isVirtual,
+              );
+
+          if (isExactMatch) {
+            item.isExactMatch = true;
+            item.matchedProductExample = matchLabel;
+          }
+
+          // Add to preview list (avoid duplicates)
+          if (!item.previewProducts.any((p) => p.id == product.id)) {
+            item.previewProducts.add(product);
+          }
+          finalResultsMap[key] = item;
+        }
+
+        // A. Try to map to an existing category
+        bool mapped = false;
         for (var catId in product.categoryIds) {
-          final parentCategory = _allCategoriesCache.firstWhereOrNull(
+          final existingCat = _allCategoriesCache.firstWhereOrNull(
             (c) => c.id == catId,
           );
-
-          if (parentCategory != null) {
-            // If this category is NOT in the list yet, add it.
-            // If it IS in the list (e.g. from name match), we keep the name match
-            // as it is usually more relevant, or update if you prefer.
-            if (!uniqueResultsMap.containsKey(parentCategory.id)) {
-              uniqueResultsMap[parentCategory.id] = SearchResultItem(
-                category: parentCategory,
-                matchType: MatchType.productContent,
-                matchedProductExample: product.name,
-              );
-            }
+          if (existingCat != null) {
+            mapped = true;
+            addToMap(existingCat.id, existingCat, false);
+            break;
           }
+        }
+
+        // B. Orphan Handling (Direct Product Match)
+        if (!mapped) {
+          final int fallbackId = product.categoryIds.isNotEmpty
+              ? product.categoryIds.first
+              : 0;
+          final int uniqueKey = fallbackId == 0 ? -product.id : fallbackId;
+
+          String title = isExactMatch ? "Direct Match" : "Other Results";
+
+          final virtualCat = CategoryModel(
+            id: fallbackId,
+            name: title,
+            imageUrl: product.image,
+            count: 1,
+            parent: 0,
+          );
+          addToMap(uniqueKey, virtualCat, true);
         }
       }
 
       if (mounted) {
         setState(() {
-          // Convert map to list
-          _searchResults = uniqueResultsMap.values.toList();
+          _searchResults = finalResultsMap.values.toList();
 
-          // Optional: Sort results. Direct Name matches first, then Product matches.
+          // SORTING: Exact Matches > Categories with Products > Empty Categories
           _searchResults.sort((a, b) {
-            if (a.matchType == b.matchType) return 0;
-            return a.matchType == MatchType.categoryName ? -1 : 1;
+            if (a.isExactMatch && !b.isExactMatch) return -1;
+            if (!a.isExactMatch && b.isExactMatch) return 1;
+            if (a.previewProducts.isNotEmpty && b.previewProducts.isEmpty)
+              return -1;
+            if (a.previewProducts.isEmpty && b.previewProducts.isNotEmpty)
+              return 1;
+            return 0;
           });
 
           _isLoading = false;
@@ -148,10 +244,13 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  //  UI BUILD
+  // ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF9F9F9),
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -173,8 +272,14 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
       body: SafeArea(
         child: Column(
           children: [
-            SearchHeader(autoFocus: true, onSearchChanged: _onSearchChanged),
-            const SizedBox(height: 12),
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SearchHeader(
+                autoFocus: true,
+                onSearchChanged: _onSearchChanged,
+              ),
+            ),
             Expanded(child: _buildResultList()),
           ],
         ),
@@ -184,155 +289,286 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
 
   Widget _buildResultList() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: accentColor));
-    }
-
-    if (!_hasSearched) {
-      return _buildEmptyState(
-        icon: Iconsax.search_normal,
-        title: "Search for anything",
-        subtitle: "Type 'Jewellery', 'Rings', or a specific product name.",
+      return const Center(
+        child: CircularProgressIndicator(color: kPrimaryDeep),
       );
     }
-
+    if (!_hasSearched) {
+      return _buildEmptyState(
+        Iconsax.search_normal,
+        "Search for anything",
+        "Type 'Jewellery', 'Rings', or a Product ID.",
+      );
+    }
     if (_searchResults.isEmpty) {
       return _buildEmptyState(
-        icon: Iconsax.search_status,
-        title: "No results found",
-        subtitle: "Try using different keywords.",
+        Iconsax.search_status,
+        "No results found",
+        "Try checking the ID or SKU.",
       );
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
       itemCount: _searchResults.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final item = _searchResults[index];
-        return _buildResultCard(item);
-      },
+      separatorBuilder: (context, index) => const SizedBox(height: 20),
+      itemBuilder: (context, index) => _buildSectionCard(_searchResults[index]),
     );
   }
 
-  Widget _buildResultCard(SearchResultItem item) {
-    final bool isProductMatch = item.matchType == MatchType.productContent;
+  // ─────────────────────────────────────────────────────────────
+  //  SMART SECTION CARD UI
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildSectionCard(SearchResultItem item) {
+    final bool hasProducts = item.previewProducts.isNotEmpty;
+    final bool isHighPriority = item.isExactMatch;
 
-    return GestureDetector(
-      onTap: () {
-        Get.to(
-          () => CategoryDetailsPage(
-            categoryId: item.category.id,
-            categoryName: item.category.name,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: isHighPriority
+            ? Border.all(color: kPrimaryDeep.withOpacity(0.4), width: 1.5)
+            : Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          transition: Transition.fadeIn,
-        );
-      },
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // HEADER
+          InkWell(
+            onTap: () {
+              if (item.isVirtual && item.previewProducts.isNotEmpty) {
+                Get.to(
+                  () => ProductDetailsPage(product: item.previewProducts.first),
+                );
+              } else {
+                Get.to(
+                  () => CategoryDetailsPage(
+                    categoryId: item.category.id,
+                    categoryName: item.category.name,
+                  ),
+                );
+              }
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade100),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        item.category.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Iconsax.category, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                item.category.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            if (isHighPriority)
+                              Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kPrimaryDeep,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  "MATCH",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.matchedProductExample ?? "View category",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: isHighPriority
+                                ? kPrimaryDeep
+                                : Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Icon(
+                    Iconsax.arrow_right_3,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (hasProducts) const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+          // PRODUCTS CAROUSEL
+          if (hasProducts)
+            SizedBox(
+              height: 200,
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                scrollDirection: Axis.horizontal,
+                itemCount: item.previewProducts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return _buildMiniProductCard(item.previewProducts[index]);
+                },
+              ),
+            ),
+          if (!hasProducts) const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniProductCard(ProductModel product) {
+    return GestureDetector(
+      onTap: () => Get.to(() => ProductDetailsPage(product: product)),
       child: Container(
+        width: 130,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Category Image
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(13),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.network(
-                    item.category.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
-                      Iconsax.folder,
-                      color: Colors.grey.shade300,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 16),
-
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
-                    Text(
-                      item.category.name,
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: Colors.black87,
+                    Container(
+                      color: Colors.grey.shade50,
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: Image.network(
+                        product.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Iconsax.image, color: Colors.grey),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-
-                    if (isProductMatch && item.matchedProductExample != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          "Contains \"${item.matchedProductExample}\"",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: accentColor,
-                            fontWeight: FontWeight.w500,
+                    if (product.userSku != null)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 2,
+                            horizontal: 4,
                           ),
-                        ),
-                      )
-                    else
-                      Text(
-                        "${item.category.count} items",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: Colors.black.withOpacity(0.6),
+                          child: Text(
+                            "SKU: ${product.userSku}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
-
-              const Icon(Iconsax.arrow_right_3, color: Colors.grey, size: 20),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "₹${product.price}",
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimaryDeep,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _buildEmptyState(IconData icon, String title, String subtitle) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40.0),
@@ -342,7 +578,7 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 40, color: Colors.grey[400]),
@@ -364,7 +600,6 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
               style: TextStyle(
                 color: Colors.grey[500],
                 fontFamily: 'Poppins',
-                height: 1.5,
                 fontSize: 13,
               ),
             ),
@@ -376,17 +611,21 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
 }
 
 // --- HELPER CLASSES ---
-
 enum MatchType { categoryName, productContent }
 
 class SearchResultItem {
   final CategoryModel category;
   final MatchType matchType;
-  final String? matchedProductExample;
+  String? matchedProductExample;
+  bool isExactMatch;
+  final bool isVirtual;
+  final List<ProductModel> previewProducts = [];
 
   SearchResultItem({
     required this.category,
     required this.matchType,
     this.matchedProductExample,
+    this.isExactMatch = false,
+    this.isVirtual = false,
   });
 }

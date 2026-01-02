@@ -36,7 +36,7 @@ class ApiService {
   };
 
   // ---------------------------------------------------------------------------
-  // Product / Category helpers (Unchanged)
+  // Product / Category helpers
   // ---------------------------------------------------------------------------
   static Future<List<CategoryModel>> fetchCategories() async {
     final Uri url = Uri.parse(
@@ -146,6 +146,7 @@ class ApiService {
     }
   }
 
+  // Standard ID Fetch (Throws error)
   static Future<ProductModel> fetchProductById(int id) async {
     final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/products/$id');
 
@@ -160,6 +161,48 @@ class ApiService {
       throw Exception('Error fetching product detail: $e');
     }
   }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🔥 NEW METHODS FOR ROBUST SEARCH
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Safe ID fetch - Returns null instead of throwing error if not found.
+  /// Used by search to check if a numeric query is a valid ID.
+  static Future<ProductModel?> fetchProductByIdSafe(String id) async {
+    // If ID is not a valid number, return null immediately
+    if (int.tryParse(id) == null) return null;
+
+    final Uri url = Uri.parse('$baseUrl/wp-json/wc/v3/products/$id');
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        return ProductModel.fromJson(json.decode(response.body));
+      }
+      return null; // Not found or error
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Explicit SKU fetch - Finds products that exactly match the SKU.
+  // Check that this method exists in your ApiService class!
+  static Future<List<ProductModel>> fetchProductsBySku(String sku) async {
+    final Uri url = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products?sku=${Uri.encodeQueryComponent(sku)}',
+    );
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => ProductModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
 
   static Future<List<ProductModel>> fetchTopSellingProducts() async {
     final Uri url = Uri.parse(
@@ -303,9 +346,6 @@ class ApiService {
     return null;
   }
 
-  // ---------------------------------------------------------------------------
-  // 11. updateBusinessDetails -> UPDATES BOTH BILLING AND RESELLER META
-  // ---------------------------------------------------------------------------
   static Future<void> updateBusinessDetails({
     String? userId,
     required Map<String, dynamic> data,
@@ -341,31 +381,19 @@ class ApiService {
       "phone": data["phone"] ?? "",
     };
 
-    // 2. Prepare Meta Data (Matches the screenshot fields exactly)
-    // - "Address" field in screenshot -> reseller_store_address
-    // - "Locality" field in screenshot -> reseller_store_locality
-    // - "Pincode" field in screenshot -> reseller_store_pincode
     final List<Map<String, dynamic>> metaData = [
-      // Standard Custom Keys
       {"key": "kakiso_whatsapp", "value": data["whatsapp"]},
       {"key": "kakiso_gstin", "value": data["gstin"]},
       {"key": "kakiso_business_name", "value": data["businessName"]},
 
-      // Reseller Profile Keys (For the specific backend section)
       {"key": "reseller_store_store_name", "value": data["businessName"] ?? ""},
-      {
-        "key": "billing_businessname",
-        "value": data["ownerName"] ?? "",
-      }, // Or business name if preferred
+      {"key": "billing_businessname", "value": data["ownerName"] ?? ""},
       {"key": "reseller_store_address", "value": data["addressLine1"] ?? ""},
       {"key": "reseller_store_locality", "value": data["addressLine2"] ?? ""},
       {"key": "reseller_store_city", "value": data["city"] ?? ""},
       {"key": "reseller_store_state", "value": data["state"] ?? ""},
       {"key": "reseller_store_pincode", "value": data["pincode"] ?? ""},
-      {
-        "key": "reseller_store_postcode",
-        "value": data["pincode"] ?? "",
-      }, // Redundancy for safety
+      {"key": "reseller_store_postcode", "value": data["pincode"] ?? ""},
       {"key": "reseller_store_country", "value": data["country"] ?? "IN"},
       {"key": "reseller_store_phone", "value": data["phone"] ?? ""},
       {"key": "reseller_store_email", "value": data["email"] ?? ""},
@@ -396,9 +424,6 @@ class ApiService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 12. REQUEST PASSWORD RESET
-  // ---------------------------------------------------------------------------
   static Future<void> requestPasswordReset(String email) async {
     final String trimmedEmail = email.trim();
     if (trimmedEmail.isEmpty) {
@@ -447,9 +472,6 @@ class ApiService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 13. FETCH BUSINESS DETAILS -> READS RESELLER META FIRST
-  // ---------------------------------------------------------------------------
   static Future<Map<String, dynamic>?> fetchBusinessDetails({
     required String userId,
   }) async {
@@ -473,7 +495,6 @@ class ApiService {
       final billing = (data['billing'] as Map?) ?? {};
       final List meta = (data['meta_data'] as List?) ?? [];
 
-      // Extract specific meta keys
       String? metaStoreName;
       String? metaBusinessName;
       String? metaAddress;
@@ -505,7 +526,6 @@ class ApiService {
         }
       }
 
-      // Reconstruct Owner Name from Billing first+last if meta is missing
       String bFirst = billing['first_name']?.toString() ?? '';
       String bLast = billing['last_name']?.toString() ?? '';
       String billingOwner = '$bFirst $bLast'.trim();
@@ -513,29 +533,19 @@ class ApiService {
         billingOwner = data['first_name']?.toString() ?? '';
       }
 
-      // PRIORITY: Reseller Meta > Billing > Root
       return {
         "businessName": metaStoreName ?? billing['company']?.toString() ?? '',
         "ownerName": metaBusinessName ?? billingOwner,
         "phone": metaPhone ?? billing['phone']?.toString() ?? '',
-        "whatsapp":
-            metaPhone ??
-            billing['phone']?.toString() ??
-            '', // Default whatsapp to phone
+        "whatsapp": metaPhone ?? billing['phone']?.toString() ?? '',
         "email":
             metaEmail ??
             billing['email']?.toString() ??
             data['email']?.toString() ??
             '',
-
-        // Address Mapping
         "addressLine1": metaAddress ?? billing['address_1']?.toString() ?? '',
         "addressLine2": metaLocality ?? billing['address_2']?.toString() ?? '',
-        "address":
-            metaAddress ??
-            billing['address_1']?.toString() ??
-            '', // Legacy support
-
+        "address": metaAddress ?? billing['address_1']?.toString() ?? '',
         "city": metaCity ?? billing['city']?.toString() ?? '',
         "state": metaState ?? billing['state']?.toString() ?? '',
         "country": billing['country']?.toString() ?? 'India',
@@ -547,19 +557,13 @@ class ApiService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // NEW: updateResellerBusinessMeta (Deprecated but kept for compatibility)
-  // ---------------------------------------------------------------------------
   static Future<void> updateResellerBusinessMeta({
     String? userId,
     required Map<String, dynamic> data,
   }) async {
-    // This is now effectively handled inside updateBusinessDetails via meta_data
-    // You can keep this empty or remove it if you only use updateBusinessDetails
     return;
   }
 
-  // ... [Rest of the file remains unchanged: Categories, Leaderboards, Orders] ...
   static const int topRankingCategoryId = 513;
   static const int hotRankingCategoryId = 512;
 

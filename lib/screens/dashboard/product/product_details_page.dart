@@ -198,7 +198,7 @@ class ProductDetailsPage extends StatelessWidget {
   // ===========================================================================
   Widget _buildSpecsSection() {
     final Map<String, String?> data = {
-      'Product Id': product.userSku,
+      'User SKU': product.userSku,
       'Unique Code': product.uniqueCode,
       'HSN Code': product.hsnCode,
       'GST Rate': product.gst != null ? '${product.gst}%' : null,

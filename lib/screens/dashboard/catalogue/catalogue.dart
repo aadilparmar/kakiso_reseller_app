@@ -474,32 +474,34 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Create Catalog",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: "Catalog Name",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: "Catalog Name",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  isDense: true,
                 ),
-                isDense: true,
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: notesCtrl,
-              decoration: InputDecoration(
-                labelText: "Notes (optional)",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notesCtrl,
+                decoration: InputDecoration(
+                  labelText: "Notes (optional)",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  isDense: true,
                 ),
-                isDense: true,
+                maxLines: 2,
               ),
-              maxLines: 2,
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
@@ -574,21 +576,26 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Export CSV",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Generate a Shopify/Amazon compatible CSV.",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: Colors.grey,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Generate a Shopify/Amazon compatible CSV.",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: Colors.grey,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildMarginInput(controller: marginCtrl, onTagSelected: (val) {}),
-          ],
+              const SizedBox(height: 16),
+              _buildMarginInput(
+                controller: marginCtrl,
+                onTagSelected: (val) {},
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
@@ -769,31 +776,36 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Download Catalog PDF",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "Generating PDF for ${productsToPrint.length} items.",
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: "Business / Shop Name",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Generating PDF for ${productsToPrint.length} items.",
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: Colors.grey,
                 ),
-                isDense: true,
               ),
-            ),
-            const SizedBox(height: 12),
-            _buildMarginInput(controller: marginCtrl, onTagSelected: (val) {}),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: "Business / Shop Name",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildMarginInput(
+                controller: marginCtrl,
+                onTagSelected: (val) {},
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
@@ -900,21 +912,26 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Share Catalog",
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Prices will be increased by your margin percentage.",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: Colors.grey,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Prices will be increased by your margin percentage.",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: Colors.grey,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildMarginInput(controller: marginCtrl, onTagSelected: (val) {}),
-          ],
+              const SizedBox(height: 16),
+              _buildMarginInput(
+                controller: marginCtrl,
+                onTagSelected: (val) {},
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
@@ -1582,10 +1599,15 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                     ),
                                     Row(
                                       children: [
-                                        Icon(
-                                          Iconsax.flash_1,
-                                          color: accentColor,
-                                          size: 22,
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            left: 12.0,
+                                          ),
+                                          child: Icon(
+                                            Iconsax.flash_1,
+                                            color: accentColor,
+                                            size: 22,
+                                          ),
                                         ),
                                         SizedBox(width: 8),
                                         Text(
@@ -1700,8 +1722,11 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
         border: Border.all(color: Colors.grey.shade200),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      // 🌟 CHANGED TO WRAP FOR RESPONSIVENESS
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           _buildSocialIconButton(
             icon: Iconsax.message_text,
@@ -1709,21 +1734,18 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
             bgColor: const Color(0xFFDCFCE7),
             onTap: () => _openShareMarginDialog(cat),
           ),
-          const SizedBox(width: 6),
           _buildSocialIconButton(
             icon: Icons.facebook,
             color: const Color(0xFF1877F2),
             bgColor: const Color(0xFFDBEAFE),
             onTap: () => _openShareMarginDialog(cat),
           ),
-          const SizedBox(width: 6),
           _buildSocialIconButton(
             icon: Iconsax.camera,
             color: const Color(0xFFE1306C),
             bgColor: const Color(0xFFFCE7F3),
             onTap: () => _openShareMarginDialog(cat),
           ),
-          const SizedBox(width: 6),
           _buildSocialIconButton(
             icon: Icons.share,
             color: const Color(0xFFE1306C),
@@ -1737,8 +1759,10 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
   // HELPER FOR TOOLS ROW
   Widget _buildToolsRow(CatalogueModel cat) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // 🌟 CHANGED TO WRAP FOR RESPONSIVENESS
+    return Wrap(
+      spacing: 6,
+      runSpacing: 8,
       children: [
         _buildCatalogueActionButton(
           icon: Iconsax.magicpen,
