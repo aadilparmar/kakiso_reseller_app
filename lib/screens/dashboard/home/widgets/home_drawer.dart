@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For Haptic Feedback
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+// 1. IMPORT AUTO TRANSLATE
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 // MODELS
 import 'package:kakiso_reseller_app/models/user.dart';
@@ -269,19 +271,22 @@ class _HomeDrawerState extends State<HomeDrawer> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // The Greeting
-          Text(
-            _getGreeting(),
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              _getGreeting(),
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          // User Name (Big & Bold)
+          // User Name (Big & Bold) - Usually names are not translated, keeping as is
           Text(
-            widget.userData.name.split(' ').first, // First name impact
+            widget.userData.name.split(' ').first,
             style: const TextStyle(
               fontSize: 32,
               color: Colors.black87,
@@ -334,12 +339,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        "Logged in as",
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade400,
-                          fontFamily: 'Poppins',
+                      // 🗣️ WRAPPED
+                      AutoTranslate(
+                        child: Text(
+                          "Logged in as",
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade400,
+                            fontFamily: 'Poppins',
+                          ),
                         ),
                       ),
                       Text(
@@ -368,53 +376,20 @@ class _HomeDrawerState extends State<HomeDrawer> {
   // --- B. FLOATING ISLAND CONTENT ---
   // ------------------------------------------------------------------
 
-  // --- QUICK ACTIONS ROW ---
-  // Widget _buildQuickActionsRow(Color primary) {
-  //   return Row(
-  //     children: [
-  //       Expanded(
-  //         child: _buildQuickActionBtn(
-  //           icon: Iconsax.share,
-  //           label: "Share App",
-  //           color: Colors.blueAccent,
-  //           onTap: () {
-  //             HapticFeedback.lightImpact();
-  //             Get.back();
-  //             Get.snackbar(
-  //               "Share",
-  //               "Sharing link copied!",
-  //               snackPosition: SnackPosition.BOTTOM,
-  //             );
-  //           },
-  //         ),
-  //       ),
-  //       const SizedBox(width: 12),
-  //       Expanded(
-  //         child: _buildQuickActionBtn(
-  //           icon: Iconsax.star_1,
-  //           label: "Rate Us",
-  //           color: Colors.orangeAccent,
-  //           onTap: () {
-  //             HapticFeedback.lightImpact();
-  //             Get.back();
-  //           },
-  //         ),
-  //       ),
-  //     ],
-  //   );
-  // }
-
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: Colors.grey.shade400,
-          letterSpacing: 1.2,
-          fontFamily: 'Poppins',
+      // 🗣️ WRAPPED
+      child: AutoTranslate(
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: Colors.grey.shade400,
+            letterSpacing: 1.2,
+            fontFamily: 'Poppins',
+          ),
         ),
       ),
     );
@@ -467,15 +442,20 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      fontSize: 14,
-                      color: isSelected ? Colors.black87 : Colors.grey.shade700,
+                  // 🗣️ WRAPPED
+                  child: AutoTranslate(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        fontSize: 14,
+                        color: isSelected
+                            ? Colors.black87
+                            : Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ),
@@ -541,12 +521,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
             child: Icon(Iconsax.category, size: 18, color: primary),
           ),
-          title: const Text(
-            'Categories',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Poppins',
+          // 🗣️ WRAPPED
+          title: const AutoTranslate(
+            child: Text(
+              'Categories',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+              ),
             ),
           ),
           children: parentCategories.map((parent) {
@@ -554,12 +537,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
             return ListTile(
               dense: true,
               contentPadding: const EdgeInsets.only(left: 20, right: 16),
-              title: Text(
-                parent.name,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade800,
-                  fontFamily: 'Poppins',
+              // 🗣️ WRAPPED
+              title: AutoTranslate(
+                child: Text(
+                  parent.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade800,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
               trailing: Icon(
@@ -612,13 +598,16 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 children: [
                   Icon(Iconsax.logout, size: 18, color: Colors.redAccent),
                   SizedBox(width: 8),
-                  Text(
-                    'Log Out',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.redAccent,
-                      fontFamily: 'Poppins',
+                  // 🗣️ WRAPPED
+                  AutoTranslate(
+                    child: Text(
+                      'Log Out',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.redAccent,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
                   ),
                 ],
@@ -626,12 +615,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            "Version 1.0.2 • Made with ❤️",
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey.shade300,
-              fontFamily: 'Poppins',
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              "Version 1.0.2 • Made with ❤️",
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade300,
+                fontFamily: 'Poppins',
+              ),
             ),
           ),
         ],
@@ -672,12 +664,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "Frequently Asked Questions",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
+              // 🗣️ WRAPPED
+              const AutoTranslate(
+                child: Text(
+                  "Frequently Asked Questions",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -708,24 +703,30 @@ class _HomeDrawerState extends State<HomeDrawer> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: ExpansionTile(
-        title: Text(
-          question,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            fontFamily: 'Poppins',
+        // 🗣️ WRAPPED
+        title: AutoTranslate(
+          child: Text(
+            question,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontFamily: 'Poppins',
+            ),
           ),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            answer,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 13,
-              height: 1.5,
-              fontFamily: 'Poppins',
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(
+              answer,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+                height: 1.5,
+                fontFamily: 'Poppins',
+              ),
             ),
           ),
         ],
@@ -763,30 +764,39 @@ class _HomeDrawerState extends State<HomeDrawer> {
               child: Icon(Iconsax.building_3, size: 40, color: primary),
             ),
             const SizedBox(height: 20),
-            const Text(
-              "KaKiSo Reseller",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Poppins',
+            // 🗣️ WRAPPED
+            const AutoTranslate(
+              child: Text(
+                "KaKiSo Reseller",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                ),
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              "Empowering resellers to grow their business with zero investment. We provide high-quality products at wholesale rates.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-                fontFamily: 'Poppins',
+            // 🗣️ WRAPPED
+            AutoTranslate(
+              child: Text(
+                "Empowering resellers to grow their business with zero investment. We provide high-quality products at wholesale rates.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                  fontFamily: 'Poppins',
+                ),
               ),
             ),
             const SizedBox(height: 30),
             const Divider(),
             const SizedBox(height: 10),
-            const Text(
-              "© 2024 KaKiSo Inc. All rights reserved.",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            // 🗣️ WRAPPED
+            const AutoTranslate(
+              child: Text(
+                "© 2024 KaKiSo Inc. All rights reserved.",
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
             ),
             const SizedBox(height: 20),
           ],
@@ -804,28 +814,40 @@ class _HomeDrawerState extends State<HomeDrawer> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Log out?',
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        // 🗣️ WRAPPED
+        title: const AutoTranslate(
+          child: Text(
+            'Log out?',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
-        content: const Text(
-          'Are you sure you want to log out from your account?',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 14,
-            color: Colors.grey,
+        // 🗣️ WRAPPED
+        content: const AutoTranslate(
+          child: Text(
+            'Are you sure you want to log out from your account?',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 14,
+              color: Colors.grey,
+            ),
           ),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
+            // 🗣️ WRAPPED
+            child: const AutoTranslate(
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
               ),
             ),
           ),
@@ -838,12 +860,15 @@ class _HomeDrawerState extends State<HomeDrawer> {
               ),
             ),
             onPressed: () => Get.back(result: true),
-            child: const Text(
-              'Yes, Log Out',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+            // 🗣️ WRAPPED
+            child: const AutoTranslate(
+              child: Text(
+                'Yes, Log Out',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),

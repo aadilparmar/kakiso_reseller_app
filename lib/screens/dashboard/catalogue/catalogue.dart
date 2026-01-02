@@ -15,6 +15,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 // 1. IMPORT SHOWCASEVIEW
 import 'package:showcaseview/showcaseview.dart';
+// 2. IMPORT AUTO TRANSLATE
+import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
@@ -39,7 +41,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_deta
 
 const Color accentColor = Color(0xFF2563EB); // Royal Blue
 
-// 2. WRAPPER WIDGET TO INIT SHOWCASE
 class CatalogueSection extends StatelessWidget {
   final UserData userData;
   const CatalogueSection({super.key, required this.userData});
@@ -50,7 +51,7 @@ class CatalogueSection extends StatelessWidget {
       builder: (context) => _CatalogueSectionContent(userData: userData),
       autoPlay: false,
       blurValue: 1,
-      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 300),
     );
   }
@@ -93,10 +94,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // 🔹 Worker to listen to product updates
   Worker? _productListener;
 
-  // 3. DEFINE SHOWCASE KEYS
   final GlobalKey _addCatalogKey = GlobalKey();
   final GlobalKey _shareKey = GlobalKey();
   final GlobalKey _toolsKey = GlobalKey();
@@ -104,7 +103,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   @override
   void initState() {
     super.initState();
-    // SETUP PULSE ANIMATION
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -114,7 +112,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // REACTIVE LISTENER
     _productListener = ever(homeProductsController.allProducts, (products) {
       if (products.isNotEmpty) {
         _checkAndCreateDefaultCatalogues();
@@ -126,18 +123,12 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
         _checkAndCreateDefaultCatalogues();
       }
       _checkForNavArguments();
-
-      // 4. TRIGGER TOUR IF FIRST TIME
       _checkAndStartTour();
     });
   }
 
-  // 🔹 TOUR LOGIC
   void _checkAndStartTour() async {
-    // Wait a bit for UI to settle and default catalogues to potentially create
     await Future.delayed(const Duration(seconds: 1));
-
-    // Check if tour has been shown
     bool hasShownTour =
         _localStorage.read('has_shown_catalogue_tour_v2') ?? false;
 
@@ -153,17 +144,19 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
         context,
       ).startShowCase([_addCatalogKey, _shareKey, _toolsKey]);
     } else {
-      // If list is empty, just show the add button tour
       ShowCaseWidget.of(context).startShowCase([_addCatalogKey]);
     }
   }
 
-  // LOGIC TO CREATE DEFAULT CATALOGUES
+  // 🔹 FIXED LOGIC: Changed key to 'v4' to force re-check
   Future<void> _checkAndCreateDefaultCatalogues() async {
+    // 1. CHANGED KEY to v4 to force execution if missing
     bool hasCreated =
-        _localStorage.read('has_created_default_catalogs_v3') ?? false;
+        _localStorage.read('has_created_default_catalogs_v4') ?? false;
 
-    if (hasCreated) return;
+    // 2. CHECK IF CATALOGUES ARE EMPTY EVEN IF FLAG IS TRUE
+    // If flag is true but list is empty, we should retry.
+    if (hasCreated && catalogueController.myCatalogues.isNotEmpty) return;
 
     final allProducts = homeProductsController.allProducts;
     if (allProducts.isEmpty) return;
@@ -183,7 +176,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Premium items with high profit potential.",
         );
         await Future.delayed(const Duration(milliseconds: 50));
-
         final cat = catalogueController.myCatalogues.firstWhereOrNull(
           (c) => c.name == "🏆 High Margin Picks",
         );
@@ -214,7 +206,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Budget-friendly bestsellers.",
         );
         await Future.delayed(const Duration(milliseconds: 50));
-
         final cat = catalogueController.myCatalogues.firstWhereOrNull(
           (c) => c.name == "💰 Under ₹1000 Store",
         );
@@ -240,7 +231,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           "Most popular items right now.",
         );
         await Future.delayed(const Duration(milliseconds: 50));
-
         final cat = catalogueController.myCatalogues.firstWhereOrNull(
           (c) => c.name == "🚀 Trending & Viral",
         );
@@ -252,7 +242,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
       }
     }
 
-    _localStorage.write('has_created_default_catalogs_v3', true);
+    // Mark as created (v4)
+    _localStorage.write('has_created_default_catalogs_v4', true);
     if (mounted) setState(() {});
   }
 
@@ -286,7 +277,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           controller: controller,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: "Margin Percentage (%)",
+            // 🗣️ WRAPPED
+            label: const AutoTranslate(child: Text("Margin Percentage (%)")),
             hintText: "Min 20%",
             suffixText: "%",
             prefixIcon: const Icon(Iconsax.percentage_square),
@@ -325,9 +317,12 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          " * Minimum 20% margin is required.",
-          style: TextStyle(fontSize: 10, color: Colors.grey),
+        // 🗣️ WRAPPED
+        const AutoTranslate(
+          child: Text(
+            " * Minimum 20% margin is required.",
+            style: TextStyle(fontSize: 10, color: Colors.grey),
+          ),
         ),
       ],
     );
@@ -337,8 +332,14 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   Future<void> _handleBulkDownload(CatalogueModel cat) async {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty",
-        "No products to download.",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text("Empty", style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        messageText: const AutoTranslate(
+          child: Text("No products to download."),
+        ),
         backgroundColor: Colors.orange.shade100,
       );
       return;
@@ -346,9 +347,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
     Get.showOverlay(
       asyncFunction: () async {
-        // ignore: unused_local_variable
-        int successCount = 0;
-
         try {
           Directory? directory;
           if (Platform.isAndroid) {
@@ -382,7 +380,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
                 File file = File('${directory.path}/$fileName');
                 await file.writeAsBytes(response.bodyBytes);
-                successCount++;
               }
             } catch (e) {
               debugPrint("Failed to download image for ${p.name}: $e");
@@ -390,8 +387,15 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           }
 
           Get.snackbar(
-            "Download Complete",
-            "Saved to Gallery",
+            "",
+            "",
+            titleText: const AutoTranslate(
+              child: Text(
+                "Download Complete",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            messageText: const AutoTranslate(child: Text("Saved to Gallery")),
             backgroundColor: Colors.green,
             colorText: Colors.white,
             duration: const Duration(seconds: 5),
@@ -419,9 +423,12 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
             children: const [
               CircularProgressIndicator(color: accentColor),
               SizedBox(height: 16),
-              Text(
-                "Downloading images...",
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              // 🗣️ WRAPPED
+              AutoTranslate(
+                child: Text(
+                  "Downloading images...",
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                ),
               ),
             ],
           ),
@@ -437,20 +444,29 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16.0),
         ),
-        title: const Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
-        content: const Text(
-          'Do you want to log out?',
-          style: TextStyle(fontFamily: 'Poppins'),
+        title: const AutoTranslate(
+          child: Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
+        ),
+        content: const AutoTranslate(
+          child: Text(
+            'Do you want to log out?',
+            style: TextStyle(fontFamily: 'Poppins'),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const AutoTranslate(child: Text('Cancel')),
+          ),
           TextButton(
             onPressed: () async {
               Get.back();
               await _storage.delete(key: 'authToken');
               Get.offAll(() => const LoginPage());
             },
-            child: const Text('Logout', style: TextStyle(color: accentColor)),
+            child: const AutoTranslate(
+              child: Text('Logout', style: TextStyle(color: accentColor)),
+            ),
           ),
         ],
       ),
@@ -472,9 +488,14 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Create Catalog",
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        title: const AutoTranslate(
+          child: Text(
+            "Create Catalog",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -483,7 +504,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               TextField(
                 controller: nameCtrl,
                 decoration: InputDecoration(
-                  labelText: "Catalog Name",
+                  // 🗣️ WRAPPED
+                  label: const AutoTranslate(child: Text("Catalog Name")),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -494,7 +516,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               TextField(
                 controller: notesCtrl,
                 decoration: InputDecoration(
-                  labelText: "Notes (optional)",
+                  // 🗣️ WRAPPED
+                  label: const AutoTranslate(child: Text("Notes (optional)")),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -506,7 +529,10 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const AutoTranslate(child: Text("Cancel")),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
@@ -523,7 +549,9 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               );
               Get.back();
             },
-            child: const Text("Create", style: TextStyle(color: Colors.white)),
+            child: const AutoTranslate(
+              child: Text("Create", style: TextStyle(color: Colors.white)),
+            ),
           ),
         ],
       ),
@@ -562,8 +590,15 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   void _openCsvExportDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty Catalog",
-        "Add products first!",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Empty Catalog",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: const AutoTranslate(child: Text("Add products first!")),
         backgroundColor: Colors.red.shade50,
       );
       return;
@@ -574,21 +609,28 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Export CSV",
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        title: const AutoTranslate(
+          child: Text(
+            "Export CSV",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Generate a Shopify/Amazon compatible CSV.",
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  color: Colors.grey,
+              const AutoTranslate(
+                child: Text(
+                  "Generate a Shopify/Amazon compatible CSV.",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -600,7 +642,10 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const AutoTranslate(child: Text("Cancel")),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
@@ -608,8 +653,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
               if (margin < 20) {
                 Get.snackbar(
-                  "Low Margin",
-                  "Minimum margin must be 20%",
+                  "",
+                  "",
+                  titleText: const AutoTranslate(
+                    child: Text(
+                      "Low Margin",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  messageText: const AutoTranslate(
+                    child: Text("Minimum margin must be 20%"),
+                  ),
                   backgroundColor: Colors.red.shade100,
                   snackPosition: SnackPosition.BOTTOM,
                 );
@@ -618,9 +672,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               Get.back();
               _generateAndShareCsv(cat, margin);
             },
-            child: const Text(
-              "Download",
-              style: TextStyle(color: Colors.white),
+            child: const AutoTranslate(
+              child: Text("Download", style: TextStyle(color: Colors.white)),
             ),
           ),
         ],
@@ -658,7 +711,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
           for (var p in cat.products) {
             double basePrice = double.tryParse(p.price) ?? 0;
-            // Updated Formula: Base * (1 + margin%)
             double finalPrice = basePrice * (1 + marginPercent / 100);
             double regularPrice = double.tryParse(p.regularPrice) ?? 0;
 
@@ -729,8 +781,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   void _openPdfMarginDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalog",
-        "Add products before generating a PDF.",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Empty catalog",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: const AutoTranslate(
+          child: Text("Add products before generating a PDF."),
+        ),
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -774,27 +835,37 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Download Catalog PDF",
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        title: const AutoTranslate(
+          child: Text(
+            "Download Catalog PDF",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                "Generating PDF for ${productsToPrint.length} items.",
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  color: Colors.grey,
+              AutoTranslate(
+                child: Text(
+                  "Generating PDF for ${productsToPrint.length} items.",
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: nameCtrl,
                 decoration: InputDecoration(
-                  labelText: "Business / Shop Name",
+                  // 🗣️ WRAPPED
+                  label: const AutoTranslate(
+                    child: Text("Business / Shop Name"),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -810,7 +881,10 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const AutoTranslate(child: Text("Cancel")),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
@@ -822,8 +896,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
               if (marginPercent < 20) {
                 Get.snackbar(
-                  "Low Margin",
-                  "Minimum margin must be 20%",
+                  "",
+                  "",
+                  titleText: const AutoTranslate(
+                    child: Text(
+                      "Low Margin",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  messageText: const AutoTranslate(
+                    child: Text("Minimum margin must be 20%"),
+                  ),
                   backgroundColor: Colors.red.shade100,
                   snackPosition: SnackPosition.BOTTOM,
                 );
@@ -833,9 +916,8 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               Get.back();
               _generateCataloguePdf(cat, name, marginPercent, productsToPrint);
             },
-            child: const Text(
-              "Generate",
-              style: TextStyle(color: Colors.white),
+            child: const AutoTranslate(
+              child: Text("Generate", style: TextStyle(color: Colors.white)),
             ),
           ),
         ],
@@ -862,8 +944,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
             extraMargin: extraMargin,
           );
           Get.snackbar(
-            "Success",
-            "Catalog PDF generated.",
+            "",
+            "",
+            titleText: const AutoTranslate(
+              child: Text(
+                "Success",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            messageText: const AutoTranslate(
+              child: Text("Catalog PDF generated."),
+            ),
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.green,
             colorText: Colors.white,
@@ -900,8 +991,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   void _openShareMarginDialog(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty catalog",
-        "Add products before sharing.",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Empty catalog",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: const AutoTranslate(
+          child: Text("Add products before sharing."),
+        ),
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -910,21 +1010,28 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     Get.dialog(
       AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          "Share Catalog",
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        title: const AutoTranslate(
+          child: Text(
+            "Share Catalog",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Prices will be increased by your margin percentage.",
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  color: Colors.grey,
+              const AutoTranslate(
+                child: Text(
+                  "Prices will be increased by your margin percentage.",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -936,7 +1043,10 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const AutoTranslate(child: Text("Cancel")),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () {
@@ -944,8 +1054,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                   double.tryParse(marginCtrl.text.trim()) ?? 0;
               if (marginPercent < 20) {
                 Get.snackbar(
-                  "Low Margin",
-                  "Minimum margin must be 20%",
+                  "",
+                  "",
+                  titleText: const AutoTranslate(
+                    child: Text(
+                      "Low Margin",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  messageText: const AutoTranslate(
+                    child: Text("Minimum margin must be 20%"),
+                  ),
                   backgroundColor: Colors.red.shade100,
                   snackPosition: SnackPosition.BOTTOM,
                 );
@@ -954,7 +1073,9 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
               Get.back();
               _processShare(cat, marginPercent);
             },
-            child: const Text("Share", style: TextStyle(color: Colors.white)),
+            child: const AutoTranslate(
+              child: Text("Share", style: TextStyle(color: Colors.white)),
+            ),
           ),
         ],
       ),
@@ -965,8 +1086,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     if (cat.products.isEmpty) return;
     if (cat.products.length > 30) {
       Get.snackbar(
-        "Large Catalog",
-        "Preparing ${cat.products.length} images...",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Large Catalog",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: AutoTranslate(
+          child: Text("Preparing ${cat.products.length} images..."),
+        ),
         backgroundColor: Colors.orange.shade50,
         colorText: Colors.orange.shade800,
       );
@@ -1000,8 +1130,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
           if (xFiles.isEmpty) {
             Get.snackbar(
-              "Copied text",
-              "Catalog text copied. No images found.",
+              "",
+              "",
+              titleText: const AutoTranslate(
+                child: Text(
+                  "Copied text",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              messageText: const AutoTranslate(
+                child: Text("Catalog text copied. No images found."),
+              ),
               snackPosition: SnackPosition.BOTTOM,
             );
             await Share.share(buffer.toString());
@@ -1011,8 +1150,17 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
           await Share.shareXFiles(xFiles, text: "");
 
           Get.snackbar(
-            "Ready to Share",
-            "Images shared. Text copied to clipboard!",
+            "",
+            "",
+            titleText: const AutoTranslate(
+              child: Text(
+                "Ready to Share",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            messageText: const AutoTranslate(
+              child: Text("Images shared. Text copied to clipboard!"),
+            ),
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.green,
             colorText: Colors.white,
@@ -1074,8 +1222,15 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
   void _openCollageStudio(CatalogueModel cat) {
     if (cat.products.isEmpty) {
       Get.snackbar(
-        "Empty Catalog",
-        "Add products first!",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Empty Catalog",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: const AutoTranslate(child: Text("Add products first!")),
         backgroundColor: Colors.red.shade50,
       );
       return;
@@ -1146,13 +1301,16 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                 ),
               ),
               icon: Icon(icon, size: 16, color: effectiveColor),
-              label: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
-                  color: effectiveColor,
+              // 🗣️ WRAPPED LABEL
+              label: AutoTranslate(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                    color: effectiveColor,
+                  ),
                 ),
               ),
             )
@@ -1166,13 +1324,16 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                 ),
               ),
               icon: Icon(icon, size: 16, color: effectiveColor),
-              label: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
-                  color: effectiveColor,
+              // 🗣️ WRAPPED LABEL
+              label: AutoTranslate(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                    color: effectiveColor,
+                  ),
                 ),
               ),
             ),
@@ -1328,9 +1489,9 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
             backgroundColor: accentColor,
             onPressed: _openCreateCatalogueDialog,
             icon: const Icon(Iconsax.folder_add, color: Colors.white),
-            label: const Text(
-              "New Catalog",
-              style: TextStyle(color: Colors.white),
+            // 🗣️ WRAPPED
+            label: const AutoTranslate(
+              child: Text("New Catalog", style: TextStyle(color: Colors.white)),
             ),
           ),
         ),
@@ -1516,15 +1677,18 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                                       color: Color(0xFF1D4ED8),
                                                     ),
                                                     const SizedBox(width: 4),
-                                                    Text(
-                                                      "${cat.products.length} items",
-                                                      style: const TextStyle(
-                                                        fontFamily: 'Poppins',
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: Color(
-                                                          0xFF1D4ED8,
+                                                    // 🗣️ WRAPPED
+                                                    AutoTranslate(
+                                                      child: Text(
+                                                        "${cat.products.length} items",
+                                                        style: const TextStyle(
+                                                          fontFamily: 'Poppins',
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: Color(
+                                                            0xFF1D4ED8,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
@@ -1555,15 +1719,18 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                                       color: Color(0xFF8B5CF6),
                                                     ),
                                                     SizedBox(width: 4),
-                                                    Text(
-                                                      "My Catalog",
-                                                      style: TextStyle(
-                                                        fontFamily: 'Poppins',
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                        color: Color(
-                                                          0xFF6D28D9,
+                                                    // 🗣️ WRAPPED
+                                                    AutoTranslate(
+                                                      child: Text(
+                                                        "My Catalog",
+                                                        style: TextStyle(
+                                                          fontFamily: 'Poppins',
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Color(
+                                                            0xFF6D28D9,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
@@ -1576,8 +1743,7 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                                 opacity: isGuideActive
                                                     ? 0.3
                                                     : 1.0,
-                                                child: // ... inside ListView.builder ... inside Opacity ...
-                                                _buildCatalogueActionButton(
+                                                child: _buildCatalogueActionButton(
                                                   icon: Iconsax.trash,
                                                   label: "Delete",
                                                   onTap: () {
@@ -1590,32 +1756,40 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                                                 16,
                                                               ),
                                                         ),
-                                                        title: const Text(
-                                                          "Delete Catalog",
-                                                          style: TextStyle(
-                                                            fontFamily:
-                                                                'Poppins',
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                          ),
-                                                        ),
-                                                        content: Text(
-                                                          "Are you sure you want to delete '${cat.name}'? This cannot be undone.",
-                                                          style:
-                                                              const TextStyle(
-                                                                fontFamily:
-                                                                    'Poppins',
+                                                        title:
+                                                            const AutoTranslate(
+                                                              child: Text(
+                                                                "Delete Catalog",
+                                                                style: TextStyle(
+                                                                  fontFamily:
+                                                                      'Poppins',
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
                                                               ),
+                                                            ),
+                                                        content: AutoTranslate(
+                                                          child: Text(
+                                                            "Are you sure you want to delete '${cat.name}'? This cannot be undone.",
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontFamily:
+                                                                      'Poppins',
+                                                                ),
+                                                          ),
                                                         ),
                                                         actions: [
                                                           TextButton(
                                                             onPressed: () =>
                                                                 Get.back(), // Close dialog
-                                                            child: const Text(
-                                                              "Cancel",
-                                                              style: TextStyle(
-                                                                color:
-                                                                    Colors.grey,
+                                                            child: const AutoTranslate(
+                                                              child: Text(
+                                                                "Cancel",
+                                                                style: TextStyle(
+                                                                  color: Colors
+                                                                      .grey,
+                                                                ),
                                                               ),
                                                             ),
                                                           ),
@@ -1642,14 +1816,16 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                                               // 3. Close dialog
                                                               Get.back();
                                                             },
-                                                            child: const Text(
-                                                              "Delete",
-                                                              style: TextStyle(
-                                                                color:
-                                                                    Colors.red,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
+                                                            child: const AutoTranslate(
+                                                              child: Text(
+                                                                "Delete",
+                                                                style: TextStyle(
+                                                                  color: Colors
+                                                                      .red,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
                                                               ),
                                                             ),
                                                           ),
@@ -1684,13 +1860,16 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                                           ),
                                         ),
                                         SizedBox(width: 8),
-                                        Text(
-                                          "Reseller Tools",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 16,
-                                            color: Color(0xFF86198F),
-                                            fontFamily: 'Poppins',
+                                        // 🗣️ WRAPPED
+                                        const AutoTranslate(
+                                          child: Text(
+                                            "Reseller Tools",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 16,
+                                              color: Color(0xFF86198F),
+                                              fontFamily: 'Poppins',
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -1796,7 +1975,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
         border: Border.all(color: Colors.grey.shade200),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      // 🌟 CHANGED TO WRAP FOR RESPONSIVENESS
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
@@ -1833,7 +2011,6 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
 
   // HELPER FOR TOOLS ROW
   Widget _buildToolsRow(CatalogueModel cat) {
-    // 🌟 CHANGED TO WRAP FOR RESPONSIVENESS
     return Wrap(
       spacing: 6,
       runSpacing: 8,
@@ -1956,23 +2133,29 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Poppins',
+                      // 🗣️ WRAPPED
+                      AutoTranslate(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        message,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 13,
-                          fontFamily: 'Poppins',
-                          height: 1.4,
+                      // 🗣️ WRAPPED
+                      AutoTranslate(
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 13,
+                            fontFamily: 'Poppins',
+                            height: 1.4,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1987,12 +2170,15 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
                             color: accentColor,
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: const Text(
-                            "Got it!",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                          // 🗣️ WRAPPED
+                          child: const AutoTranslate(
+                            child: Text(
+                              "Got it!",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -2033,13 +2219,11 @@ class _ProductSelectionSheet extends StatefulWidget {
 }
 
 class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
-  // Store IDs of selected products
   final Set<String> _selectedIds = {};
 
   @override
   void initState() {
     super.initState();
-    // Default: select first 30 (or all if less)
     for (var i = 0; i < widget.catalogue.products.length; i++) {
       if (i < 30) {
         _selectedIds.add(widget.catalogue.products[i].id.toString());
@@ -2052,11 +2236,21 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
       if (_selectedIds.contains(id)) {
         _selectedIds.remove(id);
       } else {
-        // 🔒 STRICT LIMIT CHECK
         if (_selectedIds.length >= 30) {
           Get.snackbar(
-            "Limit Reached",
-            "PDF limit is 30 products. Unselect an item to add this one.",
+            "",
+            "",
+            titleText: const AutoTranslate(
+              child: Text(
+                "Limit Reached",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            messageText: const AutoTranslate(
+              child: Text(
+                "PDF limit is 30 products. Unselect an item to add this one.",
+              ),
+            ),
             backgroundColor: Colors.orange.shade50,
             colorText: Colors.orange.shade900,
             duration: const Duration(seconds: 3),
@@ -2074,7 +2268,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
     setState(() {
       _selectedIds.clear();
       final products = widget.catalogue.products;
-      // If total > 30, only select the first 30
       final int limit = products.length > 30 ? 30 : products.length;
 
       for (var i = 0; i < limit; i++) {
@@ -2084,8 +2277,17 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
 
     if (widget.catalogue.products.length > 30) {
       Get.snackbar(
-        "Selection Limited",
-        "Selected the first 30 products automatically.",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Selection Limited",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: const AutoTranslate(
+          child: Text("Selected the first 30 products automatically."),
+        ),
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -2109,13 +2311,11 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      // ✅ FIX: Wrapped in SafeArea to ensure bottom button isn't hidden
       child: SafeArea(
         top: false,
         child: Column(
           children: [
             const SizedBox(height: 12),
-            // Handle
             Container(
               width: 40,
               height: 4,
@@ -2126,7 +2326,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Title & Count
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -2134,34 +2333,42 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Select Products for PDF",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Poppins',
+                      // 🗣️ WRAPPED
+                      const AutoTranslate(
+                        child: Text(
+                          "Select Products for PDF",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
                         ),
                       ),
                       Row(
                         children: [
-                          Text(
-                            "${_selectedIds.length} / 30 selected",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _selectedIds.length == 30
-                                  ? Colors.red
-                                  : accentColor,
-                              fontWeight: FontWeight.w600,
+                          // 🗣️ WRAPPED DYNAMIC
+                          AutoTranslate(
+                            child: Text(
+                              "${_selectedIds.length} / 30 selected",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _selectedIds.length == 30
+                                    ? Colors.red
+                                    : accentColor,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           if (_selectedIds.length == 30)
                             const Padding(
                               padding: EdgeInsets.only(left: 6.0),
-                              child: Text(
-                                "(Max limit)",
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.red,
+                              child: AutoTranslate(
+                                child: Text(
+                                  "(Max limit)",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.red,
+                                  ),
                                 ),
                               ),
                             ),
@@ -2172,10 +2379,13 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                   const Spacer(),
                   TextButton(
                     onPressed: isFullSelection ? _deselectAll : _selectAllSmart,
-                    child: Text(
-                      isFullSelection
-                          ? "Clear"
-                          : (isLargeCatalog ? "Select Top 30" : "Select All"),
+                    // 🗣️ WRAPPED
+                    child: AutoTranslate(
+                      child: Text(
+                        isFullSelection
+                            ? "Clear"
+                            : (isLargeCatalog ? "Select Top 30" : "Select All"),
+                      ),
                     ),
                   ),
                 ],
@@ -2184,7 +2394,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
 
             const Divider(),
 
-            // List
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),
@@ -2193,7 +2402,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                 itemBuilder: (ctx, i) {
                   final p = products[i];
                   final isSelected = _selectedIds.contains(p.id.toString());
-                  // Visual feedback: If user hit limit & item not selected -> dim it slightly
                   final isLimitReached = _selectedIds.length >= 30;
                   final bool isDisabled = isLimitReached && !isSelected;
 
@@ -2211,13 +2419,12 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                           ),
                           borderRadius: BorderRadius.circular(12),
                           color: isSelected
-                              ? accentColor.withValues(alpha: 0.04)
+                              ? accentColor.withOpacity(0.04)
                               : Colors.white,
                         ),
                         padding: const EdgeInsets.all(8),
                         child: Row(
                           children: [
-                            // Image
                             Container(
                               width: 50,
                               height: 50,
@@ -2236,7 +2443,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                                   : null,
                             ),
                             const SizedBox(width: 12),
-                            // Details
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2260,7 +2466,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                                 ],
                               ),
                             ),
-                            // Checkbox
                             Container(
                               width: 24,
                               height: 24,
@@ -2291,7 +2496,6 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
               ),
             ),
 
-            // Bottom Button
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: SizedBox(
@@ -2314,12 +2518,15 @@ class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
                               .toList();
                           widget.onConfirm(selectedProducts);
                         },
-                  child: Text(
-                    "Continue (${_selectedIds.length})",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  // 🗣️ WRAPPED
+                  child: AutoTranslate(
+                    child: Text(
+                      "Continue (${_selectedIds.length})",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -2380,8 +2587,12 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
       }
     } catch (e) {
       Get.snackbar(
-        "Error",
-        "Could not load image: $e",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text("Error", style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        messageText: AutoTranslate(child: Text("Could not load image: $e")),
         backgroundColor: Colors.red.shade50,
       );
     }
@@ -2391,11 +2602,19 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
     setState(() => _isGenerating = true);
     double marginPercent = double.tryParse(_marginController.text) ?? 0.0;
 
-    // 🔒 Strict 20% Check
     if (marginPercent < 20) {
       Get.snackbar(
-        "Low Margin",
-        "Minimum margin must be 20%",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text(
+            "Low Margin",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        messageText: const AutoTranslate(
+          child: Text("Minimum margin must be 20%"),
+        ),
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade900,
         snackPosition: SnackPosition.BOTTOM,
@@ -2405,22 +2624,17 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
     }
 
     try {
-      // 📝 To handle % margin correctly while preserving existing Service API,
-      // we pre-calculate the prices here and pass them to the service.
       List<ProductModel> adjustedProducts = widget.catalogue.products.map((p) {
         double base = double.tryParse(p.price) ?? 0;
         double newPrice = base * (1 + marginPercent / 100);
 
-        // Create a copy with the new price string
         return ProductModel(
           id: p.id,
           name: p.name,
-          price: newPrice.toStringAsFixed(0), // Rounded to whole number
+          price: newPrice.toStringAsFixed(0),
           regularPrice: p.regularPrice,
-
           image: p.image,
           images: p.images,
-
           attributes: p.attributes,
           description: p.description,
           shortDescription: p.shortDescription,
@@ -2438,7 +2652,7 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
         themeColor: _themeColor,
         backgroundColor: _bgColor,
         backgroundImage: _customBgImage,
-        extraMargin: 0, // 👈 Margin already applied to product price
+        extraMargin: 0,
       );
 
       List<XFile> xFiles = files.map((f) => XFile(f.path)).toList();
@@ -2449,8 +2663,12 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       Get.snackbar(
-        "Error",
-        "Failed: $e",
+        "",
+        "",
+        titleText: const AutoTranslate(
+          child: Text("Error", style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        messageText: AutoTranslate(child: Text("Failed: $e")),
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -2467,12 +2685,10 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      // ⌨️ KEYBOARD FIX + SAFE AREA FIX: Handles both navigation bar and keyboard
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        // ✅ FIX: Wrapped in SafeArea so bottom content (button) isn't covered by nav bar
         child: SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -2493,28 +2709,43 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                 ),
                 const SizedBox(height: 20),
 
+                // 🗣️ WRAPPED
                 const Center(
-                  child: Text(
-                    "Collage Studio Pro 📸",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  child: AutoTranslate(
+                    child: Text(
+                      "Collage Studio Pro 📸",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
 
+                // 🗣️ WRAPPED
                 const Center(
-                  child: Text(
-                    "Create professional collage to share with your customers, social media and others",
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                  child: AutoTranslate(
+                    child: Text(
+                      "Create professional collage to share with your customers, social media and others",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
                 // Layouts
-                const Text(
-                  "CHOOSE LAYOUT",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
+                // 🗣️ WRAPPED
+                const AutoTranslate(
+                  child: Text(
+                    "CHOOSE LAYOUT",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2553,12 +2784,15 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                 const SizedBox(height: 24),
 
                 // 📸 BACKGROUND
-                const Text(
-                  "BACKGROUND",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
+                // 🗣️ WRAPPED
+                const AutoTranslate(
+                  child: Text(
+                    "BACKGROUND",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -2654,12 +2888,15 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                             color: Colors.green,
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            "Image Selected",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
+                          // 🗣️ WRAPPED
+                          const AutoTranslate(
+                            child: Text(
+                              "Image Selected",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
                             ),
                           ),
                           const Spacer(),
@@ -2678,17 +2915,19 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
 
                 const SizedBox(height: 24),
 
-                // 💰 MARGIN INPUT (NEW WIDGET)
-                const Text(
-                  "ADD MARGIN (%)",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
+                // 💰 MARGIN INPUT
+                // 🗣️ WRAPPED
+                const AutoTranslate(
+                  child: Text(
+                    "ADD MARGIN (%)",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Reusing the same UI logic but embedded
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2749,9 +2988,12 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      " * Minimum 20% margin is required.",
-                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                    // 🗣️ WRAPPED
+                    const AutoTranslate(
+                      child: Text(
+                        " * Minimum 20% margin is required.",
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
                     ),
                   ],
                 ),
@@ -2761,9 +3003,12 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   activeColor: _themeColor,
-                  title: const Text(
-                    "Show Price Tags",
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  // 🗣️ WRAPPED
+                  title: const AutoTranslate(
+                    child: Text(
+                      "Show Price Tags",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
                   value: _showPrices,
                   onChanged: (v) => setState(() => _showPrices = v),
@@ -2771,9 +3016,12 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   activeColor: _themeColor,
-                  title: const Text(
-                    "Add Branding",
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  // 🗣️ WRAPPED
+                  title: const AutoTranslate(
+                    child: Text(
+                      "Add Branding",
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
                   value: _showBranding,
                   onChanged: (v) => setState(() => _showBranding = v),
@@ -2802,12 +3050,15 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
                             ),
                           )
                         : const Icon(Iconsax.magicpen, color: Colors.white),
-                    label: Text(
-                      _isGenerating ? "Designing..." : "Create & Share",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    // 🗣️ WRAPPED
+                    label: AutoTranslate(
+                      child: Text(
+                        _isGenerating ? "Designing..." : "Create & Share",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -2836,7 +3087,10 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
             child: Icon(icon, size: 20, color: Colors.black87),
           ),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 10)),
+          // 🗣️ WRAPPED
+          AutoTranslate(
+            child: Text(label, style: const TextStyle(fontSize: 10)),
+          ),
         ],
       ),
     );
@@ -2861,12 +3115,15 @@ class _CollageStudioSheetState extends State<_CollageStudioSheet> {
           children: [
             Icon(icon, color: selected ? _themeColor : Colors.grey),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: selected ? _themeColor : Colors.grey,
+            // 🗣️ WRAPPED
+            AutoTranslate(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? _themeColor : Colors.grey,
+                ),
               ),
             ),
           ],

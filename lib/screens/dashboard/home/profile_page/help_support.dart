@@ -173,23 +173,6 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
 
   // ─── WIDGET BUILDERS ───
 
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey.shade600,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
   Widget _buildContactCard({
     required IconData icon,
     required String title,
@@ -247,66 +230,6 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTopicItem(IconData icon, String label, double maxWidth) {
-    // Calculates width for 2 items per row with spacing
-    double width = (maxWidth - 20) / 2;
-
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade200),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey.shade700),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExpandableFAQ(String question, String answer) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-        title: Text(
-          question,
-          style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        children: [
-          Text(
-            answer,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              color: Colors.grey,
-              height: 1.5,
-            ),
-          ),
-        ],
       ),
     );
   }

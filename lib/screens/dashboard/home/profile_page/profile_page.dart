@@ -3,25 +3,29 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/fees_charges.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/help_support.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/reseller_guide.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-// 1. Import the package
 import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 // MODELS & SERVICES
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
+import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
-// SCREENS
+// EXISTING SCREENS
 import 'package:kakiso_reseller_app/screens/dashboard/order_management/orders_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/buisness_details/buisness_details.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
-import 'package:kakiso_reseller_app/utils/double_tap.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/fees_charges.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/help_support.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/reseller_guide.dart';
+
+// --- 🆕 NEW PAGES IMPORT ---
+// Update these paths based on where you saved the files
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/about_kakiso.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/faq_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/bank_upi_page.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/rate_kakiso_page.dart';
 
 const Color kPrimaryColor = Color(0xFF2563EB);
 const Color kBgColor = Color(0xFFF1F3F6);
@@ -38,8 +42,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final _storage = GetStorage();
-
-  // 🔹 GET THE SERVICE INSTANCE
   final TranslationService _translationService = Get.find<TranslationService>();
 
   @override
@@ -65,7 +67,6 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 🔹 FIXED: Wrapped "Choose Language" in AutoTranslate
                   const AutoTranslate(
                     child: Text(
                       "Choose Language",
@@ -84,13 +85,10 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const Divider(),
-
-            // Language Options
             _buildLangOption("English", "en", "A"),
             _buildLangOption("Hindi", "hi", "अ"),
             _buildLangOption("Punjabi", "pa", "ੳ"),
             _buildLangOption("Gujarati", "gu", "અ"),
-
             const SizedBox(height: 10),
           ],
         ),
@@ -100,18 +98,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildLangOption(String name, String code, String symbol) {
-    // USE INSTANCE TO CHECK LANGUAGE
     bool isSelected = _translationService.currentLanguage == code;
 
     return InkWell(
       onTap: () async {
-        // USE INSTANCE TO SET LANGUAGE
         await _translationService.setLanguage(code);
-
-        // Save preference locally
         _storage.write('language_code', code);
-
-        setState(() {}); // Rebuild UI
+        setState(() {});
         Get.back();
 
         Get.snackbar(
@@ -151,7 +144,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(width: 16),
-            // 🔹 FIXED: Wrapped Language Name in AutoTranslate
             AutoTranslate(
               child: Text(
                 name,
@@ -243,80 +235,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ─── RATE DIALOG ───
-  void _showRateDialog() {
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/logos/login-logo.png',
-                height: 40,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Iconsax.heart, size: 40, color: kPrimaryColor),
-              ),
-              const SizedBox(height: 16),
-              const AutoTranslate(
-                child: Text(
-                  "Enjoying KaKiSo?",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const AutoTranslate(
-                child: Text(
-                  "Your support helps us grow!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Get.back(),
-                      child: const AutoTranslate(child: Text("Later")),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimaryColor,
-                      ),
-                      onPressed: () {
-                        Get.back();
-                      },
-                      child: const AutoTranslate(
-                        child: Text(
-                          "Rate Us 5★",
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return DoubleBackToExitWrapper(
@@ -352,7 +270,6 @@ class _ProfilePageState extends State<ProfilePage> {
               _buildActionBanner(),
               const SizedBox(height: 12),
 
-              // 🌟 UPDATED HELP GRID (Earnings Removed)
               _buildHelpGrid(),
 
               const SizedBox(height: 12),
@@ -375,16 +292,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ),
+                // 🆕 UPDATED LINK: Points to BankUpiPage
                 _buildListItem(
                   icon: Iconsax.bank,
                   title: "Bank & UPI Details",
                   subtitle: "Add details for payouts",
-                  onTap: () => Get.to(
-                    () => BusinessDetailsPage(
-                      userData: widget.userData,
-                      fromDrawer: true,
-                    ),
-                  ),
+                  onTap: () => Get.to(() => const BankUpiPage()),
                 ),
               ]),
 
@@ -404,15 +317,17 @@ class _ProfilePageState extends State<ProfilePage> {
                   subtitle: "Contact us",
                   onTap: () => Get.to(() => const HelpSupportPage()),
                 ),
+                // 🆕 UPDATED LINK: Points to FAQPage
                 _buildListItem(
                   icon: Iconsax.message_question,
                   title: "FAQs",
-                  onTap: () {},
+                  onTap: () => Get.to(() => const FAQPage()),
                 ),
+                // 🆕 UPDATED LINK: Points to AboutKakisoPage
                 _buildListItem(
                   icon: Iconsax.info_circle,
                   title: "About KaKiSo",
-                  onTap: () {},
+                  onTap: () => Get.to(() => const AboutKakisoPage()),
                 ),
               ]),
 
@@ -430,10 +345,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                 ),
+                // 🆕 UPDATED LINK: Points to RateKakisoPage (removed dialog)
                 _buildListItem(
                   icon: Iconsax.star1,
                   title: "Rate KaKiSo",
-                  onTap: _showRateDialog,
+                  onTap: () => Get.to(() => const RateKakisoPage()),
                 ),
                 _buildListItem(
                   icon: Iconsax.logout,
@@ -475,7 +391,6 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name usually doesn't need translation, but you can wrap if needed
                 Text(
                   widget.userData.name.isNotEmpty
                       ? widget.userData.name
@@ -536,7 +451,7 @@ class _ProfilePageState extends State<ProfilePage> {
           const Expanded(
             child: AutoTranslate(
               child: Text(
-                "Add your bank details to receive weekly payouts on time.",
+                "Add your bank details for easy Access while reSelling",
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 12,
@@ -568,9 +483,6 @@ class _ProfilePageState extends State<ProfilePage> {
             "Wishlist",
             () => Get.to(() => WishlistScreen()),
           ),
-          // 🛑 REMOVED "Earnings" HERE
-
-          // CONNECTED LANGUAGE BUTTON
           _gridItem(Iconsax.global, "Language", _showLanguageSheet),
         ],
       ),
@@ -591,7 +503,6 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Icon(icon, color: kTextPrimary, size: 22),
           ),
           const SizedBox(height: 8),
-          // 🔹 ENSURE THIS IS WRAPPED
           AutoTranslate(
             child: Text(
               label,
