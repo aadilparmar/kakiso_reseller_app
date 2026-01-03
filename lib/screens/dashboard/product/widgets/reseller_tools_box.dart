@@ -103,19 +103,23 @@ class ResellerToolsBox extends StatelessWidget {
           // --- ROW 2: SOCIAL SHARE BUTTONS ---
           Row(
             children: [
-              // 1. WHATSAPP (The Big Green Button)
-              Expanded(
-                flex: 2,
-                child: Obx(
-                  () => _buildSocialButton(
-                    label: "WhatsApp",
-                    // Use a generic icon if brand icons aren't available, or add font_awesome_flutter
-                    icon: Icons.message,
-                    color: const Color(0xFF25D366), // WhatsApp Green
-                    textColor: Colors.white,
-                    isLoading: controller.isSharing.value,
-                    onTap: () => controller.promptAndShare(context, product),
-                  ),
+              // 4. UNIVERSAL (More)
+              Obx(
+                () => _buildSocialIcon(
+                  icon: Icons.share,
+                  color: Colors.black87,
+                  isLoading: controller.isSharing.value,
+                  onTap: () => controller.promptAndShare(context, product),
+                ),
+              ),
+
+              const SizedBox(width: 10),
+              Obx(
+                () => _buildSocialIcon(
+                  icon: Icons.message_rounded,
+                  color: const Color.fromARGB(255, 24, 242, 35), // FB Blue
+                  isLoading: controller.isSharing.value,
+                  onTap: () => controller.promptAndShare(context, product),
                 ),
               ),
 
@@ -144,16 +148,6 @@ class ResellerToolsBox extends StatelessWidget {
               ),
 
               const SizedBox(width: 10),
-
-              // 4. UNIVERSAL (More)
-              Obx(
-                () => _buildSocialIcon(
-                  icon: Iconsax.share,
-                  color: Colors.black87,
-                  isLoading: controller.isSharing.value,
-                  onTap: () => controller.promptAndShare(context, product),
-                ),
-              ),
             ],
           ),
         ],
@@ -218,60 +212,6 @@ class ResellerToolsBox extends StatelessWidget {
   }
 
   // --- HELPER 2: BIG COLORED SOCIAL BUTTON (WhatsApp) ---
-  Widget _buildSocialButton({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required Color textColor,
-    required VoidCallback onTap,
-    bool isLoading = false,
-  }) {
-    return InkWell(
-      onTap: isLoading ? null : onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: isLoading
-            ? const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: textColor, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
 
   // --- HELPER 3: SMALL CIRCULAR SOCIAL ICON ---
   Widget _buildSocialIcon({

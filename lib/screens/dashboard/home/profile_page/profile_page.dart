@@ -560,7 +560,7 @@ class _ProfilePageState extends State<ProfilePage> {
             "Wishlist",
             () => Get.to(() => WishlistScreen()),
           ),
-          _gridItem(Iconsax.global, "Language", _showLanguageSheet),
+          _gridItem(Iconsax.language_circle, "Language", _showLanguageSheet),
         ],
       ),
     );

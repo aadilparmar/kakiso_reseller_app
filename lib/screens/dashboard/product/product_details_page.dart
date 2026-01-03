@@ -131,8 +131,7 @@ class ProductDetailsPage extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     // Keywords / Tags
-                    if (product.keywords.isNotEmpty) _buildKeywordsSection(),
-
+                    // if (product.keywords.isNotEmpty) _buildKeywordsSection(),
                     const SizedBox(height: 24),
 
                     // Reseller Tools (Download, Share)
@@ -198,7 +197,7 @@ class ProductDetailsPage extends StatelessWidget {
   // ===========================================================================
   Widget _buildSpecsSection() {
     final Map<String, String?> data = {
-      'User SKU': product.userSku,
+      "Product Id": product.id.toString(),
       'Unique Code': product.uniqueCode,
       'HSN Code': product.hsnCode,
       'GST Rate': product.gst != null ? '${product.gst}%' : null,
@@ -543,40 +542,40 @@ class ProductDetailsPage extends StatelessWidget {
   // ===========================================================================
   // 🔹 WIDGET: KEYWORDS / TAGS
   // ===========================================================================
-  Widget _buildKeywordsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Tags / Keywords",
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: product.keywords.map((tag) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Text(
-                "#$tag",
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
+  // Widget _buildKeywordsSection() {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       const Text(
+  //         "Tags / Keywords",
+  //         style: TextStyle(
+  //           fontSize: 14,
+  //           fontWeight: FontWeight.w600,
+  //           color: Colors.grey,
+  //         ),
+  //       ),
+  //       const SizedBox(height: 8),
+  //       Wrap(
+  //         spacing: 8,
+  //         runSpacing: 8,
+  //         children: product.keywords.map((tag) {
+  //           return Container(
+  //             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+  //             decoration: BoxDecoration(
+  //               color: Colors.grey.shade50,
+  //               borderRadius: BorderRadius.circular(20),
+  //               border: Border.all(color: Colors.grey.shade200),
+  //             ),
+  //             child: Text(
+  //               "#$tag",
+  //               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+  //             ),
+  //           );
+  //         }).toList(),
+  //       ),
+  //     ],
+  //   );
+  // }
 
   // ===========================================================================
   // 🔹 HELPER: ADD TO CATALOGUE

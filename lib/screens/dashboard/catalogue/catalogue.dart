@@ -706,68 +706,123 @@ class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
     Get.showOverlay(
       asyncFunction: () async {
         try {
+          // 1. COMPREHENSIVE HEADERS (42 Fields)
           List<String> headers = [
-            "Handle",
-            "Title",
-            "Body (HTML)",
-            "Vendor",
+            "ID",
+            "Name",
             "Type",
-            "Tags",
-            "Option1 Name",
-            "Option1 Value",
-            "Variant Price",
-            "Variant Compare At Price",
-            "Image Src",
-            "Image Alt Text",
-            "Status",
+            "SKU",
+            "Regular Price",
+            "Sale Price",
+            "Discount %",
+            "Stock Status",
+            "Categories (IDs)",
+            "Brand Name",
+            "Brand Logo",
+            "Short Description",
+            "Description",
+            "All Images",
+            "Main Image",
+            "HSN Code",
+            "GST",
+            "Unique Code",
+            "EAN Barcode",
+            "Shipping Fee",
+            "Country of Origin",
+            "Manufactured By",
+            "Imported By",
+            "Marketed By",
+            "Dispatch Time",
+            "Package Includes",
+            "Length",
+            "Width",
+            "Height",
+            "Weight",
+            "Gross Weight",
+            "Item Length",
+            "Item Width",
+            "Item Height",
+            "Item Weight",
+            "Net Contents",
+            "Highlights",
+            "Care Instructions",
+            "Disclaimer",
+            "Warranty",
+            "Keywords",
+            "Attributes",
           ];
 
           String csvContent = "${headers.join(",")}\n";
 
           for (var p in cat.products) {
+            // Price Calculation with Margin applied to Sale Price
             double basePrice = double.tryParse(p.price) ?? 0;
             double finalPrice = basePrice * (1 + marginPercent / 100);
-            double regularPrice = double.tryParse(p.regularPrice) ?? 0;
 
-            String handle = p.name.toLowerCase().replaceAll(
-              RegExp(r'[^a-z0-9]+'),
-              '-',
-            );
-            String description = p.description.replaceAll(
-              RegExp(r'<[^>]*>'),
-              '',
-            );
-            String vendor = p.brandName ?? "Reseller";
-            String tags =
-                "Reseller App, ${p.attributes.map((c) => c.name).join(',')}";
+            // Attribute Formatting: Name:[Option1/Option2]
+            String attrString = p.attributes
+                .map((a) => "${a.name}:[${a.options.join('/')}]")
+                .join(" | ");
 
+            // 2. DATA MAPPING (Aligning with Catalog Builder Engine)
             List<String> row = [
-              handle,
+              p.id.toString(),
               _escapeCsv(p.name),
-              _escapeCsv(description),
-              _escapeCsv(vendor),
-              "Product",
-              _escapeCsv(tags),
-              "Title",
-              "Default Title",
-              finalPrice.toStringAsFixed(2),
-              regularPrice > 0 ? regularPrice.toStringAsFixed(2) : "",
-              _escapeCsv(p.image),
-              _escapeCsv(p.name),
+              "simple",
+              _escapeCsv(p.userSku ?? ""),
+              p.regularPrice,
+              finalPrice.toStringAsFixed(2), // Margin applied
+              p.discountPercentage?.toString() ?? "0",
               "active",
+              p.categoryIds.join("|"),
+              _escapeCsv(p.brandName ?? ""),
+              _escapeCsv(p.brandLogoUrl ?? ""),
+              _escapeCsv(p.shortDescription),
+              _escapeCsv(p.description),
+              _escapeCsv(p.images.join("|")),
+              _escapeCsv(p.image),
+              _escapeCsv(p.hsnCode ?? ""),
+              _escapeCsv(p.gst ?? ""),
+              _escapeCsv(p.uniqueCode ?? ""),
+              _escapeCsv(p.eanBarcode ?? ""),
+              _escapeCsv(p.shippingFee ?? ""),
+              _escapeCsv(p.countryOfOrigin ?? ""),
+              _escapeCsv(p.manufacturedBy ?? ""),
+              _escapeCsv(p.importedBy ?? ""),
+              _escapeCsv(p.marketedBy ?? ""),
+              _escapeCsv(p.dispatchTime ?? ""),
+              _escapeCsv(p.packageIncludes ?? ""),
+              _escapeCsv(p.length ?? ""),
+              _escapeCsv(p.width ?? ""),
+              _escapeCsv(p.height ?? ""),
+              _escapeCsv(p.weight ?? ""),
+              _escapeCsv(p.packageGrossWeight ?? ""),
+              _escapeCsv(p.itemLength ?? ""),
+              _escapeCsv(p.itemWidth ?? ""),
+              _escapeCsv(p.itemHeight ?? ""),
+              _escapeCsv(p.itemWeight ?? ""),
+              _escapeCsv(p.netContents ?? ""),
+              _escapeCsv(p.highlights ?? ""),
+              _escapeCsv(p.careInstruction ?? ""),
+              _escapeCsv(p.disclaimer ?? ""),
+              _escapeCsv(p.warranty ?? ""),
+              _escapeCsv(p.keywords.join(",")),
+              _escapeCsv(attrString),
             ];
+
             csvContent += "${row.join(",")}\n";
           }
 
           final directory = await getTemporaryDirectory();
-          final path =
-              "${directory.path}/${cat.name.replaceAll(' ', '_')}_Export.csv";
+          final fileName =
+              "Catalog_${cat.name.replaceAll(' ', '_')}_Export.csv";
+          final path = "${directory.path}/$fileName";
           final file = File(path);
           await file.writeAsString(csvContent);
 
           await Share.shareXFiles([
             XFile(path),
-          ], text: "Here is your product CSV.");
+          ], text: "Comprehensive CSV Export for Catalog: ${cat.name}");
         } catch (e) {
           Get.snackbar(
             "Error",
