@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 class MySubscriptionPage extends StatefulWidget {
   const MySubscriptionPage({super.key});
@@ -10,228 +9,435 @@ class MySubscriptionPage extends StatefulWidget {
 }
 
 class _MySubscriptionPageState extends State<MySubscriptionPage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+    with TickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late AnimationController _slideController;
+  late Animation<double> _pulseAnimation;
+  late List<Animation<Offset>> _slideAnimations;
 
   @override
   void initState() {
     super.initState();
-    // Animation for the card to "pop" in
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    _scaleAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
+
+    _slideAnimations = List.generate(
+      6,
+      (index) =>
+          Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+            CurvedAnimation(
+              parent: _slideController,
+              curve: Interval(
+                index * 0.12,
+                0.5 + (index * 0.12),
+                curve: Curves.easeOutCubic,
+              ),
+            ),
+          ),
     );
-    _controller.forward();
+
+    _slideController.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pulseController.dispose();
+    _slideController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6), // Very light grey bg
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const AutoTranslate(
-          child: Text(
-            "My Subscription",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.arrow_back,
               color: Colors.black87,
+              size: 20,
             ),
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Text(
+          "My Subscription",
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: true,
       ),
-      // Allows the body to scroll behind the app bar if needed,
-      // but we keep it simple here.
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-            // ─── 1. HERO SECTION WITH ANIMATED BLACK CARD ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: _buildPremiumCard(),
+            // PROMOTIONAL BANNER
+            SlideTransition(
+              position: _slideAnimations[0],
+              child: FadeTransition(
+                opacity: _slideController,
+                child: _buildPromoBanner(),
               ),
             ),
 
-            const SizedBox(height: 25),
+            const SizedBox(height: 16),
 
-            // ─── 2. REBATE TICKET (Crucial Requirement) ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _buildRebateTicket(),
+            // Hero card
+            SlideTransition(
+              position: _slideAnimations[1],
+              child: FadeTransition(
+                opacity: _slideController,
+                child: _buildHeroCard(),
+              ),
             ),
 
-            const SizedBox(height: 25),
+            const SizedBox(height: 20),
 
-            // ─── 3. VALUE PROPOSITION (Feature List) ───
-            Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
+            // VALUE SAVED CARD
+            SlideTransition(
+              position: _slideAnimations[2],
+              child: FadeTransition(
+                opacity: _slideController,
+                child: _buildValueSavedCard(),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Stats cards
+            SlideTransition(
+              position: _slideAnimations[3],
+              child: FadeTransition(
+                opacity: _slideController,
+                child: _buildStatsRow(),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Features
+            SlideTransition(
+              position: _slideAnimations[4],
+              child: FadeTransition(
+                opacity: _slideController,
+                child: _buildFeaturesSection(),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // FAQ
+            SlideTransition(
+              position: _slideAnimations[5],
+              child: FadeTransition(
+                opacity: _slideController,
+                child: _buildFaqSection(),
+              ),
+            ),
+
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPromoBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ScaleTransition(
+        scale: _pulseAnimation,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF6B6B).withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  shape: BoxShape.circle,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, -5),
+                child: const Icon(Iconsax.gift, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "🎉 LIMITED TIME OFFER",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      "100% Promotional Rebate Active",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  "ACTIVE",
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFF6B6B),
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroCard() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF667eea).withOpacity(0.4),
+              blurRadius: 25,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Iconsax.crown_1, color: Color(0xFFFFD700), size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        "PRO",
+                        style: TextStyle(
+                          color: Color(0xFF667eea),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Iconsax.verify5,
+                    color: Color(0xFF4ADE80),
+                    size: 22,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              "KaKiSo PRO",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 36,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 0.5,
+                shadows: [
+                  Shadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(24),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              "Premium Access • Unlimited Everything",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
+              ),
+            ),
+
+            const SizedBox(height: 28),
+
+            // PRICING EMPHASIS
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(10),
-                        ),
-                      ),
+                  const Text(
+                    "Regular Price",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 20),
-
+                  const SizedBox(height: 4),
+                  const Text(
+                    "₹1999 / month",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 24,
+                      color: Colors.white,
+                      decoration: TextDecoration.lineThrough,
+                      decorationThickness: 3,
+                      decorationColor: Colors.white70,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Icon(
-                        Iconsax.star1,
-                        color: Color(0xFFFFD700),
-                        size: 24,
-                      ),
-                      const SizedBox(width: 10),
-                      const AutoTranslate(
-                        child: Text(
-                          "Plan Benefits",
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const Text(
+                        "You Pay:",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 20,
+                          vertical: 10,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const AutoTranslate(
-                          child: Text(
-                            "ALL ACTIVE",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: const Text(
+                          "₹0",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF4ADE80),
+                            letterSpacing: 1,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-
-                  _buildFeatureRow(
-                    Iconsax.box,
-                    "Smart Cataloging",
-                    "Unlimited",
-                    true,
-                  ),
-                  _buildFeatureRow(
-                    Iconsax.global,
-                    "Global Reselling",
-                    "Enabled",
-                    true,
-                  ),
-                  _buildFeatureRow(
-                    Iconsax.chart_2,
-                    "Advance Margin Calculator",
-                    "Advanced",
-                    true,
-                  ),
-                  _buildFeatureRow(
-                    Iconsax.message,
-                    "Auto-WhatsApp",
-                    "One-Click",
-                    true,
-                  ),
-                  _buildFeatureRow(
-                    Iconsax.shop,
-                    "Store Builder",
-                    "Beta Access",
-                    true,
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // ─── 4. FAQ / REASSURANCE ───
-                  const AutoTranslate(
-                    child: Text(
-                      "Frequently Asked",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildFaqItem(
-                    "Will I be charged later?",
-                    "No, you will be notified well in advance before any pricing changes.",
-                  ),
-                  _buildFaqItem(
-                    "Is there a hidden fee?",
-                    "Zero. You keep 100% of your profits.",
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // Footer Text
-                  const Center(
-                    child: AutoTranslate(
-                      child: Text(
-                        "Subscription ID: KKS-PRO-2025-FREE",
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                          fontFamily: 'Courier',
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -241,151 +447,102 @@ class _MySubscriptionPageState extends State<MySubscriptionPage>
     );
   }
 
-  // ─── WIDGET BUILDERS ───
-
-  Widget _buildPremiumCard() {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF1c1c1c),
-            Color(0xFF383838),
-          ], // Matte Black Gradient
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+  Widget _buildValueSavedCard() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF4ADE80).withOpacity(0.15),
+              const Color(0xFF22C55E).withOpacity(0.15),
+            ],
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Background Decor
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              height: 150,
-              width: 150,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF4ADE80), width: 2),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Iconsax.ticket_discount,
+              color: Color(0xFF16A34A),
+              size: 40,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "You're Saving",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF16A34A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "₹1,999",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 42,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF16A34A),
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Every Single Month!",
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF16A34A),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFFFD700).withOpacity(0.2),
-                    Colors.transparent,
-                  ],
+                color: const Color(0xFF4ADE80).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                "💰 Thanks to our promotional rebate program",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF166534),
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatCard(
+              "Subscription Value",
+              "₹1,999/mo",
+              Iconsax.dollar_circle,
+              Colors.orange,
+            ),
           ),
-
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Iconsax.crown_1,
-                            color: Color(0xFFFFD700),
-                            size: 14,
-                          ),
-                          SizedBox(width: 6),
-                          AutoTranslate(
-                            child: Text(
-                              "PRO TIER",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Iconsax.verify5,
-                      color: Colors.greenAccent,
-                      size: 24,
-                    ),
-                  ],
-                ),
-
-                const Spacer(),
-
-                // Plan Name
-                const AutoTranslate(
-                  child: Text(
-                    "KaKiSo PRO",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Price Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      "₹1999",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 16,
-                        color: Colors.grey,
-                        decoration: TextDecoration.lineThrough,
-                        decorationColor: Colors.redAccent,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Color(0xFFFFD700), Color(0xFFFFE082)],
-                      ).createShader(bounds),
-                      child: const Text(
-                        "FREE",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                          height: 1.0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                ),
-              ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildStatCard(
+              "Your Payment",
+              "₹0/mo",
+              Iconsax.ticket_discount,
+              Colors.green,
             ),
           ),
         ],
@@ -393,48 +550,299 @@ class _MySubscriptionPageState extends State<MySubscriptionPage>
     );
   }
 
-  Widget _buildRebateTicket() {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1), // Amber 50
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFFFD54F),
-          width: 1,
-        ), // Amber 200
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 4.0),
-            child: Icon(Iconsax.ticket, color: Color(0xFFFFA000), size: 24),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 11,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: color == Colors.green
+                  ? const Color(0xFF16A34A)
+                  : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturesSection() {
+    final features = [
+      (
+        "Smart Cataloging",
+        Iconsax.box,
+        "Unlimited products",
+        Colors.blue,
+        "Worth ₹499/mo",
+      ),
+      (
+        "Global Reselling",
+        Iconsax.global,
+        "Worldwide access",
+        Colors.green,
+        "Worth ₹399/mo",
+      ),
+      (
+        "Margin Calculator",
+        Iconsax.chart_2,
+        "Advanced tools",
+        Colors.orange,
+        "Worth ₹299/mo",
+      ),
+      (
+        "Auto-WhatsApp",
+        Iconsax.message,
+        "One-click share",
+        Colors.teal,
+        "Worth ₹399/mo",
+      ),
+      (
+        "Store Builder",
+        Iconsax.shop,
+        "Beta access",
+        Colors.purple,
+        "Worth ₹399/mo",
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Iconsax.star1, color: Color(0xFFFFD700), size: 26),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    "Premium Features",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    "ALL FREE",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF16A34A),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            ...features.map(
+              (feature) => _buildFeatureItem(
+                feature.$1,
+                feature.$2,
+                feature.$3,
+                feature.$4,
+                feature.$5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem(
+    String title,
+    IconData icon,
+    String subtitle,
+    Color color,
+    String value,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const AutoTranslate(
-                  child: Text(
-                    "100% Fee Rebate Applied",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFE65100),
-                      fontSize: 14,
-                    ),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 6),
-                const AutoTranslate(
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    color: Color(0xFF16A34A),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Iconsax.tick_circle5,
+              color: Colors.green,
+              size: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFaqSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Important Information",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildFaqItem(
+            "How long is this rebate valid?",
+            "The promotional rebate is currently active for all users. We'll notify you well in advance if there are any changes to the program.",
+          ),
+          const SizedBox(height: 12),
+          _buildFaqItem(
+            "Will I be charged when the promotion ends?",
+            "Absolutely not. You'll receive advance notification before any pricing changes. We'll never charge you without your explicit consent.",
+          ),
+          const SizedBox(height: 12),
+          _buildFaqItem(
+            "What happens to my data if I'm charged later?",
+            "Your data and features remain yours forever. You'll have the option to continue with paid access or export everything.",
+          ),
+          const SizedBox(height: 24),
+
+          // Info Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue[50]!, Colors.purple[50]!],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Iconsax.info_circle, color: Colors.blue[700], size: 28),
+                const SizedBox(width: 16),
+                const Expanded(
                   child: Text(
-                    "KaKiSo is offering a promotional rebate on all subscription/transaction charges. This is subject to change in the future.",
+                    "This is a genuine promotional offer. No credit card required. No hidden fees. Cancel anytime.",
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 12,
-                      color: Color(0xFF5D4037),
+                      color: Color(0xFF1E40AF),
+                      fontWeight: FontWeight.w600,
                       height: 1.5,
                     ),
                   ),
@@ -442,61 +850,23 @@ class _MySubscriptionPageState extends State<MySubscriptionPage>
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildFeatureRow(
-    IconData icon,
-    String title,
-    String value,
-    bool active,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: active ? const Color(0xFFE3F2FD) : Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: active ? const Color(0xFF1565C0) : Colors.grey,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: AutoTranslate(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: active ? Colors.black87 : Colors.grey,
-                ),
+          const SizedBox(height: 20),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(20),
               ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: active ? Colors.green.shade50 : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: AutoTranslate(
               child: Text(
-                value,
+                "Subscription ID: KKS-PRO-2025-FREE",
                 style: TextStyle(
-                  fontFamily: 'Poppins',
+                  fontFamily: 'Courier',
                   fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: active ? Colors.green.shade700 : Colors.grey,
+                  color: Colors.grey[600],
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -507,42 +877,53 @@ class _MySubscriptionPageState extends State<MySubscriptionPage>
   }
 
   Widget _buildFaqItem(String question, String answer) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        collapsedIconColor: Colors.grey,
-        iconColor: Colors.black87,
-        title: AutoTranslate(
-          child: Text(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+          iconColor: const Color(0xFF667eea),
+          collapsedIconColor: Colors.grey[600],
+          title: Text(
             question,
             style: const TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
           ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AutoTranslate(
-                child: Text(
-                  answer,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12.5,
-                    color: Colors.grey.shade600,
-                    height: 1.5,
-                  ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+              child: Text(
+                answer,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                  height: 1.5,
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
