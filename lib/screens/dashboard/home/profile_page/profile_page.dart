@@ -1,5 +1,6 @@
+// lib/screens/dashboard/home/profile_page/profile_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
@@ -7,7 +8,10 @@ import 'package:flutter_auto_translate/flutter_auto_translate.dart';
 
 // MODELS & SERVICES
 import 'package:kakiso_reseller_app/models/user.dart';
+import 'package:kakiso_reseller_app/screens/authentication/signup/privacy_policy.dart';
+import 'package:kakiso_reseller_app/screens/authentication/signup/terms_and_condition.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/notification/notification.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/my_subscription_page.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
@@ -26,8 +30,6 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/about_ka
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/faq_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/bank_upi_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/rate_kakiso_page.dart';
-
-// --- 🔔 NOTIFICATION SCREEN IMPORT ---
 
 const Color kPrimaryColor = Color(0xFF2563EB);
 const Color kBgColor = Color(0xFFF1F3F6);
@@ -55,6 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void _showLanguageSheet() {
     Get.bottomSheet(
       Container(
+        height: Get.height * 0.85, // Set height to avoid cramping
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -89,15 +92,27 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const Divider(),
               Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildLangOption("English", "en", "A"),
-                      _buildLangOption("Hindi", "hi", "अ"),
-                      _buildLangOption("Punjabi", "pa", "ੳ"),
-                      _buildLangOption("Gujarati", "gu", "અ"),
-                    ],
-                  ),
+                child: ListView(
+                  // Changed to ListView for better scrolling
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    // Existing
+                    _buildLangOption("English", "en", "A"),
+                    _buildLangOption("Hindi (हिंदी)", "hi", "अ"),
+                    _buildLangOption("Punjabi (ਪੰਜਾਬੀ)", "pa", "ੳ"),
+                    _buildLangOption("Gujarati (ગુજરાતી)", "gu", "અ"),
+
+                    // Added Languages
+                    _buildLangOption("Marathi (मराठी)", "mr", "म"),
+                    _buildLangOption("Bengali (বাংলা)", "bn", "ব"),
+                    _buildLangOption("Kannada (ಕನ್ನಡ)", "kn", "ಕ"),
+                    _buildLangOption("Tamil (தமிழ்)", "ta", "த"),
+                    _buildLangOption("Malayalam (മലയാളം)", "ml", "മ"),
+                    _buildLangOption("Telugu (తెలుగు)", "te", "త"),
+                    _buildLangOption("Odia (ଓଡିଆ)", "or", "ଅ"),
+                    _buildLangOption("Assamese (অসমীয়া)", "as", "অ"),
+                    _buildLangOption("Urdu (اردو)", "ur", "ا"),
+                  ],
                 ),
               ),
               const SizedBox(height: 10),
@@ -267,7 +282,7 @@ class _ProfilePageState extends State<ProfilePage> {
           titleSpacing: 20,
           title: const AutoTranslate(
             child: Text(
-              "Account",
+              "My Account",
               style: TextStyle(
                 color: kTextPrimary,
                 fontFamily: 'Poppins',
@@ -314,7 +329,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         _buildListContainer([
                           _buildListItem(
                             icon: Iconsax.location,
-                            title: "My Addresses",
+                            title: "Customer Addresses",
                             onTap: () => Get.to(
                               () => CustomerAddressPage(
                                 userData: widget.userData,
@@ -345,6 +360,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             subtitle: "Add details for payouts",
                             onTap: () => Get.to(() => const BankUpiPage()),
                           ),
+                          _buildListItem(
+                            icon: Iconsax.bank,
+                            title: "My Subscriptions",
+                            subtitle: "Add details for payouts",
+                            onTap: () =>
+                                Get.to(() => const MySubscriptionPage()),
+                          ),
                         ]),
 
                         const SizedBox(height: 12),
@@ -373,6 +395,18 @@ class _ProfilePageState extends State<ProfilePage> {
                             icon: Iconsax.info_circle,
                             title: "About KaKiSo",
                             onTap: () => Get.to(() => const AboutKakisoPage()),
+                          ),
+                          // --- NEW LEGAL LINKS ADDED HERE ---
+                          _buildListItem(
+                            icon: Iconsax.security_safe,
+                            title: "Privacy Notice",
+                            onTap: () =>
+                                Get.to(() => const PrivacyPolicyPage()),
+                          ),
+                          _buildListItem(
+                            icon: Iconsax.document_text,
+                            title: "Terms & Conditions of Use",
+                            onTap: () => Get.to(() => const TermsOfUsePage()),
                           ),
                         ]),
 

@@ -655,7 +655,8 @@ class _RegisterPageState extends State<RegisterPage>
                                                 text: 'I agree to KaKiSo’s ',
                                               ),
                                               TextSpan(
-                                                text: 'Terms & Conditions',
+                                                text:
+                                                    'Terms & Conditions of Use',
                                                 style: const TextStyle(
                                                   color: kPrimaryDeep,
                                                   fontWeight: FontWeight.w600,

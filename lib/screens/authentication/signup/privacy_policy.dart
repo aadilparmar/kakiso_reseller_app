@@ -16,81 +16,50 @@ class PrivacyPolicyPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: const Text(
           '''
-PRIVACY POLICY – KAKISO RESELLERS
-Effective Date: 15 December 2025
+PRIVACY STATEMENT FOR KAKISO RESELLERS
+Effective Date: December 15, 2025
 
-KaKiSo Private Limited is committed to protecting your privacy and complies with Indian data protection laws.
-
-──────────────────────────────
-1. INFORMATION WE COLLECT
-
-• Name, phone number, email
-• Business and shipping address
-• Order and transaction details
+KaKiSo Private Limited ("we," "us," or "our"), located at Fortune 5, Sardarnagar West Street 1, Rajkot, Gujarat - 360001, is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and share your data through the KaKiSo mobile application and our secure infrastructure.
 
 ──────────────────────────────
-2. APP PERMISSIONS
+1. INFORMATION COLLECTION AND USE
 
-• Contacts: Used locally for sharing catalogs
-• Storage: Used for saving images and PDFs
+We collect information to provide and improve our dropshipping and reselling services:
 
-──────────────────────────────
-3. HOW DATA IS USED
-
-• Account management
-• Order fulfillment
-• Payments and payouts
-• Legal compliance
+• Personal Identifiers: Name, email address, phone number, and shipping addresses.
+• Transaction & Payment Data: We use Razorpay to process payments. While we collect payment details to facilitate orders, sensitive financial data is processed securely by Razorpay in compliance with RBI regulations.
+• Sensitive Permissions:
+  - Contacts: Accessed locally only on your device to facilitate sharing product listings with your network. We do not upload your contact list to our servers.
+  - Gallery: Used to allow you to upload images for listings and download product catalogs/PDFs to your device.
 
 ──────────────────────────────
-4. DATA SHARING
+2. DATA SHARING AND INFRASTRUCTURE
 
-• Suppliers (limited order data)
-• Logistics partners
-• Razorpay (payments)
-• AWS (secure hosting)
+We share data only as necessary to fulfill your orders and business needs:
 
-KaKiSo does not sell user data.
-
-──────────────────────────────
-5. DATA SECURITY
-
-• HTTPS encryption
-• Secure AWS infrastructure
-• Access control mechanisms
+• Suppliers: We share reseller and customer details (Name, Address, Phone) with suppliers via packing slips for item preparation.
+• Courier Partners: Shipping details are shared with delivery partners to ensure successful transit of goods.
+• Infrastructure (AWS): Our services are hosted on Amazon Web Services (AWS). While AWS provides the infrastructure to store your data securely, they do not "use" your data for any other purpose.
+• Meta Platforms: We provide tools for you to share listings directly to Facebook, WhatsApp, and Instagram.
 
 ──────────────────────────────
-6. DATA RETENTION
+3. DATA RETENTION AND DELETION
 
-• While account is active
-• Up to 10 years for legal compliance
-
-──────────────────────────────
-7. ACCOUNT DELETION
-
-Request via:
-• App settings, or
-• Email: info@kakiso.com
-
-Processing time: 7–14 business days.
+• Retention: We retain your data as long as your account is active. To comply with Indian tax and regulatory requirements, certain transaction data is stored for a minimum of 10 years.
+• Deletion: You may request data deletion through the App Settings (Clear Data) or by contacting us at info@kakiso.com. We will process deletion requests within 30 days, except for data we are legally required to retain.
 
 ──────────────────────────────
-8. CHILDREN’S PRIVACY
+4. SECURITY
 
-Only users aged 18+ are permitted.
-
-──────────────────────────────
-9. POLICY UPDATES
-
-Changes will be reflected by updated dates.
+We utilize the high-tier security features of AWS to protect your information. All data transmitted between your device and our servers is encrypted in transit via HTTPS.
 
 ──────────────────────────────
-CONTACT
+5. GRIEVANCE OFFICER
+
+In accordance with the Information Technology Act and DPDP Rules, if you have any concerns or grievances, please contact our Grievance Officer:
 
 Email: info@kakiso.com
-Address: Fortune 5, Sardarnagar West Street 1, Rajkot, Gujarat – 360001
-
-This policy is accessible without login.
+Address: KaKiSo Private Limited, Fortune 5, Sardarnagar West Street 1, Rajkot, Gujarat - 360001.
           ''',
           style: TextStyle(
             fontFamily: 'Poppins',

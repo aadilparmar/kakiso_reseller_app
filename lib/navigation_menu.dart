@@ -194,7 +194,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
                 icon: _buildIcon(
                   Iconsax.profile_circle,
                   Iconsax.tag_user,
-                  'Profile',
+                  'My Account',
                   4,
                   controller.selectedIndex.value,
                   itemWidth,
