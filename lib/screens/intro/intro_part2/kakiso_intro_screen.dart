@@ -30,6 +30,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
   // Controllers
   late PageController _pageController;
   late AnimationController _bgAnimationController;
+  late AnimationController _shimmerController;
 
   // State
   double _currentPageValue = 0.0;
@@ -42,6 +43,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
           "Join 22,000+ Indian ReSellers already registered with KaKiSo's exclusive product supplier network. No inventory, No risk.",
       icon: Iconsax.shop,
       accentIcon: Iconsax.graph,
+      type: _CardType.normal,
     ),
     _IntroItem(
       title: "Share Catalogs, Zero Investment, More Profits.",
@@ -49,6 +51,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
           "Share professional, white-labeled catalogs directly to your WhatsApp, Instagram, Facebook, Website, etc.",
       icon: Iconsax.share,
       accentIcon: Iconsax.money_3,
+      type: _CardType.normal,
     ),
     _IntroItem(
       title: "Total business control, Ready to earn on your terms",
@@ -56,13 +59,29 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
           "Set your own margins, run business at your own convenience, focus on unlimited growth.",
       icon: Iconsax.box,
       accentIcon: Iconsax.receipt_2,
+      type: _CardType.normal,
+    ),
+    _IntroItem(
+      title: "Business Pro Features - Absolutely FREE",
+      subtitle:
+          "₹2,999/month worth of premium features at ZERO cost. Limited time promotional offer!",
+      icon: Iconsax.crown,
+      accentIcon: Iconsax.verify,
+      type: _CardType.subscription,
+      subscriptionFeatures: [
+        "VIP Wholesale Pricing (15% OFF)",
+        "Next-Day Dispatch Guarantee",
+        "UNLIMITED AI Background Tools",
+        "Auto-Bot Bulk WhatsApp Sharing",
+        "Smart Auto-Translate (All Langs)",
+        "Dedicated Personal Manager",
+      ],
     ),
   ];
 
   @override
   void initState() {
     super.initState();
-    // viewportFraction < 1.0 allows seeing the next card peaking in
     _pageController = PageController(viewportFraction: 0.85);
     _pageController.addListener(() {
       setState(() {
@@ -74,18 +93,44 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
+
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _bgAnimationController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
   // ─────────────────────────────────────────────────────────────
   //  NAVIGATION LOGIC
   // ─────────────────────────────────────────────────────────────
+
+  // Logic for the Top Right Button (Skip / Get Started)
+  void _handleHeaderAction() {
+    final int lastPageIndex = _pages.length - 1;
+    final int currentIndex = _currentPageValue.round();
+
+    if (currentIndex < lastPageIndex) {
+      // SKIP: Animate to the last page (Subscription Card)
+      HapticFeedback.selectionClick();
+      _pageController.animateToPage(
+        lastPageIndex,
+        duration: const Duration(milliseconds: 1000),
+        curve: Curves.easeOutQuart,
+      );
+    } else {
+      // GET STARTED: Go to register
+      _goToRegister();
+    }
+  }
+
   void _goToNext() {
     HapticFeedback.lightImpact();
     if (_currentPageValue < _pages.length - 1) {
@@ -99,7 +144,8 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
   }
 
   void _goToRegister() {
-    Get.off(
+    HapticFeedback.mediumImpact();
+    Get.to(
       () => const RegisterPage(),
       transition: Transition.rightToLeftWithFade,
       duration: const Duration(milliseconds: 500),
@@ -122,7 +168,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
     final int activeIndex = _currentPageValue.round();
     final Size screenSize = MediaQuery.of(context).size;
 
-    // Dynamic height calculation to prevent overflow on small screens
+    // Dynamic height calculation
     final double carouselHeight = (screenSize.height * 0.55).clamp(
       400.0,
       500.0,
@@ -142,7 +188,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
                 children: [
                   const SizedBox(height: 16),
 
-                  // --- HEADER ---
+                  // --- HEADER (Skip / Get Started) ---
                   _buildHeader(activeIndex),
 
                   const Spacer(),
@@ -182,7 +228,6 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
   // ─────────────────────────────────────────────────────────────
 
   Widget _buildAnimatedCard(int index, int activeIndex) {
-    // Calculate transformation values for "Scale & Fade" effect
     double scale = 1.0;
     double opacity = 1.0;
 
@@ -200,7 +245,13 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
       scale: scale,
       child: Opacity(
         opacity: opacity,
-        child: _IntroCard(item: _pages[index], isActive: index == activeIndex),
+        child: _pages[index].type == _CardType.subscription
+            ? _SubscriptionCard(
+                item: _pages[index],
+                isActive: index == activeIndex,
+                shimmerAnimation: _shimmerController,
+              )
+            : _IntroCard(item: _pages[index], isActive: index == activeIndex),
       ),
     );
   }
@@ -253,10 +304,9 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Logo Section
+          // Logo
           Row(
             children: [
-              // Invisible placeholder to align logo if needed
               const SizedBox(height: 36, width: 1),
               Image.asset('assets/logos/login-logo.png', height: 36),
             ],
@@ -273,7 +323,8 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
             },
             child: TextButton(
               key: ValueKey<bool>(isLastPage),
-              onPressed: _goToRegister,
+              onPressed:
+                  _handleHeaderAction, // UPDATED: Handles Skip -> Scroll behavior
               style: TextButton.styleFrom(
                 foregroundColor: isLastPage ? kPrimaryDeep : Colors.black54,
                 splashFactory: NoSplash.splashFactory,
@@ -318,7 +369,6 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
         children: [
-          // Primary Action Button
           _BouncyButton(
             onPressed: activeIndex == _pages.length - 1
                 ? _goToRegister
@@ -373,10 +423,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Disclaimer Text
           Text(
             "KaKiSo is offering a promotional rebate on all subscription/transaction charges. This is subject to change in the future.",
             textScaleFactor: 1.0,
@@ -389,10 +436,7 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
               height: 1.4,
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Secondary "Sign In" Link
           GestureDetector(
             onTap: _goToLogin,
             child: RichText(
@@ -439,7 +483,6 @@ class _BouncyButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onPressed;
   const _BouncyButton({required this.child, required this.onPressed});
-
   @override
   State<_BouncyButton> createState() => _BouncyButtonState();
 }
@@ -484,27 +527,35 @@ class _BouncyButtonState extends State<_BouncyButton>
 }
 
 // ─────────────────────────────────────────────────────────────
-//  INTRO CARD COMPONENT
+//  DATA MODELS
 // ─────────────────────────────────────────────────────────────
+
+enum _CardType { normal, subscription }
 
 class _IntroItem {
   final String title;
   final String subtitle;
   final IconData icon;
   final IconData accentIcon;
-
+  final _CardType type;
+  final List<String> subscriptionFeatures;
   const _IntroItem({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.accentIcon,
+    this.type = _CardType.normal,
+    this.subscriptionFeatures = const [],
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+//  NORMAL INTRO CARD
+// ─────────────────────────────────────────────────────────────
 
 class _IntroCard extends StatelessWidget {
   final _IntroItem item;
   final bool isActive;
-
   const _IntroCard({required this.item, required this.isActive});
 
   @override
@@ -531,7 +582,6 @@ class _IntroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         child: Stack(
           children: [
-            // Background Circles
             Positioned(
               top: -50,
               right: -50,
@@ -556,15 +606,12 @@ class _IntroCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Content
             Padding(
               padding: const EdgeInsets.all(32.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Icons Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -579,8 +626,6 @@ class _IntroCard extends StatelessWidget {
                         ),
                         child: Icon(item.icon, size: 32, color: Colors.white),
                       ),
-
-                      // Accent Icon
                       TweenAnimationBuilder(
                         tween: Tween<double>(begin: 0, end: isActive ? 1 : 0),
                         duration: const Duration(milliseconds: 500),
@@ -611,9 +656,7 @@ class _IntroCard extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  const Spacer(), // Pushes text to the bottom naturally
-                  // Text Content
+                  const Spacer(),
                   AnimatedOpacity(
                     duration: const Duration(milliseconds: 400),
                     opacity: isActive ? 1.0 : 0.6,
@@ -648,6 +691,274 @@ class _IntroCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  SUBSCRIPTION SHOWCASE CARD (4TH CARD)
+// ─────────────────────────────────────────────────────────────
+
+class _SubscriptionCard extends StatelessWidget {
+  final _IntroItem item;
+  final bool isActive;
+  final AnimationController shimmerAnimation;
+
+  const _SubscriptionCard({
+    required this.item,
+    required this.isActive,
+    required this.shimmerAnimation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 8, 10, 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFEA580C), // Orange from subscription page
+            Color(0xFFC2410C),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEA580C).withValues(alpha: 0.4),
+            blurRadius: 25,
+            offset: const Offset(0, 15),
+            spreadRadius: -3,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Stack(
+          children: [
+            // Animated shimmer effect
+            AnimatedBuilder(
+              animation: shimmerAnimation,
+              builder: (context, child) {
+                return Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        stops: [
+                          shimmerAnimation.value - 0.3,
+                          shimmerAnimation.value,
+                          shimmerAnimation.value + 0.3,
+                        ],
+                        colors: [
+                          Colors.transparent,
+                          Colors.white.withValues(alpha: 0.1),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // Background decorations
+            Positioned(
+              top: -50,
+              right: -50,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+              ),
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(28.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with crown and badge
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: const Icon(
+                          Iconsax.crown,
+                          size: 28,
+                          color: Colors.white,
+                        ),
+                      ),
+                      TweenAnimationBuilder(
+                        tween: Tween<double>(begin: 0, end: isActive ? 1 : 0),
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.elasticOut,
+                        builder: (context, double value, child) {
+                          return Transform.scale(
+                            scale: value,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                "FREE",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFEA580C),
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Title and subtitle
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 400),
+                    opacity: isActive ? 1.0 : 0.6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          textScaleFactor: 1.0,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: kFontFamily,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Text(
+                              "₹2,999/mo",
+                              style: TextStyle(
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: Colors.white.withValues(
+                                  alpha: 0.7,
+                                ),
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              "₹0",
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Features list
+                  Expanded(
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: item.subscriptionFeatures.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: TweenAnimationBuilder(
+                            tween: Tween<double>(
+                              begin: 0,
+                              end: isActive ? 1 : 0,
+                            ),
+                            duration: Duration(
+                              milliseconds: 400 + (index * 80),
+                            ),
+                            curve: Curves.easeOut,
+                            builder: (context, double value, child) {
+                              return Transform.translate(
+                                offset: Offset((1 - value) * -20, 0),
+                                child: Opacity(
+                                  opacity: value,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Iconsax.tick_circle,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          item.subscriptionFeatures[index],
+                                          textScaleFactor: 1.0,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontFamily: kFontFamily,
+                                            fontSize: 12,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w500,
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

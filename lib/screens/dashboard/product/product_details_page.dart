@@ -7,6 +7,7 @@ import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/widgets/price_calculator.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/widgets/similar_product_section.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 // --- WIDGET IMPORTS ---
@@ -33,7 +34,11 @@ class ProductDetailsPage extends StatelessWidget {
     // Initialize Product Controller
     final controller = Get.put(ProductDetailsController());
     controller.initialize(product);
-
+    // We use Get.put here to ensure it exists even if the user hasn't visited Wishlist yet
+    final recentlyViewed = Get.put(RecentlyViewedController());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      recentlyViewed.addToRecentlyViewed(product);
+    });
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(

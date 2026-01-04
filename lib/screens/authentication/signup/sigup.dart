@@ -13,6 +13,7 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/privacy_policy.dart';
 import 'package:kakiso_reseller_app/screens/authentication/signup/terms_and_condition.dart';
+import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -344,6 +345,14 @@ class _RegisterPageState extends State<RegisterPage>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            IconButton(
+                              onPressed: () =>
+                                  Get.offAll(() => const KakisoIntroScreen()),
+                              icon: const Icon(
+                                Iconsax.arrow_left_2,
+                                color: Colors.black54,
+                              ),
+                            ),
                             Image.asset(
                               'assets/logos/login-logo.png',
                               height: 40,

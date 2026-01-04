@@ -4,7 +4,10 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:http/http.dart' as http;
+import 'package:kakiso_reseller_app/controllers/shared_products_controller.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 
@@ -24,6 +27,7 @@ class CollageService {
     Color backgroundColor = Colors.white,
     File? backgroundImage,
   }) async {
+    Get.find<SharedProductsController>().logSharedProducts(products);
     // 1. Setup Pagination
     int itemsPerPage = 9;
     switch (layout) {

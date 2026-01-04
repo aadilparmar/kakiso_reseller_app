@@ -1,5 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:confetti/confetti.dart';
+import 'package:animate_do/animate_do.dart';
+import 'dart:ui';
+import 'dart:math';
+
+// --- DATA MODEL ---
+class SubscriptionPlan {
+  final String title;
+  final String subtitle;
+  final double price;
+  final double rebate;
+  final List<String> features;
+  final List<bool> availability;
+  final List<Color> gradient;
+  final Color shadowColor;
+  final bool isRecommended;
+  final String badgeText;
+
+  SubscriptionPlan({
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    required this.rebate,
+    required this.features,
+    required this.availability,
+    required this.gradient,
+    required this.shadowColor,
+    this.isRecommended = false,
+    this.badgeText = "",
+  });
+}
 
 class MySubscriptionPage extends StatefulWidget {
   const MySubscriptionPage({super.key});
@@ -10,920 +42,674 @@ class MySubscriptionPage extends StatefulWidget {
 
 class _MySubscriptionPageState extends State<MySubscriptionPage>
     with TickerProviderStateMixin {
+  late PageController _pageController;
+  late ConfettiController _confettiController;
+  late AnimationController _shimmerController;
   late AnimationController _pulseController;
-  late AnimationController _slideController;
-  late Animation<double> _pulseAnimation;
-  late List<Animation<Offset>> _slideAnimations;
+
+  // ignore: unused_field
+  int _currentIndex = 2;
+  double _pageValue = 2.0;
+  bool _showConfetti = false;
+
+  final List<SubscriptionPlan> _plans = [
+    SubscriptionPlan(
+      title: "Starter",
+      subtitle: "For hobbyists",
+      price: 499,
+      rebate: 499,
+      gradient: [const Color(0xFF94A3B8), const Color(0xFFCBD5E1)],
+      shadowColor: const Color(0xFF64748B),
+      features: [
+        "Browse Product Catalog",
+        "Standard Delivery (5-7 Days)",
+        "Manual Image Downloading",
+        "Manual WhatsApp Sharing",
+        "Community Support Only",
+        "Smart Auto-Translate",
+        "AI Background Remover",
+        "VIP Wholesale Prices",
+      ],
+      availability: [true, true, true, true, true, false, false, false],
+    ),
+    SubscriptionPlan(
+      title: "Growth",
+      subtitle: "For side-hustlers",
+      price: 1499,
+      rebate: 1499,
+      gradient: [const Color(0xFF4F46E5), const Color(0xFF818CF8)],
+      shadowColor: const Color(0xFF4F46E5),
+      features: [
+        "Full Product Access",
+        "Express Delivery (3-5 Days)",
+        "One-Click Share (Single)",
+        "15 AI Background Removals/mo",
+        "Chat Support (9am - 6pm)",
+        "Smart Auto-Translate (Basic)",
+        "Bulk Sharing Tools",
+        "VIP Wholesale Prices",
+      ],
+      availability: [true, true, true, true, true, true, false, false],
+    ),
+    SubscriptionPlan(
+      title: "Business Pro",
+      subtitle: "Maximum profit & speed",
+      price: 2999,
+      rebate: 2999,
+      isRecommended: true,
+      badgeText: "YOUR ACTIVE PLAN",
+      gradient: [const Color(0xFFEA580C), const Color(0xFFC2410C)],
+      shadowColor: const Color(0xFFEA580C),
+      features: [
+        "VIP Wholesale Pricing (Flat 15% OFF)",
+        "Next-Day Dispatch Guarantee",
+        "UNLIMITED AI Background Tools",
+        "Auto-Bot Bulk Sharing (WhatsApp)",
+        "Smart Auto-Translate (All Langs)",
+        "Video Catalog Access",
+        "Free Return Shipping Insurance",
+        "Dedicated Personal Manager",
+      ],
+      availability: [true, true, true, true, true, true, true, true],
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 2, viewportFraction: 0.85);
+    _pageController.addListener(() {
+      setState(() {
+        _pageValue = _pageController.page!;
+      });
+    });
+
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
+
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
 
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
       vsync: this,
+      duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    _slideAnimations = List.generate(
-      6,
-      (index) =>
-          Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
-            CurvedAnimation(
-              parent: _slideController,
-              curve: Interval(
-                index * 0.12,
-                0.5 + (index * 0.12),
-                curve: Curves.easeOutCubic,
-              ),
-            ),
-          ),
-    );
-
-    _slideController.forward();
+    // Trigger confetti after a delay
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() => _showConfetti = true);
+        _confettiController.play();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pageController.dispose();
+    _confettiController.dispose();
+    _shimmerController.dispose();
     _pulseController.dispose();
-    _slideController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.black87,
-              size: 20,
-            ),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "My Subscription",
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700,
-            color: Colors.black87,
-            fontSize: 18,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-
-            // PROMOTIONAL BANNER
-            SlideTransition(
-              position: _slideAnimations[0],
-              child: FadeTransition(
-                opacity: _slideController,
-                child: _buildPromoBanner(),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Hero card
-            SlideTransition(
-              position: _slideAnimations[1],
-              child: FadeTransition(
-                opacity: _slideController,
-                child: _buildHeroCard(),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // VALUE SAVED CARD
-            SlideTransition(
-              position: _slideAnimations[2],
-              child: FadeTransition(
-                opacity: _slideController,
-                child: _buildValueSavedCard(),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Stats cards
-            SlideTransition(
-              position: _slideAnimations[3],
-              child: FadeTransition(
-                opacity: _slideController,
-                child: _buildStatsRow(),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Features
-            SlideTransition(
-              position: _slideAnimations[4],
-              child: FadeTransition(
-                opacity: _slideController,
-                child: _buildFeaturesSection(),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // FAQ
-            SlideTransition(
-              position: _slideAnimations[5],
-              child: FadeTransition(
-                opacity: _slideController,
-                child: _buildFaqSection(),
-              ),
-            ),
-
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPromoBanner() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ScaleTransition(
-        scale: _pulseAnimation,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF6B6B).withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Stack(
+        children: [
+          // Animated gradient background
+          AnimatedBuilder(
+            animation: _shimmerController,
+            builder: (context, child) {
+              return Container(
+                height: MediaQuery.of(context).size.height * 0.40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.25),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Iconsax.gift, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "🎉 LIMITED TIME OFFER",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "100% Promotional Rebate Active",
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  "ACTIVE",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFFF6B6B),
-                    letterSpacing: 1,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF0F172A),
+                      const Color(0xFF334155),
+                      const Color(0xFF1E293B),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    stops: [0.0, _shimmerController.value, 1.0],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(40),
+                    bottomRight: Radius.circular(40),
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildHeroCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF667eea).withOpacity(0.4),
-              blurRadius: 25,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Floating particles
+          ...List.generate(15, (index) => _buildFloatingParticle(index)),
+
+          SafeArea(
+            child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Iconsax.crown_1, color: Color(0xFFFFD700), size: 16),
-                      SizedBox(width: 6),
-                      Text(
-                        "PRO",
-                        style: TextStyle(
-                          color: Color(0xFF667eea),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Iconsax.verify5,
-                    color: Color(0xFF4ADE80),
-                    size: 22,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            const Text(
-              "KaKiSo PRO",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 0.5,
-                shadows: [
-                  Shadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            const Text(
-              "Premium Access • Unlimited Everything",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // PRICING EMPHASIS
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Regular Price",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 11,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w600,
+                // Header with entrance animation
+                FadeInDown(
+                  duration: const Duration(milliseconds: 600),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    "₹1999 / month",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 24,
-                      color: Colors.white,
-                      decoration: TextDecoration.lineThrough,
-                      decorationThickness: 3,
-                      decorationColor: Colors.white70,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Text(
-                        "You Pay:",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(
+                            Iconsax.arrow_left_2,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Text(
-                          "₹0",
+                        const Spacer(),
+                        const Text(
+                          "My Subscription",
                           style: TextStyle(
                             fontFamily: 'Poppins',
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF4ADE80),
-                            letterSpacing: 1,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const Spacer(),
+                        const SizedBox(width: 40),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Status indicator with animations
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 0,
+                  ),
+                  child: Column(
+                    children: [
+                      // Animated crown icon
+                      ZoomIn(
+                        duration: const Duration(milliseconds: 800),
+                        delay: const Duration(milliseconds: 200),
+                        child: Pulse(
+                          infinite: true,
+                          duration: const Duration(milliseconds: 2000),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF4ADE80), Color(0xFF10B981)],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF4ADE80,
+                                  ).withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Iconsax.verify5,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 600),
+                        delay: const Duration(milliseconds: 300),
+                        child: const Text(
+                          "Premium Status Active",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      SlideInUp(
+                        duration: const Duration(milliseconds: 600),
+                        delay: const Duration(milliseconds: 400),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Text(
+                            "Sponsored by Promotional Rebate Program",
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
+                ),
+
+                const SizedBox(height: 25),
+
+                // Carousel with staggered animations
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _plans.length,
+                    onPageChanged: (index) =>
+                        setState(() => _currentIndex = index),
+                    itemBuilder: (context, index) {
+                      double scale = 1.0;
+                      if (_pageController.position.haveDimensions) {
+                        scale = (1 - (_pageValue - index).abs() * 0.1).clamp(
+                          0.9,
+                          1.0,
+                        );
+                      } else {
+                        scale = (index == 2) ? 1.0 : 0.9;
+                      }
+
+                      return FadeInUp(
+                        duration: const Duration(milliseconds: 800),
+                        delay: Duration(milliseconds: 500 + (index * 100)),
+                        child: Transform.scale(
+                          scale: scale,
+                          child: _buildPlanCard(_plans[index], index == 2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                // Bottom status bar with animation
+                BounceInUp(
+                  duration: const Duration(milliseconds: 800),
+                  delay: const Duration(milliseconds: 700),
+                  child: _buildActiveStatusBar(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Confetti overlay
+          if (_showConfetti)
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                particleDrag: 0.05,
+                emissionFrequency: 0.05,
+                numberOfParticles: 30,
+                gravity: 0.2,
+                shouldLoop: false,
+                colors: const [
+                  Color(0xFFEA580C),
+                  Color(0xFF4ADE80),
+                  Color(0xFF4F46E5),
+                  Color(0xFFF59E0B),
+                  Color(0xFFEC4899),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildValueSavedCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFF4ADE80).withOpacity(0.15),
-              const Color(0xFF22C55E).withOpacity(0.15),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF4ADE80), width: 2),
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Iconsax.ticket_discount,
-              color: Color(0xFF16A34A),
-              size: 40,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "You're Saving",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF16A34A),
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              "₹1,999",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 42,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF16A34A),
-                letterSpacing: 1,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              "Every Single Month!",
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF16A34A),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4ADE80).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                "💰 Thanks to our promotional rebate program",
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF166534),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              "Subscription Value",
-              "₹1,999/mo",
-              Iconsax.dollar_circle,
-              Colors.orange,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              "Your Payment",
-              "₹0/mo",
-              Iconsax.ticket_discount,
-              Colors.green,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 11,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: color == Colors.green
-                  ? const Color(0xFF16A34A)
-                  : Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildFloatingParticle(int index) {
+    final random = Random(index);
+    final size = 4.0 + random.nextDouble() * 6;
+    final left = random.nextDouble() * MediaQuery.of(context).size.width;
+    final top = random.nextDouble() * 300;
+    final duration = 3000 + random.nextInt(2000);
 
-  Widget _buildFeaturesSection() {
-    final features = [
-      (
-        "Smart Cataloging",
-        Iconsax.box,
-        "Unlimited products",
-        Colors.blue,
-        "Worth ₹499/mo",
-      ),
-      (
-        "Global Reselling",
-        Iconsax.global,
-        "Worldwide access",
-        Colors.green,
-        "Worth ₹399/mo",
-      ),
-      (
-        "Margin Calculator",
-        Iconsax.chart_2,
-        "Advanced tools",
-        Colors.orange,
-        "Worth ₹299/mo",
-      ),
-      (
-        "Auto-WhatsApp",
-        Iconsax.message,
-        "One-click share",
-        Colors.teal,
-        "Worth ₹399/mo",
-      ),
-      (
-        "Store Builder",
-        Iconsax.shop,
-        "Beta access",
-        Colors.purple,
-        "Worth ₹399/mo",
-      ),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Iconsax.star1, color: Color(0xFFFFD700), size: 26),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    "Premium Features",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    "ALL FREE",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF16A34A),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            ...features.map(
-              (feature) => _buildFeatureItem(
-                feature.$1,
-                feature.$2,
-                feature.$3,
-                feature.$4,
-                feature.$5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeatureItem(
-    String title,
-    IconData icon,
-    String subtitle,
-    Color color,
-    String value,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
+    return Positioned(
+      left: left,
+      top: top,
+      child: FadeIn(
+        duration: Duration(milliseconds: duration),
+        delay: Duration(milliseconds: index * 100),
+        child: Pulse(
+          infinite: true,
+          duration: Duration(milliseconds: duration),
+          child: Container(
+            width: size,
+            height: size,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 10,
-                    color: Color(0xFF16A34A),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
               shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Iconsax.tick_circle5,
-              color: Colors.green,
-              size: 18,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFaqSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Important Information",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildFaqItem(
-            "How long is this rebate valid?",
-            "The promotional rebate is currently active for all users. We'll notify you well in advance if there are any changes to the program.",
-          ),
-          const SizedBox(height: 12),
-          _buildFaqItem(
-            "Will I be charged when the promotion ends?",
-            "Absolutely not. You'll receive advance notification before any pricing changes. We'll never charge you without your explicit consent.",
-          ),
-          const SizedBox(height: 12),
-          _buildFaqItem(
-            "What happens to my data if I'm charged later?",
-            "Your data and features remain yours forever. You'll have the option to continue with paid access or export everything.",
-          ),
-          const SizedBox(height: 24),
-
-          // Info Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.blue[50]!, Colors.purple[50]!],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue[200]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Iconsax.info_circle, color: Colors.blue[700], size: 28),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text(
-                    "This is a genuine promotional offer. No credit card required. No hidden fees. Cancel anytime.",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: Color(0xFF1E40AF),
-                      fontWeight: FontWeight.w600,
-                      height: 1.5,
-                    ),
-                  ),
+              color: Colors.white.withOpacity(0.3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.2),
+                  blurRadius: 10,
+                  spreadRadius: 2,
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 20),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                "Subscription ID: KKS-PRO-2025-FREE",
-                style: TextStyle(
-                  fontFamily: 'Courier',
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildFaqItem(String question, String answer) {
+  Widget _buildPlanCard(SubscriptionPlan plan, bool isUserPlan) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: isUserPlan
+                ? plan.shadowColor.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: isUserPlan ? 25 : 10,
+            offset: const Offset(0, 10),
+            spreadRadius: isUserPlan ? 2 : 0,
           ),
         ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          iconColor: const Color(0xFF667eea),
-          collapsedIconColor: Colors.grey[600],
-          title: Text(
-            question,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-              child: Text(
-                answer,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                  height: 1.5,
+            // Card header with shimmer effect
+            AnimatedBuilder(
+              animation: _shimmerController,
+              builder: (context, child) {
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isUserPlan
+                          ? [
+                              plan.gradient[0],
+                              plan.gradient[1],
+                              plan.gradient[0],
+                            ]
+                          : plan.gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      stops: isUserPlan
+                          ? [0.0, _shimmerController.value, 1.0]
+                          : null,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Bounce(
+                            infinite: isUserPlan,
+                            duration: const Duration(milliseconds: 2000),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isUserPlan
+                                    ? Colors.white
+                                    : Colors.black.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                isUserPlan ? "CURRENTLY ACTIVE" : "LOCKED",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isUserPlan
+                                      ? plan.gradient.last
+                                      : Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (isUserPlan)
+                            Spin(
+                              infinite: true,
+                              duration: const Duration(milliseconds: 3000),
+                              child: const Icon(
+                                Iconsax.crown,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        plan.title,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        plan.subtitle,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            "₹${plan.price.toInt()}",
+                            style: TextStyle(
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flash(
+                            infinite: isUserPlan,
+                            duration: const Duration(milliseconds: 2000),
+                            child: const Text(
+                              "FREE",
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            // Features list with staggered animation
+            Expanded(
+              child: Container(
+                color: Colors.white,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: plan.features.length,
+                  itemBuilder: (context, index) {
+                    final isAvailable = plan.availability[index];
+                    return SlideInLeft(
+                      duration: const Duration(milliseconds: 400),
+                      delay: Duration(milliseconds: index * 80),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Row(
+                          children: [
+                            isUserPlan && isAvailable
+                                ? Pulse(
+                                    infinite: true,
+                                    duration: Duration(
+                                      milliseconds: 2000 + index * 200,
+                                    ),
+                                    child: Icon(
+                                      Iconsax.tick_circle5,
+                                      color: const Color(0xFF10B981),
+                                      size: 18,
+                                    ),
+                                  )
+                                : Icon(
+                                    isAvailable
+                                        ? Iconsax.tick_circle
+                                        : Iconsax.lock_1,
+                                    color: isAvailable
+                                        ? Colors.grey[700]
+                                        : Colors.grey[300],
+                                    size: 18,
+                                  ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                plan.features[index],
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  color: isAvailable
+                                      ? Colors.black87
+                                      : Colors.grey[400],
+                                  fontWeight: isAvailable
+                                      ? FontWeight.w500
+                                      : FontWeight.normal,
+                                  decoration: isAvailable
+                                      ? null
+                                      : TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildActiveStatusBar(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(
+                      0.2 + _pulseController.value * 0.2,
+                    ),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(
+                        0.08 + _pulseController.value * 0.12,
+                      ),
+                      blurRadius: 15 + _pulseController.value * 5,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Swing(
+                      infinite: true,
+                      duration: const Duration(milliseconds: 2000),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Iconsax.wallet_check,
+                          color: Color(0xFF15803D),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          "₹2,999/mo Waived",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF15803D),
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          "Enjoy your Pro benefits",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
