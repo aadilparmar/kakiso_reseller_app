@@ -1,3224 +1,3246 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
-import 'package:kakiso_reseller_app/utils/double_tap.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'package:image_picker/image_picker.dart';
-// 1. IMPORT SHOWCASEVIEW
-import 'package:showcaseview/showcaseview.dart';
-// 2. IMPORT AUTO TRANSLATE
-import 'package:flutter_auto_translate/flutter_auto_translate.dart';
-
-import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
-import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
-import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
-import 'package:kakiso_reseller_app/models/user.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_details_page.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
-import 'package:kakiso_reseller_app/services/pdf_services.dart';
-import 'package:kakiso_reseller_app/services/collage_service.dart';
-
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue_sort.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_header.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_sort_bar.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_empty_state.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_empty_state.dart';
-
-// NEW IMPORT FOR STATE ACCESS
-import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
-
-const Color accentColor = Color(0xFF2563EB); // Royal Blue
-
-class CatalogueSection extends StatelessWidget {
-  final UserData userData;
-  const CatalogueSection({super.key, required this.userData});
-
-  @override
-  Widget build(BuildContext context) {
-    return ShowCaseWidget(
-      builder: (context) => _CatalogueSectionContent(userData: userData),
-      autoPlay: false,
-      blurValue: 1,
-      enableAutoScroll: true,
-      scrollDuration: const Duration(milliseconds: 300),
-    );
-  }
-}
-
-class _CatalogueSectionContent extends StatefulWidget {
-  final UserData userData;
-
-  const _CatalogueSectionContent({required this.userData});
-
-  @override
-  State<_CatalogueSectionContent> createState() =>
-      _CatalogueSectionContentState();
-}
-
-class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
-    with SingleTickerProviderStateMixin {
-  final _storage = const FlutterSecureStorage();
-  final _localStorage = GetStorage();
-  static int? _lastProcessedTimestamp;
-  final CatalogueController catalogueController = Get.put(
-    CatalogueController(),
-    permanent: true,
-  );
-
-  final HomeProductsController homeProductsController = Get.put(
-    HomeProductsController(),
-  );
-
-  final CartController cartController = Get.put(CartController());
-
-  String _searchQuery = '';
-  CatalogueSort _currentSort = CatalogueSort.newest;
-  final TextEditingController _searchController = TextEditingController();
-
-  bool _isGeneratingPdf = false;
-  bool _isGeneratingCsv = false;
-
-  String? _activeGuideTool;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  Worker? _productListener;
-
-  final GlobalKey _addCatalogKey = GlobalKey();
-  final GlobalKey _shareKey = GlobalKey();
-  final GlobalKey _toolsKey = GlobalKey();
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    _productListener = ever(homeProductsController.allProducts, (products) {
-      if (products.isNotEmpty) {
-        _checkAndCreateDefaultCatalogues();
-      }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (homeProductsController.allProducts.isNotEmpty) {
-        _checkAndCreateDefaultCatalogues();
-      }
-      _checkForNavArguments();
-      _checkAndStartTour();
-    });
-  }
-
-  void _checkAndStartTour() async {
-    await Future.delayed(const Duration(seconds: 1));
-    bool hasShownTour =
-        _localStorage.read('has_shown_catalogue_tour_v2') ?? false;
-
-    if (!hasShownTour) {
-      _startTour();
-      _localStorage.write('has_shown_catalogue_tour_v2', true);
-    }
-  }
-
-  void _startTour() {
-    if (catalogueController.myCatalogues.isNotEmpty) {
-      ShowCaseWidget.of(
-        context,
-      ).startShowCase([_addCatalogKey, _shareKey, _toolsKey]);
-    } else {
-      ShowCaseWidget.of(context).startShowCase([_addCatalogKey]);
-    }
-  }
-
-  // 🔹 FIXED LOGIC: Changed key to 'v4' to force re-check
-  Future<void> _checkAndCreateDefaultCatalogues() async {
-    // 1. CHANGED KEY to v4 to force execution if missing
-    bool hasCreated =
-        _localStorage.read('has_created_default_catalogs_v4') ?? false;
-
-    // 2. CHECK IF CATALOGUES ARE EMPTY EVEN IF FLAG IS TRUE
-    // If flag is true but list is empty, we should retry.
-    if (hasCreated && catalogueController.myCatalogues.isNotEmpty) return;
-
-    final allProducts = homeProductsController.allProducts;
-    if (allProducts.isEmpty) return;
-
-    // --- 1. HIGH MARGIN PICKS ---
-    final highMarginProducts = allProducts
-        .where((p) => (double.tryParse(p.price) ?? 0) > 1500)
-        .take(5)
-        .toList();
-
-    if (highMarginProducts.isNotEmpty) {
-      if (!catalogueController.myCatalogues.any(
-        (c) => c.name == "🏆 High Margin Picks",
-      )) {
-        catalogueController.createCatalogue(
-          "🏆 High Margin Picks",
-          "Premium items with high profit potential.",
-        );
-        await Future.delayed(const Duration(milliseconds: 50));
-        final cat = catalogueController.myCatalogues.firstWhereOrNull(
-          (c) => c.name == "🏆 High Margin Picks",
-        );
-        if (cat != null) {
-          for (var p in highMarginProducts) {
-            catalogueController.addProductToCatalogue(cat.id, p);
-          }
-        }
-      }
-    }
-
-    // --- 2. UNDER ₹1000 STORE ---
-    final budgetProducts = allProducts
-        .where(
-          (p) =>
-              (double.tryParse(p.price) ?? 0) < 1000 &&
-              (double.tryParse(p.price) ?? 0) > 0,
-        )
-        .take(8)
-        .toList();
-
-    if (budgetProducts.isNotEmpty) {
-      if (!catalogueController.myCatalogues.any(
-        (c) => c.name == "💰 Under ₹1000 Store",
-      )) {
-        catalogueController.createCatalogue(
-          "💰 Under ₹1000 Store",
-          "Budget-friendly bestsellers.",
-        );
-        await Future.delayed(const Duration(milliseconds: 50));
-        final cat = catalogueController.myCatalogues.firstWhereOrNull(
-          (c) => c.name == "💰 Under ₹1000 Store",
-        );
-        if (cat != null) {
-          for (var p in budgetProducts) {
-            catalogueController.addProductToCatalogue(cat.id, p);
-          }
-        }
-      }
-    }
-
-    // --- 3. TRENDING & VIRAL ---
-    final trendingProducts = List<ProductModel>.from(allProducts)
-      ..shuffle(Random());
-    final selectedTrending = trendingProducts.take(6).toList();
-
-    if (selectedTrending.isNotEmpty) {
-      if (!catalogueController.myCatalogues.any(
-        (c) => c.name == "🚀 Trending & Viral",
-      )) {
-        catalogueController.createCatalogue(
-          "🚀 Trending & Viral",
-          "Most popular items right now.",
-        );
-        await Future.delayed(const Duration(milliseconds: 50));
-        final cat = catalogueController.myCatalogues.firstWhereOrNull(
-          (c) => c.name == "🚀 Trending & Viral",
-        );
-        if (cat != null) {
-          for (var p in selectedTrending) {
-            catalogueController.addProductToCatalogue(cat.id, p);
-          }
-        }
-      }
-    }
-
-    // Mark as created (v4)
-    _localStorage.write('has_created_default_catalogs_v4', true);
-    if (mounted) setState(() {});
-  }
-
-  void _checkForNavArguments() {
-    final args = Get.arguments;
-
-    // 1. Check if arguments exist and are valid
-    if (args != null && args is Map) {
-      final String? toolId = args['active_tool_guide'];
-      final int? timestamp = args['guide_timestamp'];
-
-      // 2. logic: Only show if we have an ID AND it's a new timestamp we haven't seen
-      if (toolId != null && timestamp != null) {
-        if (timestamp != _lastProcessedTimestamp) {
-          // New event! Update timestamp and show guide
-          _lastProcessedTimestamp = timestamp;
-
-          setState(() {
-            _activeGuideTool = toolId;
-          });
-
-          // Optional: Clear args map to be safe, though static check handles the logic now
-          args['active_tool_guide'] = null;
-        }
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _productListener?.dispose();
-    super.dispose();
-  }
-
-  // --- REUSABLE MARGIN INPUT WIDGET ---
-  Widget _buildMarginInput({
-    required TextEditingController controller,
-    required Function(String) onTagSelected,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            // 🗣️ WRAPPED
-            label: const AutoTranslate(child: Text("Margin Percentage (%)")),
-            hintText: "Min 20%",
-            suffixText: "%",
-            prefixIcon: const Icon(Iconsax.percentage_square),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [30, 50, 70, 100].map((val) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: ActionChip(
-                  label: Text(
-                    "$val%",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                  backgroundColor: Colors.blue.shade50,
-                  labelStyle: TextStyle(color: Colors.blue.shade900),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: Colors.blue.shade100),
-                  ),
-                  onPressed: () {
-                    controller.text = val.toString();
-                    onTagSelected(val.toString());
-                  },
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 6),
-        // 🗣️ WRAPPED
-        const AutoTranslate(
-          child: Text(
-            " * Minimum 20% margin is required.",
-            style: TextStyle(fontSize: 10, color: Colors.grey),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // --- BULK DOWNLOAD LOGIC ---
-  Future<void> _handleBulkDownload(CatalogueModel cat) async {
-    if (cat.products.isEmpty) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text("Empty", style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        messageText: const AutoTranslate(
-          child: Text("No products to download."),
-        ),
-        backgroundColor: Colors.orange.shade100,
-      );
-      return;
-    }
-
-    Get.showOverlay(
-      asyncFunction: () async {
-        try {
-          Directory? directory;
-          if (Platform.isAndroid) {
-            directory = Directory(
-              '/storage/emulated/0/Download/Kakiso_Catalogues/01_KaKiSo${cat.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ' ')}',
-            );
-          } else {
-            final docDir = await getApplicationDocumentsDirectory();
-            directory = Directory(
-              '${docDir.path}/${cat.name.replaceAll(" ", "_")}',
-            );
-          }
-
-          if (!await directory.exists()) {
-            await directory.create(recursive: true);
-          }
-
-          for (int i = 0; i < cat.products.length; i++) {
-            final p = cat.products[i];
-            if (p.image.isEmpty) continue;
-
-            try {
-              final response = await http.get(Uri.parse(p.image));
-              if (response.statusCode == 200) {
-                String safeName = p.name.replaceAll(
-                  RegExp(r'[^a-zA-Z0-9]'),
-                  '_',
-                );
-                if (safeName.length > 50) safeName = safeName.substring(0, 50);
-                String fileName = "${safeName}_$i.jpg";
-
-                File file = File('${directory.path}/$fileName');
-                await file.writeAsBytes(response.bodyBytes);
-              }
-            } catch (e) {
-              debugPrint("Failed to download image for ${p.name}: $e");
-            }
-          }
-
-          Get.snackbar(
-            "",
-            "",
-            titleText: const AutoTranslate(
-              child: Text(
-                "Download Complete",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            messageText: const AutoTranslate(child: Text("Saved to Gallery")),
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 5),
-            snackPosition: SnackPosition.BOTTOM,
-            margin: const EdgeInsets.all(10),
-          );
-        } catch (e) {
-          Get.snackbar(
-            "Download Error",
-            "Could not save images: $e",
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-        }
-      },
-      loadingWidget: Center(
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              CircularProgressIndicator(color: accentColor),
-              SizedBox(height: 16),
-              // 🗣️ WRAPPED
-              AutoTranslate(
-                child: Text(
-                  "Downloading images...",
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- LOGOUT DIALOG ---
-  Future<void> _showLogoutConfirmation() async {
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-        ),
-        title: const AutoTranslate(
-          child: Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
-        ),
-        content: const AutoTranslate(
-          child: Text(
-            'Do you want to log out?',
-            style: TextStyle(fontFamily: 'Poppins'),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const AutoTranslate(child: Text('Cancel')),
-          ),
-          TextButton(
-            onPressed: () async {
-              Get.back();
-              await _storage.delete(key: 'authToken');
-              Get.offAll(() => const LoginPage());
-            },
-            child: const AutoTranslate(
-              child: Text('Logout', style: TextStyle(color: accentColor)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleDrawerNavigation(String pageId) {
-    Navigator.pop(context);
-    if (pageId == 'Home' || pageId == 'BusinessDetails') {
-      Get.off(() => HomePage(userData: widget.userData));
-    }
-  }
-
-  // --- CREATE CATALOGUE DIALOG ---
-  void _openCreateCatalogueDialog() {
-    final TextEditingController nameCtrl = TextEditingController();
-    final TextEditingController notesCtrl = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const AutoTranslate(
-          child: Text(
-            "Create Catalog",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  // 🗣️ WRAPPED
-                  label: const AutoTranslate(child: Text("Catalog Name")),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: notesCtrl,
-                decoration: InputDecoration(
-                  // 🗣️ WRAPPED
-                  label: const AutoTranslate(child: Text("Notes (optional)")),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  isDense: true,
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const AutoTranslate(child: Text("Cancel")),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) {
-                Get.snackbar("Error", "Please enter a name");
-                return;
-              }
-              catalogueController.createCatalogue(
-                name,
-                notesCtrl.text.trim().isEmpty
-                    ? "Custom catalog"
-                    : notesCtrl.text.trim(),
-              );
-              Get.back();
-            },
-            child: const AutoTranslate(
-              child: Text("Create", style: TextStyle(color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<CatalogueModel> _buildFilteredSortedList() {
-    final List<CatalogueModel> base = catalogueController.myCatalogues.toList();
-    final query = _searchQuery.trim().toLowerCase();
-    List<CatalogueModel> filtered = base;
-    if (query.isNotEmpty) {
-      filtered = base
-          .where((c) => c.name.toLowerCase().contains(query))
-          .toList();
-    }
-
-    filtered.sort((a, b) {
-      switch (_currentSort) {
-        case CatalogueSort.newest:
-          return b.createdAt.compareTo(a.createdAt);
-        case CatalogueSort.oldest:
-          return a.createdAt.compareTo(b.createdAt);
-        case CatalogueSort.nameAZ:
-          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        case CatalogueSort.nameZA:
-          return b.name.toLowerCase().compareTo(a.name.toLowerCase());
-        case CatalogueSort.mostProducts:
-          return b.products.length.compareTo(a.products.length);
-      }
-    });
-    return filtered;
-  }
-
-  // ─── CSV EXPORT LOGIC ───────────────────────────────────────────────────
-
-  void _openCsvExportDialog(CatalogueModel cat) {
-    if (cat.products.isEmpty) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Empty Catalog",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: const AutoTranslate(child: Text("Add products first!")),
-        backgroundColor: Colors.red.shade50,
-      );
-      return;
-    }
-
-    final TextEditingController marginCtrl = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const AutoTranslate(
-          child: Text(
-            "Export CSV",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AutoTranslate(
-                child: Text(
-                  "Generate a Shopify/Amazon compatible CSV.",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildMarginInput(
-                controller: marginCtrl,
-                onTagSelected: (val) {},
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const AutoTranslate(child: Text("Cancel")),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
-            onPressed: () {
-              final double margin =
-                  double.tryParse(marginCtrl.text.trim()) ?? 0;
-              if (margin < 20) {
-                Get.snackbar(
-                  "",
-                  "",
-                  titleText: const AutoTranslate(
-                    child: Text(
-                      "Low Margin",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  messageText: const AutoTranslate(
-                    child: Text("Minimum margin must be 20%"),
-                  ),
-                  backgroundColor: Colors.red.shade100,
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-                return;
-              }
-              Get.back();
-              _generateAndShareCsv(cat, margin);
-            },
-            child: const AutoTranslate(
-              child: Text("Download", style: TextStyle(color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _generateAndShareCsv(
-    CatalogueModel cat,
-    double marginPercent,
-  ) async {
-    if (_isGeneratingCsv) return;
-    setState(() => _isGeneratingCsv = true);
-
-    Get.showOverlay(
-      asyncFunction: () async {
-        try {
-          // 1. COMPREHENSIVE HEADERS (42 Fields)
-          List<String> headers = [
-            "ID",
-            "Name",
-            "Type",
-            "SKU",
-            "Regular Price",
-            "Sale Price",
-            "Discount %",
-            "Stock Status",
-            "Categories (IDs)",
-            "Brand Name",
-            "Brand Logo",
-            "Short Description",
-            "Description",
-            "All Images",
-            "Main Image",
-            "HSN Code",
-            "GST",
-            "Unique Code",
-            "EAN Barcode",
-            "Shipping Fee",
-            "Country of Origin",
-            "Manufactured By",
-            "Imported By",
-            "Marketed By",
-            "Dispatch Time",
-            "Package Includes",
-            "Length",
-            "Width",
-            "Height",
-            "Weight",
-            "Gross Weight",
-            "Item Length",
-            "Item Width",
-            "Item Height",
-            "Item Weight",
-            "Net Contents",
-            "Highlights",
-            "Care Instructions",
-            "Disclaimer",
-            "Warranty",
-            "Keywords",
-            "Attributes",
-          ];
-
-          String csvContent = "${headers.join(",")}\n";
-
-          for (var p in cat.products) {
-            // Price Calculation with Margin applied to Sale Price
-            double basePrice = double.tryParse(p.price) ?? 0;
-            double finalPrice = basePrice * (1 + marginPercent / 100);
-
-            // Attribute Formatting: Name:[Option1/Option2]
-            String attrString = p.attributes
-                .map((a) => "${a.name}:[${a.options.join('/')}]")
-                .join(" | ");
-
-            // 2. DATA MAPPING (Aligning with Catalog Builder Engine)
-            List<String> row = [
-              p.id.toString(),
-              _escapeCsv(p.name),
-              "simple",
-              _escapeCsv(p.userSku ?? ""),
-              p.regularPrice,
-              finalPrice.toStringAsFixed(2), // Margin applied
-              p.discountPercentage?.toString() ?? "0",
-              "active",
-              p.categoryIds.join("|"),
-              _escapeCsv(p.brandName ?? ""),
-              _escapeCsv(p.brandLogoUrl ?? ""),
-              _escapeCsv(p.shortDescription),
-              _escapeCsv(p.description),
-              _escapeCsv(p.images.join("|")),
-              _escapeCsv(p.image),
-              _escapeCsv(p.hsnCode ?? ""),
-              _escapeCsv(p.gst ?? ""),
-              _escapeCsv(p.uniqueCode ?? ""),
-              _escapeCsv(p.eanBarcode ?? ""),
-              _escapeCsv(p.shippingFee ?? ""),
-              _escapeCsv(p.countryOfOrigin ?? ""),
-              _escapeCsv(p.manufacturedBy ?? ""),
-              _escapeCsv(p.importedBy ?? ""),
-              _escapeCsv(p.marketedBy ?? ""),
-              _escapeCsv(p.dispatchTime ?? ""),
-              _escapeCsv(p.packageIncludes ?? ""),
-              _escapeCsv(p.length ?? ""),
-              _escapeCsv(p.width ?? ""),
-              _escapeCsv(p.height ?? ""),
-              _escapeCsv(p.weight ?? ""),
-              _escapeCsv(p.packageGrossWeight ?? ""),
-              _escapeCsv(p.itemLength ?? ""),
-              _escapeCsv(p.itemWidth ?? ""),
-              _escapeCsv(p.itemHeight ?? ""),
-              _escapeCsv(p.itemWeight ?? ""),
-              _escapeCsv(p.netContents ?? ""),
-              _escapeCsv(p.highlights ?? ""),
-              _escapeCsv(p.careInstruction ?? ""),
-              _escapeCsv(p.disclaimer ?? ""),
-              _escapeCsv(p.warranty ?? ""),
-              _escapeCsv(p.keywords.join(",")),
-              _escapeCsv(attrString),
-            ];
-
-            csvContent += "${row.join(",")}\n";
-          }
-
-          final directory = await getTemporaryDirectory();
-          final fileName =
-              "Catalog_${cat.name.replaceAll(' ', '_')}_Export.csv";
-          final path = "${directory.path}/$fileName";
-          final file = File(path);
-          await file.writeAsString(csvContent);
-
-          await Share.shareXFiles([
-            XFile(path),
-          ], text: "Comprehensive CSV Export for Catalog: ${cat.name}");
-        } catch (e) {
-          Get.snackbar(
-            "Error",
-            "CSV Generation failed: $e",
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-        } finally {
-          if (mounted) setState(() => _isGeneratingCsv = false);
-        }
-      },
-      loadingWidget: const Center(
-        child: CircularProgressIndicator(color: accentColor),
-      ),
-    );
-  }
-
-  String _escapeCsv(String value) {
-    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
-      return '"${value.replaceAll('"', '""')}"';
-    }
-    return value;
-  }
-
-  // --- PDF DIALOG ---
-  void _openPdfMarginDialog(CatalogueModel cat) {
-    if (cat.products.isEmpty) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Empty catalog",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: const AutoTranslate(
-          child: Text("Add products before generating a PDF."),
-        ),
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
-    if (cat.products.length > 30) {
-      _showProductSelectionSheet(cat);
-      return;
-    }
-    _showMarginInputAndGenerate(cat, cat.products.toList());
-  }
-
-  void _showProductSelectionSheet(CatalogueModel cat) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _ProductSelectionSheet(
-        catalogue: cat,
-        onConfirm: (selectedProducts) {
-          Navigator.pop(ctx);
-          if (selectedProducts.isEmpty) {
-            Get.snackbar("Error", "No products selected!");
-            return;
-          }
-          _showMarginInputAndGenerate(cat, selectedProducts);
-        },
-      ),
-    );
-  }
-
-  void _showMarginInputAndGenerate(
-    CatalogueModel cat,
-    List<ProductModel> productsToPrint,
-  ) {
-    final TextEditingController nameCtrl = TextEditingController(
-      text: widget.userData.name.isNotEmpty ? widget.userData.name : cat.name,
-    );
-    final TextEditingController marginCtrl = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const AutoTranslate(
-          child: Text(
-            "Download Catalog PDF",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AutoTranslate(
-                child: Text(
-                  "Generating PDF for ${productsToPrint.length} items.",
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  // 🗣️ WRAPPED
-                  label: const AutoTranslate(
-                    child: Text("Business / Shop Name"),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildMarginInput(
-                controller: marginCtrl,
-                onTagSelected: (val) {},
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const AutoTranslate(child: Text("Cancel")),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
-            onPressed: () {
-              final name = nameCtrl.text.trim().isEmpty
-                  ? "Reseller"
-                  : nameCtrl.text.trim();
-              final double marginPercent =
-                  double.tryParse(marginCtrl.text.trim()) ?? 0;
-
-              if (marginPercent < 20) {
-                Get.snackbar(
-                  "",
-                  "",
-                  titleText: const AutoTranslate(
-                    child: Text(
-                      "Low Margin",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  messageText: const AutoTranslate(
-                    child: Text("Minimum margin must be 20%"),
-                  ),
-                  backgroundColor: Colors.red.shade100,
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-                return;
-              }
-
-              Get.back();
-              _generateCataloguePdf(cat, name, marginPercent, productsToPrint);
-            },
-            child: const AutoTranslate(
-              child: Text("Generate", style: TextStyle(color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _generateCataloguePdf(
-    CatalogueModel cat,
-    String businessName,
-    double extraMargin,
-    List<ProductModel> products,
-  ) async {
-    if (_isGeneratingPdf) return;
-    setState(() => _isGeneratingPdf = true);
-
-    Get.showOverlay(
-      asyncFunction: () async {
-        try {
-          // 1. FETCH LOGO & DETAILS FROM STORAGE
-          String? logoPath;
-          String? phone;
-          String? address;
-
-          // Read the same key used in BusinessDetailsPage
-          String? jsonStr = await _storage.read(key: 'business_details');
-
-          if (jsonStr != null) {
-            final data = jsonDecode(jsonStr);
-            logoPath = data['logo_path']; // <--- THE LOGO PATH
-            phone = data['phone'];
-            address = data['city'];
-          }
-
-          // 2. PASS TO PDF SERVICE
-          await PdfService.createAndShareCatalog(
-            categoryName: cat.name,
-            products: products,
-            businessName: businessName,
-            extraMargin: extraMargin,
-            logoPath: logoPath, // <--- Now passing logo
-            businessPhone: phone, // <--- Now passing phone
-            businessAddress: address, // <--- Now passing address
-          );
-
-          Get.snackbar(
-            "",
-            "",
-            titleText: const AutoTranslate(
-              child: Text(
-                "Success",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            messageText: const AutoTranslate(
-              child: Text("Catalog PDF generated."),
-            ),
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
-          );
-        } catch (e) {
-          Get.snackbar(
-            "PDF Error",
-            "Failed to create PDF: $e",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-        } finally {
-          if (mounted) setState(() => _isGeneratingPdf = false);
-        }
-      },
-      loadingWidget: Center(
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const CircularProgressIndicator(
-            color: Color.fromARGB(255, 185, 28, 224),
-            strokeWidth: 2,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- GENERAL SHARE LOGIC (WA, INSTA, FB) ---
-  void _openShareMarginDialog(CatalogueModel cat) {
-    if (cat.products.isEmpty) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Empty catalog",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: const AutoTranslate(
-          child: Text("Add products before sharing."),
-        ),
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-    final TextEditingController marginCtrl = TextEditingController();
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const AutoTranslate(
-          child: Text(
-            "Share Catalog",
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AutoTranslate(
-                child: Text(
-                  "Prices will be increased by your margin percentage.",
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildMarginInput(
-                controller: marginCtrl,
-                onTagSelected: (val) {},
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const AutoTranslate(child: Text("Cancel")),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
-            onPressed: () {
-              final double marginPercent =
-                  double.tryParse(marginCtrl.text.trim()) ?? 0;
-              if (marginPercent < 20) {
-                Get.snackbar(
-                  "",
-                  "",
-                  titleText: const AutoTranslate(
-                    child: Text(
-                      "Low Margin",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  messageText: const AutoTranslate(
-                    child: Text("Minimum margin must be 20%"),
-                  ),
-                  backgroundColor: Colors.red.shade100,
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-                return;
-              }
-              Get.back();
-              _processShare(cat, marginPercent);
-            },
-            child: const AutoTranslate(
-              child: Text("Share", style: TextStyle(color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _processShare(CatalogueModel cat, double marginPercent) async {
-    if (cat.products.isEmpty) return;
-    if (cat.products.length > 30) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Large Catalog",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: AutoTranslate(
-          child: Text("Preparing ${cat.products.length} images..."),
-        ),
-        backgroundColor: Colors.orange.shade50,
-        colorText: Colors.orange.shade800,
-      );
-    }
-
-    final buffer = StringBuffer();
-    buffer.writeln("📦 *${cat.name}*");
-    if (cat.description.isNotEmpty) buffer.writeln(cat.description);
-    buffer.writeln("Total items: ${cat.products.length}\n");
-    buffer.writeln("🛍 *Catalog Items*:\n");
-
-    for (int i = 0; i < cat.products.length; i++) {
-      final p = cat.products[i];
-      final double basePrice = double.tryParse(p.price) ?? 0;
-      final double finalPrice = basePrice * (1 + marginPercent / 100);
-      buffer.writeln("${i + 1}. *${p.name}*");
-      buffer.writeln("   Price: ₹${finalPrice.toStringAsFixed(0)}");
-      if (p.shortDescription.isNotEmpty) {
-        buffer.writeln("   ${p.shortDescription}");
-      }
-      buffer.writeln("");
-    }
-    buffer.writeln("– ${cat.name}");
-
-    await Clipboard.setData(ClipboardData(text: buffer.toString()));
-
-    Get.showOverlay(
-      asyncFunction: () async {
-        try {
-          final xFiles = await _downloadProductImages(cat);
-
-          if (xFiles.isEmpty) {
-            Get.snackbar(
-              "",
-              "",
-              titleText: const AutoTranslate(
-                child: Text(
-                  "Copied text",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              messageText: const AutoTranslate(
-                child: Text("Catalog text copied. No images found."),
-              ),
-              snackPosition: SnackPosition.BOTTOM,
-            );
-            await Share.share(buffer.toString());
-            return;
-          }
-
-          await Share.shareXFiles(xFiles, text: "");
-
-          Get.snackbar(
-            "",
-            "",
-            titleText: const AutoTranslate(
-              child: Text(
-                "Ready to Share",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            messageText: const AutoTranslate(
-              child: Text("Images shared. Text copied to clipboard!"),
-            ),
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
-          );
-        } catch (e) {
-          Get.snackbar(
-            "Share Error",
-            "Failed to share images: $e",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-        }
-      },
-      loadingWidget: const Center(
-        child: CircularProgressIndicator(color: accentColor),
-      ),
-    );
-  }
-
-  Future<List<XFile>> _downloadProductImages(CatalogueModel cat) async {
-    final productsWithImage = cat.products
-        .where((p) => p.image.isNotEmpty)
-        .toList();
-
-    if (productsWithImage.isEmpty) return [];
-
-    final tempDir = await getTemporaryDirectory();
-    final List<Future<XFile?>> futures = [];
-
-    for (int i = 0; i < productsWithImage.length; i++) {
-      futures.add(
-        _downloadSingleImage(productsWithImage[i].image, tempDir, cat.id, i),
-      );
-    }
-    final results = await Future.wait(futures);
-    return results.whereType<XFile>().toList();
-  }
-
-  Future<XFile?> _downloadSingleImage(
-    String url,
-    Directory dir,
-    String catId,
-    int index,
-  ) async {
-    try {
-      final uri = Uri.parse(url);
-      final resp = await http.get(uri);
-      if (resp.statusCode == 200) {
-        final file = File('${dir.path}/cat_${catId}_img_$index.jpg');
-        await file.writeAsBytes(resp.bodyBytes, flush: true);
-        return XFile(file.path);
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  // --- 📸 COLLAGE STUDIO ENTRY ---
-  void _openCollageStudio(CatalogueModel cat) {
-    if (cat.products.isEmpty) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Empty Catalog",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: const AutoTranslate(child: Text("Add products first!")),
-        backgroundColor: Colors.red.shade50,
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _CollageStudioSheet(
-        catalogue: cat,
-        shopName: widget.userData.name.isNotEmpty
-            ? widget.userData.name
-            : "My Shop",
-        phone: widget.userData.phone,
-      ),
-    );
-  }
-
-  // 🔹 SMART BUTTON BUILDER with PULSE Logic
-  Widget _buildCatalogueActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color? color,
-    Color? bgColor,
-    bool outlined = false,
-  }) {
-    bool isTarget = false;
-    bool isOtherDimmed = false;
-
-    if (_activeGuideTool != null) {
-      if (_activeGuideTool == 'collage_maker' && label == "Collage") {
-        isTarget = true;
-      } else if (_activeGuideTool == 'pdf_generator' && label == "PDF") {
-        isTarget = true;
-      } else if (_activeGuideTool == 'csv_builder_pro' && label == "CSV") {
-        isTarget = true;
-      } else if (_activeGuideTool == 'bulk_downloader' && label == "Download") {
-        isTarget = true;
-      } else {
-        isOtherDimmed = true;
-      }
-    }
-
-    Color effectiveColor = color ?? accentColor;
-    Color effectiveBg = bgColor ?? Colors.white;
-
-    if (isTarget) {
-      effectiveColor = Colors.white;
-      effectiveBg = accentColor;
-    } else if (isOtherDimmed) {
-      effectiveColor = effectiveColor.withOpacity(0.3);
-      effectiveBg = effectiveBg.withOpacity(0.5);
-    }
-
-    Widget button = SizedBox(
-      height: 34,
-      child: outlined
-          ? OutlinedButton.icon(
-              onPressed: onTap,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: effectiveColor.withOpacity(0.5)),
-                backgroundColor: isTarget ? effectiveBg : null,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              icon: Icon(icon, size: 16, color: effectiveColor),
-              // 🗣️ WRAPPED LABEL
-              label: AutoTranslate(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    color: effectiveColor,
-                  ),
-                ),
-              ),
-            )
-          : TextButton.icon(
-              onPressed: onTap,
-              style: TextButton.styleFrom(
-                backgroundColor: effectiveBg,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              icon: Icon(icon, size: 16, color: effectiveColor),
-              // 🗣️ WRAPPED LABEL
-              label: AutoTranslate(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    color: effectiveColor,
-                  ),
-                ),
-              ),
-            ),
-    );
-
-    if (isTarget) {
-      return ScaleTransition(scale: _pulseAnimation, child: button);
-    }
-
-    return button;
-  }
-
-  Widget _buildSocialIconButton({
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-    required VoidCallback onTap,
-  }) {
-    double opacity = _activeGuideTool != null ? 0.3 : 1.0;
-
-    return Opacity(
-      opacity: opacity,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-          child: Icon(icon, size: 18, color: color),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DoubleBackToExitWrapper(
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF3F4F6),
-        drawer: HomeDrawer(
-          userData: widget.userData,
-          selectedTitle: 'MyCatalog',
-          onNavigate: _handleDrawerNavigation,
-          onLogoutPressed: () {
-            Navigator.pop(context);
-            _showLogoutConfirmation();
-          },
-        ),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          titleSpacing: 0,
-          title: Row(
-            children: [
-              const SizedBox(width: 6),
-              Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Iconsax.menu_1),
-                  color: accentColor,
-                  iconSize: 30,
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 4.0),
-                child: Image.asset(
-                  'assets/logos/login-logo.png',
-                  height: 50,
-                  width: 100,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const Spacer(),
-              // 🌟 5. RESTART TOUR BUTTON ADDED
-              IconButton(
-                tooltip: "Guide",
-                icon: const Icon(Iconsax.info_circle, color: accentColor),
-                onPressed: _startTour,
-              ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Iconsax.shopping_cart),
-                    color: accentColor,
-                    iconSize: 25,
-                    onPressed: () => Get.to(() => const InventoryPage()),
-                  ),
-                  Positioned(
-                    right: 5,
-                    top: 5,
-                    child: Obx(() {
-                      final count = cartController.itemCount;
-                      if (count == 0) return const SizedBox.shrink();
-                      return Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 22,
-                          minHeight: 22,
-                        ),
-                        child: Center(
-                          child: Text(
-                            count > 99 ? '99+' : '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Iconsax.heart),
-                color: accentColor,
-                iconSize: 25,
-                onPressed: () => Get.to(() => WishlistScreen()),
-              ),
-              const SizedBox(width: 16),
-            ],
-          ),
-        ),
-        // 5. SHOWCASE FAB
-        floatingActionButton: Showcase(
-          key: _addCatalogKey,
-          title: "Create Catalog",
-          description:
-              "Start here! Create custom collections for your customers.",
-          overlayColor: Colors.black.withOpacity(0.7),
-          titleTextStyle: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: accentColor,
-            fontSize: 16,
-          ),
-          descTextStyle: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-            fontSize: 12,
-          ),
-          targetShapeBorder: CircleBorder(),
-          child: FloatingActionButton.extended(
-            backgroundColor: accentColor,
-            onPressed: _openCreateCatalogueDialog,
-            icon: const Icon(Iconsax.folder_add, color: Colors.white),
-            // 🗣️ WRAPPED
-            label: const AutoTranslate(
-              child: Text("New Catalog", style: TextStyle(color: Colors.white)),
-            ),
-          ),
-        ),
-        body: SafeArea(
-          top: false,
-          child: Stack(
-            children: [
-              // 1. MAIN CONTENT
-              Column(
-                children: [
-                  Obx(
-                    () => CatalogueHeader(
-                      totalCatalogues: catalogueController.myCatalogues.length,
-                      totalProducts: catalogueController.myCatalogues.fold(
-                        0,
-                        (sum, cat) => sum + cat.products.length,
-                      ),
-                    ),
-                  ),
-                  CatalogueSearchAndSortBar(
-                    searchController: _searchController,
-                    searchQuery: _searchQuery,
-                    onSearchChanged: (value) =>
-                        setState(() => _searchQuery = value),
-                    currentSort: _currentSort,
-                    onSortChanged: (value) =>
-                        setState(() => _currentSort = value),
-                  ),
-                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                  Expanded(
-                    child: Obx(() {
-                      final items = _buildFilteredSortedList();
-                      if (catalogueController.myCatalogues.isEmpty) {
-                        return CatalogueEmptyState(
-                          onCreatePressed: _openCreateCatalogueDialog,
-                        );
-                      }
-                      if (items.isEmpty)
-                        return const CatalogueSearchEmptyState();
-                      return ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                        itemCount: items.length,
-                        itemBuilder: (context, index) {
-                          final cat = items[index];
-                          // 🌟 If Guide is active, only fully show the first item
-                          final bool isGuideActive = _activeGuideTool != null;
-                          final bool isFirstItem = index == 0;
-                          final double cardOpacity =
-                              (isGuideActive && !isFirstItem) ? 0.3 : 1.0;
-
-                          return Opacity(
-                            opacity: cardOpacity,
-                            child: GestureDetector(
-                              onTap: () => Get.to(
-                                () => CatalogueDetailsPage(catalogueId: cat.id),
-                              ),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                  border: Border.all(
-                                    color: Colors.grey.shade200,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // HEADER GRADIENT
-                                    Container(
-                                      decoration: const BoxDecoration(
-                                        borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(18),
-                                        ),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Color(0xFF8B5CF6),
-                                            Color(0xFFEC4899),
-                                          ],
-                                        ),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white.withOpacity(
-                                                0.12,
-                                              ),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Iconsax.folder_2,
-                                              size: 16,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              cat.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                          const Icon(
-                                            Iconsax.arrow_right_3,
-                                            size: 18,
-                                            color: Colors.white,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // CONTENT
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        14,
-                                        10,
-                                        14,
-                                        6,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (cat.description.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                bottom: 6.0,
-                                              ),
-                                              child: Text(
-                                                cat.description,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontFamily: 'Poppins',
-                                                  fontSize: 11,
-                                                  color: Color(0xFF4B5563),
-                                                ),
-                                              ),
-                                            ),
-                                          SizedBox(height: 6),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(
-                                                    0xFFE0F2FE,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    const Icon(
-                                                      Iconsax.bag_2,
-                                                      size: 13,
-                                                      color: Color(0xFF1D4ED8),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    // 🗣️ WRAPPED
-                                                    AutoTranslate(
-                                                      child: Text(
-                                                        "${cat.products.length} items",
-                                                        style: const TextStyle(
-                                                          fontFamily: 'Poppins',
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: Color(
-                                                            0xFF1D4ED8,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(
-                                                    0xFFF5F3FF,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
-                                                ),
-                                                child: Row(
-                                                  children: const [
-                                                    Icon(
-                                                      Iconsax.star1,
-                                                      size: 13,
-                                                      color: Color(0xFF8B5CF6),
-                                                    ),
-                                                    SizedBox(width: 4),
-                                                    // 🗣️ WRAPPED
-                                                    AutoTranslate(
-                                                      child: Text(
-                                                        "My Catalog",
-                                                        style: TextStyle(
-                                                          fontFamily: 'Poppins',
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          color: Color(
-                                                            0xFF6D28D9,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const Spacer(),
-                                              // Delete is always dimmed if guide active
-                                              Opacity(
-                                                opacity: isGuideActive
-                                                    ? 0.3
-                                                    : 1.0,
-                                                child: _buildCatalogueActionButton(
-                                                  icon: Iconsax.trash,
-                                                  label: "Delete",
-                                                  onTap: () {
-                                                    // ✨ NEW: Confirmation Dialog
-                                                    Get.dialog(
-                                                      AlertDialog(
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                16,
-                                                              ),
-                                                        ),
-                                                        title:
-                                                            const AutoTranslate(
-                                                              child: Text(
-                                                                "Delete Catalog",
-                                                                style: TextStyle(
-                                                                  fontFamily:
-                                                                      'Poppins',
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                        content: AutoTranslate(
-                                                          child: Text(
-                                                            "Are you sure you want to delete '${cat.name}'? This cannot be undone.",
-                                                            style:
-                                                                const TextStyle(
-                                                                  fontFamily:
-                                                                      'Poppins',
-                                                                ),
-                                                          ),
-                                                        ),
-                                                        actions: [
-                                                          TextButton(
-                                                            onPressed: () =>
-                                                                Get.back(), // Close dialog
-                                                            child: const AutoTranslate(
-                                                              child: Text(
-                                                                "Cancel",
-                                                                style: TextStyle(
-                                                                  color: Colors
-                                                                      .grey,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          TextButton(
-                                                            onPressed: () {
-                                                              // 1. Clear session state
-                                                              VerticalProductCard
-                                                                  .sessionAddedToCatalog
-                                                                  .removeWhere(
-                                                                    (
-                                                                      key,
-                                                                      value,
-                                                                    ) =>
-                                                                        value ==
-                                                                        cat.name,
-                                                                  );
-
-                                                              // 2. Delete from controller
-                                                              catalogueController
-                                                                  .deleteCatalogue(
-                                                                    cat.id,
-                                                                  );
-
-                                                              // 3. Close dialog
-                                                              Get.back();
-                                                            },
-                                                            child: const AutoTranslate(
-                                                              child: Text(
-                                                                "Delete",
-                                                                style: TextStyle(
-                                                                  color: Colors
-                                                                      .red,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  },
-                                                  outlined: true,
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Divider(
-                                      height: 14,
-                                      thickness: 0.7,
-                                      color: Color(0xFFE5E7EB),
-                                    ),
-                                    Row(
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            left: 12.0,
-                                          ),
-                                          child: Icon(
-                                            Iconsax.flash_1,
-                                            color: accentColor,
-                                            size: 22,
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        // 🗣️ WRAPPED
-                                        const AutoTranslate(
-                                          child: Text(
-                                            "Reseller Tools",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 16,
-                                              color: Color(0xFF86198F),
-                                              fontFamily: 'Poppins',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(height: 6),
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        12,
-                                        6,
-                                        12,
-                                        10,
-                                      ),
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        crossAxisAlignment:
-                                            WrapCrossAlignment.center,
-                                        children: [
-                                          // --- SOCIAL ICONS ---
-                                          // 6. SHOWCASE SHARE
-                                          index == 0
-                                              ? Showcase(
-                                                  key: _shareKey,
-                                                  title: "Easy Sharing",
-                                                  description:
-                                                      "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
-                                                  overlayColor: Colors.black
-                                                      .withOpacity(0.7),
-                                                  titleTextStyle: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: accentColor,
-                                                    fontSize: 16,
-                                                  ),
-                                                  descTextStyle: TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.black,
-                                                    fontSize: 12,
-                                                  ),
-                                                  targetBorderRadius:
-                                                      BorderRadius.circular(20),
-                                                  child: _buildSocialRow(cat),
-                                                )
-                                              : _buildSocialRow(cat),
-
-                                          // 7. SHOWCASE TOOLS
-                                          index == 0
-                                              ? Showcase(
-                                                  key: _toolsKey,
-                                                  title: "Power Tools",
-                                                  description:
-                                                      "Generate PDFs, Collages, or CSVs instantly to look professional.",
-                                                  overlayColor: Colors.black
-                                                      .withOpacity(0.7),
-                                                  titleTextStyle: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: accentColor,
-                                                    fontSize: 16,
-                                                  ),
-                                                  descTextStyle: TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.black,
-                                                    fontSize: 12,
-                                                  ),
-                                                  targetBorderRadius:
-                                                      BorderRadius.circular(20),
-                                                  child: _buildToolsRow(cat),
-                                                )
-                                              : _buildToolsRow(cat),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }),
-                  ),
-                ],
-              ),
-
-              // 2. ⚡ GUIDE OVERLAY
-              if (_activeGuideTool != null)
-                _buildGuideOverlay(
-                  toolId: _activeGuideTool!,
-                  onDismiss: () => setState(() => _activeGuideTool = null),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // HELPER FOR SOCIAL ROW
-  Widget _buildSocialRow(CatalogueModel cat) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          _buildSocialIconButton(
-            icon: Iconsax.message_text,
-            color: const Color(0xFF25D366),
-            bgColor: const Color(0xFFDCFCE7),
-            onTap: () => _openShareMarginDialog(cat),
-          ),
-          _buildSocialIconButton(
-            icon: Icons.facebook,
-            color: const Color(0xFF1877F2),
-            bgColor: const Color(0xFFDBEAFE),
-            onTap: () => _openShareMarginDialog(cat),
-          ),
-          _buildSocialIconButton(
-            icon: Iconsax.camera,
-            color: const Color(0xFFE1306C),
-            bgColor: const Color(0xFFFCE7F3),
-            onTap: () => _openShareMarginDialog(cat),
-          ),
-          _buildSocialIconButton(
-            icon: Icons.share,
-            color: const Color(0xFFE1306C),
-            bgColor: const Color(0xFFFCE7F3),
-            onTap: () => _openShareMarginDialog(cat),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // HELPER FOR TOOLS ROW
-  Widget _buildToolsRow(CatalogueModel cat) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 8,
-      children: [
-        _buildCatalogueActionButton(
-          icon: Iconsax.magicpen,
-          label: "Collage",
-          onTap: () => _openCollageStudio(cat),
-          bgColor: const Color(0xFFFFFBEB),
-          color: const Color(0xFFF59E0B),
-        ),
-        _buildCatalogueActionButton(
-          icon: Iconsax.document_download,
-          label: "Download",
-          onTap: () => _handleBulkDownload(cat),
-          bgColor: const Color(0xFFFFFBEB),
-          color: const Color.fromARGB(255, 11, 105, 245),
-        ),
-        _buildCatalogueActionButton(
-          icon: Iconsax.document_text,
-          label: "CSV",
-          onTap: () => _openCsvExportDialog(cat),
-          bgColor: const Color(0xFFECFDF5),
-          color: const Color(0xFF059669),
-        ),
-        _buildCatalogueActionButton(
-          icon: Iconsax.document_code,
-          label: "PDF",
-          onTap: () => _openPdfMarginDialog(cat),
-          bgColor: const Color(0xFFF5F3FF),
-          color: const Color(0xFF7C3AED),
-        ),
-      ],
-    );
-  }
-
-  // 🔹 GUIDE OVERLAY WIDGET
-  Widget _buildGuideOverlay({
-    required String toolId,
-    required VoidCallback onDismiss,
-  }) {
-    String title = "Tool Guide";
-    String message = "Select a catalog to use this tool.";
-    IconData icon = Iconsax.info_circle;
-
-    switch (toolId) {
-      case 'collage_maker':
-        title = "Collage Maker";
-        message =
-            "Tap the 'Collage' button on any catalog below to start creating amazing images!";
-        icon = Iconsax.magicpen;
-        break;
-      case 'pdf_generator':
-        title = "PDF Generator";
-        message =
-            "Tap the 'PDF' button on a catalog to generate a professional brochure.";
-        icon = Iconsax.document_text;
-        break;
-      case 'csv_builder_pro':
-        title = "CSV Export";
-        message =
-            "Tap 'CSV' to download a file ready for Amazon, Shopify, or Excel.";
-        icon = Iconsax.document_code;
-        break;
-      case 'bulk_downloader':
-        title = "Bulk Download";
-        message = "Tap 'Download' to save all product images to your gallery.";
-        icon = Iconsax.document_download;
-        break;
-      case 'smart_catalog':
-        title = "Smart Catalog";
-        message = "Click 'New Catalog' or manage existing ones here.";
-        icon = Iconsax.folder_add;
-        break;
-    }
-
-    return Positioned(
-      bottom: 20,
-      left: 16,
-      right: 16,
-      child: Material(
-        color: Colors.transparent,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOutBack,
-          builder: (context, val, child) {
-            return Transform.translate(
-              offset: Offset(0, 50 * (1 - val)),
-              child: Opacity(opacity: val, child: child),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 🗣️ WRAPPED
-                      AutoTranslate(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // 🗣️ WRAPPED
-                      AutoTranslate(
-                        child: Text(
-                          message,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 13,
-                            fontFamily: 'Poppins',
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: onDismiss,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: accentColor,
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          // 🗣️ WRAPPED
-                          child: const AutoTranslate(
-                            child: Text(
-                              "Got it!",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onDismiss,
-                  child: Icon(
-                    Icons.close,
-                    color: Colors.white.withOpacity(0.5),
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── UPDATED: PRODUCT SELECTION SHEET (Strict 30 Limit) ───────────────────
-
-class _ProductSelectionSheet extends StatefulWidget {
-  final CatalogueModel catalogue;
-  final Function(List<ProductModel>) onConfirm;
-
-  const _ProductSelectionSheet({
-    required this.catalogue,
-    required this.onConfirm,
-  });
-
-  @override
-  State<_ProductSelectionSheet> createState() => _ProductSelectionSheetState();
-}
-
-class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
-  final Set<String> _selectedIds = {};
-
-  @override
-  void initState() {
-    super.initState();
-    for (var i = 0; i < widget.catalogue.products.length; i++) {
-      if (i < 30) {
-        _selectedIds.add(widget.catalogue.products[i].id.toString());
-      }
-    }
-  }
-
-  void _toggle(String id) {
-    setState(() {
-      if (_selectedIds.contains(id)) {
-        _selectedIds.remove(id);
-      } else {
-        if (_selectedIds.length >= 30) {
-          Get.snackbar(
-            "",
-            "",
-            titleText: const AutoTranslate(
-              child: Text(
-                "Limit Reached",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            messageText: const AutoTranslate(
-              child: Text(
-                "PDF limit is 30 products. Unselect an item to add this one.",
-              ),
-            ),
-            backgroundColor: Colors.orange.shade50,
-            colorText: Colors.orange.shade900,
-            duration: const Duration(seconds: 3),
-            snackPosition: SnackPosition.BOTTOM,
-            margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
-          );
-          return;
-        }
-        _selectedIds.add(id);
-      }
-    });
-  }
-
-  void _selectAllSmart() {
-    setState(() {
-      _selectedIds.clear();
-      final products = widget.catalogue.products;
-      final int limit = products.length > 30 ? 30 : products.length;
-
-      for (var i = 0; i < limit; i++) {
-        _selectedIds.add(products[i].id.toString());
-      }
-    });
-
-    if (widget.catalogue.products.length > 30) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Selection Limited",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: const AutoTranslate(
-          child: Text("Selected the first 30 products automatically."),
-        ),
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    }
-  }
-
-  void _deselectAll() {
-    setState(() {
-      _selectedIds.clear();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final products = widget.catalogue.products;
-    final isFullSelection = _selectedIds.isNotEmpty;
-    final isLargeCatalog = products.length > 30;
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 🗣️ WRAPPED
-                      const AutoTranslate(
-                        child: Text(
-                          "Select Products for PDF",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          // 🗣️ WRAPPED DYNAMIC
-                          AutoTranslate(
-                            child: Text(
-                              "${_selectedIds.length} / 30 selected",
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: _selectedIds.length == 30
-                                    ? Colors.red
-                                    : accentColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          if (_selectedIds.length == 30)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 6.0),
-                              child: AutoTranslate(
-                                child: Text(
-                                  "(Max limit)",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: isFullSelection ? _deselectAll : _selectAllSmart,
-                    // 🗣️ WRAPPED
-                    child: AutoTranslate(
-                      child: Text(
-                        isFullSelection
-                            ? "Clear"
-                            : (isLargeCatalog ? "Select Top 30" : "Select All"),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(),
-
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: products.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (ctx, i) {
-                  final p = products[i];
-                  final isSelected = _selectedIds.contains(p.id.toString());
-                  final isLimitReached = _selectedIds.length >= 30;
-                  final bool isDisabled = isLimitReached && !isSelected;
-
-                  return InkWell(
-                    onTap: () => _toggle(p.id.toString()),
-                    child: Opacity(
-                      opacity: isDisabled ? 0.5 : 1.0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: isSelected
-                                ? accentColor
-                                : Colors.grey.shade200,
-                            width: isSelected ? 2 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          color: isSelected
-                              ? accentColor.withOpacity(0.04)
-                              : Colors.white,
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                                image: p.image.isNotEmpty
-                                    ? DecorationImage(
-                                        image: NetworkImage(p.image),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : null,
-                              ),
-                              child: p.image.isEmpty
-                                  ? const Icon(Iconsax.image, size: 20)
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    p.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    "₹${p.price}",
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: isSelected ? accentColor : Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isSelected
-                                      ? accentColor
-                                      : Colors.grey.shade400,
-                                ),
-                              ),
-                              child: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: Colors.white,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _selectedIds.isEmpty
-                      ? null
-                      : () {
-                          final selectedProducts = products
-                              .where(
-                                (p) => _selectedIds.contains(p.id.toString()),
-                              )
-                              .toList();
-                          widget.onConfirm(selectedProducts);
-                        },
-                  // 🗣️ WRAPPED
-                  child: AutoTranslate(
-                    child: Text(
-                      "Continue (${_selectedIds.length})",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── COLLAGE STUDIO SHEET (KEYBOARD FIXED) ───────────────────────────────────
-
-class _CollageStudioSheet extends StatefulWidget {
-  final CatalogueModel catalogue;
-  final String shopName;
-  final String phone;
-
-  const _CollageStudioSheet({
-    required this.catalogue,
-    required this.shopName,
-    required this.phone,
-  });
-
-  @override
-  State<_CollageStudioSheet> createState() => _CollageStudioSheetState();
-}
-
-class _CollageStudioSheetState extends State<_CollageStudioSheet> {
-  CollageLayout _selectedLayout = CollageLayout.grid;
-  final Color _themeColor = const Color.fromARGB(255, 203, 20, 145);
-  Color _bgColor = Colors.white;
-  File? _customBgImage;
-  bool _showPrices = true;
-  bool _showBranding = true;
-  bool _isGenerating = false;
-
-  final TextEditingController _marginController = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
-
-  final List<Color> _colors = [
-    Colors.white,
-    Colors.black,
-    const Color(0xFFFFF8E1), // Cream
-    const Color(0xFFE3F2FD), // Light Blue
-    const Color(0xFFF3E5F5), // Light Purple
-  ];
-
-  Future<void> _pickBgImage(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image != null) {
-        setState(() {
-          _customBgImage = File(image.path);
-          _bgColor = Colors.transparent;
-        });
-      }
-    } catch (e) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text("Error", style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        messageText: AutoTranslate(child: Text("Could not load image: $e")),
-        backgroundColor: Colors.red.shade50,
-      );
-    }
-  }
-
-  Future<void> _createAndShare() async {
-    setState(() => _isGenerating = true);
-    double marginPercent = double.tryParse(_marginController.text) ?? 0.0;
-
-    if (marginPercent < 20) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text(
-            "Low Margin",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        messageText: const AutoTranslate(
-          child: Text("Minimum margin must be 20%"),
-        ),
-        backgroundColor: Colors.red.shade100,
-        colorText: Colors.red.shade900,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      setState(() => _isGenerating = false);
-      return;
-    }
-
-    try {
-      List<ProductModel> adjustedProducts = widget.catalogue.products.map((p) {
-        double base = double.tryParse(p.price) ?? 0;
-        double newPrice = base * (1 + marginPercent / 100);
-
-        return ProductModel(
-          id: p.id,
-          name: p.name,
-          price: newPrice.toStringAsFixed(0),
-          regularPrice: p.regularPrice,
-          image: p.image,
-          images: p.images,
-          attributes: p.attributes,
-          description: p.description,
-          shortDescription: p.shortDescription,
-          brandName: p.brandName,
-        );
-      }).toList();
-
-      final List<File> files = await CollageService.generateCollages(
-        products: adjustedProducts,
-        layout: _selectedLayout,
-        shopName: _showBranding ? widget.shopName : "",
-        contactNumber: _showBranding ? widget.phone : "",
-        showPrices: _showPrices,
-        showBranding: _showBranding,
-        themeColor: _themeColor,
-        backgroundColor: _bgColor,
-        backgroundImage: _customBgImage,
-        extraMargin: 0,
-      );
-
-      List<XFile> xFiles = files.map((f) => XFile(f.path)).toList();
-      await Share.shareXFiles(
-        xFiles,
-        text: "Check out our latest collection! ✨",
-      );
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      Get.snackbar(
-        "",
-        "",
-        titleText: const AutoTranslate(
-          child: Text("Error", style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        messageText: AutoTranslate(child: Text("Failed: $e")),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      if (mounted) setState(() => _isGenerating = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // 🗣️ WRAPPED
-                const Center(
-                  child: AutoTranslate(
-                    child: Text(
-                      "Collage Studio Pro 📸",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 🗣️ WRAPPED
-                const Center(
-                  child: AutoTranslate(
-                    child: Text(
-                      "Create professional collage to share with your customers, social media and others",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Layouts
-                // 🗣️ WRAPPED
-                const AutoTranslate(
-                  child: Text(
-                    "CHOOSE LAYOUT",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _layoutOption("Grid", Iconsax.grid_3, CollageLayout.grid),
-                      const SizedBox(width: 8),
-                      _layoutOption(
-                        "Story",
-                        Iconsax.mobile,
-                        CollageLayout.story,
-                      ),
-                      const SizedBox(width: 8),
-                      _layoutOption(
-                        "Mag",
-                        Iconsax.book_1,
-                        CollageLayout.magazine,
-                      ),
-                      const SizedBox(width: 8),
-                      _layoutOption(
-                        "Clean",
-                        Iconsax.maximize_3,
-                        CollageLayout.minimal,
-                      ),
-                      const SizedBox(width: 8),
-                      _layoutOption(
-                        "Catalog",
-                        Iconsax.book,
-                        CollageLayout.catalog,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // 📸 BACKGROUND
-                // 🗣️ WRAPPED
-                const AutoTranslate(
-                  child: Text(
-                    "BACKGROUND",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _bgOptionBtn(
-                      Iconsax.gallery,
-                      "Gallery",
-                      () => _pickBgImage(ImageSource.gallery),
-                    ),
-                    const SizedBox(width: 10),
-                    _bgOptionBtn(
-                      Iconsax.camera,
-                      "Camera",
-                      () => _pickBgImage(ImageSource.camera),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 1,
-                      height: 30,
-                      color: Colors.grey.shade300,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: _colors
-                              .map(
-                                (c) => GestureDetector(
-                                  onTap: () => setState(() {
-                                    _bgColor = c;
-                                    _customBgImage = null;
-                                  }),
-                                  child: Container(
-                                    width: 36,
-                                    height: 36,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                      color: c,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.grey.shade300,
-                                      ),
-                                      boxShadow:
-                                          (_bgColor == c &&
-                                              _customBgImage == null)
-                                          ? [
-                                              const BoxShadow(
-                                                color: Colors.blue,
-                                                blurRadius: 4,
-                                              ),
-                                            ]
-                                          : [],
-                                    ),
-                                    child:
-                                        (_bgColor == c &&
-                                            _customBgImage == null)
-                                        ? const Icon(
-                                            Icons.check,
-                                            size: 16,
-                                            color: Colors.grey,
-                                          )
-                                        : null,
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (_customBgImage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.image,
-                            size: 16,
-                            color: Colors.green,
-                          ),
-                          const SizedBox(width: 8),
-                          // 🗣️ WRAPPED
-                          const AutoTranslate(
-                            child: Text(
-                              "Image Selected",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          InkWell(
-                            onTap: () => setState(() => _customBgImage = null),
-                            child: const Icon(
-                              Icons.close,
-                              size: 18,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                const SizedBox(height: 24),
-
-                // 💰 MARGIN INPUT
-                // 🗣️ WRAPPED
-                const AutoTranslate(
-                  child: Text(
-                    "ADD MARGIN (%)",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: accentColor.withOpacity(0.5)),
-                      ),
-                      child: TextField(
-                        controller: _marginController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: "e.g. 30",
-                          suffixText: "%",
-                          prefixIcon: Icon(
-                            Iconsax.percentage_square,
-                            size: 18,
-                            color: accentColor,
-                          ),
-                          contentPadding: EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [30, 50, 70, 100].map((val) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: ActionChip(
-                              label: Text(
-                                "$val%",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              backgroundColor: Colors.blue.shade50,
-                              labelStyle: TextStyle(
-                                color: Colors.blue.shade900,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                side: BorderSide(color: Colors.blue.shade100),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _marginController.text = val.toString();
-                                });
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    // 🗣️ WRAPPED
-                    const AutoTranslate(
-                      child: Text(
-                        " * Minimum 20% margin is required.",
-                        style: TextStyle(fontSize: 10, color: Colors.grey),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Toggles
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: _themeColor,
-                  // 🗣️ WRAPPED
-                  title: const AutoTranslate(
-                    child: Text(
-                      "Show Price Tags",
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  value: _showPrices,
-                  onChanged: (v) => setState(() => _showPrices = v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: _themeColor,
-                  // 🗣️ WRAPPED
-                  title: const AutoTranslate(
-                    child: Text(
-                      "Add Branding",
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  value: _showBranding,
-                  onChanged: (v) => setState(() => _showBranding = v),
-                ),
-                const SizedBox(height: 16),
-
-                // Generate
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton.icon(
-                    onPressed: _isGenerating ? null : _createAndShare,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _themeColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: _isGenerating
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Iconsax.magicpen, color: Colors.white),
-                    // 🗣️ WRAPPED
-                    label: AutoTranslate(
-                      child: Text(
-                        _isGenerating ? "Designing..." : "Create & Share",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _bgOptionBtn(IconData icon, String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 20, color: Colors.black87),
-          ),
-          const SizedBox(height: 4),
-          // 🗣️ WRAPPED
-          AutoTranslate(
-            child: Text(label, style: const TextStyle(fontSize: 10)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _layoutOption(String label, IconData icon, CollageLayout layout) {
-    bool selected = _selectedLayout == layout;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedLayout = layout),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: selected ? _themeColor.withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? _themeColor : Colors.grey.shade200,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: selected ? _themeColor : Colors.grey),
-            const SizedBox(height: 4),
-            // 🗣️ WRAPPED
-            AutoTranslate(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: selected ? _themeColor : Colors.grey,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// import 'dart:convert';
+// import 'dart:io';
+// import 'dart:math';
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
+// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+// import 'package:get/get.dart';
+// import 'package:get_storage/get_storage.dart';
+// import 'package:iconsax/iconsax.dart';
+// import 'package:kakiso_reseller_app/models/product.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
+// import 'package:kakiso_reseller_app/utils/double_tap.dart';
+// import 'package:share_plus/share_plus.dart';
+// import 'package:http/http.dart' as http;
+// import 'package:path_provider/path_provider.dart';
+// import 'package:image_picker/image_picker.dart';
+// // 1. IMPORT SHOWCASEVIEW
+// import 'package:showcaseview/showcaseview.dart';
+// // 2. IMPORT AUTO TRANSLATE
+// import 'package:flutter_auto_translate/flutter_auto_translate.dart';
+
+// import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
+// import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
+// import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
+// import 'package:kakiso_reseller_app/models/user.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalouge_details_page.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
+// import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_drawer.dart';
+// import 'package:kakiso_reseller_app/services/pdf_services.dart';
+// import 'package:kakiso_reseller_app/services/collage_service.dart';
+
+// import 'package:kakiso_reseller_app/screens/dashboard/catalogue/catalogue_sort.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_header.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_sort_bar.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_empty_state.dart';
+// import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_search_empty_state.dart';
+
+// // NEW IMPORT FOR STATE ACCESS
+// import 'package:kakiso_reseller_app/screens/dashboard/categories/categories_detail_page/widgets/vertical_product_card_categories.dart';
+
+// const Color accentColor = Color(0xFF2563EB); // Royal Blue
+
+// class CatalogueSection extends StatelessWidget {
+//   final UserData userData;
+//   const CatalogueSection({super.key, required this.userData});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return ShowCaseWidget(
+//       builder: (context) => _CatalogueSectionContent(userData: userData),
+//       autoPlay: false,
+//       blurValue: 1,
+//       enableAutoScroll: true,
+//       scrollDuration: const Duration(milliseconds: 300),
+//     );
+//   }
+// }
+
+// class _CatalogueSectionContent extends StatefulWidget {
+//   final UserData userData;
+
+//   const _CatalogueSectionContent({required this.userData});
+
+//   @override
+//   State<_CatalogueSectionContent> createState() =>
+//       _CatalogueSectionContentState();
+// }
+
+// class _CatalogueSectionContentState extends State<_CatalogueSectionContent>
+//     with SingleTickerProviderStateMixin {
+//   final _storage = const FlutterSecureStorage();
+//   final _localStorage = GetStorage();
+//   static int? _lastProcessedTimestamp;
+//   final CatalogueController catalogueController = Get.put(
+//     CatalogueController(),
+//     permanent: true,
+//   );
+
+//   final HomeProductsController homeProductsController = Get.put(
+//     HomeProductsController(),
+//   );
+
+//   final CartController cartController = Get.put(CartController());
+
+//   String _searchQuery = '';
+//   CatalogueSort _currentSort = CatalogueSort.newest;
+//   final TextEditingController _searchController = TextEditingController();
+
+//   bool _isGeneratingPdf = false;
+//   bool _isGeneratingCsv = false;
+
+//   String? _activeGuideTool;
+//   late AnimationController _pulseController;
+//   late Animation<double> _pulseAnimation;
+
+//   Worker? _productListener;
+
+//   final GlobalKey _addCatalogKey = GlobalKey();
+//   final GlobalKey _shareKey = GlobalKey();
+//   final GlobalKey _toolsKey = GlobalKey();
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _pulseController = AnimationController(
+//       vsync: this,
+//       duration: const Duration(milliseconds: 1000),
+//     )..repeat(reverse: true);
+
+//     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+//       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+//     );
+
+//     _productListener = ever(homeProductsController.allProducts, (products) {
+//       if (products.isNotEmpty) {
+//         _checkAndCreateDefaultCatalogues();
+//       }
+//     });
+
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//       if (homeProductsController.allProducts.isNotEmpty) {
+//         _checkAndCreateDefaultCatalogues();
+//       }
+//       _checkForNavArguments();
+//       _checkAndStartTour();
+//     });
+//   }
+
+//   void _checkAndStartTour() async {
+//     await Future.delayed(const Duration(seconds: 1));
+//     bool hasShownTour =
+//         _localStorage.read('has_shown_catalogue_tour_v2') ?? false;
+
+//     if (!hasShownTour) {
+//       _startTour();
+//       _localStorage.write('has_shown_catalogue_tour_v2', true);
+//     }
+//   }
+
+//   void _startTour() {
+//     if (catalogueController.myCatalogues.isNotEmpty) {
+//       ShowCaseWidget.of(
+//         context,
+//       ).startShowCase([_addCatalogKey, _shareKey, _toolsKey]);
+//     } else {
+//       ShowCaseWidget.of(context).startShowCase([_addCatalogKey]);
+//     }
+//   }
+
+//   // 🔹 FIXED LOGIC: Changed key to 'v4' to force re-check
+//   Future<void> _checkAndCreateDefaultCatalogues() async {
+//     // 1. CHANGED KEY to v4 to force execution if missing
+//     bool hasCreated =
+//         _localStorage.read('has_created_default_catalogs_v4') ?? false;
+
+//     // 2. CHECK IF CATALOGUES ARE EMPTY EVEN IF FLAG IS TRUE
+//     // If flag is true but list is empty, we should retry.
+//     if (hasCreated && catalogueController.myCatalogues.isNotEmpty) return;
+
+//     final allProducts = homeProductsController.allProducts;
+//     if (allProducts.isEmpty) return;
+
+//     // --- 1. HIGH MARGIN PICKS ---
+//     final highMarginProducts = allProducts
+//         .where((p) => (double.tryParse(p.price) ?? 0) > 1500)
+//         .take(5)
+//         .toList();
+
+//     if (highMarginProducts.isNotEmpty) {
+//       if (!catalogueController.myCatalogues.any(
+//         (c) => c.name == "🏆 High Margin Picks",
+//       )) {
+//         catalogueController.createCatalogue(
+//           "🏆 High Margin Picks",
+//           "Premium items with high profit potential.",
+//         );
+//         await Future.delayed(const Duration(milliseconds: 50));
+//         final cat = catalogueController.myCatalogues.firstWhereOrNull(
+//           (c) => c.name == "🏆 High Margin Picks",
+//         );
+//         if (cat != null) {
+//           for (var p in highMarginProducts) {
+//             catalogueController.addProductToCatalogue(cat.id, p);
+//           }
+//         }
+//       }
+//     }
+
+//     // --- 2. UNDER ₹1000 STORE ---
+//     final budgetProducts = allProducts
+//         .where(
+//           (p) =>
+//               (double.tryParse(p.price) ?? 0) < 1000 &&
+//               (double.tryParse(p.price) ?? 0) > 0,
+//         )
+//         .take(8)
+//         .toList();
+
+//     if (budgetProducts.isNotEmpty) {
+//       if (!catalogueController.myCatalogues.any(
+//         (c) => c.name == "💰 Under ₹1000 Store",
+//       )) {
+//         catalogueController.createCatalogue(
+//           "💰 Under ₹1000 Store",
+//           "Budget-friendly bestsellers.",
+//         );
+//         await Future.delayed(const Duration(milliseconds: 50));
+//         final cat = catalogueController.myCatalogues.firstWhereOrNull(
+//           (c) => c.name == "💰 Under ₹1000 Store",
+//         );
+//         if (cat != null) {
+//           for (var p in budgetProducts) {
+//             catalogueController.addProductToCatalogue(cat.id, p);
+//           }
+//         }
+//       }
+//     }
+
+//     // --- 3. TRENDING & VIRAL ---
+//     final trendingProducts = List<ProductModel>.from(allProducts)
+//       ..shuffle(Random());
+//     final selectedTrending = trendingProducts.take(6).toList();
+
+//     if (selectedTrending.isNotEmpty) {
+//       if (!catalogueController.myCatalogues.any(
+//         (c) => c.name == "🚀 Trending & Viral",
+//       )) {
+//         catalogueController.createCatalogue(
+//           "🚀 Trending & Viral",
+//           "Most popular items right now.",
+//         );
+//         await Future.delayed(const Duration(milliseconds: 50));
+//         final cat = catalogueController.myCatalogues.firstWhereOrNull(
+//           (c) => c.name == "🚀 Trending & Viral",
+//         );
+//         if (cat != null) {
+//           for (var p in selectedTrending) {
+//             catalogueController.addProductToCatalogue(cat.id, p);
+//           }
+//         }
+//       }
+//     }
+
+//     // Mark as created (v4)
+//     _localStorage.write('has_created_default_catalogs_v4', true);
+//     if (mounted) setState(() {});
+//   }
+
+//   void _checkForNavArguments() {
+//     final args = Get.arguments;
+
+//     // 1. Check if arguments exist and are valid
+//     if (args != null && args is Map) {
+//       final String? toolId = args['active_tool_guide'];
+//       final int? timestamp = args['guide_timestamp'];
+
+//       // 2. logic: Only show if we have an ID AND it's a new timestamp we haven't seen
+//       if (toolId != null && timestamp != null) {
+//         if (timestamp != _lastProcessedTimestamp) {
+//           // New event! Update timestamp and show guide
+//           _lastProcessedTimestamp = timestamp;
+
+//           setState(() {
+//             _activeGuideTool = toolId;
+//           });
+
+//           // Optional: Clear args map to be safe, though static check handles the logic now
+//           args['active_tool_guide'] = null;
+//         }
+//       }
+//     }
+//   }
+
+//   @override
+//   void dispose() {
+//     _pulseController.dispose();
+//     _productListener?.dispose();
+//     super.dispose();
+//   }
+
+//   // --- REUSABLE MARGIN INPUT WIDGET ---
+//   Widget _buildMarginInput({
+//     required TextEditingController controller,
+//     required Function(String) onTagSelected,
+//   }) {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         TextField(
+//           controller: controller,
+//           keyboardType: TextInputType.number,
+//           decoration: InputDecoration(
+//             // 🗣️ WRAPPED
+//             label: const AutoTranslate(child: Text("Margin Percentage (%)")),
+//             hintText: "Min 20%",
+//             suffixText: "%",
+//             prefixIcon: const Icon(Iconsax.percentage_square),
+//             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+//             isDense: true,
+//           ),
+//         ),
+//         const SizedBox(height: 12),
+//         SingleChildScrollView(
+//           scrollDirection: Axis.horizontal,
+//           child: Row(
+//             children: [30, 50, 70, 100].map((val) {
+//               return Padding(
+//                 padding: const EdgeInsets.only(right: 8.0),
+//                 child: ActionChip(
+//                   label: Text(
+//                     "$val%",
+//                     style: const TextStyle(
+//                       fontWeight: FontWeight.w600,
+//                       fontSize: 12,
+//                     ),
+//                   ),
+//                   backgroundColor: Colors.blue.shade50,
+//                   labelStyle: TextStyle(color: Colors.blue.shade900),
+//                   shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(20),
+//                     side: BorderSide(color: Colors.blue.shade100),
+//                   ),
+//                   onPressed: () {
+//                     controller.text = val.toString();
+//                     onTagSelected(val.toString());
+//                   },
+//                 ),
+//               );
+//             }).toList(),
+//           ),
+//         ),
+//         const SizedBox(height: 6),
+//         // 🗣️ WRAPPED
+//         const AutoTranslate(
+//           child: Text(
+//             " * Minimum 20% margin is required.",
+//             style: TextStyle(fontSize: 10, color: Colors.grey),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+
+//   // --- BULK DOWNLOAD LOGIC ---
+//   Future<void> _handleBulkDownload(CatalogueModel cat) async {
+//     if (cat.products.isEmpty) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text("Empty", style: TextStyle(fontWeight: FontWeight.bold)),
+//         ),
+//         messageText: const AutoTranslate(
+//           child: Text("No products to download."),
+//         ),
+//         backgroundColor: Colors.orange.shade100,
+//       );
+//       return;
+//     }
+
+//     Get.showOverlay(
+//       asyncFunction: () async {
+//         try {
+//           Directory? directory;
+//           if (Platform.isAndroid) {
+//             directory = Directory(
+//               '/storage/emulated/0/Download/Kakiso_Catalogues/01_KaKiSo${cat.name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ' ')}',
+//             );
+//           } else {
+//             final docDir = await getApplicationDocumentsDirectory();
+//             directory = Directory(
+//               '${docDir.path}/${cat.name.replaceAll(" ", "_")}',
+//             );
+//           }
+
+//           if (!await directory.exists()) {
+//             await directory.create(recursive: true);
+//           }
+
+//           for (int i = 0; i < cat.products.length; i++) {
+//             final p = cat.products[i];
+//             if (p.image.isEmpty) continue;
+
+//             try {
+//               final response = await http.get(Uri.parse(p.image));
+//               if (response.statusCode == 200) {
+//                 String safeName = p.name.replaceAll(
+//                   RegExp(r'[^a-zA-Z0-9]'),
+//                   '_',
+//                 );
+//                 if (safeName.length > 50) safeName = safeName.substring(0, 50);
+//                 String fileName = "${safeName}_$i.jpg";
+
+//                 File file = File('${directory.path}/$fileName');
+//                 await file.writeAsBytes(response.bodyBytes);
+//               }
+//             } catch (e) {
+//               debugPrint("Failed to download image for ${p.name}: $e");
+//             }
+//           }
+
+//           Get.snackbar(
+//             "",
+//             "",
+//             titleText: const AutoTranslate(
+//               child: Text(
+//                 "Download Complete",
+//                 style: TextStyle(fontWeight: FontWeight.bold),
+//               ),
+//             ),
+//             messageText: const AutoTranslate(child: Text("Saved to Gallery")),
+//             backgroundColor: Colors.green,
+//             colorText: Colors.white,
+//             duration: const Duration(seconds: 5),
+//             snackPosition: SnackPosition.BOTTOM,
+//             margin: const EdgeInsets.all(10),
+//           );
+//         } catch (e) {
+//           Get.snackbar(
+//             "Download Error",
+//             "Could not save images: $e",
+//             backgroundColor: Colors.red,
+//             colorText: Colors.white,
+//           );
+//         }
+//       },
+//       loadingWidget: Center(
+//         child: Container(
+//           padding: const EdgeInsets.all(20),
+//           decoration: BoxDecoration(
+//             color: Colors.white,
+//             borderRadius: BorderRadius.circular(12),
+//           ),
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: const [
+//               CircularProgressIndicator(color: accentColor),
+//               SizedBox(height: 16),
+//               // 🗣️ WRAPPED
+//               AutoTranslate(
+//                 child: Text(
+//                   "Downloading images...",
+//                   style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   // --- LOGOUT DIALOG ---
+//   Future<void> _showLogoutConfirmation() async {
+//     Get.dialog(
+//       AlertDialog(
+//         shape: RoundedRectangleBorder(
+//           borderRadius: BorderRadius.circular(16.0),
+//         ),
+//         title: const AutoTranslate(
+//           child: Text('Logout', style: TextStyle(fontFamily: 'Poppins')),
+//         ),
+//         content: const AutoTranslate(
+//           child: Text(
+//             'Do you want to log out?',
+//             style: TextStyle(fontFamily: 'Poppins'),
+//           ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Get.back(),
+//             child: const AutoTranslate(child: Text('Cancel')),
+//           ),
+//           TextButton(
+//             onPressed: () async {
+//               Get.back();
+//               await _storage.delete(key: 'authToken');
+//               Get.offAll(() => const LoginPage());
+//             },
+//             child: const AutoTranslate(
+//               child: Text('Logout', style: TextStyle(color: accentColor)),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   void _handleDrawerNavigation(String pageId) {
+//     Navigator.pop(context);
+//     if (pageId == 'Home' || pageId == 'BusinessDetails') {
+//       Get.off(() => HomePage(userData: widget.userData));
+//     }
+//   }
+
+//   // --- CREATE CATALOGUE DIALOG ---
+//   void _openCreateCatalogueDialog() {
+//     final TextEditingController nameCtrl = TextEditingController();
+//     final TextEditingController notesCtrl = TextEditingController();
+
+//     Get.dialog(
+//       AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: const AutoTranslate(
+//           child: Text(
+//             "Create Catalog",
+//             style: TextStyle(
+//               fontFamily: 'Poppins',
+//               fontWeight: FontWeight.w600,
+//             ),
+//           ),
+//         ),
+//         content: SingleChildScrollView(
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               TextField(
+//                 controller: nameCtrl,
+//                 decoration: InputDecoration(
+//                   // 🗣️ WRAPPED
+//                   label: const AutoTranslate(child: Text("Catalog Name")),
+//                   border: OutlineInputBorder(
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                   isDense: true,
+//                 ),
+//               ),
+//               const SizedBox(height: 12),
+//               TextField(
+//                 controller: notesCtrl,
+//                 decoration: InputDecoration(
+//                   // 🗣️ WRAPPED
+//                   label: const AutoTranslate(child: Text("Notes (optional)")),
+//                   border: OutlineInputBorder(
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                   isDense: true,
+//                 ),
+//                 maxLines: 2,
+//               ),
+//             ],
+//           ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Get.back(),
+//             child: const AutoTranslate(child: Text("Cancel")),
+//           ),
+//           ElevatedButton(
+//             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+//             onPressed: () {
+//               final name = nameCtrl.text.trim();
+//               if (name.isEmpty) {
+//                 Get.snackbar("Error", "Please enter a name");
+//                 return;
+//               }
+//               catalogueController.createCatalogue(
+//                 name,
+//                 notesCtrl.text.trim().isEmpty
+//                     ? "Custom catalog"
+//                     : notesCtrl.text.trim(),
+//               );
+//               Get.back();
+//             },
+//             child: const AutoTranslate(
+//               child: Text("Create", style: TextStyle(color: Colors.white)),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   List<CatalogueModel> _buildFilteredSortedList() {
+//     final List<CatalogueModel> base = catalogueController.myCatalogues.toList();
+//     final query = _searchQuery.trim().toLowerCase();
+//     List<CatalogueModel> filtered = base;
+//     if (query.isNotEmpty) {
+//       filtered = base
+//           .where((c) => c.name.toLowerCase().contains(query))
+//           .toList();
+//     }
+
+//     filtered.sort((a, b) {
+//       switch (_currentSort) {
+//         case CatalogueSort.newest:
+//           return b.createdAt.compareTo(a.createdAt);
+//         case CatalogueSort.oldest:
+//           return a.createdAt.compareTo(b.createdAt);
+//         case CatalogueSort.nameAZ:
+//           return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+//         case CatalogueSort.nameZA:
+//           return b.name.toLowerCase().compareTo(a.name.toLowerCase());
+//         case CatalogueSort.mostProducts:
+//           return b.products.length.compareTo(a.products.length);
+//       }
+//     });
+//     return filtered;
+//   }
+
+//   // ─── CSV EXPORT LOGIC ───────────────────────────────────────────────────
+
+//   void _openCsvExportDialog(CatalogueModel cat) {
+//     if (cat.products.isEmpty) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Empty Catalog",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: const AutoTranslate(child: Text("Add products first!")),
+//         backgroundColor: Colors.red.shade50,
+//       );
+//       return;
+//     }
+
+//     final TextEditingController marginCtrl = TextEditingController();
+
+//     Get.dialog(
+//       AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: const AutoTranslate(
+//           child: Text(
+//             "Export CSV",
+//             style: TextStyle(
+//               fontFamily: 'Poppins',
+//               fontWeight: FontWeight.w600,
+//             ),
+//           ),
+//         ),
+//         content: SingleChildScrollView(
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               const AutoTranslate(
+//                 child: Text(
+//                   "Generate a Shopify/Amazon compatible CSV.",
+//                   style: TextStyle(
+//                     fontFamily: 'Poppins',
+//                     fontSize: 11,
+//                     color: Colors.grey,
+//                   ),
+//                 ),
+//               ),
+//               const SizedBox(height: 16),
+//               _buildMarginInput(
+//                 controller: marginCtrl,
+//                 onTagSelected: (val) {},
+//               ),
+//             ],
+//           ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Get.back(),
+//             child: const AutoTranslate(child: Text("Cancel")),
+//           ),
+//           ElevatedButton(
+//             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+//             onPressed: () {
+//               final double margin =
+//                   double.tryParse(marginCtrl.text.trim()) ?? 0;
+//               if (margin < 20) {
+//                 Get.snackbar(
+//                   "",
+//                   "",
+//                   titleText: const AutoTranslate(
+//                     child: Text(
+//                       "Low Margin",
+//                       style: TextStyle(fontWeight: FontWeight.bold),
+//                     ),
+//                   ),
+//                   messageText: const AutoTranslate(
+//                     child: Text("Minimum margin must be 20%"),
+//                   ),
+//                   backgroundColor: Colors.red.shade100,
+//                   snackPosition: SnackPosition.BOTTOM,
+//                 );
+//                 return;
+//               }
+//               Get.back();
+//               _generateAndShareCsv(cat, margin);
+//             },
+//             child: const AutoTranslate(
+//               child: Text("Download", style: TextStyle(color: Colors.white)),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Future<void> _generateAndShareCsv(
+//     CatalogueModel cat,
+//     double marginPercent,
+//   ) async {
+//     if (_isGeneratingCsv) return;
+//     setState(() => _isGeneratingCsv = true);
+
+//     Get.showOverlay(
+//       asyncFunction: () async {
+//         try {
+//           // 1. COMPREHENSIVE HEADERS (42 Fields)
+//           List<String> headers = [
+//             "ID",
+//             "Name",
+//             "Type",
+//             "SKU",
+//             "Regular Price",
+//             "Sale Price",
+//             "Discount %",
+//             "Stock Status",
+//             "Categories (IDs)",
+//             "Brand Name",
+//             "Brand Logo",
+//             "Short Description",
+//             "Description",
+//             "All Images",
+//             "Main Image",
+//             "HSN Code",
+//             "GST",
+//             "Unique Code",
+//             "EAN Barcode",
+//             "Shipping Fee",
+//             "Country of Origin",
+//             "Manufactured By",
+//             "Imported By",
+//             "Marketed By",
+//             "Dispatch Time",
+//             "Package Includes",
+//             "Length",
+//             "Width",
+//             "Height",
+//             "Weight",
+//             "Gross Weight",
+//             "Item Length",
+//             "Item Width",
+//             "Item Height",
+//             "Item Weight",
+//             "Net Contents",
+//             "Highlights",
+//             "Care Instructions",
+//             "Disclaimer",
+//             "Warranty",
+//             "Keywords",
+//             "Attributes",
+//           ];
+
+//           String csvContent = "${headers.join(",")}\n";
+
+//           for (var p in cat.products) {
+//             // Price Calculation with Margin applied to Sale Price
+//             double basePrice = double.tryParse(p.price) ?? 0;
+//             double finalPrice = basePrice * (1 + marginPercent / 100);
+
+//             // Attribute Formatting: Name:[Option1/Option2]
+//             String attrString = p.attributes
+//                 .map((a) => "${a.name}:[${a.options.join('/')}]")
+//                 .join(" | ");
+
+//             // 2. DATA MAPPING (Aligning with Catalog Builder Engine)
+//             List<String> row = [
+//               p.id.toString(),
+//               _escapeCsv(p.name),
+//               "simple",
+//               _escapeCsv(p.userSku ?? ""),
+//               p.regularPrice,
+//               finalPrice.toStringAsFixed(2), // Margin applied
+//               p.discountPercentage?.toString() ?? "0",
+//               "active",
+//               p.categoryIds.join("|"),
+//               _escapeCsv(p.brandName ?? ""),
+//               _escapeCsv(p.brandLogoUrl ?? ""),
+//               _escapeCsv(p.shortDescription),
+//               _escapeCsv(p.description),
+//               _escapeCsv(p.images.join("|")),
+//               _escapeCsv(p.image),
+//               _escapeCsv(p.hsnCode ?? ""),
+//               _escapeCsv(p.gst ?? ""),
+//               _escapeCsv(p.uniqueCode ?? ""),
+//               _escapeCsv(p.eanBarcode ?? ""),
+//               _escapeCsv(p.shippingFee ?? ""),
+//               _escapeCsv(p.countryOfOrigin ?? ""),
+//               _escapeCsv(p.manufacturedBy ?? ""),
+//               _escapeCsv(p.importedBy ?? ""),
+//               _escapeCsv(p.marketedBy ?? ""),
+//               _escapeCsv(p.dispatchTime ?? ""),
+//               _escapeCsv(p.packageIncludes ?? ""),
+//               _escapeCsv(p.length ?? ""),
+//               _escapeCsv(p.width ?? ""),
+//               _escapeCsv(p.height ?? ""),
+//               _escapeCsv(p.weight ?? ""),
+//               _escapeCsv(p.packageGrossWeight ?? ""),
+//               _escapeCsv(p.itemLength ?? ""),
+//               _escapeCsv(p.itemWidth ?? ""),
+//               _escapeCsv(p.itemHeight ?? ""),
+//               _escapeCsv(p.itemWeight ?? ""),
+//               _escapeCsv(p.netContents ?? ""),
+//               _escapeCsv(p.highlights ?? ""),
+//               _escapeCsv(p.careInstruction ?? ""),
+//               _escapeCsv(p.disclaimer ?? ""),
+//               _escapeCsv(p.warranty ?? ""),
+//               _escapeCsv(p.keywords.join(",")),
+//               _escapeCsv(attrString),
+//             ];
+
+//             csvContent += "${row.join(",")}\n";
+//           }
+
+//           final directory = await getTemporaryDirectory();
+//           final fileName =
+//               "Catalog_${cat.name.replaceAll(' ', '_')}_Export.csv";
+//           final path = "${directory.path}/$fileName";
+//           final file = File(path);
+//           await file.writeAsString(csvContent);
+
+//           await Share.shareXFiles([
+//             XFile(path),
+//           ], text: "Comprehensive CSV Export for Catalog: ${cat.name}");
+//         } catch (e) {
+//           Get.snackbar(
+//             "Error",
+//             "CSV Generation failed: $e",
+//             backgroundColor: Colors.red,
+//             colorText: Colors.white,
+//           );
+//         } finally {
+//           if (mounted) setState(() => _isGeneratingCsv = false);
+//         }
+//       },
+//       loadingWidget: const Center(
+//         child: CircularProgressIndicator(color: accentColor),
+//       ),
+//     );
+//   }
+
+//   String _escapeCsv(String value) {
+//     if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+//       return '"${value.replaceAll('"', '""')}"';
+//     }
+//     return value;
+//   }
+
+//   // --- PDF DIALOG ---
+//   void _openPdfMarginDialog(CatalogueModel cat) {
+//     if (cat.products.isEmpty) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Empty catalog",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: const AutoTranslate(
+//           child: Text("Add products before generating a PDF."),
+//         ),
+//         snackPosition: SnackPosition.BOTTOM,
+//       );
+//       return;
+//     }
+
+//     if (cat.products.length > 30) {
+//       _showProductSelectionSheet(cat);
+//       return;
+//     }
+//     _showMarginInputAndGenerate(cat, cat.products.toList());
+//   }
+
+//   void _showProductSelectionSheet(CatalogueModel cat) {
+//     showModalBottomSheet(
+//       context: context,
+//       isScrollControlled: true,
+//       backgroundColor: Colors.transparent,
+//       builder: (ctx) => _ProductSelectionSheet(
+//         catalogue: cat,
+//         onConfirm: (selectedProducts) {
+//           Navigator.pop(ctx);
+//           if (selectedProducts.isEmpty) {
+//             Get.snackbar("Error", "No products selected!");
+//             return;
+//           }
+//           _showMarginInputAndGenerate(cat, selectedProducts);
+//         },
+//       ),
+//     );
+//   }
+
+//   void _showMarginInputAndGenerate(
+//     CatalogueModel cat,
+//     List<ProductModel> productsToPrint,
+//   ) {
+//     final TextEditingController nameCtrl = TextEditingController(
+//       text: widget.userData.name.isNotEmpty ? widget.userData.name : cat.name,
+//     );
+//     final TextEditingController marginCtrl = TextEditingController();
+
+//     Get.dialog(
+//       AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: const AutoTranslate(
+//           child: Text(
+//             "Download Catalog PDF",
+//             style: TextStyle(
+//               fontFamily: 'Poppins',
+//               fontWeight: FontWeight.w600,
+//             ),
+//           ),
+//         ),
+//         content: SingleChildScrollView(
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               AutoTranslate(
+//                 child: Text(
+//                   "Generating PDF for ${productsToPrint.length} items.",
+//                   style: const TextStyle(
+//                     fontFamily: 'Poppins',
+//                     fontSize: 11,
+//                     color: Colors.grey,
+//                   ),
+//                 ),
+//               ),
+//               const SizedBox(height: 16),
+//               TextField(
+//                 controller: nameCtrl,
+//                 decoration: InputDecoration(
+//                   // 🗣️ WRAPPED
+//                   label: const AutoTranslate(
+//                     child: Text("Business / Shop Name"),
+//                   ),
+//                   border: OutlineInputBorder(
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                   isDense: true,
+//                 ),
+//               ),
+//               const SizedBox(height: 12),
+//               _buildMarginInput(
+//                 controller: marginCtrl,
+//                 onTagSelected: (val) {},
+//               ),
+//             ],
+//           ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Get.back(),
+//             child: const AutoTranslate(child: Text("Cancel")),
+//           ),
+//           ElevatedButton(
+//             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+//             onPressed: () {
+//               final name = nameCtrl.text.trim().isEmpty
+//                   ? "Reseller"
+//                   : nameCtrl.text.trim();
+//               final double marginPercent =
+//                   double.tryParse(marginCtrl.text.trim()) ?? 0;
+
+//               if (marginPercent < 20) {
+//                 Get.snackbar(
+//                   "",
+//                   "",
+//                   titleText: const AutoTranslate(
+//                     child: Text(
+//                       "Low Margin",
+//                       style: TextStyle(fontWeight: FontWeight.bold),
+//                     ),
+//                   ),
+//                   messageText: const AutoTranslate(
+//                     child: Text("Minimum margin must be 20%"),
+//                   ),
+//                   backgroundColor: Colors.red.shade100,
+//                   snackPosition: SnackPosition.BOTTOM,
+//                 );
+//                 return;
+//               }
+
+//               Get.back();
+//               _generateCataloguePdf(cat, name, marginPercent, productsToPrint);
+//             },
+//             child: const AutoTranslate(
+//               child: Text("Generate", style: TextStyle(color: Colors.white)),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Future<void> _generateCataloguePdf(
+//     CatalogueModel cat,
+//     String businessName,
+//     double extraMargin,
+//     List<ProductModel> products,
+//   ) async {
+//     if (_isGeneratingPdf) return;
+//     setState(() => _isGeneratingPdf = true);
+
+//     Get.showOverlay(
+//       asyncFunction: () async {
+//         try {
+//           // 1. FETCH LOGO & DETAILS FROM STORAGE
+//           String? logoPath;
+//           String? phone;
+//           String? address;
+
+//           // Read the same key used in BusinessDetailsPage
+//           String? jsonStr = await _storage.read(key: 'business_details');
+
+//           if (jsonStr != null) {
+//             final data = jsonDecode(jsonStr);
+//             logoPath = data['logo_path']; // <--- THE LOGO PATH
+//             phone = data['phone'];
+//             address = data['city'];
+//           }
+
+//           // 2. PASS TO PDF SERVICE
+//           await PdfService.createAndShareCatalog(
+//             categoryName: cat.name,
+//             products: products,
+//             businessName: businessName,
+//             extraMargin: extraMargin,
+//             logoPath: logoPath, // <--- Now passing logo
+//             businessPhone: phone, // <--- Now passing phone
+//             businessAddress: address, // <--- Now passing address
+//           );
+
+//           Get.snackbar(
+//             "",
+//             "",
+//             titleText: const AutoTranslate(
+//               child: Text(
+//                 "Success",
+//                 style: TextStyle(fontWeight: FontWeight.bold),
+//               ),
+//             ),
+//             messageText: const AutoTranslate(
+//               child: Text("Catalog PDF generated."),
+//             ),
+//             snackPosition: SnackPosition.BOTTOM,
+//             backgroundColor: Colors.green,
+//             colorText: Colors.white,
+//           );
+//         } catch (e) {
+//           Get.snackbar(
+//             "PDF Error",
+//             "Failed to create PDF: $e",
+//             snackPosition: SnackPosition.BOTTOM,
+//             backgroundColor: Colors.red,
+//             colorText: Colors.white,
+//           );
+//         } finally {
+//           if (mounted) setState(() => _isGeneratingPdf = false);
+//         }
+//       },
+//       loadingWidget: Center(
+//         child: Container(
+//           padding: const EdgeInsets.all(18),
+//           decoration: BoxDecoration(
+//             color: Colors.transparent,
+//             borderRadius: BorderRadius.circular(16),
+//           ),
+//           child: const CircularProgressIndicator(
+//             color: Color.fromARGB(255, 185, 28, 224),
+//             strokeWidth: 2,
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   // --- GENERAL SHARE LOGIC (WA, INSTA, FB) ---
+//   // --- GENERAL SHARE LOGIC (WA, INSTA, FB) ---
+//   void _openShareMarginDialog(CatalogueModel cat) {
+//     if (cat.products.isEmpty) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Empty catalog",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: const AutoTranslate(
+//           child: Text("Add products before sharing."),
+//         ),
+//         snackPosition: SnackPosition.BOTTOM,
+//       );
+//       return;
+//     }
+//     final TextEditingController marginCtrl = TextEditingController();
+//     Get.dialog(
+//       AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: const AutoTranslate(
+//           child: Text(
+//             "Share Catalog",
+//             style: TextStyle(
+//               fontFamily: 'Poppins',
+//               fontWeight: FontWeight.w600,
+//             ),
+//           ),
+//         ),
+//         content: SingleChildScrollView(
+//           child: Column(
+//             mainAxisSize: MainAxisSize.min,
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               const AutoTranslate(
+//                 child: Text(
+//                   "Prices will be increased by your margin percentage.",
+//                   style: TextStyle(
+//                     fontFamily: 'Poppins',
+//                     fontSize: 11,
+//                     color: Colors.grey,
+//                   ),
+//                 ),
+//               ),
+//               const SizedBox(height: 16),
+//               _buildMarginInput(
+//                 controller: marginCtrl,
+//                 onTagSelected: (val) {},
+//               ),
+//             ],
+//           ),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Get.back(),
+//             child: const AutoTranslate(child: Text("Cancel")),
+//           ),
+//           // 🆕 NEW BUTTON: Share without Price
+//           TextButton(
+//             onPressed: () {
+//               Get.back();
+//               // Pass 0 margin and includePrice: false
+//               _processShare(cat, 0, includePrice: false);
+//             },
+//             child: const AutoTranslate(
+//               child: Text(
+//                 "Share w/o Price",
+//                 style: TextStyle(
+//                   color: Colors.grey,
+//                   fontWeight: FontWeight.bold,
+//                 ),
+//               ),
+//             ),
+//           ),
+//           ElevatedButton(
+//             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+//             onPressed: () {
+//               final double marginPercent =
+//                   double.tryParse(marginCtrl.text.trim()) ?? 0;
+//               if (marginPercent < 20) {
+//                 Get.snackbar(
+//                   "",
+//                   "",
+//                   titleText: const AutoTranslate(
+//                     child: Text(
+//                       "Low Margin",
+//                       style: TextStyle(fontWeight: FontWeight.bold),
+//                     ),
+//                   ),
+//                   messageText: const AutoTranslate(
+//                     child: Text("Minimum margin must be 20%"),
+//                   ),
+//                   backgroundColor: Colors.red.shade100,
+//                   snackPosition: SnackPosition.BOTTOM,
+//                 );
+//                 return;
+//               }
+//               Get.back();
+//               // Standard share with price
+//               _processShare(cat, marginPercent, includePrice: true);
+//             },
+//             child: const AutoTranslate(
+//               child: Text("Share", style: TextStyle(color: Colors.white)),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Future<void> _processShare(
+//     CatalogueModel cat,
+//     double marginPercent, {
+//     bool includePrice = true, // 🆕 Added parameter
+//   }) async {
+//     if (cat.products.isEmpty) return;
+//     if (cat.products.length > 30) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Large Catalog",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: AutoTranslate(
+//           child: Text("Preparing ${cat.products.length} images..."),
+//         ),
+//         backgroundColor: Colors.orange.shade50,
+//         colorText: Colors.orange.shade800,
+//       );
+//     }
+//     final buffer = StringBuffer();
+//     buffer.writeln("📦 *${cat.name}*");
+//     if (cat.description.isNotEmpty) buffer.writeln(cat.description);
+//     buffer.writeln("Total items: ${cat.products.length}\n");
+//     buffer.writeln("🛍 *Catalog Items*:\n");
+//     for (int i = 0; i < cat.products.length; i++) {
+//       final p = cat.products[i];
+
+//       buffer.writeln("${i + 1}. *${p.name}*");
+
+//       // 🆕 Only show price if includePrice is true
+//       if (includePrice) {
+//         final double basePrice = double.tryParse(p.price) ?? 0;
+//         final double finalPrice = basePrice * (1 + marginPercent / 100);
+//         buffer.writeln(" Price: ₹${finalPrice.toStringAsFixed(0)}");
+//       }
+
+//       if (p.shortDescription.isNotEmpty) {
+//         buffer.writeln(" ${p.shortDescription}");
+//       }
+//       buffer.writeln("");
+//     }
+//     buffer.writeln("– ${cat.name}");
+//     await Clipboard.setData(ClipboardData(text: buffer.toString()));
+//     Get.showOverlay(
+//       asyncFunction: () async {
+//         try {
+//           final xFiles = await _downloadProductImages(cat);
+//           if (xFiles.isEmpty) {
+//             Get.snackbar(
+//               "",
+//               "",
+//               titleText: const AutoTranslate(
+//                 child: Text(
+//                   "Copied text",
+//                   style: TextStyle(fontWeight: FontWeight.bold),
+//                 ),
+//               ),
+//               messageText: const AutoTranslate(
+//                 child: Text("Catalog text copied. No images found."),
+//               ),
+//               snackPosition: SnackPosition.BOTTOM,
+//             );
+//             await Share.share(buffer.toString());
+//             return;
+//           }
+//           await Share.shareXFiles(xFiles, text: "");
+//           Get.snackbar(
+//             "",
+//             "",
+//             titleText: const AutoTranslate(
+//               child: Text(
+//                 "Ready to Share",
+//                 style: TextStyle(fontWeight: FontWeight.bold),
+//               ),
+//             ),
+//             messageText: const AutoTranslate(
+//               child: Text("Images shared. Text copied to clipboard!"),
+//             ),
+//             snackPosition: SnackPosition.BOTTOM,
+//             backgroundColor: Colors.green,
+//             colorText: Colors.white,
+//           );
+//         } catch (e) {
+//           Get.snackbar(
+//             "Share Error",
+//             "Failed to share images: $e",
+//             snackPosition: SnackPosition.BOTTOM,
+//             backgroundColor: Colors.red,
+//             colorText: Colors.white,
+//           );
+//         }
+//       },
+//       loadingWidget: const Center(
+//         child: CircularProgressIndicator(color: accentColor),
+//       ),
+//     );
+//   }
+
+//   Future<List<XFile>> _downloadProductImages(CatalogueModel cat) async {
+//     final productsWithImage = cat.products
+//         .where((p) => p.image.isNotEmpty)
+//         .toList();
+
+//     if (productsWithImage.isEmpty) return [];
+
+//     final tempDir = await getTemporaryDirectory();
+//     final List<Future<XFile?>> futures = [];
+
+//     for (int i = 0; i < productsWithImage.length; i++) {
+//       futures.add(
+//         _downloadSingleImage(productsWithImage[i].image, tempDir, cat.id, i),
+//       );
+//     }
+//     final results = await Future.wait(futures);
+//     return results.whereType<XFile>().toList();
+//   }
+
+//   Future<XFile?> _downloadSingleImage(
+//     String url,
+//     Directory dir,
+//     String catId,
+//     int index,
+//   ) async {
+//     try {
+//       final uri = Uri.parse(url);
+//       final resp = await http.get(uri);
+//       if (resp.statusCode == 200) {
+//         final file = File('${dir.path}/cat_${catId}_img_$index.jpg');
+//         await file.writeAsBytes(resp.bodyBytes, flush: true);
+//         return XFile(file.path);
+//       }
+//     } catch (_) {}
+//     return null;
+//   }
+
+//   // --- 📸 COLLAGE STUDIO ENTRY ---
+//   void _openCollageStudio(CatalogueModel cat) {
+//     if (cat.products.isEmpty) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Empty Catalog",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: const AutoTranslate(child: Text("Add products first!")),
+//         backgroundColor: Colors.red.shade50,
+//       );
+//       return;
+//     }
+
+//     showModalBottomSheet(
+//       context: context,
+//       isScrollControlled: true,
+//       backgroundColor: Colors.transparent,
+//       builder: (context) => _CollageStudioSheet(
+//         catalogue: cat,
+//         shopName: widget.userData.name.isNotEmpty
+//             ? widget.userData.name
+//             : "My Shop",
+//         phone: widget.userData.phone,
+//       ),
+//     );
+//   }
+
+//   // 🔹 SMART BUTTON BUILDER with PULSE Logic
+//   Widget _buildCatalogueActionButton({
+//     required IconData icon,
+//     required String label,
+//     required VoidCallback onTap,
+//     Color? color,
+//     Color? bgColor,
+//     bool outlined = false,
+//   }) {
+//     bool isTarget = false;
+//     bool isOtherDimmed = false;
+
+//     if (_activeGuideTool != null) {
+//       if (_activeGuideTool == 'collage_maker' && label == "Collage") {
+//         isTarget = true;
+//       } else if (_activeGuideTool == 'pdf_generator' && label == "PDF") {
+//         isTarget = true;
+//       } else if (_activeGuideTool == 'csv_builder_pro' && label == "CSV") {
+//         isTarget = true;
+//       } else if (_activeGuideTool == 'bulk_downloader' && label == "Download") {
+//         isTarget = true;
+//       } else {
+//         isOtherDimmed = true;
+//       }
+//     }
+
+//     Color effectiveColor = color ?? accentColor;
+//     Color effectiveBg = bgColor ?? Colors.white;
+
+//     if (isTarget) {
+//       effectiveColor = Colors.white;
+//       effectiveBg = accentColor;
+//     } else if (isOtherDimmed) {
+//       effectiveColor = effectiveColor.withOpacity(0.3);
+//       effectiveBg = effectiveBg.withOpacity(0.5);
+//     }
+
+//     Widget button = SizedBox(
+//       height: 34,
+//       child: outlined
+//           ? OutlinedButton.icon(
+//               onPressed: onTap,
+//               style: OutlinedButton.styleFrom(
+//                 side: BorderSide(color: effectiveColor.withOpacity(0.5)),
+//                 backgroundColor: isTarget ? effectiveBg : null,
+//                 padding: const EdgeInsets.symmetric(horizontal: 10),
+//                 shape: RoundedRectangleBorder(
+//                   borderRadius: BorderRadius.circular(999),
+//                 ),
+//               ),
+//               icon: Icon(icon, size: 16, color: effectiveColor),
+//               // 🗣️ WRAPPED LABEL
+//               label: AutoTranslate(
+//                 child: Text(
+//                   label,
+//                   style: TextStyle(
+//                     fontSize: 11,
+//                     fontFamily: 'Poppins',
+//                     fontWeight: FontWeight.w600,
+//                     color: effectiveColor,
+//                   ),
+//                 ),
+//               ),
+//             )
+//           : TextButton.icon(
+//               onPressed: onTap,
+//               style: TextButton.styleFrom(
+//                 backgroundColor: effectiveBg,
+//                 padding: const EdgeInsets.symmetric(horizontal: 10),
+//                 shape: RoundedRectangleBorder(
+//                   borderRadius: BorderRadius.circular(999),
+//                 ),
+//               ),
+//               icon: Icon(icon, size: 16, color: effectiveColor),
+//               // 🗣️ WRAPPED LABEL
+//               label: AutoTranslate(
+//                 child: Text(
+//                   label,
+//                   style: TextStyle(
+//                     fontSize: 11,
+//                     fontFamily: 'Poppins',
+//                     fontWeight: FontWeight.w600,
+//                     color: effectiveColor,
+//                   ),
+//                 ),
+//               ),
+//             ),
+//     );
+
+//     if (isTarget) {
+//       return ScaleTransition(scale: _pulseAnimation, child: button);
+//     }
+
+//     return button;
+//   }
+
+//   Widget _buildSocialIconButton({
+//     required IconData icon,
+//     required Color color,
+//     required Color bgColor,
+//     required VoidCallback onTap,
+//   }) {
+//     double opacity = _activeGuideTool != null ? 0.3 : 1.0;
+
+//     return Opacity(
+//       opacity: opacity,
+//       child: GestureDetector(
+//         onTap: onTap,
+//         child: Container(
+//           width: 34,
+//           height: 34,
+//           decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+//           child: Icon(icon, size: 18, color: color),
+//         ),
+//       ),
+//     );
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return DoubleBackToExitWrapper(
+//       child: Scaffold(
+//         backgroundColor: const Color(0xFFF3F4F6),
+//         drawer: HomeDrawer(
+//           userData: widget.userData,
+//           selectedTitle: 'MyCatalog',
+//           onNavigate: _handleDrawerNavigation,
+//           onLogoutPressed: () {
+//             Navigator.pop(context);
+//             _showLogoutConfirmation();
+//           },
+//         ),
+//         appBar: AppBar(
+//           backgroundColor: Colors.white,
+//           elevation: 0,
+//           automaticallyImplyLeading: false,
+//           titleSpacing: 0,
+//           title: Row(
+//             children: [
+//               const SizedBox(width: 6),
+//               Builder(
+//                 builder: (context) => IconButton(
+//                   icon: const Icon(Iconsax.menu_1),
+//                   color: accentColor,
+//                   iconSize: 30,
+//                   onPressed: () => Scaffold.of(context).openDrawer(),
+//                 ),
+//               ),
+//               Padding(
+//                 padding: const EdgeInsets.only(left: 4.0),
+//                 child: Image.asset(
+//                   'assets/logos/login-logo.png',
+//                   height: 50,
+//                   width: 100,
+//                   fit: BoxFit.contain,
+//                 ),
+//               ),
+//               const Spacer(),
+//               // 🌟 5. RESTART TOUR BUTTON ADDED
+//               IconButton(
+//                 tooltip: "Guide",
+//                 icon: const Icon(Iconsax.info_circle, color: accentColor),
+//                 onPressed: _startTour,
+//               ),
+//               Stack(
+//                 clipBehavior: Clip.none,
+//                 children: [
+//                   IconButton(
+//                     icon: const Icon(Iconsax.shopping_cart),
+//                     color: accentColor,
+//                     iconSize: 25,
+//                     onPressed: () => Get.to(() => const InventoryPage()),
+//                   ),
+//                   Positioned(
+//                     right: 5,
+//                     top: 5,
+//                     child: Obx(() {
+//                       final count = cartController.itemCount;
+//                       if (count == 0) return const SizedBox.shrink();
+//                       return Container(
+//                         padding: const EdgeInsets.all(4),
+//                         decoration: BoxDecoration(
+//                           color: Colors.red,
+//                           shape: BoxShape.circle,
+//                           border: Border.all(color: Colors.white, width: 2),
+//                         ),
+//                         constraints: const BoxConstraints(
+//                           minWidth: 22,
+//                           minHeight: 22,
+//                         ),
+//                         child: Center(
+//                           child: Text(
+//                             count > 99 ? '99+' : '$count',
+//                             style: const TextStyle(
+//                               color: Colors.white,
+//                               fontSize: 10,
+//                               fontWeight: FontWeight.bold,
+//                               fontFamily: 'Poppins',
+//                             ),
+//                           ),
+//                         ),
+//                       );
+//                     }),
+//                   ),
+//                 ],
+//               ),
+//               const SizedBox(width: 4),
+//               IconButton(
+//                 icon: const Icon(Iconsax.heart),
+//                 color: accentColor,
+//                 iconSize: 25,
+//                 onPressed: () => Get.to(() => WishlistScreen()),
+//               ),
+//               const SizedBox(width: 16),
+//             ],
+//           ),
+//         ),
+//         // 5. SHOWCASE FAB
+//         floatingActionButton: Showcase(
+//           key: _addCatalogKey,
+//           title: "Create Catalog",
+//           description:
+//               "Start here! Create custom collections for your customers.",
+//           overlayColor: Colors.black.withOpacity(0.7),
+//           titleTextStyle: TextStyle(
+//             fontWeight: FontWeight.bold,
+//             color: accentColor,
+//             fontSize: 16,
+//           ),
+//           descTextStyle: TextStyle(
+//             fontWeight: FontWeight.w500,
+//             color: Colors.black,
+//             fontSize: 12,
+//           ),
+//           targetShapeBorder: CircleBorder(),
+//           child: FloatingActionButton.extended(
+//             backgroundColor: accentColor,
+//             onPressed: _openCreateCatalogueDialog,
+//             icon: const Icon(Iconsax.folder_add, color: Colors.white),
+//             // 🗣️ WRAPPED
+//             label: const AutoTranslate(
+//               child: Text("New Catalog", style: TextStyle(color: Colors.white)),
+//             ),
+//           ),
+//         ),
+//         body: SafeArea(
+//           top: false,
+//           child: Stack(
+//             children: [
+//               // 1. MAIN CONTENT
+//               Column(
+//                 children: [
+//                   Obx(
+//                     () => CatalogueHeader(
+//                       totalCatalogues: catalogueController.myCatalogues.length,
+//                       totalProducts: catalogueController.myCatalogues.fold(
+//                         0,
+//                         (sum, cat) => sum + cat.products.length,
+//                       ),
+//                     ),
+//                   ),
+//                   CatalogueSearchAndSortBar(
+//                     searchController: _searchController,
+//                     searchQuery: _searchQuery,
+//                     onSearchChanged: (value) =>
+//                         setState(() => _searchQuery = value),
+//                     currentSort: _currentSort,
+//                     onSortChanged: (value) =>
+//                         setState(() => _currentSort = value),
+//                   ),
+//                   const Divider(height: 1, color: Color(0xFFE5E7EB)),
+//                   Expanded(
+//                     child: Obx(() {
+//                       final items = _buildFilteredSortedList();
+//                       if (catalogueController.myCatalogues.isEmpty) {
+//                         return CatalogueEmptyState(
+//                           onCreatePressed: _openCreateCatalogueDialog,
+//                         );
+//                       }
+//                       if (items.isEmpty)
+//                         return const CatalogueSearchEmptyState();
+//                       return ListView.builder(
+//                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+//                         itemCount: items.length,
+//                         itemBuilder: (context, index) {
+//                           final cat = items[index];
+//                           // 🌟 If Guide is active, only fully show the first item
+//                           final bool isGuideActive = _activeGuideTool != null;
+//                           final bool isFirstItem = index == 0;
+//                           final double cardOpacity =
+//                               (isGuideActive && !isFirstItem) ? 0.3 : 1.0;
+
+//                           return Opacity(
+//                             opacity: cardOpacity,
+//                             child: GestureDetector(
+//                               onTap: () => Get.to(
+//                                 () => CatalogueDetailsPage(catalogueId: cat.id),
+//                               ),
+//                               child: Container(
+//                                 margin: const EdgeInsets.only(bottom: 12),
+//                                 decoration: BoxDecoration(
+//                                   color: Colors.white,
+//                                   borderRadius: BorderRadius.circular(18),
+//                                   boxShadow: [
+//                                     BoxShadow(
+//                                       color: Colors.black.withOpacity(0.04),
+//                                       blurRadius: 12,
+//                                       offset: const Offset(0, 4),
+//                                     ),
+//                                   ],
+//                                   border: Border.all(
+//                                     color: Colors.grey.shade200,
+//                                   ),
+//                                 ),
+//                                 child: Column(
+//                                   crossAxisAlignment: CrossAxisAlignment.start,
+//                                   children: [
+//                                     // HEADER GRADIENT
+//                                     Container(
+//                                       decoration: const BoxDecoration(
+//                                         borderRadius: BorderRadius.vertical(
+//                                           top: Radius.circular(18),
+//                                         ),
+//                                         gradient: LinearGradient(
+//                                           colors: [
+//                                             Color(0xFF8B5CF6),
+//                                             Color(0xFFEC4899),
+//                                           ],
+//                                         ),
+//                                       ),
+//                                       padding: const EdgeInsets.symmetric(
+//                                         horizontal: 14,
+//                                         vertical: 10,
+//                                       ),
+//                                       child: Row(
+//                                         children: [
+//                                           Container(
+//                                             padding: const EdgeInsets.all(6),
+//                                             decoration: BoxDecoration(
+//                                               color: Colors.white.withOpacity(
+//                                                 0.12,
+//                                               ),
+//                                               shape: BoxShape.circle,
+//                                             ),
+//                                             child: const Icon(
+//                                               Iconsax.folder_2,
+//                                               size: 16,
+//                                               color: Colors.white,
+//                                             ),
+//                                           ),
+//                                           const SizedBox(width: 10),
+//                                           Expanded(
+//                                             child: Text(
+//                                               cat.name,
+//                                               maxLines: 1,
+//                                               overflow: TextOverflow.ellipsis,
+//                                               style: const TextStyle(
+//                                                 fontFamily: 'Poppins',
+//                                                 fontSize: 15,
+//                                                 fontWeight: FontWeight.w600,
+//                                                 color: Colors.white,
+//                                               ),
+//                                             ),
+//                                           ),
+//                                           const Icon(
+//                                             Iconsax.arrow_right_3,
+//                                             size: 18,
+//                                             color: Colors.white,
+//                                           ),
+//                                         ],
+//                                       ),
+//                                     ),
+
+//                                     // CONTENT
+//                                     Padding(
+//                                       padding: const EdgeInsets.fromLTRB(
+//                                         14,
+//                                         10,
+//                                         14,
+//                                         6,
+//                                       ),
+//                                       child: Column(
+//                                         crossAxisAlignment:
+//                                             CrossAxisAlignment.start,
+//                                         children: [
+//                                           if (cat.description.isNotEmpty)
+//                                             Padding(
+//                                               padding: const EdgeInsets.only(
+//                                                 bottom: 6.0,
+//                                               ),
+//                                               child: Text(
+//                                                 cat.description,
+//                                                 maxLines: 2,
+//                                                 overflow: TextOverflow.ellipsis,
+//                                                 style: const TextStyle(
+//                                                   fontFamily: 'Poppins',
+//                                                   fontSize: 11,
+//                                                   color: Color(0xFF4B5563),
+//                                                 ),
+//                                               ),
+//                                             ),
+//                                           SizedBox(height: 6),
+//                                           Row(
+//                                             children: [
+//                                               Container(
+//                                                 padding:
+//                                                     const EdgeInsets.symmetric(
+//                                                       horizontal: 8,
+//                                                       vertical: 4,
+//                                                     ),
+//                                                 decoration: BoxDecoration(
+//                                                   color: const Color(
+//                                                     0xFFE0F2FE,
+//                                                   ),
+//                                                   borderRadius:
+//                                                       BorderRadius.circular(
+//                                                         999,
+//                                                       ),
+//                                                 ),
+//                                                 child: Row(
+//                                                   children: [
+//                                                     const Icon(
+//                                                       Iconsax.bag_2,
+//                                                       size: 13,
+//                                                       color: Color(0xFF1D4ED8),
+//                                                     ),
+//                                                     const SizedBox(width: 4),
+//                                                     // 🗣️ WRAPPED
+//                                                     AutoTranslate(
+//                                                       child: Text(
+//                                                         "${cat.products.length} items",
+//                                                         style: const TextStyle(
+//                                                           fontFamily: 'Poppins',
+//                                                           fontSize: 11,
+//                                                           fontWeight:
+//                                                               FontWeight.w600,
+//                                                           color: Color(
+//                                                             0xFF1D4ED8,
+//                                                           ),
+//                                                         ),
+//                                                       ),
+//                                                     ),
+//                                                   ],
+//                                                 ),
+//                                               ),
+//                                               const SizedBox(width: 8),
+//                                               Container(
+//                                                 padding:
+//                                                     const EdgeInsets.symmetric(
+//                                                       horizontal: 8,
+//                                                       vertical: 4,
+//                                                     ),
+//                                                 decoration: BoxDecoration(
+//                                                   color: const Color(
+//                                                     0xFFF5F3FF,
+//                                                   ),
+//                                                   borderRadius:
+//                                                       BorderRadius.circular(
+//                                                         999,
+//                                                       ),
+//                                                 ),
+//                                                 child: Row(
+//                                                   children: const [
+//                                                     Icon(
+//                                                       Iconsax.star1,
+//                                                       size: 13,
+//                                                       color: Color(0xFF8B5CF6),
+//                                                     ),
+//                                                     SizedBox(width: 4),
+//                                                     // 🗣️ WRAPPED
+//                                                     AutoTranslate(
+//                                                       child: Text(
+//                                                         "My Catalog",
+//                                                         style: TextStyle(
+//                                                           fontFamily: 'Poppins',
+//                                                           fontSize: 11,
+//                                                           fontWeight:
+//                                                               FontWeight.w500,
+//                                                           color: Color(
+//                                                             0xFF6D28D9,
+//                                                           ),
+//                                                         ),
+//                                                       ),
+//                                                     ),
+//                                                   ],
+//                                                 ),
+//                                               ),
+//                                               const Spacer(),
+//                                               // Delete is always dimmed if guide active
+//                                               Opacity(
+//                                                 opacity: isGuideActive
+//                                                     ? 0.3
+//                                                     : 1.0,
+//                                                 child: _buildCatalogueActionButton(
+//                                                   icon: Iconsax.trash,
+//                                                   label: "Delete",
+//                                                   onTap: () {
+//                                                     // ✨ NEW: Confirmation Dialog
+//                                                     Get.dialog(
+//                                                       AlertDialog(
+//                                                         shape: RoundedRectangleBorder(
+//                                                           borderRadius:
+//                                                               BorderRadius.circular(
+//                                                                 16,
+//                                                               ),
+//                                                         ),
+//                                                         title:
+//                                                             const AutoTranslate(
+//                                                               child: Text(
+//                                                                 "Delete Catalog",
+//                                                                 style: TextStyle(
+//                                                                   fontFamily:
+//                                                                       'Poppins',
+//                                                                   fontWeight:
+//                                                                       FontWeight
+//                                                                           .w600,
+//                                                                 ),
+//                                                               ),
+//                                                             ),
+//                                                         content: AutoTranslate(
+//                                                           child: Text(
+//                                                             "Are you sure you want to delete '${cat.name}'? This cannot be undone.",
+//                                                             style:
+//                                                                 const TextStyle(
+//                                                                   fontFamily:
+//                                                                       'Poppins',
+//                                                                 ),
+//                                                           ),
+//                                                         ),
+//                                                         actions: [
+//                                                           TextButton(
+//                                                             onPressed: () =>
+//                                                                 Get.back(), // Close dialog
+//                                                             child: const AutoTranslate(
+//                                                               child: Text(
+//                                                                 "Cancel",
+//                                                                 style: TextStyle(
+//                                                                   color: Colors
+//                                                                       .grey,
+//                                                                 ),
+//                                                               ),
+//                                                             ),
+//                                                           ),
+//                                                           TextButton(
+//                                                             onPressed: () {
+//                                                               // 1. Clear session state
+//                                                               VerticalProductCard
+//                                                                   .sessionAddedToCatalog
+//                                                                   .removeWhere(
+//                                                                     (
+//                                                                       key,
+//                                                                       value,
+//                                                                     ) =>
+//                                                                         value ==
+//                                                                         cat.name,
+//                                                                   );
+
+//                                                               // 2. Delete from controller
+//                                                               catalogueController
+//                                                                   .deleteCatalogue(
+//                                                                     cat.id,
+//                                                                   );
+
+//                                                               // 3. Close dialog
+//                                                               Get.back();
+//                                                             },
+//                                                             child: const AutoTranslate(
+//                                                               child: Text(
+//                                                                 "Delete",
+//                                                                 style: TextStyle(
+//                                                                   color: Colors
+//                                                                       .red,
+//                                                                   fontWeight:
+//                                                                       FontWeight
+//                                                                           .bold,
+//                                                                 ),
+//                                                               ),
+//                                                             ),
+//                                                           ),
+//                                                         ],
+//                                                       ),
+//                                                     );
+//                                                   },
+//                                                   outlined: true,
+//                                                   color: Colors.red,
+//                                                 ),
+//                                               ),
+//                                             ],
+//                                           ),
+//                                         ],
+//                                       ),
+//                                     ),
+//                                     const Divider(
+//                                       height: 14,
+//                                       thickness: 0.7,
+//                                       color: Color(0xFFE5E7EB),
+//                                     ),
+//                                     Row(
+//                                       children: [
+//                                         Padding(
+//                                           padding: const EdgeInsets.only(
+//                                             left: 12.0,
+//                                           ),
+//                                           child: Icon(
+//                                             Iconsax.flash_1,
+//                                             color: accentColor,
+//                                             size: 22,
+//                                           ),
+//                                         ),
+//                                         SizedBox(width: 8),
+//                                         // 🗣️ WRAPPED
+//                                         const AutoTranslate(
+//                                           child: Text(
+//                                             "Reseller Tools",
+//                                             style: TextStyle(
+//                                               fontWeight: FontWeight.w800,
+//                                               fontSize: 16,
+//                                               color: Color(0xFF86198F),
+//                                               fontFamily: 'Poppins',
+//                                             ),
+//                                           ),
+//                                         ),
+//                                       ],
+//                                     ),
+//                                     SizedBox(height: 6),
+//                                     Padding(
+//                                       padding: const EdgeInsets.fromLTRB(
+//                                         12,
+//                                         6,
+//                                         12,
+//                                         10,
+//                                       ),
+//                                       child: Wrap(
+//                                         spacing: 8,
+//                                         runSpacing: 8,
+//                                         crossAxisAlignment:
+//                                             WrapCrossAlignment.center,
+//                                         children: [
+//                                           // --- SOCIAL ICONS ---
+//                                           // 6. SHOWCASE SHARE
+//                                           index == 0
+//                                               ? Showcase(
+//                                                   key: _shareKey,
+//                                                   title: "Easy Sharing",
+//                                                   description:
+//                                                       "Share directly to WhatsApp, Instagram, or Facebook with your margin added.",
+//                                                   overlayColor: Colors.black
+//                                                       .withOpacity(0.7),
+//                                                   titleTextStyle: TextStyle(
+//                                                     fontWeight: FontWeight.bold,
+//                                                     color: accentColor,
+//                                                     fontSize: 16,
+//                                                   ),
+//                                                   descTextStyle: TextStyle(
+//                                                     fontWeight: FontWeight.w500,
+//                                                     color: Colors.black,
+//                                                     fontSize: 12,
+//                                                   ),
+//                                                   targetBorderRadius:
+//                                                       BorderRadius.circular(20),
+//                                                   child: _buildSocialRow(cat),
+//                                                 )
+//                                               : _buildSocialRow(cat),
+
+//                                           // 7. SHOWCASE TOOLS
+//                                           index == 0
+//                                               ? Showcase(
+//                                                   key: _toolsKey,
+//                                                   title: "Power Tools",
+//                                                   description:
+//                                                       "Generate PDFs, Collages, or CSVs instantly to look professional.",
+//                                                   overlayColor: Colors.black
+//                                                       .withOpacity(0.7),
+//                                                   titleTextStyle: TextStyle(
+//                                                     fontWeight: FontWeight.bold,
+//                                                     color: accentColor,
+//                                                     fontSize: 16,
+//                                                   ),
+//                                                   descTextStyle: TextStyle(
+//                                                     fontWeight: FontWeight.w500,
+//                                                     color: Colors.black,
+//                                                     fontSize: 12,
+//                                                   ),
+//                                                   targetBorderRadius:
+//                                                       BorderRadius.circular(20),
+//                                                   child: _buildToolsRow(cat),
+//                                                 )
+//                                               : _buildToolsRow(cat),
+//                                         ],
+//                                       ),
+//                                     ),
+//                                   ],
+//                                 ),
+//                               ),
+//                             ),
+//                           );
+//                         },
+//                       );
+//                     }),
+//                   ),
+//                 ],
+//               ),
+
+//               // 2. ⚡ GUIDE OVERLAY
+//               if (_activeGuideTool != null)
+//                 _buildGuideOverlay(
+//                   toolId: _activeGuideTool!,
+//                   onDismiss: () => setState(() => _activeGuideTool = null),
+//                 ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   // HELPER FOR SOCIAL ROW
+//   Widget _buildSocialRow(CatalogueModel cat) {
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: Colors.grey.shade50,
+//         borderRadius: BorderRadius.circular(20),
+//         border: Border.all(color: Colors.grey.shade200),
+//       ),
+//       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+//       child: Wrap(
+//         spacing: 6,
+//         runSpacing: 6,
+//         crossAxisAlignment: WrapCrossAlignment.center,
+//         children: [
+//           _buildSocialIconButton(
+//             icon: Iconsax.message_text,
+//             color: const Color(0xFF25D366),
+//             bgColor: const Color(0xFFDCFCE7),
+//             onTap: () => _openShareMarginDialog(cat),
+//           ),
+//           _buildSocialIconButton(
+//             icon: Icons.facebook,
+//             color: const Color(0xFF1877F2),
+//             bgColor: const Color(0xFFDBEAFE),
+//             onTap: () => _openShareMarginDialog(cat),
+//           ),
+//           _buildSocialIconButton(
+//             icon: Iconsax.camera,
+//             color: const Color(0xFFE1306C),
+//             bgColor: const Color(0xFFFCE7F3),
+//             onTap: () => _openShareMarginDialog(cat),
+//           ),
+//           _buildSocialIconButton(
+//             icon: Icons.share,
+//             color: const Color(0xFFE1306C),
+//             bgColor: const Color(0xFFFCE7F3),
+//             onTap: () => _openShareMarginDialog(cat),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // HELPER FOR TOOLS ROW
+//   Widget _buildToolsRow(CatalogueModel cat) {
+//     return Wrap(
+//       spacing: 6,
+//       runSpacing: 8,
+//       children: [
+//         _buildCatalogueActionButton(
+//           icon: Iconsax.magicpen,
+//           label: "Collage",
+//           onTap: () => _openCollageStudio(cat),
+//           bgColor: const Color(0xFFFFFBEB),
+//           color: const Color(0xFFF59E0B),
+//         ),
+//         _buildCatalogueActionButton(
+//           icon: Iconsax.document_download,
+//           label: "Download",
+//           onTap: () => _handleBulkDownload(cat),
+//           bgColor: const Color(0xFFFFFBEB),
+//           color: const Color.fromARGB(255, 11, 105, 245),
+//         ),
+//         _buildCatalogueActionButton(
+//           icon: Iconsax.document_text,
+//           label: "CSV",
+//           onTap: () => _openCsvExportDialog(cat),
+//           bgColor: const Color(0xFFECFDF5),
+//           color: const Color(0xFF059669),
+//         ),
+//         _buildCatalogueActionButton(
+//           icon: Iconsax.document_code,
+//           label: "PDF",
+//           onTap: () => _openPdfMarginDialog(cat),
+//           bgColor: const Color(0xFFF5F3FF),
+//           color: const Color(0xFF7C3AED),
+//         ),
+//       ],
+//     );
+//   }
+
+//   // 🔹 GUIDE OVERLAY WIDGET
+//   Widget _buildGuideOverlay({
+//     required String toolId,
+//     required VoidCallback onDismiss,
+//   }) {
+//     String title = "Tool Guide";
+//     String message = "Select a catalog to use this tool.";
+//     IconData icon = Iconsax.info_circle;
+
+//     switch (toolId) {
+//       case 'collage_maker':
+//         title = "Collage Maker";
+//         message =
+//             "Tap the 'Collage' button on any catalog below to start creating amazing images!";
+//         icon = Iconsax.magicpen;
+//         break;
+//       case 'pdf_generator':
+//         title = "PDF Generator";
+//         message =
+//             "Tap the 'PDF' button on a catalog to generate a professional brochure.";
+//         icon = Iconsax.document_text;
+//         break;
+//       case 'csv_builder_pro':
+//         title = "CSV Export";
+//         message =
+//             "Tap 'CSV' to download a file ready for Amazon, Shopify, or Excel.";
+//         icon = Iconsax.document_code;
+//         break;
+//       case 'bulk_downloader':
+//         title = "Bulk Download";
+//         message = "Tap 'Download' to save all product images to your gallery.";
+//         icon = Iconsax.document_download;
+//         break;
+//       case 'smart_catalog':
+//         title = "Smart Catalog";
+//         message = "Click 'New Catalog' or manage existing ones here.";
+//         icon = Iconsax.folder_add;
+//         break;
+//     }
+
+//     return Positioned(
+//       bottom: 20,
+//       left: 16,
+//       right: 16,
+//       child: Material(
+//         color: Colors.transparent,
+//         child: TweenAnimationBuilder<double>(
+//           tween: Tween(begin: 0.0, end: 1.0),
+//           duration: const Duration(milliseconds: 500),
+//           curve: Curves.easeOutBack,
+//           builder: (context, val, child) {
+//             return Transform.translate(
+//               offset: Offset(0, 50 * (1 - val)),
+//               child: Opacity(opacity: val, child: child),
+//             );
+//           },
+//           child: Container(
+//             padding: const EdgeInsets.all(20),
+//             decoration: BoxDecoration(
+//               color: Colors.black.withOpacity(0.9),
+//               borderRadius: BorderRadius.circular(20),
+//               boxShadow: [
+//                 BoxShadow(
+//                   color: Colors.black.withOpacity(0.3),
+//                   blurRadius: 20,
+//                   offset: const Offset(0, 10),
+//                 ),
+//               ],
+//             ),
+//             child: Row(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Container(
+//                   padding: const EdgeInsets.all(12),
+//                   decoration: BoxDecoration(
+//                     color: Colors.white.withOpacity(0.2),
+//                     shape: BoxShape.circle,
+//                   ),
+//                   child: Icon(icon, color: Colors.white, size: 28),
+//                 ),
+//                 const SizedBox(width: 16),
+//                 Expanded(
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       // 🗣️ WRAPPED
+//                       AutoTranslate(
+//                         child: Text(
+//                           title,
+//                           style: const TextStyle(
+//                             color: Colors.white,
+//                             fontSize: 16,
+//                             fontWeight: FontWeight.bold,
+//                             fontFamily: 'Poppins',
+//                           ),
+//                         ),
+//                       ),
+//                       const SizedBox(height: 4),
+//                       // 🗣️ WRAPPED
+//                       AutoTranslate(
+//                         child: Text(
+//                           message,
+//                           style: TextStyle(
+//                             color: Colors.white.withOpacity(0.8),
+//                             fontSize: 13,
+//                             fontFamily: 'Poppins',
+//                             height: 1.4,
+//                           ),
+//                         ),
+//                       ),
+//                       const SizedBox(height: 12),
+//                       GestureDetector(
+//                         onTap: onDismiss,
+//                         child: Container(
+//                           padding: const EdgeInsets.symmetric(
+//                             horizontal: 16,
+//                             vertical: 8,
+//                           ),
+//                           decoration: BoxDecoration(
+//                             color: accentColor,
+//                             borderRadius: BorderRadius.circular(30),
+//                           ),
+//                           // 🗣️ WRAPPED
+//                           child: const AutoTranslate(
+//                             child: Text(
+//                               "Got it!",
+//                               style: TextStyle(
+//                                 color: Colors.white,
+//                                 fontSize: 12,
+//                                 fontWeight: FontWeight.bold,
+//                               ),
+//                             ),
+//                           ),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//                 GestureDetector(
+//                   onTap: onDismiss,
+//                   child: Icon(
+//                     Icons.close,
+//                     color: Colors.white.withOpacity(0.5),
+//                     size: 20,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // ─── UPDATED: PRODUCT SELECTION SHEET (Strict 30 Limit) ───────────────────
+
+// class _ProductSelectionSheet extends StatefulWidget {
+//   final CatalogueModel catalogue;
+//   final Function(List<ProductModel>) onConfirm;
+
+//   const _ProductSelectionSheet({
+//     required this.catalogue,
+//     required this.onConfirm,
+//   });
+
+//   @override
+//   State<_ProductSelectionSheet> createState() => _ProductSelectionSheetState();
+// }
+
+// class _ProductSelectionSheetState extends State<_ProductSelectionSheet> {
+//   final Set<String> _selectedIds = {};
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     for (var i = 0; i < widget.catalogue.products.length; i++) {
+//       if (i < 30) {
+//         _selectedIds.add(widget.catalogue.products[i].id.toString());
+//       }
+//     }
+//   }
+
+//   void _toggle(String id) {
+//     setState(() {
+//       if (_selectedIds.contains(id)) {
+//         _selectedIds.remove(id);
+//       } else {
+//         if (_selectedIds.length >= 30) {
+//           Get.snackbar(
+//             "",
+//             "",
+//             titleText: const AutoTranslate(
+//               child: Text(
+//                 "Limit Reached",
+//                 style: TextStyle(fontWeight: FontWeight.bold),
+//               ),
+//             ),
+//             messageText: const AutoTranslate(
+//               child: Text(
+//                 "PDF limit is 30 products. Unselect an item to add this one.",
+//               ),
+//             ),
+//             backgroundColor: Colors.orange.shade50,
+//             colorText: Colors.orange.shade900,
+//             duration: const Duration(seconds: 3),
+//             snackPosition: SnackPosition.BOTTOM,
+//             margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+//           );
+//           return;
+//         }
+//         _selectedIds.add(id);
+//       }
+//     });
+//   }
+
+//   void _selectAllSmart() {
+//     setState(() {
+//       _selectedIds.clear();
+//       final products = widget.catalogue.products;
+//       final int limit = products.length > 30 ? 30 : products.length;
+
+//       for (var i = 0; i < limit; i++) {
+//         _selectedIds.add(products[i].id.toString());
+//       }
+//     });
+
+//     if (widget.catalogue.products.length > 30) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Selection Limited",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: const AutoTranslate(
+//           child: Text("Selected the first 30 products automatically."),
+//         ),
+//         snackPosition: SnackPosition.BOTTOM,
+//       );
+//     }
+//   }
+
+//   void _deselectAll() {
+//     setState(() {
+//       _selectedIds.clear();
+//     });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final products = widget.catalogue.products;
+//     final isFullSelection = _selectedIds.isNotEmpty;
+//     final isLargeCatalog = products.length > 30;
+
+//     return Container(
+//       height: MediaQuery.of(context).size.height * 0.85,
+//       decoration: const BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+//       ),
+//       child: SafeArea(
+//         top: false,
+//         child: Column(
+//           children: [
+//             const SizedBox(height: 12),
+//             Container(
+//               width: 40,
+//               height: 4,
+//               decoration: BoxDecoration(
+//                 color: Colors.grey.shade300,
+//                 borderRadius: BorderRadius.circular(4),
+//               ),
+//             ),
+//             const SizedBox(height: 16),
+
+//             Padding(
+//               padding: const EdgeInsets.symmetric(horizontal: 20),
+//               child: Row(
+//                 children: [
+//                   Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       // 🗣️ WRAPPED
+//                       const AutoTranslate(
+//                         child: Text(
+//                           "Select Products for PDF",
+//                           style: TextStyle(
+//                             fontSize: 18,
+//                             fontWeight: FontWeight.bold,
+//                             fontFamily: 'Poppins',
+//                           ),
+//                         ),
+//                       ),
+//                       Row(
+//                         children: [
+//                           // 🗣️ WRAPPED DYNAMIC
+//                           AutoTranslate(
+//                             child: Text(
+//                               "${_selectedIds.length} / 30 selected",
+//                               style: TextStyle(
+//                                 fontSize: 13,
+//                                 color: _selectedIds.length == 30
+//                                     ? Colors.red
+//                                     : accentColor,
+//                                 fontWeight: FontWeight.w600,
+//                               ),
+//                             ),
+//                           ),
+//                           if (_selectedIds.length == 30)
+//                             const Padding(
+//                               padding: EdgeInsets.only(left: 6.0),
+//                               child: AutoTranslate(
+//                                 child: Text(
+//                                   "(Max limit)",
+//                                   style: TextStyle(
+//                                     fontSize: 10,
+//                                     color: Colors.red,
+//                                   ),
+//                                 ),
+//                               ),
+//                             ),
+//                         ],
+//                       ),
+//                     ],
+//                   ),
+//                   const Spacer(),
+//                   TextButton(
+//                     onPressed: isFullSelection ? _deselectAll : _selectAllSmart,
+//                     // 🗣️ WRAPPED
+//                     child: AutoTranslate(
+//                       child: Text(
+//                         isFullSelection
+//                             ? "Clear"
+//                             : (isLargeCatalog ? "Select Top 30" : "Select All"),
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+
+//             const Divider(),
+
+//             Expanded(
+//               child: ListView.separated(
+//                 padding: const EdgeInsets.all(16),
+//                 itemCount: products.length,
+//                 separatorBuilder: (_, __) => const SizedBox(height: 10),
+//                 itemBuilder: (ctx, i) {
+//                   final p = products[i];
+//                   final isSelected = _selectedIds.contains(p.id.toString());
+//                   final isLimitReached = _selectedIds.length >= 30;
+//                   final bool isDisabled = isLimitReached && !isSelected;
+
+//                   return InkWell(
+//                     onTap: () => _toggle(p.id.toString()),
+//                     child: Opacity(
+//                       opacity: isDisabled ? 0.5 : 1.0,
+//                       child: Container(
+//                         decoration: BoxDecoration(
+//                           border: Border.all(
+//                             color: isSelected
+//                                 ? accentColor
+//                                 : Colors.grey.shade200,
+//                             width: isSelected ? 2 : 1,
+//                           ),
+//                           borderRadius: BorderRadius.circular(12),
+//                           color: isSelected
+//                               ? accentColor.withOpacity(0.04)
+//                               : Colors.white,
+//                         ),
+//                         padding: const EdgeInsets.all(8),
+//                         child: Row(
+//                           children: [
+//                             Container(
+//                               width: 50,
+//                               height: 50,
+//                               decoration: BoxDecoration(
+//                                 color: Colors.grey.shade100,
+//                                 borderRadius: BorderRadius.circular(8),
+//                                 image: p.image.isNotEmpty
+//                                     ? DecorationImage(
+//                                         image: NetworkImage(p.image),
+//                                         fit: BoxFit.cover,
+//                                       )
+//                                     : null,
+//                               ),
+//                               child: p.image.isEmpty
+//                                   ? const Icon(Iconsax.image, size: 20)
+//                                   : null,
+//                             ),
+//                             const SizedBox(width: 12),
+//                             Expanded(
+//                               child: Column(
+//                                 crossAxisAlignment: CrossAxisAlignment.start,
+//                                 children: [
+//                                   Text(
+//                                     p.name,
+//                                     maxLines: 1,
+//                                     overflow: TextOverflow.ellipsis,
+//                                     style: const TextStyle(
+//                                       fontWeight: FontWeight.w600,
+//                                       fontSize: 13,
+//                                     ),
+//                                   ),
+//                                   Text(
+//                                     "₹${p.price}",
+//                                     style: const TextStyle(
+//                                       color: Colors.grey,
+//                                       fontSize: 12,
+//                                     ),
+//                                   ),
+//                                 ],
+//                               ),
+//                             ),
+//                             Container(
+//                               width: 24,
+//                               height: 24,
+//                               decoration: BoxDecoration(
+//                                 color: isSelected ? accentColor : Colors.white,
+//                                 shape: BoxShape.circle,
+//                                 border: Border.all(
+//                                   color: isSelected
+//                                       ? accentColor
+//                                       : Colors.grey.shade400,
+//                                 ),
+//                               ),
+//                               child: isSelected
+//                                   ? const Icon(
+//                                       Icons.check,
+//                                       size: 16,
+//                                       color: Colors.white,
+//                                     )
+//                                   : null,
+//                             ),
+//                             const SizedBox(width: 8),
+//                           ],
+//                         ),
+//                       ),
+//                     ),
+//                   );
+//                 },
+//               ),
+//             ),
+
+//             Padding(
+//               padding: const EdgeInsets.all(16.0),
+//               child: SizedBox(
+//                 width: double.infinity,
+//                 height: 50,
+//                 child: ElevatedButton(
+//                   style: ElevatedButton.styleFrom(
+//                     backgroundColor: accentColor,
+//                     shape: RoundedRectangleBorder(
+//                       borderRadius: BorderRadius.circular(12),
+//                     ),
+//                   ),
+//                   onPressed: _selectedIds.isEmpty
+//                       ? null
+//                       : () {
+//                           final selectedProducts = products
+//                               .where(
+//                                 (p) => _selectedIds.contains(p.id.toString()),
+//                               )
+//                               .toList();
+//                           widget.onConfirm(selectedProducts);
+//                         },
+//                   // 🗣️ WRAPPED
+//                   child: AutoTranslate(
+//                     child: Text(
+//                       "Continue (${_selectedIds.length})",
+//                       style: const TextStyle(
+//                         color: Colors.white,
+//                         fontSize: 16,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // ─── COLLAGE STUDIO SHEET (KEYBOARD FIXED) ───────────────────────────────────
+
+// class _CollageStudioSheet extends StatefulWidget {
+//   final CatalogueModel catalogue;
+//   final String shopName;
+//   final String phone;
+
+//   const _CollageStudioSheet({
+//     required this.catalogue,
+//     required this.shopName,
+//     required this.phone,
+//   });
+
+//   @override
+//   State<_CollageStudioSheet> createState() => _CollageStudioSheetState();
+// }
+
+// class _CollageStudioSheetState extends State<_CollageStudioSheet> {
+//   CollageLayout _selectedLayout = CollageLayout.grid;
+//   final Color _themeColor = const Color.fromARGB(255, 203, 20, 145);
+//   Color _bgColor = Colors.white;
+//   File? _customBgImage;
+//   bool _showPrices = true;
+//   bool _showBranding = true;
+//   bool _isGenerating = false;
+
+//   final TextEditingController _marginController = TextEditingController();
+//   final ImagePicker _picker = ImagePicker();
+
+//   final List<Color> _colors = [
+//     Colors.white,
+//     Colors.black,
+//     const Color(0xFFFFF8E1), // Cream
+//     const Color(0xFFE3F2FD), // Light Blue
+//     const Color(0xFFF3E5F5), // Light Purple
+//   ];
+
+//   Future<void> _pickBgImage(ImageSource source) async {
+//     try {
+//       final XFile? image = await _picker.pickImage(source: source);
+//       if (image != null) {
+//         setState(() {
+//           _customBgImage = File(image.path);
+//           _bgColor = Colors.transparent;
+//         });
+//       }
+//     } catch (e) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text("Error", style: TextStyle(fontWeight: FontWeight.bold)),
+//         ),
+//         messageText: AutoTranslate(child: Text("Could not load image: $e")),
+//         backgroundColor: Colors.red.shade50,
+//       );
+//     }
+//   }
+
+//   Future<void> _createAndShare() async {
+//     setState(() => _isGenerating = true);
+//     double marginPercent = double.tryParse(_marginController.text) ?? 0.0;
+
+//     if (marginPercent < 20) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text(
+//             "Low Margin",
+//             style: TextStyle(fontWeight: FontWeight.bold),
+//           ),
+//         ),
+//         messageText: const AutoTranslate(
+//           child: Text("Minimum margin must be 20%"),
+//         ),
+//         backgroundColor: Colors.red.shade100,
+//         colorText: Colors.red.shade900,
+//         snackPosition: SnackPosition.BOTTOM,
+//       );
+//       setState(() => _isGenerating = false);
+//       return;
+//     }
+
+//     try {
+//       List<ProductModel> adjustedProducts = widget.catalogue.products.map((p) {
+//         double base = double.tryParse(p.price) ?? 0;
+//         double newPrice = base * (1 + marginPercent / 100);
+
+//         return ProductModel(
+//           id: p.id,
+//           name: p.name,
+//           price: newPrice.toStringAsFixed(0),
+//           regularPrice: p.regularPrice,
+//           image: p.image,
+//           images: p.images,
+//           attributes: p.attributes,
+//           description: p.description,
+//           shortDescription: p.shortDescription,
+//           brandName: p.brandName,
+//         );
+//       }).toList();
+
+//       final List<File> files = await CollageService.generateCollages(
+//         products: adjustedProducts,
+//         layout: _selectedLayout,
+//         shopName: _showBranding ? widget.shopName : "",
+//         contactNumber: _showBranding ? widget.phone : "",
+//         showPrices: _showPrices,
+//         showBranding: _showBranding,
+//         themeColor: _themeColor,
+//         backgroundColor: _bgColor,
+//         backgroundImage: _customBgImage,
+//         extraMargin: 0,
+//       );
+
+//       List<XFile> xFiles = files.map((f) => XFile(f.path)).toList();
+//       await Share.shareXFiles(
+//         xFiles,
+//         text: "Check out our latest collection! ✨",
+//       );
+//       if (mounted) Navigator.pop(context);
+//     } catch (e) {
+//       Get.snackbar(
+//         "",
+//         "",
+//         titleText: const AutoTranslate(
+//           child: Text("Error", style: TextStyle(fontWeight: FontWeight.bold)),
+//         ),
+//         messageText: AutoTranslate(child: Text("Failed: $e")),
+//         backgroundColor: Colors.red,
+//         colorText: Colors.white,
+//       );
+//     } finally {
+//       if (mounted) setState(() => _isGenerating = false);
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       decoration: const BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+//       ),
+//       padding: const EdgeInsets.symmetric(horizontal: 20),
+//       child: Padding(
+//         padding: EdgeInsets.only(
+//           bottom: MediaQuery.of(context).viewInsets.bottom,
+//         ),
+//         child: SafeArea(
+//           top: false,
+//           child: SingleChildScrollView(
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 const SizedBox(height: 16),
+//                 Center(
+//                   child: Container(
+//                     width: 40,
+//                     height: 4,
+//                     decoration: BoxDecoration(
+//                       color: Colors.grey.shade300,
+//                       borderRadius: BorderRadius.circular(4),
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(height: 20),
+
+//                 // 🗣️ WRAPPED
+//                 const Center(
+//                   child: AutoTranslate(
+//                     child: Text(
+//                       "Collage Studio Pro 📸",
+//                       style: TextStyle(
+//                         fontSize: 18,
+//                         fontWeight: FontWeight.w700,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+
+//                 // 🗣️ WRAPPED
+//                 const Center(
+//                   child: AutoTranslate(
+//                     child: Text(
+//                       "Create professional collage to share with your customers, social media and others",
+//                       style: TextStyle(
+//                         fontSize: 10,
+//                         fontWeight: FontWeight.w500,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(height: 24),
+
+//                 // Layouts
+//                 // 🗣️ WRAPPED
+//                 const AutoTranslate(
+//                   child: Text(
+//                     "CHOOSE LAYOUT",
+//                     style: TextStyle(
+//                       fontSize: 11,
+//                       fontWeight: FontWeight.bold,
+//                       color: Colors.grey,
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(height: 12),
+//                 SingleChildScrollView(
+//                   scrollDirection: Axis.horizontal,
+//                   child: Row(
+//                     children: [
+//                       _layoutOption("Grid", Iconsax.grid_3, CollageLayout.grid),
+//                       const SizedBox(width: 8),
+//                       _layoutOption(
+//                         "Story",
+//                         Iconsax.mobile,
+//                         CollageLayout.story,
+//                       ),
+//                       const SizedBox(width: 8),
+//                       _layoutOption(
+//                         "Mag",
+//                         Iconsax.book_1,
+//                         CollageLayout.magazine,
+//                       ),
+//                       const SizedBox(width: 8),
+//                       _layoutOption(
+//                         "Clean",
+//                         Iconsax.maximize_3,
+//                         CollageLayout.minimal,
+//                       ),
+//                       const SizedBox(width: 8),
+//                       _layoutOption(
+//                         "Catalog",
+//                         Iconsax.book,
+//                         CollageLayout.catalog,
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//                 const SizedBox(height: 24),
+
+//                 // 📸 BACKGROUND
+//                 // 🗣️ WRAPPED
+//                 const AutoTranslate(
+//                   child: Text(
+//                     "BACKGROUND",
+//                     style: TextStyle(
+//                       fontSize: 11,
+//                       fontWeight: FontWeight.bold,
+//                       color: Colors.grey,
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(height: 12),
+//                 Row(
+//                   children: [
+//                     _bgOptionBtn(
+//                       Iconsax.gallery,
+//                       "Gallery",
+//                       () => _pickBgImage(ImageSource.gallery),
+//                     ),
+//                     const SizedBox(width: 10),
+//                     _bgOptionBtn(
+//                       Iconsax.camera,
+//                       "Camera",
+//                       () => _pickBgImage(ImageSource.camera),
+//                     ),
+//                     const SizedBox(width: 10),
+//                     Container(
+//                       width: 1,
+//                       height: 30,
+//                       color: Colors.grey.shade300,
+//                     ),
+//                     const SizedBox(width: 10),
+//                     Expanded(
+//                       child: SingleChildScrollView(
+//                         scrollDirection: Axis.horizontal,
+//                         child: Row(
+//                           children: _colors
+//                               .map(
+//                                 (c) => GestureDetector(
+//                                   onTap: () => setState(() {
+//                                     _bgColor = c;
+//                                     _customBgImage = null;
+//                                   }),
+//                                   child: Container(
+//                                     width: 36,
+//                                     height: 36,
+//                                     margin: const EdgeInsets.only(right: 8),
+//                                     decoration: BoxDecoration(
+//                                       color: c,
+//                                       shape: BoxShape.circle,
+//                                       border: Border.all(
+//                                         color: Colors.grey.shade300,
+//                                       ),
+//                                       boxShadow:
+//                                           (_bgColor == c &&
+//                                               _customBgImage == null)
+//                                           ? [
+//                                               const BoxShadow(
+//                                                 color: Colors.blue,
+//                                                 blurRadius: 4,
+//                                               ),
+//                                             ]
+//                                           : [],
+//                                     ),
+//                                     child:
+//                                         (_bgColor == c &&
+//                                             _customBgImage == null)
+//                                         ? const Icon(
+//                                             Icons.check,
+//                                             size: 16,
+//                                             color: Colors.grey,
+//                                           )
+//                                         : null,
+//                                   ),
+//                                 ),
+//                               )
+//                               .toList(),
+//                         ),
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+
+//                 if (_customBgImage != null)
+//                   Padding(
+//                     padding: const EdgeInsets.only(top: 12),
+//                     child: Container(
+//                       padding: const EdgeInsets.symmetric(
+//                         horizontal: 12,
+//                         vertical: 8,
+//                       ),
+//                       decoration: BoxDecoration(
+//                         color: Colors.green.shade50,
+//                         borderRadius: BorderRadius.circular(8),
+//                         border: Border.all(color: Colors.green),
+//                       ),
+//                       child: Row(
+//                         children: [
+//                           const Icon(
+//                             Icons.image,
+//                             size: 16,
+//                             color: Colors.green,
+//                           ),
+//                           const SizedBox(width: 8),
+//                           // 🗣️ WRAPPED
+//                           const AutoTranslate(
+//                             child: Text(
+//                               "Image Selected",
+//                               style: TextStyle(
+//                                 fontSize: 12,
+//                                 fontWeight: FontWeight.bold,
+//                                 color: Colors.green,
+//                               ),
+//                             ),
+//                           ),
+//                           const Spacer(),
+//                           InkWell(
+//                             onTap: () => setState(() => _customBgImage = null),
+//                             child: const Icon(
+//                               Icons.close,
+//                               size: 18,
+//                               color: Colors.red,
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                     ),
+//                   ),
+
+//                 const SizedBox(height: 24),
+
+//                 // 💰 MARGIN INPUT
+//                 // 🗣️ WRAPPED
+//                 const AutoTranslate(
+//                   child: Text(
+//                     "ADD MARGIN (%)",
+//                     style: TextStyle(
+//                       fontSize: 11,
+//                       fontWeight: FontWeight.bold,
+//                       color: Colors.grey,
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(height: 8),
+//                 Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Container(
+//                       padding: const EdgeInsets.symmetric(horizontal: 12),
+//                       decoration: BoxDecoration(
+//                         color: Colors.grey.shade100,
+//                         borderRadius: BorderRadius.circular(12),
+//                         border: Border.all(color: accentColor.withOpacity(0.5)),
+//                       ),
+//                       child: TextField(
+//                         controller: _marginController,
+//                         keyboardType: TextInputType.number,
+//                         decoration: const InputDecoration(
+//                           border: InputBorder.none,
+//                           hintText: "e.g. 30",
+//                           suffixText: "%",
+//                           prefixIcon: Icon(
+//                             Iconsax.percentage_square,
+//                             size: 18,
+//                             color: accentColor,
+//                           ),
+//                           contentPadding: EdgeInsets.symmetric(vertical: 12),
+//                         ),
+//                       ),
+//                     ),
+//                     const SizedBox(height: 12),
+//                     SingleChildScrollView(
+//                       scrollDirection: Axis.horizontal,
+//                       child: Row(
+//                         children: [30, 50, 70, 100].map((val) {
+//                           return Padding(
+//                             padding: const EdgeInsets.only(right: 8.0),
+//                             child: ActionChip(
+//                               label: Text(
+//                                 "$val%",
+//                                 style: const TextStyle(
+//                                   fontWeight: FontWeight.w600,
+//                                   fontSize: 12,
+//                                 ),
+//                               ),
+//                               backgroundColor: Colors.blue.shade50,
+//                               labelStyle: TextStyle(
+//                                 color: Colors.blue.shade900,
+//                               ),
+//                               shape: RoundedRectangleBorder(
+//                                 borderRadius: BorderRadius.circular(20),
+//                                 side: BorderSide(color: Colors.blue.shade100),
+//                               ),
+//                               onPressed: () {
+//                                 setState(() {
+//                                   _marginController.text = val.toString();
+//                                 });
+//                               },
+//                             ),
+//                           );
+//                         }).toList(),
+//                       ),
+//                     ),
+//                     const SizedBox(height: 6),
+//                     // 🗣️ WRAPPED
+//                     const AutoTranslate(
+//                       child: Text(
+//                         " * Minimum 20% margin is required.",
+//                         style: TextStyle(fontSize: 10, color: Colors.grey),
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//                 const SizedBox(height: 16),
+
+//                 // Toggles
+//                 SwitchListTile(
+//                   contentPadding: EdgeInsets.zero,
+//                   activeColor: _themeColor,
+//                   // 🗣️ WRAPPED
+//                   title: const AutoTranslate(
+//                     child: Text(
+//                       "Show Price Tags",
+//                       style: TextStyle(fontWeight: FontWeight.w600),
+//                     ),
+//                   ),
+//                   value: _showPrices,
+//                   onChanged: (v) => setState(() => _showPrices = v),
+//                 ),
+//                 SwitchListTile(
+//                   contentPadding: EdgeInsets.zero,
+//                   activeColor: _themeColor,
+//                   // 🗣️ WRAPPED
+//                   title: const AutoTranslate(
+//                     child: Text(
+//                       "Add Branding",
+//                       style: TextStyle(fontWeight: FontWeight.w600),
+//                     ),
+//                   ),
+//                   value: _showBranding,
+//                   onChanged: (v) => setState(() => _showBranding = v),
+//                 ),
+//                 const SizedBox(height: 16),
+
+//                 // Generate
+//                 SizedBox(
+//                   width: double.infinity,
+//                   height: 54,
+//                   child: ElevatedButton.icon(
+//                     onPressed: _isGenerating ? null : _createAndShare,
+//                     style: ElevatedButton.styleFrom(
+//                       backgroundColor: _themeColor,
+//                       shape: RoundedRectangleBorder(
+//                         borderRadius: BorderRadius.circular(16),
+//                       ),
+//                     ),
+//                     icon: _isGenerating
+//                         ? const SizedBox(
+//                             width: 20,
+//                             height: 20,
+//                             child: CircularProgressIndicator(
+//                               color: Colors.white,
+//                               strokeWidth: 2,
+//                             ),
+//                           )
+//                         : const Icon(Iconsax.magicpen, color: Colors.white),
+//                     // 🗣️ WRAPPED
+//                     label: AutoTranslate(
+//                       child: Text(
+//                         _isGenerating ? "Designing..." : "Create & Share",
+//                         style: const TextStyle(
+//                           color: Colors.white,
+//                           fontWeight: FontWeight.bold,
+//                           fontSize: 16,
+//                         ),
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+
+//                 const SizedBox(height: 30),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _bgOptionBtn(IconData icon, String label, VoidCallback onTap) {
+//     return InkWell(
+//       onTap: onTap,
+//       child: Column(
+//         children: [
+//           Container(
+//             padding: const EdgeInsets.all(10),
+//             decoration: BoxDecoration(
+//               color: Colors.grey.shade100,
+//               shape: BoxShape.circle,
+//             ),
+//             child: Icon(icon, size: 20, color: Colors.black87),
+//           ),
+//           const SizedBox(height: 4),
+//           // 🗣️ WRAPPED
+//           AutoTranslate(
+//             child: Text(label, style: const TextStyle(fontSize: 10)),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _layoutOption(String label, IconData icon, CollageLayout layout) {
+//     bool selected = _selectedLayout == layout;
+//     return GestureDetector(
+//       onTap: () => setState(() => _selectedLayout = layout),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 200),
+//         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+//         decoration: BoxDecoration(
+//           color: selected ? _themeColor.withOpacity(0.1) : Colors.white,
+//           borderRadius: BorderRadius.circular(12),
+//           border: Border.all(
+//             color: selected ? _themeColor : Colors.grey.shade200,
+//             width: 2,
+//           ),
+//         ),
+//         child: Column(
+//           children: [
+//             Icon(icon, color: selected ? _themeColor : Colors.grey),
+//             const SizedBox(height: 4),
+//             // 🗣️ WRAPPED
+//             AutoTranslate(
+//               child: Text(
+//                 label,
+//                 style: TextStyle(
+//                   fontSize: 11,
+//                   fontWeight: FontWeight.bold,
+//                   color: selected ? _themeColor : Colors.grey,
+//                 ),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
