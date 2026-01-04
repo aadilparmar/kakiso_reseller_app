@@ -210,7 +210,7 @@ class _WishlistScreenState extends State<WishlistScreen>
         ),
         centerTitle: true,
         title: const Text(
-          "Collections",
+          "Wishlist",
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,

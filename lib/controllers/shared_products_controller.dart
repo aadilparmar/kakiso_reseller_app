@@ -21,8 +21,9 @@ class SharedProductsController extends GetxController {
       sharedItems.removeWhere((item) => item.id == product.id);
       sharedItems.insert(0, product);
     }
-    if (sharedItems.length > 50)
+    if (sharedItems.length > 50) {
       sharedItems.assignAll(sharedItems.sublist(0, 50));
+    }
     _saveToStorage();
   }
 

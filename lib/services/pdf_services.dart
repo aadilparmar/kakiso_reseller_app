@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:kakiso_reseller_app/controllers/shared_products_controller.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;

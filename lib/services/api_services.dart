@@ -515,13 +515,11 @@ class ApiService {
     throw Exception('Order Fetch Error');
   }
 
-  // You could add this to your ApiService to enable tracking
   static Future<void> trackProductView({
     required String userId,
     required int productId,
   }) async {
     try {
-      // Example: Sending a custom meta-data update or hit to a custom endpoint
       final Uri url = Uri.parse('$baseUrl/wp-json/kakiso/v1/track-view');
       await _client.post(
         url,
