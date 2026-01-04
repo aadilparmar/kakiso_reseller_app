@@ -11,9 +11,11 @@ import 'package:kakiso_reseller_app/models/product.dart';
 class PdfService {
   // 🎨 COLORS
   static const PdfColor white = PdfColor.fromInt(0xFFFFFFFF);
+  static const PdfColor black = PdfColor.fromInt(0xFF000000);
   static const PdfColor lightGrey = PdfColor.fromInt(0xFFF8F9FA);
   static const PdfColor borderColor = PdfColor.fromInt(0xFFE0E0E0);
   static const PdfColor darkText = PdfColor.fromInt(0xFF1A1A1A);
+  static const PdfColor mediumText = PdfColor.fromInt(0xFF6B7280);
   static const PdfColor accentGold = PdfColor.fromInt(0xFFD4AF37);
   static const PdfColor priceGreen = PdfColor.fromInt(0xFF10B981);
   static const PdfColor discountRed = PdfColor.fromInt(0xFFEF4444);
@@ -42,6 +44,8 @@ class PdfService {
     // 1. Load Fonts
     final fontRegular = await PdfGoogleFonts.openSansRegular();
     final fontBold = await PdfGoogleFonts.openSansBold();
+    final fontSemiBold =
+        await PdfGoogleFonts.openSansSemiBold(); // Added for Cover
 
     // 2. Load Logo
     pw.ImageProvider? logo;
@@ -58,6 +62,25 @@ class PdfService {
     final productImages = await _fetchProductImages(products);
 
     // 4. Build PDF
+
+    // --- PAGE 1: MAGAZINE STYLE COVER PAGE ---
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.zero, // Full bleed for cover
+        build: (ctx) => _buildCoverPage(
+          categoryName,
+          businessName,
+          logo,
+          businessPhone,
+          businessAddress,
+          fontSemiBold,
+          fontRegular,
+        ),
+      ),
+    );
+
+    // --- PAGE 2+: PRODUCT GRID ---
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -66,16 +89,7 @@ class PdfService {
         footer: (ctx) => _buildFooter(ctx, businessName, fontRegular),
         build: (ctx) {
           return [
-            // COVER SECTION (First Page Top)
-            _buildCoverSection(
-              categoryName,
-              businessName,
-              businessPhone,
-              fontBold,
-            ),
-            pw.SizedBox(height: 20),
-
-            // PRODUCT GRID using WRAP (Crash Proof)
+            // PRODUCT GRID using WRAP
             pw.Wrap(
               spacing: 15, // Horizontal gap
               runSpacing: 20, // Vertical gap
@@ -109,7 +123,169 @@ class PdfService {
     );
   }
 
-  // 📐 ROBUST CARD BUILDER
+  // 📖 MAGAZINE COVER PAGE BUILDER
+  static pw.Widget _buildCoverPage(
+    String categoryName,
+    String businessName,
+    pw.ImageProvider? logo,
+    String? phone,
+    String? address,
+    pw.Font semiBold,
+    pw.Font regular,
+  ) {
+    return pw.Container(
+      color: white,
+      child: pw.Stack(
+        children: [
+          // Frame
+          pw.Container(
+            margin: const pw.EdgeInsets.all(30),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: accentGold, width: 2),
+            ),
+          ),
+
+          // Corner decorations
+          pw.Positioned(
+            top: 30,
+            left: 30,
+            child: pw.Container(
+              width: 50,
+              height: 50,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  top: pw.BorderSide(color: black, width: 4),
+                  left: pw.BorderSide(color: black, width: 4),
+                ),
+              ),
+            ),
+          ),
+          pw.Positioned(
+            bottom: 30,
+            right: 30,
+            child: pw.Container(
+              width: 50,
+              height: 50,
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(color: black, width: 4),
+                  right: pw.BorderSide(color: black, width: 4),
+                ),
+              ),
+            ),
+          ),
+
+          // Content
+          pw.Center(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.all(50),
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    'PREMIUM COLLECTION',
+                    style: pw.TextStyle(
+                      fontSize: 12,
+                      letterSpacing: 4,
+                      color: mediumText,
+                      fontWeight: pw.FontWeight.bold,
+                      font: semiBold,
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 40),
+
+                  // Logo
+                  if (logo != null)
+                    pw.Container(
+                      height: 150,
+                      child: pw.Image(logo, fit: pw.BoxFit.contain),
+                    )
+                  else
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(30),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: black, width: 5),
+                      ),
+                      child: pw.Text(
+                        businessName.isNotEmpty ? businessName[0] : 'K',
+                        style: pw.TextStyle(
+                          fontSize: 80,
+                          fontWeight: pw.FontWeight.bold,
+                          font: semiBold,
+                        ),
+                      ),
+                    ),
+
+                  pw.SizedBox(height: 40),
+
+                  pw.Text(
+                    categoryName.toUpperCase(),
+                    textAlign: pw.TextAlign.center,
+                    style: pw.TextStyle(
+                      fontSize: 36,
+                      fontWeight: pw.FontWeight.bold,
+                      letterSpacing: 3,
+                      font: semiBold,
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 15),
+
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 8,
+                    ),
+                    child: pw.Text(
+                      'EST. ${DateTime.now().year}',
+                      style: pw.TextStyle(
+                        color: white,
+                        fontSize: 11,
+                        letterSpacing: 4,
+                        font: semiBold,
+                      ),
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 60),
+
+                  pw.Divider(
+                    color: accentGold,
+                    thickness: 2,
+                    indent: 80,
+                    endIndent: 80,
+                  ),
+
+                  pw.SizedBox(height: 20),
+
+                  pw.Text(
+                    businessName.toUpperCase(),
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                      letterSpacing: 2,
+                      font: semiBold,
+                    ),
+                  ),
+
+                  if (phone != null && phone.isNotEmpty) ...[
+                    pw.SizedBox(height: 10),
+                    pw.Text(
+                      'PHONE: $phone',
+                      style: pw.TextStyle(fontSize: 11, font: regular),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 📐 ROBUST CARD BUILDER (Kept exactly as you wanted)
   static pw.Widget _buildProductCard({
     required ProductModel product,
     required pw.ImageProvider? image,
@@ -261,36 +437,6 @@ class PdfService {
             "CATALOG",
             style: pw.TextStyle(color: PdfColors.grey, fontSize: 10),
           ),
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _buildCoverSection(
-    String title,
-    String business,
-    String? phone,
-    pw.Font font,
-  ) {
-    return pw.Container(
-      width: double.infinity,
-      padding: const pw.EdgeInsets.all(20),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: accentGold, width: 2),
-      ),
-      child: pw.Column(
-        children: [
-          pw.Text(
-            business.toUpperCase(),
-            style: pw.TextStyle(font: font, fontSize: 18),
-          ),
-          pw.Divider(color: accentGold),
-          pw.Text(
-            title.toUpperCase(),
-            style: pw.TextStyle(font: font, fontSize: 24),
-          ),
-          if (phone != null)
-            pw.Text("Contact: $phone", style: const pw.TextStyle(fontSize: 10)),
         ],
       ),
     );
