@@ -34,8 +34,8 @@ class DescriptionSection extends StatelessWidget {
             const Text(
               "Product Details",
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
                 fontFamily: 'Poppins',
                 color: Colors.black87,
               ),

@@ -57,7 +57,7 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    // Increased debounce to 800ms to allow typing full 10-digit SKUs
+    // Increased debounce to 800ms to allow typing full codes
     _debounce = Timer(const Duration(milliseconds: 800), () {
       if (query.trim().isNotEmpty) {
         _performHybridSearch(query);
@@ -71,7 +71,7 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  🔥 HYBRID SEARCH ENGINE (Full 10-digit Support)
+  //  🔥 HYBRID SEARCH ENGINE (Unique Code + ID Support)
   // ─────────────────────────────────────────────────────────────
   Future<void> _performHybridSearch(String query) async {
     setState(() {
@@ -92,15 +92,15 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
     try {
       // 2. Prepare Parallel Search Tasks
       List<Future<List<ProductModel>>> tasks = [
-        // A. Standard Search (Name, Description, partial SKU if indexed)
+        // A. Standard Search (Name, Description)
         ApiService.searchProducts(query),
 
-        // B. SKU Search (EXACT match for full 10-digit codes)
-        ApiService.fetchProductsBySku(query),
+        // B. Unique Code Search (Replaces SKU Search)
+        ApiService.fetchProductsByUniqueCode(query),
       ];
 
       // C. ID Search (Only if query is strictly numeric)
-      // This helps if the user types "1402" expecting ID 1402
+      // Keeps the ID logic as requested
       if (int.tryParse(cleanQuery) != null) {
         tasks.add(
           ApiService.fetchProductByIdSafe(cleanQuery).then((product) {
@@ -144,22 +144,20 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
         bool isExactMatch = false;
 
         final String pId = product.id.toString();
-        final String pSku = (product.userSku ?? '').toLowerCase();
+        // final String pSku = (product.userSku ?? '').toLowerCase(); // SKU logic removed from matching priority
         final String pCode = (product.uniqueCode ?? '').toLowerCase();
 
-        // STRICT MATCHING LOGIC (No length limits)
+        // STRICT MATCHING LOGIC (Prioritizing Unique Code and ID)
         if (pId == cleanQuery) {
           matchLabel = "ID: $pId";
           isExactMatch = true;
-        } else if (pSku == cleanQuery) {
-          matchLabel = "SKU: ${product.userSku}";
-          isExactMatch = true;
         } else if (pCode == cleanQuery) {
+          // Exact Unique Code Match
           matchLabel = "Code: ${product.uniqueCode}";
           isExactMatch = true;
-        } else if (pSku.contains(cleanQuery)) {
-          // Partial SKU match - Allowed for any length
-          matchLabel = "SKU: ${product.userSku}";
+        } else if (pCode.contains(cleanQuery)) {
+          // Partial Unique Code Match
+          matchLabel = "Code: ${product.uniqueCode}";
           isExactMatch = true;
         }
 
@@ -297,14 +295,14 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
       return _buildEmptyState(
         Iconsax.search_normal,
         "Search for anything",
-        "Type 'Jewellery', 'Rings', or a Product ID.",
+        "Type 'Jewellery', 'Rings', or a Unique Code.",
       );
     }
     if (_searchResults.isEmpty) {
       return _buildEmptyState(
         Iconsax.search_status,
         "No results found",
-        "Try checking the ID or SKU.",
+        "Try checking the ID or Unique Code.",
       );
     }
 
@@ -508,7 +506,8 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
                         ),
                       ),
                     ),
-                    if (product.userSku != null)
+                    // Replaced SKU label with Unique Code label if available
+                    if (product.uniqueCode != null)
                       Positioned(
                         bottom: 0,
                         left: 0,
@@ -520,7 +519,7 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
                           ),
                           color: Colors.black.withOpacity(0.6),
                           child: Text(
-                            "SKU: ${product.userSku}",
+                            "Code: ${product.uniqueCode}",
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,

@@ -185,10 +185,10 @@ class _PricingCalculatorState extends State<PricingCalculator> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(0.5),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -206,9 +206,7 @@ class _PricingCalculatorState extends State<PricingCalculator> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
+
                 border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
               ),
               child: Row(
@@ -415,7 +413,12 @@ class _PricingCalculatorState extends State<PricingCalculator> {
                     child: ElevatedButton.icon(
                       onPressed: _copyToClipboard,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black87,
+                        backgroundColor: const Color.fromARGB(
+                          221,
+                          222,
+                          19,
+                          178,
+                        ),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(

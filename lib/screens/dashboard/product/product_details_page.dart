@@ -76,26 +76,11 @@ class ProductDetailsPage extends StatelessWidget {
                     // Title, Price, Discount
                     ProductInfoHeader(product: product),
 
-                    // Secondary Name (if exists)
-                    if (product.userProductName != null &&
-                        product.userProductName != product.name)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          "(${product.userProductName})",
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-
-                    const SizedBox(height: 16),
-
                     // Brand / Sold By
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    const SizedBox(height: 16),
                     ProductBrandSection(product: product),
-
                     const SizedBox(height: 16),
                     const Divider(height: 1, color: Color(0xFFF3F4F6)),
                     const SizedBox(height: 24),
@@ -139,35 +124,52 @@ class ProductDetailsPage extends StatelessWidget {
                     // if (product.keywords.isNotEmpty) _buildKeywordsSection(),
                     const SizedBox(height: 24),
 
-                    // Reseller Tools (Download, Share)
-                    ResellerToolsBox(product: product, controller: controller),
-
-                    const SizedBox(height: 20),
-
                     // Add to Catalogue Button
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      height: 54, // Taller for better touch target
+                      child: ElevatedButton(
                         onPressed: () => _openAddToCatalogueSheet(product),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: accentColor,
+                          backgroundColor:
+                              accentColor, // Solid, high-contrast color
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 2, // Subtle shadow for "lift"
+                          shadowColor: accentColor.withOpacity(
+                            0.4,
+                          ), // Colored shadow looks premium
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                              10,
+                            ), // Clean, modern corners
                           ),
-                          elevation: 0,
                         ),
-                        icon: const Icon(Iconsax.book_saved, size: 20),
-                        label: const Text(
-                          'Add to Catalogue',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Iconsax.book_saved, size: 22),
+                            const SizedBox(
+                              width: 12,
+                            ), // Good separation between icon and text
+                            const Text(
+                              'Add To Catalog', // All caps for importance
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500, // Extra Bold
+                                letterSpacing:
+                                    0.8, // Slightly wider for readability
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // Reseller Tools (Download, Share)
+                    ResellerToolsBox(product: product, controller: controller),
 
                     const SizedBox(height: 24),
 
@@ -182,7 +184,7 @@ class ProductDetailsPage extends StatelessWidget {
                     SimilarProductsSection(categoryId: "0"),
 
                     // Bottom Padding for Sticky Bar
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -231,8 +233,8 @@ class ProductDetailsPage extends StatelessWidget {
         const Text(
           "Product Specifications",
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
             fontFamily: 'Poppins',
           ),
         ),
@@ -316,8 +318,8 @@ class ProductDetailsPage extends StatelessWidget {
         const Text(
           "Dimensions & Weight",
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
             fontFamily: 'Poppins',
           ),
         ),
@@ -545,45 +547,7 @@ class ProductDetailsPage extends StatelessWidget {
   }
 
   // ===========================================================================
-  // 🔹 WIDGET: KEYWORDS / TAGS
-  // ===========================================================================
-  // Widget _buildKeywordsSection() {
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: [
-  //       const Text(
-  //         "Tags / Keywords",
-  //         style: TextStyle(
-  //           fontSize: 14,
-  //           fontWeight: FontWeight.w600,
-  //           color: Colors.grey,
-  //         ),
-  //       ),
-  //       const SizedBox(height: 8),
-  //       Wrap(
-  //         spacing: 8,
-  //         runSpacing: 8,
-  //         children: product.keywords.map((tag) {
-  //           return Container(
-  //             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-  //             decoration: BoxDecoration(
-  //               color: Colors.grey.shade50,
-  //               borderRadius: BorderRadius.circular(20),
-  //               border: Border.all(color: Colors.grey.shade200),
-  //             ),
-  //             child: Text(
-  //               "#$tag",
-  //               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-  //             ),
-  //           );
-  //         }).toList(),
-  //       ),
-  //     ],
-  //   );
-  // }
-
-  // ===========================================================================
-  // 🔹 HELPER: ADD TO CATALOGUE
+  // 🔹 HELPER: ADD TO CATALOGUE (UPDATED WITH SAFE AREA)
   // ===========================================================================
   void _openAddToCatalogueSheet(ProductModel product) {
     final availableCatalogues = catalogueController.catalogueNames;
@@ -591,72 +555,84 @@ class ProductDetailsPage extends StatelessWidget {
       context: Get.context!,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      // Added useSafeArea to ensure it doesn't overlap status bar when expanded
+      useSafeArea: true,
       builder: (ctx) {
         return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const Text(
-                'Add to Catalogue',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              if (availableCatalogues.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      "No catalogues found. Create a new one below!",
-                      style: TextStyle(color: Colors.grey),
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            0,
+          ), // Removed bottom padding here
+          child: SafeArea(
+            // Wrapped content in SafeArea to handle bottom notches/home bars
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                )
-              else
-                ...availableCatalogues.map(
-                  (name) => ListTile(
-                    title: Text(name),
-                    leading: const Icon(Iconsax.folder, color: accentColor),
-                    onTap: () {
-                      catalogueController.addProductToExistingCatalogue(
-                        name,
-                        product,
-                      );
+                ),
+                const Text(
+                  'Add to Catalog',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+
+                if (availableCatalogues.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text(
+                        "No catalogs found. Create a new one below!",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  )
+                else
+                  ...availableCatalogues.map(
+                    (name) => ListTile(
+                      title: Text(name),
+                      leading: const Icon(Iconsax.folder, color: accentColor),
+                      onTap: () {
+                        catalogueController.addProductToExistingCatalogue(
+                          name,
+                          product,
+                        );
+                        Navigator.pop(ctx);
+                        Get.snackbar("Success", "Added to $name");
+                      },
+                    ),
+                  ),
+
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
                       Navigator.pop(ctx);
-                      Get.snackbar("Success", "Added to $name");
+                      _showCreateNewCatalogueDialog(product);
                     },
+                    child: const Text("Create New Catalog"),
                   ),
                 ),
-
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showCreateNewCatalogueDialog(product);
-                  },
-                  child: const Text("Create New Catalogue"),
-                ),
-              ),
-            ],
+                // Add a small spacer at the bottom for visual comfort
+                const SizedBox(height: 12),
+              ],
+            ),
           ),
         );
       },
@@ -668,32 +644,35 @@ class ProductDetailsPage extends StatelessWidget {
     showDialog(
       context: Get.context!,
       builder: (ctx) {
-        return AlertDialog(
-          title: const Text('New Catalogue'),
-          content: TextField(
-            controller: nameController,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: 'Collection Name'),
+        // Wrapped Dialog content in SafeArea as well for consistency
+        return SafeArea(
+          child: AlertDialog(
+            title: const Text('New Catalogue'),
+            content: TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Collection Name'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameController.text.isNotEmpty) {
+                    catalogueController.createCatalogueAndAddProduct(
+                      nameController.text.trim(),
+                      product,
+                    );
+                    Navigator.pop(ctx);
+                    Get.snackbar("Success", "Catalogue Created");
+                  }
+                },
+                child: const Text('Create'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  catalogueController.createCatalogueAndAddProduct(
-                    nameController.text.trim(),
-                    product,
-                  );
-                  Navigator.pop(ctx);
-                  Get.snackbar("Success", "Catalogue Created");
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
         );
       },
     );

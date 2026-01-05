@@ -19,10 +19,7 @@ class ApiService {
       'cs_389ffd5342045eb06ac641085e7885fc3f0db010';
   static const String appApiKey = '';
 
-  // 1. PERFORMANCE: Reusing a single client for connection pooling
   static final http.Client _client = http.Client();
-
-  // 2. PERFORMANCE: Memory cache for static resources
   static List<CategoryModel>? _cachedCategories;
   static List<BrandModel>? _cachedBrands;
 
@@ -36,10 +33,7 @@ class ApiService {
     "Connection": "keep-alive",
   };
 
-  // ---------------------------------------------------------------------------
-  // Product / Category helpers
-  // ---------------------------------------------------------------------------
-
+  // --- CATEGORIES ---
   static Future<List<CategoryModel>> fetchCategories() async {
     if (_cachedCategories != null) return _cachedCategories!;
 
@@ -61,6 +55,7 @@ class ApiService {
     }
   }
 
+  // --- PRODUCTS ---
   static Future<List<ProductModel>> fetchProducts({
     int page = 1,
     int perPage = 20,
@@ -68,7 +63,7 @@ class ApiService {
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
-    List<int>? brandIds, // <--- 1. ADD THIS LINE
+    List<int>? brandIds,
   }) async {
     final buffer = StringBuffer(
       '$baseUrl/wp-json/wc/v3/products?status=publish',
@@ -127,7 +122,7 @@ class ApiService {
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
-    List<int>? brandIds, // <--- 1. ADD THIS LINE
+    List<int>? brandIds,
   }) async {
     final buffer = StringBuffer(
       '$baseUrl/wp-json/wc/v3/products?category=$categoryId&status=publish&per_page=20',
@@ -198,6 +193,56 @@ class ApiService {
       }
       return [];
     } catch (e) {
+      return [];
+    }
+  }
+
+  // 🔥 UPDATED: Advanced Unique Code Search
+  static Future<List<ProductModel>> fetchProductsByUniqueCode(
+    String code,
+  ) async {
+    final String cleanCode = code.trim();
+    if (cleanCode.isEmpty) return [];
+
+    // Strategy 1: Standard Search (Works if backend plugin indexes meta)
+    final Uri searchUrl = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products?search=${Uri.encodeQueryComponent(cleanCode)}&status=publish',
+    );
+
+    // Strategy 2: Legacy Meta Filter (Works on some WC setups without plugins)
+    // NOTE: This tries to find exact matches for the specific key
+    final Uri metaUrl = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products?filter[meta_key]=_unique_product_code&filter[meta_value]=${Uri.encodeQueryComponent(cleanCode)}&status=publish',
+    );
+
+    // Strategy 3: Check SKU just in case (Many systems mirror unique code to SKU)
+    final Uri skuUrl = Uri.parse(
+      '$baseUrl/wp-json/wc/v3/products?sku=${Uri.encodeQueryComponent(cleanCode)}',
+    );
+
+    try {
+      // Run all checks in parallel to be robust
+      final results = await Future.wait([
+        _client.get(searchUrl, headers: _headers),
+        _client.get(metaUrl, headers: _headers),
+        _client.get(skuUrl, headers: _headers),
+      ]);
+
+      final Map<int, ProductModel> uniqueMap = {};
+
+      for (var response in results) {
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          for (var item in data) {
+            final p = ProductModel.fromJson(item);
+            uniqueMap[p.id] = p;
+          }
+        }
+      }
+
+      return uniqueMap.values.toList();
+    } catch (e) {
+      print("Unique Code Search Error: $e");
       return [];
     }
   }
@@ -395,14 +440,13 @@ class ApiService {
         "city": billing['city'] ?? '',
         "state": billing['state'] ?? '',
         "pincode": billing['postcode'] ?? '',
-        "gstin": '', // Added missing key
+        "gstin": '',
       };
     } catch (e) {
       return null;
     }
   }
 
-  // FIXED: Removed the invalid 'return' text and fixed the arrow syntax error
   static Future<void> updateResellerBusinessMeta({
     String? userId,
     required Map<String, dynamic> data,
