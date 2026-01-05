@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:kakiso_reseller_app/utils/constants.dart'; // For accentColor
+import 'package:kakiso_reseller_app/utils/constants.dart';
 
 class PricingCalculator extends StatefulWidget {
-  final double productCost; // Base cost from API
+  final double productCost;
 
   const PricingCalculator({super.key, required this.productCost});
 
@@ -13,82 +13,161 @@ class PricingCalculator extends StatefulWidget {
 }
 
 class _PricingCalculatorState extends State<PricingCalculator> {
-  // Controller for the Editable Field
-  final _sellingPriceController = TextEditingController();
+  // Controllers
+  final TextEditingController _marginController = TextEditingController();
+  final TextEditingController _totalPriceController = TextEditingController();
+
+  // Focus Nodes
+  final FocusNode _marginFocus = FocusNode();
+  final FocusNode _priceFocus = FocusNode();
 
   // State Variables
-  double _costPrice = 0.0;
-  double _sellingPrice = 0.0;
+  double _margin = 0.0;
+  double _totalPrice = 0.0;
 
-  // Derived Values
-  double _profit = 0.0;
-  double _markupPercentage = 10.0; // Starts at 10% minimum
+  // Message Configuration Toggles
+  bool _includePrice = true;
+  bool _includeShipping = true;
+  bool _includeReturns = true;
 
   @override
   void initState() {
     super.initState();
-    _costPrice = widget.productCost;
+    _resetToDefault();
 
-    // Initial State: Cost + 10% Markup
-    _updateSellingPriceFromMarkup(10.0);
+    _marginController.addListener(_onMarginChanged);
+    _totalPriceController.addListener(_onPriceChanged);
+  }
+
+  void _resetToDefault() {
+    // Default Strategy: Cost + 20%
+    double initialMargin = (widget.productCost * 0.20);
+    _updateValues(newMargin: initialMargin);
   }
 
   @override
   void dispose() {
-    _sellingPriceController.dispose();
+    _marginController.dispose();
+    _totalPriceController.dispose();
+    _marginFocus.dispose();
+    _priceFocus.dispose();
     super.dispose();
   }
 
-  // 1. Logic: User Types Manual Price
-  void _calculateFromInput(String val) {
-    // Remove non-numeric except decimal
-    String cleanVal = val.replaceAll(RegExp(r'[^0-9.]'), '');
-    double sell = double.tryParse(cleanVal) ?? 0.0;
+  // --- CALCULATION LOGIC ---
 
+  void _updateValues({required double newMargin}) {
     setState(() {
-      _sellingPrice = sell;
-      _profit = _sellingPrice - _costPrice;
-
-      if (_costPrice > 0) {
-        // Markup Formula
-        _markupPercentage = ((_sellingPrice - _costPrice) / _costPrice) * 100;
-      } else {
-        _markupPercentage = 0.0;
-      }
+      _margin = newMargin;
+      _totalPrice = widget.productCost + _margin;
     });
+
+    if (!_marginFocus.hasFocus) {
+      _marginController.text = _margin.toStringAsFixed(0);
+    }
+    if (!_priceFocus.hasFocus) {
+      _totalPriceController.text = _totalPrice.toStringAsFixed(0);
+    }
   }
 
-  // 2. Logic: User Slides or Clicks Chip
-  void _updateSellingPriceFromMarkup(double percentage) {
-    setState(() {
-      _markupPercentage = percentage;
-      // Price Formula: Cost * (1 + Markup/100)
-      _sellingPrice = _costPrice * (1 + (_markupPercentage / 100));
-      _profit = _sellingPrice - _costPrice;
+  void _onMarginChanged() {
+    if (!_marginFocus.hasFocus) return;
+    String text = _marginController.text.replaceAll(RegExp(r'[^0-9.-]'), '');
+    double val = double.tryParse(text) ?? 0.0;
 
-      // Update text field without triggering infinite loop
-      _sellingPriceController.text = _sellingPrice.toStringAsFixed(0);
+    setState(() {
+      _margin = val;
+      _totalPrice = widget.productCost + _margin;
     });
+
+    String newTotal = _totalPrice.toStringAsFixed(0);
+    if (_totalPriceController.text != newTotal) {
+      _totalPriceController.text = newTotal;
+    }
   }
 
-  // 3. Logic: Copy Quote for Customer
-  void _copyQuoteToClipboard() {
-    final String quote =
-        "Price: ₹${_sellingPrice.toStringAsFixed(0)}\nFree Shipping Available!\nDM to order.";
-    Clipboard.setData(ClipboardData(text: quote));
+  void _onPriceChanged() {
+    if (!_priceFocus.hasFocus) return;
+    String text = _totalPriceController.text.replaceAll(
+      RegExp(r'[^0-9.-]'),
+      '',
+    );
+    double val = double.tryParse(text) ?? 0.0;
 
+    setState(() {
+      _totalPrice = val;
+      _margin = _totalPrice - widget.productCost;
+    });
+
+    String newMargin = _margin.toStringAsFixed(0);
+    if (_marginController.text != newMargin) {
+      _marginController.text = newMargin;
+    }
+  }
+
+  void _applyQuickMargin(double value, {bool isPercentage = false}) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    double calcMargin = isPercentage
+        ? (widget.productCost * (value / 100))
+        : value;
+    _updateValues(newMargin: calcMargin);
+  }
+
+  void _applyPsychologicalPricing() {
+    // Rounds to nearest 9 (e.g. 105 -> 109, 112 -> 119) or just subtract 1?
+    // Let's do simple logic: If price is 500, make it 499.
+    HapticFeedback.mediumImpact();
+    FocusScope.of(context).unfocus();
+
+    double current = _totalPrice;
+    double target = (current / 100).ceil() * 100 - 1; // e.g. 450 -> 499
+
+    if (target <= widget.productCost) {
+      // Avoid loss, just add 99 to base
+      target = widget.productCost + 99;
+    }
+
+    double newMargin = target - widget.productCost;
+    _updateValues(newMargin: newMargin);
+  }
+
+  // --- MESSAGE GENERATION ---
+
+  String _generateMessage() {
+    final StringBuffer buffer = StringBuffer();
+    buffer.writeln("🛍️ *Best Quality Product*");
+
+    if (_includePrice) {
+      buffer.writeln("💰 Price: *₹${_totalPrice.toStringAsFixed(0)}*");
+    } else {
+      buffer.writeln("💰 Price: *DM for Price*");
+    }
+
+    if (_includeShipping) buffer.writeln("🚚 *Free Express Shipping*");
+    if (_includeReturns) buffer.writeln("↩️ *Easy 7-Day Returns*");
+
+    buffer.writeln("✅ *Prepaid / Online Payment*");
+    buffer.write("\n👇 *Reply to book order now!*");
+
+    return buffer.toString();
+  }
+
+  void _copyToClipboard() {
+    HapticFeedback.mediumImpact();
+    Clipboard.setData(ClipboardData(text: _generateMessage()));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
-            SizedBox(width: 10),
-            Text("Price quote copied!"),
+            Icon(Iconsax.copy_success, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Text("Details copied to clipboard!"),
           ],
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.black87,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 2),
       ),
@@ -97,329 +176,403 @@ class _PricingCalculatorState extends State<PricingCalculator> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isProfitable = _profit >= 0;
-    final Color statusColor = isProfitable ? Colors.green : Colors.red;
-
-    // Calculate Flex ratio for the visual bar
-    double total = _costPrice + (_profit > 0 ? _profit : 0);
-    int costFlex = total > 0 ? ((_costPrice / total) * 100).toInt() : 1;
-    int profitFlex = total > 0 ? ((_profit / total) * 100).toInt() : 0;
-    if (profitFlex < 0) profitFlex = 0; // Safety
+    final bool isLoss = _margin < 0;
+    // Reseller Green/Red
+    final Color profitColor = isLoss
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFF2E7D32);
 
     return Container(
-      padding: const EdgeInsets.all(20), // Reduced padding slightly for safety
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade100),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // --- HEADER (FIXED OVERFLOW) ---
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Left Side (Title)
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Iconsax.calculator,
-                        color: accentColor,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Flexible(
-                      child: Text(
-                        "Profit Calculator",
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ),
-                  ],
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 16 : 0,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // --- 1. HEADER (Product Cost) ---
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
                 ),
+                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
               ),
-              const SizedBox(width: 8),
-              // Right Side (Badge)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isProfitable ? Icons.trending_up : Icons.trending_down,
-                      size: 14,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "₹${_profit.toStringAsFixed(0)} PROFIT",
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // --- VISUAL BAR (Cost vs Profit) ---
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              height: 12,
               child: Row(
                 children: [
-                  Expanded(
-                    flex: costFlex,
-                    child: Container(color: Colors.grey.shade300),
+                  const Icon(Iconsax.tag, size: 18, color: Colors.black54),
+                  const SizedBox(width: 10),
+                  Text(
+                    "Product Cost:",
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
-                  Expanded(
-                    flex: profitFlex,
-                    child: Container(color: accentColor),
+                  const Spacer(),
+                  Text(
+                    "₹${widget.productCost.toStringAsFixed(0)}",
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Cost: ₹${_costPrice.toStringAsFixed(0)}",
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  "Your Margin: ${_markupPercentage.toStringAsFixed(0)}%",
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: accentColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          // --- INPUTS ---
-          Row(
-            children: [
-              // Input Field
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Selling Price",
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+            const SizedBox(height: 20),
+
+            // --- 2. INPUTS (Bi-Directional) ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  // MARGIN
+                  Expanded(
+                    child: _buildInputBox(
+                      controller: _marginController,
+                      node: _marginFocus,
+                      label: "Your Margin",
+                      color: profitColor,
+                      isMargin: true,
                     ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _sellingPriceController,
-                      keyboardType: TextInputType.number,
-                      onChanged: _calculateFromInput,
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(
+                      Icons.add,
+                      color: Colors.grey.shade300,
+                      size: 24,
+                    ),
+                  ),
+
+                  // TOTAL PRICE
+                  Expanded(
+                    child: _buildInputBox(
+                      controller: _totalPriceController,
+                      node: _priceFocus,
+                      label: "Final Price",
+                      color: Colors.black87,
+                      isMargin: false,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // PROFIT TEXT
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 20),
+              child: Text(
+                isLoss
+                    ? "⚠️ Selling at Loss of ₹${_margin.abs().toStringAsFixed(0)}"
+                    : "🎉 You earn ₹${_margin.toStringAsFixed(0)} on this order",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: profitColor,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+
+            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+            // --- 3. QUICK ACTIONS ---
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _buildChip("15%", 15, true),
+                  _buildChip("25%", 25, true),
+                  _buildChip("₹100", 100, false),
+                  _buildChip("₹200", 200, false),
+                  // PSYCHOLOGICAL PRICING BUTTON
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: ActionChip(
+                      label: const Text("Make it ₹99"),
+                      labelStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      backgroundColor: accentColor,
+                      padding: EdgeInsets.zero,
+                      onPressed: _applyPsychologicalPricing,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+            // --- 4. LIVE MESSAGE PREVIEW ---
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Message Preview",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black54,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // CHAT BUBBLE
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCF8C6), // WhatsApp Greenish
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(12),
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _generateMessage(),
                       style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: Colors.black87,
+                        height: 1.4,
                       ),
-                      decoration: InputDecoration(
-                        prefixText: "₹ ",
-                        prefixStyle: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // --- 5. TOGGLES & ACTIONS ---
+            Container(
+              color: const Color(0xFFF9FAFB),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildToggle(
+                        "Price",
+                        _includePrice,
+                        (v) => setState(() => _includePrice = v),
+                      ),
+                      _buildToggle(
+                        "Free Ship",
+                        _includeShipping,
+                        (v) => setState(() => _includeShipping = v),
+                      ),
+                      _buildToggle(
+                        "Returns",
+                        _includeReturns,
+                        (v) => setState(() => _includeReturns = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // COPY BUTTON
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _copyToClipboard,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 16,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: accentColor,
-                            width: 2,
-                          ),
+                      ),
+                      icon: const Icon(Iconsax.copy, size: 20),
+                      label: const Text(
+                        "Copy to Clipboard",
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Copy Button
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("", style: TextStyle(fontSize: 12)), // Spacer
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 50, // Match input height
-                      child: ElevatedButton(
-                        onPressed: _copyQuoteToClipboard,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.copy, size: 16, color: Colors.white),
-                            SizedBox(width: 6),
-                            Text(
-                              "Copy",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          // --- SLIDER SECTION ---
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Quick Markup",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              Text(
-                "${_markupPercentage.toStringAsFixed(0)}%",
-                style: const TextStyle(
-                  color: accentColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: accentColor,
-              inactiveTrackColor: accentColor.withValues(alpha: 0.1),
-              thumbColor: Colors.white,
-              overlayColor: accentColor.withValues(alpha: 0.1),
-              trackHeight: 6,
-              thumbShape: const RoundSliderThumbShape(
-                enabledThumbRadius: 10,
-                elevation: 4,
+                  ),
+                ],
               ),
             ),
-            child: Slider(
-              value: _markupPercentage.clamp(10.0, 300.0),
-              min: 10.0,
-              max: 300.0,
-              divisions: 29,
-              label: "${_markupPercentage.toStringAsFixed(0)}%",
-              onChanged: (value) => _updateSellingPriceFromMarkup(value),
-            ),
-          ),
-
-          // --- QUICK CHIPS (FIXED OVERFLOW) ---
-          // Wrapped in SingleChildScrollView for safety on small screens
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildQuickChip("10%", 10.0),
-                const SizedBox(width: 8),
-                _buildQuickChip("20%", 20.0),
-                const SizedBox(width: 8),
-                _buildQuickChip("50%", 50.0),
-                const SizedBox(width: 8),
-                _buildQuickChip("100%", 100.0),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildQuickChip(String label, double value) {
-    final bool isActive = (_markupPercentage - value).abs() < 1;
-    return GestureDetector(
-      onTap: () => _updateSellingPriceFromMarkup(value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? accentColor : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? accentColor : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
+  // --- WIDGET BUILDERS ---
+
+  Widget _buildInputBox({
+    required TextEditingController controller,
+    required FocusNode node,
+    required String label,
+    required Color color,
+    required bool isMargin,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
           label,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isActive ? Colors.white : Colors.grey.shade600,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade600,
+            fontFamily: 'Poppins',
           ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: node.hasFocus ? color : Colors.grey.shade300,
+              width: node.hasFocus ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 12, right: 4),
+                child: Text(
+                  "₹",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade400,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: node,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    color: color,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChip(String label, double val, bool isPercent) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => _applyQuickMargin(val, isPercentage: isPercent),
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Text(
+            isPercent ? "+$label" : "+ $label",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggle(String label, bool value, Function(bool) onChanged) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onChanged(!value);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: value ? accentColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: value ? accentColor : Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              value ? Icons.check_circle : Icons.circle_outlined,
+              size: 14,
+              color: value ? accentColor : Colors.grey,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: value ? accentColor : Colors.grey.shade600,
+              ),
+            ),
+          ],
         ),
       ),
     );

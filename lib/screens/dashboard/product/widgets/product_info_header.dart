@@ -218,8 +218,8 @@ class ProductInfoHeader extends StatelessWidget {
         Text(
           product.name,
           style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
+            fontSize: 20,
+            fontWeight: FontWeight.w400,
             fontFamily: 'Poppins',
             height: 1.3,
             color: Color(0xFF1F2937),
@@ -237,8 +237,8 @@ class ProductInfoHeader extends StatelessWidget {
             Text(
               "₹${product.price}",
               style: const TextStyle(
-                fontSize: 35,
-                fontWeight: FontWeight.w600,
+                fontSize: 30,
+                fontWeight: FontWeight.w400,
                 fontFamily: 'Poppins',
                 color: Colors.black,
                 height: 1.0,
@@ -254,7 +254,7 @@ class ProductInfoHeader extends StatelessWidget {
                 child: Text(
                   "₹${product.regularPrice}",
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 20,
                     decoration: TextDecoration.lineThrough,
                     color: Colors.grey.shade400,
                     fontFamily: 'Poppins',
@@ -299,9 +299,9 @@ class ProductInfoHeader extends StatelessWidget {
         const Text(
           "Inclusive of all taxes",
           style: TextStyle(
-            color: Color(0xFF10B981),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+            color: Color.fromARGB(255, 95, 98, 97),
+            fontSize: 10,
+            fontWeight: FontWeight.w300,
           ),
         ),
       ],
