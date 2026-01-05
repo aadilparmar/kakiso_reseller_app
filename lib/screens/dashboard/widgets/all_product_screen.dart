@@ -88,6 +88,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           order: _order,
           minPrice: _activeFilter.minPrice,
           maxPrice: _activeFilter.maxPrice,
+          brandIds: _activeFilter.selectedBrandIds, // <--- ADD THIS
         );
       } else {
         products = await ApiService.fetchProducts(
@@ -95,6 +96,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           order: _order,
           minPrice: _activeFilter.minPrice,
           maxPrice: _activeFilter.maxPrice,
+          brandIds: _activeFilter.selectedBrandIds, // <--- ADD THIS
         );
       }
 

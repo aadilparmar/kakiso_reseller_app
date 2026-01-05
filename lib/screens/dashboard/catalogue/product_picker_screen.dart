@@ -178,7 +178,7 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
                 controller: _searchController,
                 onChanged: (value) => setState(() => _searchQuery = value),
                 decoration: const InputDecoration(
-                  hintText: "Search products...",
+                  hintText: "Search products & categories...",
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -204,6 +204,32 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
       return const SizedBox(height: 110);
     }
 
+    // --- SEARCH & SORT LOGIC ADDED HERE ---
+    List<CategoryModel> visibleCategories = List.from(_categories);
+
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase().trim();
+
+      // 1. Filter categories that match the query
+      visibleCategories = visibleCategories.where((cat) {
+        return cat.name.toLowerCase().contains(query);
+      }).toList();
+
+      // 2. Sort so matches starting with the query appear first
+      visibleCategories.sort((a, b) {
+        final aName = a.name.toLowerCase();
+        final bName = b.name.toLowerCase();
+
+        final aStarts = aName.startsWith(query);
+        final bStarts = bName.startsWith(query);
+
+        if (aStarts && !bStarts) return -1; // a comes first
+        if (!aStarts && bStarts) return 1; // b comes first
+        return aName.compareTo(bName); // otherwise alphabetical
+      });
+    }
+    // ---------------------------------------
+
     return Container(
       height: 110,
       width: double.infinity,
@@ -211,7 +237,8 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         scrollDirection: Axis.horizontal,
-        itemCount: _categories.length + 1,
+        // Use visibleCategories instead of _categories
+        itemCount: visibleCategories.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -225,8 +252,10 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
               ),
             );
           }
-          final cat = _categories[index - 1];
+
+          final cat = visibleCategories[index - 1];
           final isSelected = _activeCategoryId == cat.id;
+
           return GestureDetector(
             onTap: () => _onCategorySelected(cat.id),
             child: _buildCategoryItem(
@@ -524,7 +553,7 @@ class _PickerProductCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. IMAGE SECTION - Uses flexible instead of strict fixed logic for better adaptability
+              // 1. IMAGE SECTION
               Expanded(
                 flex: 60,
                 child: Stack(
@@ -610,7 +639,7 @@ class _PickerProductCard extends StatelessWidget {
 
               // 2. DETAILS SECTION
               Expanded(
-                flex: 40, // Increased text space slightly for responsiveness
+                flex: 40,
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Column(
@@ -619,7 +648,6 @@ class _PickerProductCard extends StatelessWidget {
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            // Using Wrap/Flex logic inside LayoutBuilder is safer for text scaling
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -634,7 +662,7 @@ class _PickerProductCard extends StatelessWidget {
                                     color: kBlack,
                                   ),
                                 ),
-                                const Spacer(), // Pushes prices down
+                                const Spacer(),
                                 Wrap(
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
+
+// 1. IMPORT YOUR MODELS AND SERVICES
+import 'package:kakiso_reseller_app/models/brand.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
@@ -15,6 +18,7 @@ class FilterOptions {
   double? maxPrice;
   bool inStockOnly;
   List<int> selectedCategoryIds;
+  List<int> selectedBrandIds; // Added Brand IDs
 
   FilterOptions({
     this.sortType = SortType.relevance,
@@ -22,6 +26,7 @@ class FilterOptions {
     this.maxPrice,
     this.inStockOnly = false,
     this.selectedCategoryIds = const [],
+    this.selectedBrandIds = const [], // Initialize
   });
 
   void reset() {
@@ -30,6 +35,7 @@ class FilterOptions {
     maxPrice = null;
     inStockOnly = false;
     selectedCategoryIds = [];
+    selectedBrandIds = []; // Reset brands
   }
 
   bool get hasActiveFilters =>
@@ -37,7 +43,8 @@ class FilterOptions {
       minPrice != null ||
       maxPrice != null ||
       inStockOnly ||
-      selectedCategoryIds.isNotEmpty;
+      selectedCategoryIds.isNotEmpty ||
+      selectedBrandIds.isNotEmpty; // Check brands
 
   FilterOptions copyWith({
     SortType? sortType,
@@ -45,6 +52,7 @@ class FilterOptions {
     double? maxPrice,
     bool? inStockOnly,
     List<int>? selectedCategoryIds,
+    List<int>? selectedBrandIds, // Copy brands
   }) {
     return FilterOptions(
       sortType: sortType ?? this.sortType,
@@ -53,6 +61,7 @@ class FilterOptions {
       inStockOnly: inStockOnly ?? this.inStockOnly,
       selectedCategoryIds:
           selectedCategoryIds ?? List.from(this.selectedCategoryIds),
+      selectedBrandIds: selectedBrandIds ?? List.from(this.selectedBrandIds),
     );
   }
 }
@@ -100,9 +109,12 @@ class _SplitFilterContent extends StatefulWidget {
 }
 
 class _SplitFilterContentState extends State<_SplitFilterContent> {
-  final List<String> _tabs = ['Category', 'Price', 'Availability'];
+  // Updated tabs to include Brand
+  final List<String> _tabs = ['Category', 'Brand', 'Price', 'Availability'];
+
   final List<IconData> _tabIcons = [
     Iconsax.category,
+    Iconsax.tag_2, // Brand icon
     Iconsax.wallet_3,
     Iconsax.box_tick,
   ];
@@ -110,9 +122,15 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
   int _selectedIndex = 0;
   late FilterOptions _tempFilter;
 
+  // -- Categories State --
   List<CategoryModel> _allCategories = [];
   bool _isLoadingCategories = true;
   String _errorMessage = '';
+
+  // -- Brands State --
+  List<BrandModel> _allBrands = [];
+  bool _isLoadingBrands = true;
+  String _brandErrorMessage = '';
 
   late TextEditingController _minController;
   late TextEditingController _maxController;
@@ -130,6 +148,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
 
     _fetchCategoriesInternal();
+    _fetchBrandsInternal(); // Call fetch brands here
   }
 
   Future<void> _fetchCategoriesInternal() async {
@@ -153,6 +172,32 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
         setState(() {
           _isLoadingCategories = false;
           _errorMessage = "Failed to load categories";
+        });
+      }
+    }
+  }
+
+  // Method to fetch brands
+  Future<void> _fetchBrandsInternal() async {
+    setState(() {
+      _isLoadingBrands = true;
+      _brandErrorMessage = '';
+    });
+
+    try {
+      final brands = await ApiService.fetchBrands();
+
+      if (mounted) {
+        setState(() {
+          _allBrands = brands;
+          _isLoadingBrands = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingBrands = false;
+          _brandErrorMessage = "Failed to load brands";
         });
       }
     }
@@ -192,10 +237,8 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     Navigator.pop(context, _tempFilter);
   }
 
-  // UPDATED: Now clears filters and immediately closes the sheet
   void _handleClear() {
     HapticFeedback.lightImpact();
-    // Create a fresh filter object with default values (cleared state)
     final resetFilter = FilterOptions();
     Navigator.pop(context, resetFilter);
   }
@@ -208,6 +251,19 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
         }
       } else {
         _tempFilter.selectedCategoryIds.remove(categoryId);
+      }
+    });
+  }
+
+  // Toggle logic for brands
+  void _toggleBrandSelection(int brandId, bool? isSelected) {
+    setState(() {
+      if (isSelected == true) {
+        if (!_tempFilter.selectedBrandIds.contains(brandId)) {
+          _tempFilter.selectedBrandIds.add(brandId);
+        }
+      } else {
+        _tempFilter.selectedBrandIds.remove(brandId);
       }
     });
   }
@@ -332,14 +388,17 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
       case 0:
         return _buildCategoryView();
       case 1:
-        return _buildPriceView();
+        return _buildBrandView(); // Added Brand View
       case 2:
+        return _buildPriceView();
+      case 3:
         return _buildAvailabilityView();
       default:
         return const SizedBox();
     }
   }
 
+  // --- CATEGORY VIEW ---
   Widget _buildCategoryView() {
     if (_isLoadingCategories) {
       return Center(
@@ -499,6 +558,129 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
+  // --- BRAND VIEW IMPLEMENTATION ---
+  Widget _buildBrandView() {
+    if (_isLoadingBrands) {
+      return Center(
+        child: CircularProgressIndicator(
+          color: widget.accentColor,
+          strokeWidth: 2,
+        ),
+      );
+    }
+
+    if (_brandErrorMessage.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(height: 8),
+            Text(
+              _brandErrorMessage,
+              style: const TextStyle(color: Colors.grey),
+            ),
+            TextButton(
+              onPressed: _fetchBrandsInternal,
+              child: const Text("Retry"),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_allBrands.isEmpty) {
+      return const Center(
+        child: Text("No brands found", style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      itemCount: _allBrands.length + 1,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              "Select Brands",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+          );
+        }
+
+        final brand = _allBrands[index - 1];
+        final isSelected = _tempFilter.selectedBrandIds.contains(brand.id);
+
+        return InkWell(
+          onTap: () => _toggleBrandSelection(brand.id, !isSelected),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? widget.accentColor.withOpacity(0.05)
+                  : Colors.white,
+              border: Border.all(
+                color: isSelected ? widget.accentColor : Colors.grey.shade200,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                if (brand.logoUrl != null && brand.logoUrl!.isNotEmpty) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      brand.logoUrl!,
+                      width: 30,
+                      height: 30,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Iconsax.tag, size: 20, color: Colors.grey),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    brand.name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: isSelected ? widget.accentColor : Colors.black87,
+                    ),
+                  ),
+                ),
+                Transform.scale(
+                  scale: 1.0,
+                  child: Checkbox(
+                    activeColor: widget.accentColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    value: isSelected,
+                    onChanged: (val) => _toggleBrandSelection(brand.id, val),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- PRICE VIEW ---
   Widget _buildPriceView() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -613,6 +795,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     );
   }
 
+  // --- AVAILABILITY VIEW ---
   Widget _buildAvailabilityView() {
     return ListView(
       padding: const EdgeInsets.all(20),

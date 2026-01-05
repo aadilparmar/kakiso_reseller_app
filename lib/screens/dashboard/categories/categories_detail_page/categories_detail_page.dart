@@ -122,6 +122,7 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
         order: _order,
         minPrice: _activeFilter.minPrice ?? _currentPriceRange.start,
         maxPrice: _activeFilter.maxPrice ?? _currentPriceRange.end,
+        brandIds: _activeFilter.selectedBrandIds, // <--- ADD THIS
       );
 
       // 2. Client-Side Filtering (Enforce In Stock & Strict Price)

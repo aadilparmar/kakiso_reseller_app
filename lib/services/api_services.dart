@@ -68,6 +68,7 @@ class ApiService {
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
+    List<int>? brandIds, // <--- 1. ADD THIS LINE
   }) async {
     final buffer = StringBuffer(
       '$baseUrl/wp-json/wc/v3/products?status=publish',
@@ -75,7 +76,9 @@ class ApiService {
     buffer.write('&per_page=$perPage&page=$page&orderby=$orderBy&order=$order');
     if (minPrice != null) buffer.write('&min_price=${minPrice.toInt()}');
     if (maxPrice != null) buffer.write('&max_price=${maxPrice.toInt()}');
-
+    if (brandIds != null && brandIds.isNotEmpty) {
+      buffer.write('&brand=${brandIds.join(',')}');
+    }
     try {
       final response = await _client.get(
         Uri.parse(buffer.toString()),
@@ -124,6 +127,7 @@ class ApiService {
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
+    List<int>? brandIds, // <--- 1. ADD THIS LINE
   }) async {
     final buffer = StringBuffer(
       '$baseUrl/wp-json/wc/v3/products?category=$categoryId&status=publish&per_page=20',
@@ -131,7 +135,9 @@ class ApiService {
     buffer.write('&orderby=$orderBy&order=$order');
     if (minPrice != null) buffer.write('&min_price=${minPrice.toInt()}');
     if (maxPrice != null) buffer.write('&max_price=${maxPrice.toInt()}');
-
+    if (brandIds != null && brandIds.isNotEmpty) {
+      buffer.write('&brand=${brandIds.join(',')}');
+    }
     try {
       final response = await _client.get(
         Uri.parse(buffer.toString()),
@@ -235,7 +241,7 @@ class ApiService {
     if (_cachedBrands != null) return _cachedBrands!;
     try {
       final response = await _client.get(
-        Uri.parse('$baseUrl/wp-json/wc/v3/brands?per_page=100'),
+        Uri.parse('$baseUrl/wp-json/wc/v3/products/brands?per_page=100'),
         headers: _headers,
       );
       if (response.statusCode == 200) {
