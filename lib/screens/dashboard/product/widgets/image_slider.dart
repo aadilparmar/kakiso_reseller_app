@@ -5,7 +5,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/watermarked_image.dart';
-// 1. IMPORT YOUR NEW WIDGET
 import 'fullscreen_image_viewer.dart';
 
 class ProductImageSlider extends StatefulWidget {
@@ -44,7 +43,9 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
         ? widget.product.images
         : [widget.product.image];
 
-    // Helpers
+    // Check if we have a valid unique code to show
+    final bool hasUniqueCode = widget.product.watermarkCode.isNotEmpty;
+
     final bool hasBrand =
         widget.product.brandName != null &&
         widget.product.brandName!.isNotEmpty;
@@ -76,8 +77,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           children: [
-            // --- A. MAIN IMAGE SLIDER (BIG IMAGE) ---
-            // ✅ THIS HAS THE WATERMARK
+            // --- A. MAIN IMAGE SLIDER ---
             Positioned.fill(
               child: PageView.builder(
                 controller: _pageController,
@@ -99,12 +99,23 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                     },
                     child: Hero(
                       tag: 'product_${widget.product.id}_$index',
-                      // ✅ USES WatermarkedImage HERE
-                      child: WatermarkedImage(
-                        imageUrl: imageList[index],
-                        code: widget.product.watermarkCode,
-                        fit: BoxFit.cover,
-                      ),
+                      // 🔹 STRICT LOGIC:
+                      // Only use WatermarkedImage if we have a Unique Code.
+                      // Otherwise, show clean image.
+                      child: hasUniqueCode
+                          ? WatermarkedImage(
+                              imageUrl: imageList[index],
+                              code: widget.product.watermarkCode,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.network(
+                              imageList[index],
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, o, s) => Container(
+                                color: Colors.grey[50],
+                                child: const Icon(Icons.image_not_supported),
+                              ),
+                            ),
                     ),
                   );
                 },
@@ -243,8 +254,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
               ),
             ),
 
-            // --- E. THUMBNAILS (SMALL PREVIEWS) ---
-            // ❌ NO WATERMARK HERE
+            // --- E. THUMBNAILS (Always Clean) ---
             if (imageList.length > 1)
               Positioned(
                 bottom: 20,
@@ -301,11 +311,9 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
-                                // ✅ REVERTED TO STANDARD IMAGE (No Watermark)
                                 child: Image.network(
                                   imageList[index],
                                   fit: BoxFit.cover,
-                                  // Keep the dimming logic for unselected
                                   color: isSelected
                                       ? null
                                       : Colors.black.withValues(alpha: 0.4),

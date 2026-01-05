@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui; // 1. Needed for Image Processing
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http; // 2. Needed to fetch bytes
+import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -60,38 +60,40 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
         "👇 *Reply to order now!*";
   }
 
-  // --- 2. NEW: CLIENT-SIDE WATERMARK ENGINE ---
-  // This function downloads the image, draws the code on it, and saves it.
+  // --- 2. CLIENT-SIDE WATERMARK ENGINE ---
   Future<XFile> _processAndWatermarkImage(String imageUrl) async {
+    // 🔹 STRICT LOGIC:
+    // Check code directly. If empty, download and return ORIGINAL file.
+    final String code = widget.product.watermarkCode;
+
+    if (code.trim().isEmpty) {
+      return await ApiService.downloadImageAsFile(imageUrl);
+    }
+
     try {
       // A. Download Bytes
       final http.Response response = await http.get(Uri.parse(imageUrl));
       if (response.statusCode != 200) throw Exception("Download failed");
       final Uint8List originalBytes = response.bodyBytes;
 
-      // B. Decode Image to allow editing
+      // B. Decode
       final ui.Codec codec = await ui.instantiateImageCodec(originalBytes);
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
       final ui.Image image = frameInfo.image;
 
-      // C. Setup Canvas for Drawing
+      // C. Setup Canvas
       final ui.PictureRecorder recorder = ui.PictureRecorder();
       final Canvas canvas = Canvas(recorder);
       final double width = image.width.toDouble();
       final double height = image.height.toDouble();
 
-      // D. Draw the Original Image
+      // D. Draw Image
       canvas.drawImage(image, Offset.zero, Paint());
 
-      // E. Draw the Watermark (Bottom Right)
-      final String code = widget.product.watermarkCode; // Get Code from Product
-
-      // Calculate Font Size (Dynamic based on image size)
-      // We use 3% of image width as font size so it looks good on 4K or HD images
+      // E. Draw Watermark
       final double fontSize = width * 0.035;
       final double padding = fontSize * 0.6;
 
-      // Create Text Painter
       final TextSpan span = TextSpan(
         style: TextStyle(
           color: Colors.white,
@@ -107,11 +109,9 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
       );
       tp.layout();
 
-      // Calculate Position (Bottom Right with margin)
       final double x = width - tp.width - (padding * 2);
       final double y = height - tp.height - (padding * 2);
 
-      // Draw Semi-Transparent Background Box
       final Paint bgPaint = Paint()..color = Colors.black.withOpacity(0.6);
       final Rect bgRect = Rect.fromLTWH(
         x - padding,
@@ -119,16 +119,14 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
         tp.width + (padding * 2),
         tp.height + (padding * 2),
       );
-      // Draw rounded rect manually or just simple rect
       canvas.drawRRect(
         RRect.fromRectAndRadius(bgRect, Radius.circular(padding / 2)),
         bgPaint,
       );
 
-      // Draw Text on top
       tp.paint(canvas, Offset(x, y));
 
-      // F. Save to File
+      // F. Save
       final ui.Image processedImage = await recorder.endRecording().toImage(
         width.toInt(),
         height.toInt(),
@@ -142,15 +140,12 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
       final Uint8List pngBytes = byteData.buffer.asUint8List();
 
       final tempDir = await getTemporaryDirectory();
-      // Create unique filename
       final String fileName = "${DateTime.now().millisecondsSinceEpoch}_wm.png";
       final File file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(pngBytes);
 
       return XFile(file.path);
     } catch (e) {
-      // If watermarking fails (e.g., memory issue), fallback to original file
-      // This ensures the user can still share SOMETHING even if processing fails
       print("Watermark failed: $e");
       return await ApiService.downloadImageAsFile(imageUrl);
     }
@@ -166,7 +161,6 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
     setLoading(true);
 
     try {
-      // A. Copy Caption logic
       final String caption = _getShareText();
       if (copyCaption) {
         await Clipboard.setData(ClipboardData(text: caption));
@@ -182,7 +176,6 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
         }
       }
 
-      // B. Process Images (Add Watermark)
       List<String> imageUrls = widget.product.images.take(4).toList();
       if (imageUrls.isEmpty && widget.product.image.isNotEmpty) {
         imageUrls = [widget.product.image];
@@ -190,14 +183,13 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
 
       final List<XFile> files = [];
       for (String url in imageUrls) {
-        // 🔴 CHANGE: CALL OUR NEW WATERMARK ENGINE
+        // Will watermark ONLY if uniqueCode exists
         final XFile file = await _processAndWatermarkImage(url);
         files.add(file);
       }
 
       if (files.isEmpty) throw Exception("No images available.");
 
-      // C. Share the Watermarked Files
       await Share.shareXFiles(files, text: caption);
     } catch (e) {
       Get.rawSnackbar(
@@ -212,9 +204,7 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
     }
   }
 
-  // --- 4. DOWNLOAD LOGIC (UNCHANGED) ---
-  // Note: If you want 'Download' button to also watermark, you'd need to
-  // update the controller's download logic or call _processAndWatermarkImage here manually.
+  // --- 4. DOWNLOAD LOGIC ---
   Future<void> _handleDownload() async {
     setState(() => _downloading = true);
     try {
@@ -313,7 +303,6 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
           // --- 2. SECONDARY SHARE ROW ---
           Row(
             children: [
-              // Facebook
               Expanded(
                 child: _buildSecondaryBtn(
                   label: "Facebook",
@@ -329,7 +318,6 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Instagram
               Expanded(
                 child: _buildSecondaryBtn(
                   label: "Instagram",
@@ -345,7 +333,6 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
                 ),
               ),
               const SizedBox(width: 12),
-              // More
               Expanded(
                 child: _buildSecondaryBtn(
                   label: "More",
@@ -431,7 +418,6 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
     );
   }
 
-  // --- HELPER: SECONDARY BUTTON (Unchanged) ---
   Widget _buildSecondaryBtn({
     required String label,
     required IconData icon,

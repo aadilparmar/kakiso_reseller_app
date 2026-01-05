@@ -285,8 +285,6 @@ class ProductModel {
   }
 
   String get watermarkCode {
-    if (uniqueCode != null && uniqueCode!.isNotEmpty) return uniqueCode!;
-    if (userSku != null && userSku!.isNotEmpty) return userSku!;
-    return 'ID: $id';
+    return uniqueCode ?? '';
   }
 }
