@@ -106,6 +106,9 @@ class CatalogueUtils {
         description: p.description,
         shortDescription: p.shortDescription,
         brandName: p.brandName,
+        manageStock: p.manageStock,
+        stockQuantity: p.stockQuantity,
+        stockStatus: p.stockStatus,
       );
     }).toList();
   }

@@ -80,6 +80,10 @@ class ProductModel {
   final String? eanBarcode;
   final String? userProductName;
   final List<String> keywords;
+  // 🔹 NEW INVENTORY FIELDS
+  final bool manageStock; // Maps to 'manage_stock'
+  final int stockQuantity; // Maps to 'stock_quantity'
+  final String stockStatus; // Maps to 'stock_status' (e.g., "instock")
 
   ProductModel({
     required this.id,
@@ -92,7 +96,12 @@ class ProductModel {
     required this.images,
     this.discountPercentage,
     required this.attributes,
-    this.categoryIds = const [], // <--- Default to empty list
+    this.categoryIds = const [],
+    // 🔹 Initialize New Fields
+    required this.manageStock,
+    required this.stockQuantity,
+    required this.stockStatus,
+    // <--- Default to empty list
     this.brandName,
     this.brandLogoUrl,
     this.userSku,
@@ -242,6 +251,10 @@ class ProductModel {
       packageGrossWeight: getMeta(['product_package_weight']),
       itemLength: getMeta(['product_item_length']),
       itemWidth: getMeta(['product_item_width']),
+      manageStock: json['manage_stock'] == true, //
+      stockQuantity:
+          int.tryParse(json['stock_quantity']?.toString() ?? '0') ?? 0, //
+      stockStatus: json['stock_status']?.toString() ?? 'outofstock',
       itemHeight: getMeta(['product_item_height']),
       itemWeight: getMeta(['product_item_weight']),
       netContents: getMeta(['product_net_contents']),
@@ -281,6 +294,9 @@ class ProductModel {
       ],
       'dimensions': {'length': length, 'width': width, 'height': height},
       'weight': weight,
+      'manage_stock': manageStock,
+      'stock_quantity': stockQuantity,
+      'stock_status': stockStatus,
     };
   }
 

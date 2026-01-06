@@ -317,10 +317,16 @@ class _InventoryPageState extends State<InventoryPage> {
     if (items.isEmpty) return false;
 
     for (final item in items) {
+      // 🔹 1. STOCK VALIDATION
+      // Check if the current quantity in cart exceeds available stock
+      if (item.quantity > item.product.stockQuantity) {
+        return false;
+      }
+
+      // 🔹 2. MARGIN VALIDATION (Existing)
       final basePrice = double.tryParse(item.product.price) ?? 0;
       final ctrl = _getMarginControllerForItem(item.product.id, basePrice);
       final margin = double.tryParse(ctrl.text) ?? 0;
-
       final marginPercent = basePrice > 0 ? (margin / basePrice) * 100 : 0;
 
       if (marginPercent < 19.9) return false;
@@ -703,8 +709,37 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
 
           const Divider(height: 24, thickness: 1, color: Color(0xFFF5F5F5)),
+          // 🔹 ADD THIS STOCK WARNING BOX
+          if (item.quantity > item.product.stockQuantity)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Iconsax.info_circle,
+                    color: Colors.orange.shade700,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Only ${item.product.stockQuantity} left in stock",
+                    style: TextStyle(
+                      color: Colors.orange.shade900,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-          // PRICE INPUT
+          // Existing PRICE INPUT
           _buildCustomerPriceInput(item, marginCtrl, basePrice),
         ],
       ),
@@ -1381,8 +1416,22 @@ class _InventoryPageState extends State<InventoryPage> {
                 child: SizedBox(
                   height: 50,
                   child: ElevatedButton(
+                    // Inside _buildBottomBar's ElevatedButton onPressed:
                     onPressed: () {
                       if (!isValid) {
+                        // Check specifically for stock errors first
+                        for (var item in cartController.cartItems) {
+                          if (item.quantity > item.product.stockQuantity) {
+                            _showPremiumSnackbar(
+                              "Out of Stock",
+                              "Only ${item.product.stockQuantity} units available for ${item.product.name}.",
+                              isError: true,
+                            );
+                            return;
+                          }
+                        }
+
+                        // Existing Margin/Loss checks
                         if (_computeNetMargin() < 0) {
                           _showPremiumSnackbar(
                             "Net Loss Alert",
