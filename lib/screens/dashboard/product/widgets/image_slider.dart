@@ -168,8 +168,8 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w500,
                         fontFamily: 'Poppins',
                         shadows: [
                           Shadow(

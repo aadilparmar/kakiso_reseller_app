@@ -14,7 +14,7 @@ class VideoBannerCarousel extends StatefulWidget {
 
 class _VideoBannerCarouselState extends State<VideoBannerCarousel> {
   final List<String> _videoPaths = [
-    'assets/videos/kakiso_banner1.mp4',
+    'assets/videos/kakiso_banner6.mp4',
     'assets/videos/kakiso_banner5.mp4',
     'assets/videos/kakiso_banner4.mp4',
   ];
@@ -244,7 +244,7 @@ class _HomeVideoBannerState extends State<HomeVideoBanner>
   void _openAllProducts() {
     Get.to(
       () => const AllProductsScreen(
-        title: 'Christmas Specials',
+        title: 'Sankranti Specials',
         initialOrderBy: 'date',
         initialOrder: 'desc',
       ),

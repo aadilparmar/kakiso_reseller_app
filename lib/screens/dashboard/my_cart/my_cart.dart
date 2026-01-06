@@ -38,7 +38,7 @@ class _InventoryPageState extends State<InventoryPage> {
   // --- FEES CONSTANTS ---
   static const double kShippingFee = 100.0;
   static const double kPlatformFee = 15.0;
-  static const double kConvenienceFee = 12.0;
+  static const double kConvenienceFee = 10.0;
 
   // Snackbar State
   OverlayEntry? _currentSnackbar;

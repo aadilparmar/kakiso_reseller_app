@@ -1,44 +1,39 @@
 // lib/screens/dashboard/home/home_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added for Haptics if needed
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart'; // 🔹 REQUIRED IMPORT
+import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/kite_celebration.dart';
+
+// --- WIDGET & SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/notification/notification.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/welcom_overlay.dart';
-
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/product_search_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
-
-// 🔹 IMPORT THE WELCOME OVERLAY
-
-// --- INTERNAL IMPORTS ---
 import 'package:kakiso_reseller_app/utils/constants.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/controllers/home_products_controller.dart';
 import 'package:kakiso_reseller_app/utils/double_tap.dart';
-
-// --- WIDGET IMPORTS ---
 import 'widgets/home_drawer.dart';
 import 'widgets/search_header.dart';
-
-// --- SCREEN IMPORTS ---
 import 'package:kakiso_reseller_app/screens/authentication/login/login.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
-
-// --- DASHBOARD SECTIONS IMPORTS ---
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/story_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/curated_collections.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/flash_sale_banner.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/recommended_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
+
+// --- NEW IMPORT ---
 
 class HomePage extends StatefulWidget {
   final UserData userData;
@@ -52,14 +47,16 @@ class _HomePageState extends State<HomePage> {
   late UserData _userData;
   String _selectedTitle = 'BusinessDetails';
   final _storage = const FlutterSecureStorage();
-  final _localStorage = GetStorage(); // 🔹 STORAGE INSTANCE
+  final _localStorage = GetStorage();
+
+  // New state for kite celebration
+  bool _isCelebrating = false;
 
   // Controllers
   final CartController cartController = Get.put(CartController());
   final HomeProductsController homeProductsController = Get.put(
     HomeProductsController(),
   );
-
   final NotificationController notificationController = Get.put(
     NotificationController(),
   );
@@ -69,42 +66,27 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _userData = widget.userData;
 
-    // 🔹 CHECK FOR FIRST TIME WELCOME
+    // Trigger celebration every time user comes to home
+    setState(() {
+      _isCelebrating = true;
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowWelcome();
     });
   }
 
   void _checkAndShowWelcome() {
-    // 1. Check if key exists
     bool hasSeen = _localStorage.read('has_seen_welcome') ?? false;
-
     if (!hasSeen) {
-      // 2. Mark as seen immediately
       _localStorage.write('has_seen_welcome', true);
-
-      // 3. Show the Overlay
       Get.dialog(
         WelcomeOverlay(userName: _userData.name),
         barrierDismissible: false,
-        barrierColor: Colors.transparent, // Blur is handled inside widget
+        barrierColor: Colors.transparent,
         transitionDuration: const Duration(milliseconds: 500),
       );
     }
-  }
-
-  void _handleNavigation(String pageId) {
-    setState(() {
-      _selectedTitle = pageId;
-    });
-    Get.snackbar(
-      'Navigation',
-      'Navigating to $pageId...',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.black87,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 1),
-    );
   }
 
   Future<void> _showLogoutConfirmation() async {
@@ -158,26 +140,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- CUSTOM SNACKBAR FUNCTION ---
   void showCustomCartSnackbar(ProductModel product) {
     Get.snackbar(
       '',
       '',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.only(bottom: 20, left: 10, right: 10),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.all(16),
       borderRadius: 24,
-      backgroundColor: Colors.white.withValues(alpha: 0.95),
+      backgroundColor: Colors.white.withOpacity(0.95),
       barBlur: 20,
-      colorText: Colors.black,
-      boxShadows: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.1),
-          blurRadius: 20,
-          spreadRadius: 5,
-          offset: const Offset(0, 4),
-        ),
-      ],
       titleText: Row(
         children: [
           Container(
@@ -206,7 +178,6 @@ class _HomePageState extends State<HomePage> {
                     color: Color(0xFF4A317E),
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   product.name,
                   style: TextStyle(
@@ -223,18 +194,10 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      messageText: const SizedBox(height: 0),
       mainButton: TextButton(
         onPressed: () => Get.to(() => const InventoryPage()),
-        style: TextButton.styleFrom(
-          backgroundColor: const Color(0xFF4A317E).withValues(alpha: 0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        ),
-        child: Row(
-          children: const [
+        child: const Row(
+          children: [
             Text(
               "View",
               style: TextStyle(
@@ -244,12 +207,10 @@ class _HomePageState extends State<HomePage> {
                 fontFamily: 'Poppins',
               ),
             ),
-            SizedBox(width: 6),
             Icon(Iconsax.arrow_right_3, size: 16, color: Color(0xFF4A317E)),
           ],
         ),
       ),
-      duration: const Duration(seconds: 4),
     );
   }
 
@@ -258,8 +219,6 @@ class _HomePageState extends State<HomePage> {
     return DoubleBackToExitWrapper(
       child: Scaffold(
         backgroundColor: Colors.white,
-
-        // --- APP BAR ---
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -284,190 +243,182 @@ class _HomePageState extends State<HomePage> {
                   fit: BoxFit.contain,
                 ),
               ),
-
               const Spacer(),
-
-              // 1. Notification Icon with Dynamic Badge
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Iconsax.notification),
-                    color: accentColor,
-                    iconSize: 25,
-                    onPressed: () => Get.to(
-                      () => const NotificationScreen(),
-                      transition: Transition.rightToLeft,
-                    ),
-                  ),
-                  Positioned(
-                    right: 5,
-                    top: 5,
-                    child: Obx(() {
-                      final unreadCount = notificationController.notifications
-                          .where((n) => !n.isRead)
-                          .length;
-
-                      if (unreadCount == 0) return const SizedBox.shrink();
-
-                      return Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-
+              _buildNotificationIcon(),
               const SizedBox(width: 4),
-
-              // 2. Cart Icon with Badge
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(Iconsax.shopping_cart),
-                    color: accentColor,
-                    iconSize: 25,
-                    onPressed: () => Get.to(() => const InventoryPage()),
-                  ),
-                  Positioned(
-                    right: 5,
-                    top: 5,
-                    child: Obx(() {
-                      final count = cartController.itemCount;
-                      if (count == 0) return const SizedBox.shrink();
-                      return Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 20,
-                          minHeight: 20,
-                        ),
-                        child: Center(
-                          child: Text(
-                            count > 99 ? '99+' : '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-
+              _buildCartIcon(),
               const SizedBox(width: 4),
-
-              // 3. Wishlist Icon
               IconButton(
                 icon: const Icon(Iconsax.heart),
                 color: accentColor,
                 iconSize: 25,
-                onPressed: () {
-                  Get.to(() => WishlistScreen());
-                },
+                onPressed: () => Get.to(() => WishlistScreen()),
               ),
-
               const SizedBox(width: 16),
             ],
           ),
         ),
-
-        // --- DRAWER ---
         drawer: HomeDrawer(
           userData: _userData,
           selectedTitle: _selectedTitle,
-          onNavigate: _handleNavigation,
+          onNavigate: (id) => setState(() => _selectedTitle = id),
           onLogoutPressed: () {
             Navigator.pop(context);
             _showLogoutConfirmation();
           },
         ),
 
-        // --- BODY ---
-        body: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // SEARCH
-              SearchHeader(
-                readOnly: true,
-                onTap: () {
-                  Get.to(
-                    () => const UniversalSearchPage(),
-                    transition: Transition.fadeIn,
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              const VideoBannerCarousel(),
-              // SECTIONS
-              const StorySection(),
-              const SizedBox(height: 16),
-              const RecommendedSection(),
-              const SizedBox(height: 10),
-              const FlashSaleBanner(),
-              const SizedBox(height: 16),
-              const TopRankingSection(),
-              const SizedBox(height: 6),
-              const NewArrivalSection(),
-              const TrendingProducts(),
-              const SizedBox(height: 16),
-              const CuratedCollections(),
-              const SizedBox(height: 16),
-
-              // 🔹 Budget Store Section
-              Obx(() {
-                if (homeProductsController.isLoading.value) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-
-                if (homeProductsController.errorMessage.isNotEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Text(
-                      homeProductsController.errorMessage.value,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                      ),
+        // --- BODY WRAPPED IN STACK FOR KITES ---
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SearchHeader(
+                    readOnly: true,
+                    onTap: () => Get.to(
+                      () => const UniversalSearchPage(),
+                      transition: Transition.fadeIn,
                     ),
-                  );
-                }
+                  ),
+                  const SizedBox(height: 8),
+                  const VideoBannerCarousel(),
+                  const StorySection(),
+                  const SizedBox(height: 16),
+                  const RecommendedSection(),
+                  const SizedBox(height: 10),
+                  const FlashSaleBanner(),
+                  const SizedBox(height: 16),
+                  const TopRankingSection(),
+                  const SizedBox(height: 6),
+                  const NewArrivalSection(),
+                  const TrendingProducts(),
+                  const SizedBox(height: 16),
+                  const CuratedCollections(),
+                  const SizedBox(height: 16),
+                  _buildBudgetSection(),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
 
-                final products = homeProductsController.allProducts;
-                return BudgetStoreSection(
-                  products: products,
-                  onProductAddedToCart: showCustomCartSnackbar,
-                );
-              }),
-
-              const SizedBox(height: 16),
-            ],
-          ),
+            // Kite Celebration Overlay
+            if (_isCelebrating)
+              IgnorePointer(
+                child: KiteCelebration(
+                  onFinished: () {
+                    if (mounted) setState(() => _isCelebrating = false);
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );
+  }
+
+  Widget _buildNotificationIcon() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Iconsax.notification),
+          color: accentColor,
+          iconSize: 25,
+          onPressed: () => Get.to(
+            () => const NotificationScreen(),
+            transition: Transition.rightToLeft,
+          ),
+        ),
+        Positioned(
+          right: 5,
+          top: 5,
+          child: Obx(() {
+            final unreadCount = notificationController.notifications
+                .where((n) => !n.isRead)
+                .length;
+            if (unreadCount == 0) return const SizedBox.shrink();
+            return Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCartIcon() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Iconsax.shopping_cart),
+          color: accentColor,
+          iconSize: 25,
+          onPressed: () => Get.to(() => const InventoryPage()),
+        ),
+        Positioned(
+          right: 5,
+          top: 5,
+          child: Obx(() {
+            final count = cartController.itemCount;
+            if (count == 0) return const SizedBox.shrink();
+            return Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              child: Center(
+                child: Text(
+                  count > 99 ? '99+' : '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBudgetSection() {
+    return Obx(() {
+      if (homeProductsController.isLoading.value)
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 24.0),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      if (homeProductsController.errorMessage.isNotEmpty)
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Text(
+            homeProductsController.errorMessage.value,
+            style: const TextStyle(
+              color: Colors.red,
+              fontFamily: 'Poppins',
+              fontSize: 12,
+            ),
+          ),
+        );
+      return BudgetStoreSection(
+        products: homeProductsController.allProducts,
+        onProductAddedToCart: showCustomCartSnackbar,
+      );
+    });
   }
 }
