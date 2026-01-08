@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:ui';
+import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -80,7 +81,7 @@ class _RegisterPageState extends State<RegisterPage>
 
   // Focus Nodes
   final FocusNode _phoneFocusNode = FocusNode();
-  final FocusNode _passwordFocusNode = FocusNode(); // Added for password logic
+  final FocusNode _passwordFocusNode = FocusNode();
 
   late final AnimationController _bgController;
 
@@ -117,8 +118,8 @@ class _RegisterPageState extends State<RegisterPage>
     _confirmPasswordController.dispose();
     _referralController.dispose();
     _phoneFocusNode.dispose();
-    _passwordFocusNode.dispose(); // Dispose new node
-    _passwordVisibilityTimer?.cancel(); // Cancel timer
+    _passwordFocusNode.dispose();
+    _passwordVisibilityTimer?.cancel();
     super.dispose();
   }
 
@@ -126,7 +127,6 @@ class _RegisterPageState extends State<RegisterPage>
   //  PASSWORD VISIBILITY LOGIC
   // ─────────────────────────────────────────────────────────
 
-  // Helper to force hide and kill timer
   void _forceHidePassword() {
     if (!mounted) return;
     setState(() {
@@ -135,17 +135,13 @@ class _RegisterPageState extends State<RegisterPage>
     _passwordVisibilityTimer?.cancel();
   }
 
-  // Logic to toggle visibility with 20s timer
   void _togglePasswordVisibility() {
     if (_isPasswordVisible) {
-      // If currently visible, hide it and cancel timer
       _forceHidePassword();
     } else {
-      // Show it
       setState(() {
         _isPasswordVisible = true;
       });
-      // Start 20s timer to auto-hide
       _passwordVisibilityTimer?.cancel();
       _passwordVisibilityTimer = Timer(const Duration(seconds: 20), () {
         _forceHidePassword();
@@ -154,10 +150,9 @@ class _RegisterPageState extends State<RegisterPage>
   }
 
   // ─────────────────────────────────────────────────────────
-  //  PASSWORD STRENGTH CHECKER & TYPING LOGIC
+  //  PASSWORD STRENGTH CHECKER
   // ─────────────────────────────────────────────────────────
   void _onPasswordChanged(String value) {
-    // SECURITY: If user types while password is visible, hide it immediately
     if (_isPasswordVisible) {
       _forceHidePassword();
     }
@@ -168,6 +163,59 @@ class _RegisterPageState extends State<RegisterPage>
       _hasLowercase = value.contains(RegExp(r'[a-z]'));
       _hasDigits = value.contains(RegExp(r'[0-9]'));
     });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  OTP LOGIC (RE-DESIGNED)
+  // ─────────────────────────────────────────────────────────
+
+  String _generateOtp() {
+    var rng = Random();
+    return (1000 + rng.nextInt(9000)).toString();
+  }
+
+  Future<void> _initiateOtpProcess() async {
+    final String otpCode = _generateOtp();
+    final String phoneNumber = _phoneController.text.trim();
+
+    // 1. Show Simulated "Top" Notification (Like a real WhatsApp push)
+    Get.snackbar(
+      "WhatsApp Business",
+      "Your KaKiSo verification code is $otpCode",
+      icon: const Icon(Iconsax.message, color: Colors.green),
+      backgroundColor: Colors.white,
+      colorText: Colors.black87,
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 8),
+      margin: const EdgeInsets.all(12),
+      borderRadius: 12,
+      boxShadows: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.1),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      isDismissible: true,
+      forwardAnimationCurve: Curves.easeOutBack,
+    );
+
+    // 2. Show Modern Bottom Sheet for Verification
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _OtpBottomSheet(
+        phoneNumber: phoneNumber,
+        correctOtp: otpCode,
+        onVerified: () {
+          Navigator.pop(context); // Close sheet
+          _performRegistration(); // Proceed
+        },
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────────────────
@@ -220,7 +268,6 @@ class _RegisterPageState extends State<RegisterPage>
       MutationOptions(document: gql(mutation), variables: variables),
     );
 
-    // 1. Check for Errors first
     if (result.hasException) {
       if (result.exception!.linkException != null) {
         throw Exception("Network Error. Please check your connection.");
@@ -231,19 +278,61 @@ class _RegisterPageState extends State<RegisterPage>
       throw Exception("An unknown error occurred.");
     }
 
-    // 2. Check for Data
     final data = result.data?['registerUser'];
     if (data == null || data['user'] == null) {
       throw Exception('Registration failed. Invalid response from server.');
     }
-
-    // If we reach here, success!
   }
 
   // ─────────────────────────────────────────────────────────
-  //  HANDLE REGISTER
+  //  PERFORM REGISTRATION (After OTP)
   // ─────────────────────────────────────────────────────────
-  Future<void> _handleRegister() async {
+  Future<void> _performRegistration() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await _registerUserInWordPress(
+        fullName: _fullNameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green.shade600,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: const Text('Account created! Please Sign in.'),
+        ),
+      );
+
+      Get.offAll(() => const LoginPage());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: Text("Account Already Exists"),
+        ),
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  HANDLE REGISTER BUTTON PRESS
+  // ─────────────────────────────────────────────────────────
+  void _handleRegisterButtonPress() {
     if (_isLoading) return;
 
     if (!_formKey.currentState!.validate()) return;
@@ -273,48 +362,7 @@ class _RegisterPageState extends State<RegisterPage>
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      await _registerUserInWordPress(
-        fullName: _fullNameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      // Success!
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green.shade600,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          content: const Text('Account created! Please log in.'),
-        ),
-      );
-
-      Get.offAll(() => const LoginPage());
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      String errorMsg = e.toString().replaceAll('Exception:', '').trim();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red.shade700,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          content: Text("Error: $errorMsg"),
-        ),
-      );
-    }
+    _initiateOtpProcess();
   }
 
   // ─────────────────────────────────────────────────────────
@@ -341,7 +389,6 @@ class _RegisterPageState extends State<RegisterPage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -382,7 +429,6 @@ class _RegisterPageState extends State<RegisterPage>
                         ),
                         const SizedBox(height: 24),
 
-                        // Form Card
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -513,9 +559,9 @@ class _RegisterPageState extends State<RegisterPage>
                                 const SizedBox(height: 14),
                                 TextFormField(
                                   controller: _passwordController,
-                                  focusNode: _passwordFocusNode, // ATTACHED
+                                  focusNode: _passwordFocusNode,
                                   obscureText: !_isPasswordVisible,
-                                  onChanged: _onPasswordChanged, // MODIFIED
+                                  onChanged: _onPasswordChanged,
                                   decoration:
                                       _inputDecoration(
                                         label: 'Password',
@@ -528,8 +574,7 @@ class _RegisterPageState extends State<RegisterPage>
                                                 : Icons.visibility_off,
                                             color: Colors.grey,
                                           ),
-                                          onPressed:
-                                              _togglePasswordVisibility, // MODIFIED
+                                          onPressed: _togglePasswordVisibility,
                                         ),
                                       ),
                                   validator: (value) {
@@ -705,7 +750,7 @@ class _RegisterPageState extends State<RegisterPage>
                                 _BouncyButton(
                                   onPressed: _isLoading
                                       ? () {}
-                                      : _handleRegister,
+                                      : _handleRegisterButtonPress,
                                   child: Container(
                                     width: double.infinity,
                                     height: 52,
@@ -935,6 +980,289 @@ class _BouncyButtonState extends State<_BouncyButton>
         animation: _controller,
         builder: (context, child) =>
             Transform.scale(scale: _scaleAnimation.value, child: widget.child),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW MODERN OTP SHEET WIDGET (Included in the same file)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _OtpBottomSheet extends StatefulWidget {
+  final String phoneNumber;
+  final String correctOtp;
+  final VoidCallback onVerified;
+
+  const _OtpBottomSheet({
+    required this.phoneNumber,
+    required this.correctOtp,
+    required this.onVerified,
+  });
+
+  @override
+  State<_OtpBottomSheet> createState() => _OtpBottomSheetState();
+}
+
+class _OtpBottomSheetState extends State<_OtpBottomSheet> {
+  final TextEditingController _otpController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  String? _errorMessage;
+  bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-focus the input when sheet opens
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _verify() async {
+    final entered = _otpController.text.trim();
+    if (entered.length != 4) return;
+
+    if (entered == widget.correctOtp) {
+      setState(() => _isVerifying = true);
+      // Simulate small delay for better UX
+      await Future.delayed(const Duration(milliseconds: 500));
+      widget.onVerified();
+    } else {
+      setState(() {
+        _errorMessage = "Incorrect code. Please check the notification.";
+        _otpController.clear();
+      });
+      // Clear error after 2 seconds
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _errorMessage = null);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Keyboard padding is handled by the ModalBottomSheet in scaffold generally,
+    // but in sticky bottom sheets we grab viewInsets.
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Handle Bar
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Icon & Title
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(
+                      0xFF25D366,
+                    ).withValues(alpha: 0.1), // WhatsApp Green Tint
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Iconsax.message,
+                    color: Color(0xFF25D366),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Verify it's you",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: kFontFamily,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Enter the 4-digit code sent to\n+91 ${widget.phoneNumber}",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black54,
+                          fontFamily: kFontFamily,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            // ─────────────────────────────────────────────────────────────
+            // CUSTOM OTP BOX UI (No external packages needed)
+            // ─────────────────────────────────────────────────────────────
+            Stack(
+              children: [
+                // Invisible Text Field to handle focus and typing
+                Opacity(
+                  opacity: 0,
+                  child: TextField(
+                    controller: _otpController,
+                    focusNode: _focusNode,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    onChanged: (_) {
+                      setState(() => _errorMessage = null);
+                      if (_otpController.text.length == 4) {
+                        _verify();
+                      }
+                    },
+                  ),
+                ),
+
+                // Visible Box Row
+                GestureDetector(
+                  onTap: () => _focusNode.requestFocus(),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(4, (index) {
+                      final text = _otpController.text;
+                      final char = index < text.length ? text[index] : "";
+                      final isFocused = index == text.length;
+
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 60,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: char.isNotEmpty
+                              ? Colors.white
+                              : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _errorMessage != null
+                                ? Colors.red
+                                : (isFocused || char.isNotEmpty)
+                                ? kPrimaryDeep
+                                : Colors.grey.shade300,
+                            width: (isFocused || char.isNotEmpty) ? 2.0 : 1.0,
+                          ),
+                          boxShadow: (isFocused)
+                              ? [
+                                  BoxShadow(
+                                    color: kPrimaryDeep.withValues(alpha: 0.1),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Center(
+                          child: Text(
+                            char,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: kFontFamily,
+                              color: kPrimaryDeep,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
+
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Center(
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 32),
+
+            // Verify Button
+            SizedBox(
+              height: 54,
+              child: ElevatedButton(
+                onPressed: _isVerifying ? null : _verify,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimaryDeep,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isVerifying
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        "Verify Code",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: kFontFamily,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.grey, fontFamily: kFontFamily),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

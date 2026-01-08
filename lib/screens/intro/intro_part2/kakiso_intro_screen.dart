@@ -54,9 +54,9 @@ class _KakisoIntroScreenState extends State<KakisoIntroScreen>
       type: _CardType.normal,
     ),
     _IntroItem(
-      title: "Total business control, Ready to earn on your terms",
+      title: "You Sell.\nWe Ship.",
       subtitle:
-          "Set your own margins, run business at your own convenience, focus on unlimited growth.",
+          "Set your Margins, Zero inventory, Zero Packaging, Focus on unlimited Growth.",
       icon: Iconsax.box,
       accentIcon: Iconsax.receipt_2,
       type: _CardType.normal,

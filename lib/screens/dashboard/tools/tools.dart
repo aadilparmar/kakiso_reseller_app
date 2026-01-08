@@ -152,6 +152,14 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         pageBuilder: (_) => const SizedBox.shrink(),
       ),
       Tool(
+        id: 'reseller_catalog',
+        title: 'Quick CSV Export',
+        subtitle: 'Download standard product catalogs in CSV/Excel.',
+        iconData: Iconsax.document_download,
+        enabled: true,
+        pageBuilder: (_) => const ResellerCatalogPage(),
+      ),
+      Tool(
         id: 'bulk_downloader',
         title: 'Bulk Image Downloader',
         subtitle: 'Download high-quality product assets in a single click.',
@@ -166,14 +174,6 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
         iconData: Iconsax.send_1,
         enabled: true,
         pageBuilder: (_) => const OneClickWhatsAppPage(),
-      ),
-      Tool(
-        id: 'reseller_catalog',
-        title: 'Quick CSV Export',
-        subtitle: 'Download standard product catalogs in CSV/Excel.',
-        iconData: Iconsax.document_download,
-        enabled: true,
-        pageBuilder: (_) => const ResellerCatalogPage(),
       ),
       Tool(
         id: 'price_margin',
@@ -193,7 +193,7 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
       ),
       Tool(
         id: 'auto_video',
-        title: 'Auto video generator',
+        title: 'Ai video generator',
         subtitle: 'Convert product photos into short vertical videos.',
         iconData: Iconsax.video,
         enabled: false,
@@ -217,8 +217,42 @@ class _ToolsSectionState extends State<_ToolsSectionContent> {
       ),
       Tool(
         id: 'ai_caption',
-        title: 'AI caption generator',
-        subtitle: 'AI-written captions for your product posts.',
+        title: 'AI Title & Description generator',
+        subtitle: 'AI-written Title & Description for your product posts.',
+        iconData: Iconsax.magic_star,
+        enabled: false,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'ai_image',
+        title: 'AI Image generator',
+        subtitle: 'AI Image Generator for your product posts.',
+        iconData: Iconsax.magic_star,
+        enabled: false,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'ai_web_generator',
+        title: 'Hosted Web Store Generator',
+        subtitle: 'Get your own hosted ecommerce store for D2C Brand.',
+        iconData: Iconsax.magic_star,
+        enabled: false,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'ai_premium_access',
+        title: 'Premium Product Access',
+        subtitle:
+            'Get access to the KaKiSo premium products with high margin possibility.',
+        iconData: Iconsax.magic_star,
+        enabled: false,
+        pageBuilder: (_) => const SizedBox.shrink(),
+      ),
+      Tool(
+        id: 'ai_premium_access',
+        title: 'Unlimited Product Access',
+        subtitle:
+            'Get access to the unlimited Product SKUs to multi category e-commerce buisness.',
         iconData: Iconsax.magic_star,
         enabled: false,
         pageBuilder: (_) => const SizedBox.shrink(),

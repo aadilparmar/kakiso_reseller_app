@@ -5,20 +5,22 @@ import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 
+// INTERNAL IMPORTS
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
-const Color kAccentColor = Color(0xFF2563EB); // Royal Blue
-const Color kProfitColor = Color(0xFF10B981); // Emerald Green
-const Color kCostColor = Color(0xFF64748B); // Slate
-const Color kFeeColor = Color(0xFFF59E0B); // Amber
+const Color kAccentColor = Color(0xFF2563EB);
+const Color kProfitColor = Color(0xFF10B981);
+const Color kCostColor = Color(0xFF64748B);
+const Color kFeeColor = Color(0xFFF59E0B);
 const Color kBgColor = Color(0xFFF8FAFC);
 const Color kSurface = Colors.white;
 
-// 1. WRAPPER FOR TOUR
 class PriceMarginToolPage extends StatelessWidget {
   const PriceMarginToolPage({super.key});
 
@@ -28,7 +30,7 @@ class PriceMarginToolPage extends StatelessWidget {
       builder: (context) => const _PriceMarginToolContent(),
       autoPlay: false,
       blurValue: 1,
-      enableAutoScroll: true, // 🌟 Ensures scrolling works
+      enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 400),
     );
   }
@@ -43,48 +45,43 @@ class _PriceMarginToolContent extends StatefulWidget {
 }
 
 class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
-  // --- STATE ---
   final List<ProductModel> _selectedProducts = [];
   final _localStorage = GetStorage();
 
-  // 2. SHOWCASE KEYS
   final GlobalKey _addKey = GlobalKey();
   final GlobalKey _calculatorKey = GlobalKey();
   final GlobalKey _strategyKey = GlobalKey();
   final GlobalKey _goalKey = GlobalKey();
   final GlobalKey _shareKey = GlobalKey();
 
-  // The Core Variables
   double _sellingPrice = 0.0;
-  double _targetGoal = 5000.0; // Default goal: Earn 5k
+  double _targetGoal = 5000.0;
+  double _currentMarginPct = 20.0; // Default 20% margin
 
-  // Fees Configuration
   final double _shippingCost = 100.0;
   bool _resellerAbsorbsShipping = false;
   bool _isSharing = false;
 
-  // Constants
   static const double kPlatformFeePerItem = 5.0;
   static const double kConvenienceFeeConst = 10.0;
 
-  // Text Controllers
   final TextEditingController _priceCtrl = TextEditingController();
   final TextEditingController _profitCtrl = TextEditingController();
-  final TextEditingController _marginCtrl = TextEditingController();
+  final TextEditingController _marginCtrl = TextEditingController(text: "20.0");
   final TextEditingController _goalCtrl = TextEditingController(text: "5000");
 
   @override
   void initState() {
     super.initState();
-    // 3. TRIGGER TOUR
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndStartTour());
   }
 
   void _checkAndStartTour() {
-    bool hasShown = _localStorage.read('has_shown_profit_tool_tour') ?? false;
+    bool hasShown =
+        _localStorage.read('has_shown_profit_tool_tour_v2') ?? false;
     if (!hasShown) {
       _startTour();
-      _localStorage.write('has_shown_profit_tool_tour', true);
+      _localStorage.write('has_shown_profit_tool_tour_v2', true);
     }
   }
 
@@ -96,8 +93,7 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
         _strategyKey,
         _goalKey,
         _shareKey,
-      ] else
-        _addKey, // If empty, only show add button
+      ],
     ]);
   }
 
@@ -110,14 +106,13 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
     super.dispose();
   }
 
-  // ─── CALCULATION ENGINE 🧠 ────────────────────────────────────────────────
+  // ─── CALCULATION ENGINE 🧠 ───
 
   double get _baseProductCost => _selectedProducts.fold(
     0.0,
     (sum, p) => sum + (double.tryParse(p.price) ?? 0),
   );
 
-  // Fees
   double get _platformFee => _selectedProducts.isEmpty
       ? 0
       : (_selectedProducts.length * kPlatformFeePerItem);
@@ -125,28 +120,21 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
       _selectedProducts.isEmpty ? 0 : kConvenienceFeeConst;
   double get _shippingVal => _resellerAbsorbsShipping ? _shippingCost : 0;
 
-  // Break Even & Profit
   double get _totalCost =>
       _baseProductCost + _platformFee + _convenienceFee + _shippingVal;
   double get _netProfit => _sellingPrice - _totalCost;
-  double get _marginPercent =>
-      _totalCost > 0 ? ((_sellingPrice - _totalCost) / _totalCost) * 100 : 0;
 
-  // Goal Math
   int get _unitsToGoal {
     if (_netProfit <= 0) return 0;
     return (_targetGoal / _netProfit).ceil();
   }
 
-  // Breakdown for Monthly Goal
   String get _weeklyGoalText {
     if (_unitsToGoal <= 0) return "Check profit settings";
     int weekly = (_unitsToGoal / 4).ceil();
-    if (weekly < 1) weekly = 1;
-    return "$weekly bundles / week";
+    return "${weekly < 1 ? 1 : weekly} sales / week";
   }
 
-  // Market Estimate (Heuristic)
   double get _marketValue => _baseProductCost * 2.2;
 
   // --- SYNC LOGIC ---
@@ -156,6 +144,9 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
     double price = double.tryParse(val.replaceAll(',', '')) ?? 0;
     setState(() {
       _sellingPrice = price;
+      _currentMarginPct = _totalCost > 0
+          ? ((_sellingPrice - _totalCost) / _totalCost) * 100
+          : 0;
       _syncControllers(source: 'price');
     });
   }
@@ -163,9 +154,9 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
   void _onProfitChanged(String val) {
     if (val.isEmpty) return;
     double targetProfit = double.tryParse(val.replaceAll(',', '')) ?? 0;
-    double newPrice = _totalCost + targetProfit;
     setState(() {
-      _sellingPrice = newPrice;
+      _sellingPrice = _totalCost + targetProfit;
+      _currentMarginPct = _totalCost > 0 ? (_netProfit / _totalCost) * 100 : 0;
       _syncControllers(source: 'profit');
     });
   }
@@ -173,17 +164,10 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
   void _onMarginChanged(String val) {
     if (val.isEmpty) return;
     double marginPct = double.tryParse(val) ?? 0;
-    double newPrice = _totalCost * (1 + (marginPct / 100));
     setState(() {
-      _sellingPrice = newPrice;
+      _currentMarginPct = marginPct;
+      _sellingPrice = _totalCost * (1 + (marginPct / 100));
       _syncControllers(source: 'margin');
-    });
-  }
-
-  void _onGoalChanged(String val) {
-    if (val.isEmpty) return;
-    setState(() {
-      _targetGoal = double.tryParse(val.replaceAll(',', '')) ?? 5000;
     });
   }
 
@@ -191,89 +175,57 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
     if (source != 'price') _priceCtrl.text = _sellingPrice.toStringAsFixed(0);
     if (source != 'profit') _profitCtrl.text = _netProfit.toStringAsFixed(0);
     if (source != 'margin')
-      _marginCtrl.text = _marginPercent.toStringAsFixed(1);
+      _marginCtrl.text = _currentMarginPct.toStringAsFixed(1);
   }
 
-  // --- AUTOMATION BUTTONS ---
-
   void _applyAutoPrice(String type) {
-    double price = _sellingPrice;
+    double price;
     if (type == 'quick') {
       price = _totalCost * 1.15; // 15% Margin
-      price = (price / 10).ceil() * 10.0 - 1; // Round to 9
-    } else if (type == 'max') {
+      price = (price / 10).ceil() * 10.0 - 1;
+    } else {
       price = _totalCost * 1.40; // 40% Margin
-      double next100 = (price / 100).ceil() * 100.0;
-      if (next100 == price) next100 += 100;
-      price = next100 - 1; // Round to 99
+      price = (price / 100).ceil() * 100.0 - 1;
     }
     setState(() {
       _sellingPrice = price;
+      _currentMarginPct = ((_sellingPrice - _totalCost) / _totalCost) * 100;
       _syncControllers(source: 'all');
     });
   }
 
-  // --- DEAL BROADCASTER (SHARE) ---
   Future<void> _broadcastDeal() async {
-    if (_selectedProducts.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Select products first")));
-      return;
-    }
-
+    if (_selectedProducts.isEmpty) return;
     setState(() => _isSharing = true);
-
     try {
       final buffer = StringBuffer();
-      buffer.writeln("🔥 *STEAL DEAL ALERT!* 🔥");
-      if (_selectedProducts.length > 1) {
-        buffer.writeln("📦 *${_selectedProducts.length} Item Combo Pack*");
-      } else {
-        buffer.writeln("📦 *Premium Quality Pick*");
-      }
-      buffer.writeln("");
-
-      if (_sellingPrice < _marketValue) {
-        buffer.writeln("❌ Market Price: ~₹${_marketValue.toStringAsFixed(0)}~");
-      }
+      buffer.writeln("🔥 *STEAL DEAL ALERT!* 🔥\n");
       buffer.writeln(
-        "✅ *OFFER PRICE: ₹${_sellingPrice.toStringAsFixed(0)} Only!* 🤑",
+        _selectedProducts.length > 1
+            ? "📦 *${_selectedProducts.length} Item Combo Pack*"
+            : "📦 *Premium Collection Pick*",
       );
-      buffer.writeln("");
+      if (_sellingPrice < _marketValue)
+        buffer.writeln("❌ Market Price: ~₹${_marketValue.toStringAsFixed(0)}~");
+      buffer.writeln(
+        "✅ *OFFER PRICE: ₹${_sellingPrice.toStringAsFixed(0)} Only!* 🤑\n",
+      );
+      buffer.writeln(
+        _resellerAbsorbsShipping
+            ? "🚚 *Free Home Delivery*"
+            : "🚚 *Fast Delivery Available*",
+      );
 
-      if (_resellerAbsorbsShipping) {
-        buffer.writeln("🚚 *Free Home Delivery Included*");
-      } else {
-        buffer.writeln("🚚 *Fast Delivery Available*");
+      List<XFile> files = [];
+      for (var p in _selectedProducts) {
+        if (p.image.isNotEmpty)
+          files.add(await ApiService.downloadImageAsFile(p.image));
       }
-
-      if (_selectedProducts.length > 1) {
-        buffer.writeln("\n🎁 _Includes:_");
-        for (var p in _selectedProducts) {
-          buffer.writeln("• ${p.name}");
-        }
-      }
-
-      buffer.writeln("\n👇 *Reply 'BOOK' to grab this deal!*");
-
-      List<XFile> filesToShare = [];
-      for (var product in _selectedProducts) {
-        if (product.image.isNotEmpty) {
-          final file = await ApiService.downloadImageAsFile(product.image);
-          filesToShare.add(file);
-        }
-      }
-
-      await Share.shareXFiles(filesToShare, text: buffer.toString());
-    } catch (e) {
-      debugPrint("Share error: $e");
+      await Share.shareXFiles(files, text: buffer.toString());
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
   }
-
-  // ─── UI COMPONENTS ─────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +236,7 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
           "Profit Lab",
           style: TextStyle(
             fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.bold,
             color: Color(0xFF1E293B),
           ),
         ),
@@ -300,21 +252,17 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // RESTART TOUR BUTTON
           IconButton(
-            tooltip: "Guide",
             icon: const Icon(Iconsax.info_circle, color: kAccentColor),
             onPressed: _startTour,
           ),
           IconButton(
             icon: const Icon(Iconsax.refresh, color: kAccentColor),
-            onPressed: () {
-              setState(() {
-                _selectedProducts.clear();
-                _sellingPrice = 0;
-                _syncControllers(source: 'all');
-              });
-            },
+            onPressed: () => setState(() {
+              _selectedProducts.clear();
+              _sellingPrice = 0;
+              _syncControllers(source: 'all');
+            }),
           ),
         ],
       ),
@@ -324,123 +272,46 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 4. WRAP WIDGETS IN SHOWCASE
-
-            // Step 1: Add Products
             Showcase(
               key: _addKey,
-              title: "Step 1: Add Products",
-              description: "Tap here to select items you want to sell.",
-              overlayColor: Colors.black.withOpacity(0.7),
-              titleTextStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: kAccentColor,
-                fontSize: 16,
-              ),
-              descTextStyle: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.black,
-                fontSize: 12,
-              ),
-              targetBorderRadius: BorderRadius.circular(20),
+              title: "Add Catalogue Items",
+              description:
+                  "Select products from your catalogues to build a bundle.",
               child: _buildProductStack(),
             ),
             const SizedBox(height: 20),
-
             if (_selectedProducts.isNotEmpty) ...[
-              // Step 2: Calculator
               Showcase(
                 key: _calculatorKey,
-                title: "Profit Calculator",
-                description:
-                    "Adjust the selling price to see your real-time profit and margin.",
-                overlayColor: Colors.black.withOpacity(0.7),
-                titleTextStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: kAccentColor,
-                  fontSize: 16,
-                ),
-                descTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontSize: 12,
-                ),
-                targetBorderRadius: BorderRadius.circular(24),
+                title: "Margin Calculator",
+                description: "Adjust your percentage margin to see profit.",
                 child: _buildMainDashboard(),
               ),
               const SizedBox(height: 16),
-
-              // Cost Summary (No tour needed)
               _buildCostSummary(),
               const SizedBox(height: 20),
-
-              // Step 3: Strategy
               Showcase(
                 key: _strategyKey,
-                title: "Smart Pricing",
+                title: "Pricing Strategy",
                 description:
-                    "Use 'Quick Sell' for volume or 'Max Profit' for premium earnings.",
-                overlayColor: Colors.black.withOpacity(0.7),
-                titleTextStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: kAccentColor,
-                  fontSize: 16,
-                ),
-                descTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontSize: 12,
-                ),
-                targetBorderRadius: BorderRadius.circular(12),
+                    "Quickly set margins for fast sales or max profit.",
                 child: _buildStrategyPad(),
               ),
               const SizedBox(height: 20),
-
-              // Step 4: Goal
               Showcase(
                 key: _goalKey,
-                title: "Goal Tracker",
+                title: "Earning Goal",
                 description:
-                    "Set a monthly earning goal. We'll tell you how many items to sell per week.",
-                overlayColor: Colors.black.withOpacity(0.7),
-                titleTextStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: kAccentColor,
-                  fontSize: 16,
-                ),
-                descTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontSize: 12,
-                ),
-                targetBorderRadius: BorderRadius.circular(20),
+                    "Set a monthly target and see how many sales you need.",
                 child: _buildEnhancedGoalTracker(),
               ),
               const SizedBox(height: 24),
-
-              // Step 5: Share
               Showcase(
                 key: _shareKey,
-                title: "Broadcast Deal",
-                description:
-                    "Instantly share this deal with images and price calculated for you.",
-                overlayColor: Colors.black.withOpacity(0.7),
-                titleTextStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: kAccentColor,
-                  fontSize: 16,
-                ),
-                descTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
-                  fontSize: 12,
-                ),
-                targetBorderRadius: BorderRadius.circular(20),
+                title: "Broadcast",
+                description: "Share images and price to WhatsApp.",
                 child: _buildDealBroadcaster(),
               ),
-
-              // Padding for scrolling
-              const SizedBox(height: 100),
             ],
           ],
         ),
@@ -453,7 +324,6 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
       return GestureDetector(
         onTap: _pickProducts,
         child: Container(
-          width: double.infinity,
           height: 130,
           decoration: BoxDecoration(
             color: kSurface,
@@ -468,21 +338,19 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
               Text(
                 "Build Your Deal",
                 style: TextStyle(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
                   color: Colors.grey,
-                  fontSize: 16,
                 ),
               ),
               Text(
-                "Add products to calculate margins",
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+                "Pull products from your catalogues",
+                style: TextStyle(color: Colors.grey, fontSize: 11),
               ),
             ],
           ),
         ),
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -500,11 +368,9 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
               onPressed: _pickProducts,
               icon: const Icon(Iconsax.add_circle, size: 16),
               label: const Text("Add"),
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             ),
           ],
         ),
-        const SizedBox(height: 8),
         SizedBox(
           height: 80,
           child: ListView.builder(
@@ -526,20 +392,12 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
                 child: Align(
                   alignment: Alignment.topRight,
                   child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedProducts.removeAt(i);
-                        if (_selectedProducts.isEmpty) {
-                          _sellingPrice = 0;
-                        } else {
-                          _sellingPrice = _totalCost * 1.2;
-                        }
-                        _syncControllers(source: 'all');
-                      });
-                    },
+                    onTap: () => setState(() {
+                      _selectedProducts.removeAt(i);
+                      _onMarginChanged(_currentMarginPct.toString());
+                    }),
                     child: Container(
                       margin: const EdgeInsets.all(4),
-                      padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
@@ -567,11 +425,7 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
         color: kSurface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20),
         ],
       ),
       child: Column(
@@ -580,12 +434,10 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
             "CUSTOMER PAYS",
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.bold,
               color: Colors.grey,
-              letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -596,10 +448,9 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black38,
+                  color: Colors.black26,
                 ),
               ),
-              const SizedBox(width: 4),
               IntrinsicWidth(
                 child: TextField(
                   controller: _priceCtrl,
@@ -607,14 +458,10 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 40,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                    height: 1.0,
+                    fontWeight: FontWeight.bold,
                   ),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
                     hintText: "0",
                   ),
                   onChanged: _onSellingPriceChanged,
@@ -622,7 +469,7 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const Divider(height: 30),
           Row(
             children: [
               Expanded(
@@ -643,7 +490,6 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
                       ),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        isDense: true,
                         prefixText: "₹",
                       ),
                       onChanged: _onProfitChanged,
@@ -670,7 +516,6 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
                       ),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        isDense: true,
                         suffixText: "%",
                       ),
                       onChanged: _onMarginChanged,
@@ -681,383 +526,251 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: kBgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _resellerAbsorbsShipping ? Iconsax.truck_fast : Iconsax.box,
-                  size: 18,
-                  color: Colors.purple,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _resellerAbsorbsShipping
-                        ? "Free Shipping (You pay)"
-                        : "Customer Pays Shipping",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Switch(
-                  value: _resellerAbsorbsShipping,
-                  activeColor: Colors.purple,
-                  onChanged: (v) {
-                    setState(() {
-                      _resellerAbsorbsShipping = v;
-                      _syncControllers(source: 'all');
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
+          _buildShippingToggle(),
         ],
       ),
     );
   }
 
-  Widget _buildCostSummary() {
+  Widget _buildShippingToggle() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        color: kBgColor,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            "Base Cost + Fees",
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+          const Icon(Iconsax.truck_fast, size: 18, color: Colors.purple),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              "Free Shipping (You will pay)",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
           ),
-          Row(
-            children: [
-              Text(
-                "Break Even: ",
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              Text(
-                "₹${_totalCost.toStringAsFixed(0)}",
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: kCostColor,
-                ),
-              ),
-            ],
+          Switch(
+            value: _resellerAbsorbsShipping,
+            activeColor: Colors.purple,
+            onChanged: (v) => setState(() {
+              _resellerAbsorbsShipping = v;
+              _onMarginChanged(_currentMarginPct.toString());
+            }),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStrategyPad() {
-    return Row(
+  Widget _buildCostSummary() => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: kSurface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.grey.shade200),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
-          child: _strategyBtn(
-            "🚀 Quick Sell",
-            "Low Margin",
-            () => _applyAutoPrice('quick'),
-            Colors.orange,
-          ),
+        const Text(
+          "Break-Even Cost",
+          style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _strategyBtn(
-            "💎 Max Profit",
-            "Premium",
-            () => _applyAutoPrice('max'),
-            Colors.purple,
+        Text(
+          "₹${_totalCost.toStringAsFixed(0)}",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: kCostColor,
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+
+  Widget _buildStrategyPad() => Row(
+    children: [
+      Expanded(
+        child: _strategyBtn(
+          "🚀 Quick Sell",
+          "15% Margin",
+          () => _applyAutoPrice('quick'),
+          Colors.orange,
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: _strategyBtn(
+          "💎 Max Profit",
+          "40% Margin",
+          () => _applyAutoPrice('max'),
+          Colors.purple,
+        ),
+      ),
+    ],
+  );
 
   Widget _strategyBtn(
     String label,
     String sub,
     VoidCallback onTap,
     Color color,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+  ) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-            const SizedBox(height: 2),
-            Text(
-              sub,
-              style: TextStyle(
-                fontSize: 10,
-                color: color.withValues(alpha: 0.8),
+          ),
+          Text(sub, style: TextStyle(fontSize: 10, color: color)),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildEnhancedGoalTracker() => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: kSurface,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            const Icon(Iconsax.status_up, color: Colors.blueGrey),
+            const SizedBox(width: 12),
+            const Text(
+              "Monthly Earning Goal",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            Container(
+              width: 80,
+              decoration: BoxDecoration(
+                color: kBgColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: _goalCtrl,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                  prefixText: "₹",
+                ),
+                onChanged: (v) =>
+                    setState(() => _targetGoal = double.tryParse(v) ?? 0),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildEnhancedGoalTracker() {
-    bool isLoss = _netProfit <= 0;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey.shade50,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Iconsax.triangle,
-                  size: 20,
-                  color: Colors.blueGrey,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Monthly Target",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        const Divider(height: 30),
+        _netProfit <= 0
+            ? const Text(
+                "⚠️ Increase margin to calculate goal",
+                style: TextStyle(color: Colors.red, fontSize: 12),
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "SALES NEEDED",
+                          style: TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                        Text(
+                          "$_unitsToGoal Bundles",
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  Text(
-                    "Plan your earnings",
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "WEEKLY PACE",
+                          style: TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                        Text(
+                          _weeklyGoalText,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: kAccentColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const Spacer(),
-              Container(
-                width: 90,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: kBgColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextField(
-                  controller: _goalCtrl,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey,
-                  ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    prefixText: "₹",
-                  ),
-                  onChanged: _onGoalChanged,
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          if (isLoss)
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  "⚠️ Increase margin to see goal progress",
-                  style: TextStyle(fontSize: 12, color: Colors.red),
-                ),
-              ),
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "TOTAL SALES NEEDED",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "$_unitsToGoal Bundles",
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(width: 1, height: 40, color: Colors.grey.shade200),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "SPEED REQUIRED",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _weeklyGoalText,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: kAccentColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 
-  Widget _buildDealBroadcaster() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+  Widget _buildDealBroadcaster() => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E293B),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      children: [
+        const Text(
+          "READY TO SHARE?",
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: kAccentColor.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: _isSharing ? null : _broadcastDeal,
+          icon: _isSharing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Iconsax.share, color: Colors.black),
+          label: const Text(
+            "Share Deal to WhatsApp",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Iconsax.flash_1, color: Colors.yellow, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "READY TO SELL?",
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Broadcast Deal: ₹${_sellingPrice.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _isSharing ? null : _broadcastDeal,
-              icon: _isSharing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        color: Colors.black,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Icon(Iconsax.share, color: Colors.black),
-              label: Text(
-                _isSharing ? "Generating..." : "Share Deal with Photos",
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 
   Future<void> _pickProducts() async {
     final List<ProductModel>? picked = await showModalBottomSheet(
@@ -1066,25 +779,16 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => const _MultiProductPickerSheet(),
     );
-
-    if (picked != null && picked.isNotEmpty) {
+    if (picked != null) {
       setState(() {
         _selectedProducts.addAll(picked);
-        _sellingPrice = _totalCost * 1.20;
-        _syncControllers(source: 'all');
-      });
-      // 🌟 Re-check tour to show next steps if needed
-      // Delay to let UI rebuild
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (_localStorage.read('has_shown_profit_tool_tour') == true) {
-          // Optionally prompt to continue tour here if needed
-        }
+        _onMarginChanged(_currentMarginPct.toString());
       });
     }
   }
 }
 
-// ─── HELPER: MULTI PICKER SHEET ──────────────────────────────────────────────
+// ─── CATALOGUE PRODUCT PICKER ───
 class _MultiProductPickerSheet extends StatefulWidget {
   const _MultiProductPickerSheet();
   @override
@@ -1093,41 +797,29 @@ class _MultiProductPickerSheet extends StatefulWidget {
 }
 
 class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  List<ProductModel> _products = [];
+  final CatalogueController catalogueController =
+      Get.find<CatalogueController>();
+  List<ProductModel> _allProducts = [];
+  List<ProductModel> _filtered = [];
   final Set<ProductModel> _selected = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetch();
+    _load();
   }
 
-  Future<void> _fetch({String query = ''}) async {
-    setState(() => _isLoading = true);
-    try {
-      final items = query.isEmpty
-          ? await ApiService.fetchProducts(page: 1, perPage: 30)
-          : await ApiService.searchProducts(query);
-      if (mounted) {
-        setState(() {
-          _products = items;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _toggle(ProductModel p) {
+  void _load() {
+    // Merge all products from all user catalogues
+    final products = catalogueController.myCatalogues
+        .expand((c) => c.products)
+        .toSet()
+        .toList();
     setState(() {
-      if (_selected.contains(p)) {
-        _selected.remove(p);
-      } else {
-        _selected.add(p);
-      }
+      _allProducts = products;
+      _filtered = products;
+      _isLoading = false;
     });
   }
 
@@ -1142,36 +834,18 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Select Products",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "${_selected.length} selected",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
+                const Text(
+                  "Catalogue Items",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 if (_selected.isNotEmpty)
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context, _selected.toList()),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kAccentColor,
-                    ),
-                    child: const Text(
-                      "Done",
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    child: const Text("Add Selected"),
                   ),
               ],
             ),
@@ -1179,9 +853,8 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
-              controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search...',
+                hintText: 'Search in catalogues...',
                 prefixIcon: const Icon(Iconsax.search_normal),
                 filled: true,
                 fillColor: kBgColor,
@@ -1190,10 +863,15 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onChanged: (v) => _fetch(query: v),
+              onChanged: (v) => setState(
+                () => _filtered = _allProducts
+                    .where(
+                      (p) => p.name.toLowerCase().contains(v.toLowerCase()),
+                    )
+                    .toList(),
+              ),
             ),
           ),
-          const SizedBox(height: 10),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -1206,20 +884,22 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 10,
                         ),
-                    itemCount: _products.length,
+                    itemCount: _filtered.length,
                     itemBuilder: (ctx, i) {
-                      final p = _products[i];
-                      final isSelected = _selected.contains(p);
+                      final p = _filtered[i];
+                      final isSel = _selected.contains(p);
                       return GestureDetector(
-                        onTap: () => _toggle(p),
+                        onTap: () => setState(
+                          () => isSel ? _selected.remove(p) : _selected.add(p),
+                        ),
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isSelected
+                              color: isSel
                                   ? kAccentColor
                                   : Colors.grey.shade200,
-                              width: isSelected ? 3 : 1,
+                              width: isSel ? 3 : 1,
                             ),
                           ),
                           child: Column(

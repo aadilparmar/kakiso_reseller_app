@@ -9,12 +9,12 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
+import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 
 // --- CONSTANTS ---
 const Color _activeIconColor = Color(0xFFE91E63);
 final Color _inactiveColor = const Color.fromARGB(255, 0, 0, 0);
-const Color _badgeColor = Color(0xFFFF9800); // Orange/Gold for "HOT" tag
 
 class NavigationController extends GetxController {
   final UserData userData;
@@ -334,7 +334,7 @@ class _NavigationMenuState extends State<NavigationMenu>
           // THE "HOT" BADGE
           Positioned(
             top: -10,
-            right: 0, // Align to right edge of the container
+            right: 12, // Align to right edge of the container
             child: AnimatedBuilder(
               animation: _badgeAnimation,
               builder: (context, child) {
@@ -347,13 +347,13 @@ class _NavigationMenuState extends State<NavigationMenu>
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _badgeColor,
+                  color: kAccentColor,
                   borderRadius: BorderRadius.circular(4),
                   boxShadow: [
                     BoxShadow(
-                      color: _badgeColor.withOpacity(0.4),
+                      color: kAccentColor,
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -363,11 +363,11 @@ class _NavigationMenuState extends State<NavigationMenu>
                 child: const FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    "HOT",
+                    "₹₹",
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
+                      color: Color.fromARGB(255, 255, 255, 255),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
                     ),
                   ),

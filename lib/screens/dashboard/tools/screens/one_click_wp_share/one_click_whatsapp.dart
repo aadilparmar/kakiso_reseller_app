@@ -10,12 +10,13 @@ import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:get_storage/get_storage.dart';
-// 1. IMPORT SHOWCASEVIEW
+import 'package:get/get.dart';
 import 'package:showcaseview/showcaseview.dart';
 
 // INTERNAL IMPORTS
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 
 // ─── THEME CONSTANTS ─────────────────────────────────────────────────────────
 const Color kWhatsAppTeal = Color(0xFF075E54);
@@ -28,7 +29,6 @@ const Color kAccentBlue = Color(0xFF2563EB);
 
 enum MarginType { fixed, percentage }
 
-// 2. WRAPPER WIDGET FOR TOUR
 class OneClickWhatsAppPage extends StatelessWidget {
   const OneClickWhatsAppPage({super.key});
 
@@ -38,7 +38,6 @@ class OneClickWhatsAppPage extends StatelessWidget {
       builder: (context) => const _OneClickWhatsAppContent(),
       autoPlay: false,
       blurValue: 1,
-      // 🌟 FIX: Enable Auto Scroll and add a delay for smoother focus
       enableAutoScroll: true,
       scrollDuration: const Duration(milliseconds: 400),
     );
@@ -62,10 +61,9 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
       FlutterNativeContactPicker();
   final _localStorage = GetStorage();
 
-  // Scroll Controller
   final ScrollController _scrollController = ScrollController();
 
-  // 3. SHOWCASE KEYS
+  // SHOWCASE KEYS
   final GlobalKey _productKey = GlobalKey();
   final GlobalKey _pricingKey = GlobalKey();
   final GlobalKey _marketingKey = GlobalKey();
@@ -73,13 +71,12 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
   final GlobalKey _shareKey = GlobalKey();
   final GlobalKey _infoKey = GlobalKey();
 
-  // --- CONTROLLERS ---
   String _generatedCaption = "";
   bool _isDownloading = false;
 
-  // --- PROFIT & PRICING ENGINE ---
-  MarginType _marginType = MarginType.fixed;
-  double _marginValue = 100.0;
+  // --- PROFIT & PRICING ENGINE (Updated to Percentage Default) ---
+  MarginType _marginType = MarginType.percentage;
+  double _marginValue = 15.0; // Default 15% margin
   bool _useMagicPricing = true;
   bool _showDiscount = true;
 
@@ -99,17 +96,14 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
   @override
   void initState() {
     super.initState();
-    marginInputController.text = "100";
+    marginInputController.text = _marginValue.toStringAsFixed(0);
     _loadBusinessName();
     _updateCaption();
-
-    // 4. TRIGGER TOUR ON LOAD
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndStartTour());
   }
 
   void _checkAndStartTour() {
     bool hasShown = _localStorage.read('has_shown_whatsapp_tour_v4') ?? false;
-
     if (!hasShown) {
       _startTour();
       _localStorage.write('has_shown_whatsapp_tour_v4', true);
@@ -117,7 +111,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
   }
 
   void _startTour() {
-    // 🌟 FIX: Removed manual scroll logic. Let ShowcaseView handle it.
     ShowCaseWidget.of(context).startShowCase([
       _productKey,
       _pricingKey,
@@ -152,8 +145,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     super.dispose();
   }
 
-  // ─── 🧠 PRICING LOGIC ─────────────────────────────────────────────────────
-
   double _calculateSellingPrice(String basePriceStr) {
     double base = double.tryParse(basePriceStr) ?? 0.0;
     double price = base;
@@ -161,6 +152,7 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     if (_marginType == MarginType.fixed) {
       price = base + _marginValue;
     } else {
+      // Percentage calculation: Base + (Base * Margin%)
       price = base + (base * _marginValue / 100);
     }
 
@@ -178,8 +170,8 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
   double _calculateTotalPotentialProfit() {
     double totalProfit = 0.0;
     for (var p in selectedProducts) {
-      double base = double.tryParse(p.price) ?? 0.0;
       double selling = _calculateSellingPrice(p.price);
+      double base = double.tryParse(p.price) ?? 0.0;
       totalProfit += (selling - base);
     }
     return totalProfit;
@@ -206,52 +198,42 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     }
   }
 
-  // ─── 📝 CAPTION GENERATOR ─────────────────────────────────────────────────
-
   void _updateCaption() {
     if (selectedProducts.isEmpty) {
       setState(() => _generatedCaption = "Add products to generate catalog.");
       return;
     }
-
     final buffer = StringBuffer();
     final businessName = businessNameController.text.trim();
     final hasName = businessName.isNotEmpty && _showBranding;
 
     if (_isHinglish) {
       if (hasName) buffer.writeln("👋 *Welcome to $businessName*");
-      if (_selectedTone == 'Urgency') {
+      if (_selectedTone == 'Urgency')
         buffer.writeln("🔥 *Jaldi Karo! Offer Khatam hone wala hai* 🔥");
-      } else if (_selectedTone == 'Luxury') {
+      else if (_selectedTone == 'Luxury')
         buffer.writeln("✨ *Premium Collection - Sirf Aapke Liye* ✨");
-      } else {
+      else
         buffer.writeln("😍 *Dekhiye hamari nayi collection*");
-      }
     } else {
       if (hasName) buffer.writeln("👋 *New at $businessName*");
-      if (_selectedTone == 'Urgency') {
+      if (_selectedTone == 'Urgency')
         buffer.writeln("🚨 *FLASH SALE! Limited Time Offer* 🚨");
-      } else if (_selectedTone == 'Luxury') {
+      else if (_selectedTone == 'Luxury')
         buffer.writeln("✨ *Exclusive Premium Designs* ✨");
-      } else {
+      else
         buffer.writeln("😍 *Check out these new arrivals!*");
-      }
     }
 
-    if (_validityPeriod != 'None') {
-      buffer.writeln(_getDynamicDate());
-    }
+    if (_validityPeriod != 'None') buffer.writeln(_getDynamicDate());
     buffer.writeln("");
 
     for (int i = 0; i < selectedProducts.length; i++) {
       final p = selectedProducts[i];
       final sellingPrice = _calculateSellingPrice(p.price);
-
       buffer.writeln("━━━━━━━━━━━━━━━━");
       buffer.writeln("✅ *Design ${i + 1}*");
-
       if (_includeTitle) buffer.writeln("📦 ${p.name}");
-
       if (_includePrice) {
         if (_showDiscount) {
           buffer.writeln("🏷️ ${_getDiscountString(sellingPrice)}");
@@ -262,56 +244,43 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
           buffer.writeln("💰 *Price: ₹${sellingPrice.toStringAsFixed(0)}*");
         }
       }
-
       if (_includeSizes && p.attributes.isNotEmpty) {
         final sizes = p.attributes.firstWhere(
           (a) => a.name.toLowerCase().contains('size'),
           orElse: () => ProductAttribute(id: 0, name: '', options: []),
         );
-        if (sizes.options.isNotEmpty) {
+        if (sizes.options.isNotEmpty)
           buffer.writeln("📏 Sizes: ${sizes.options.join(', ')}");
-        }
       }
-
       if (_includeDescription && p.description.isNotEmpty) {
         String cleanDesc = p.description.replaceAll(RegExp(r'<[^>]*>'), '');
-        if (cleanDesc.length > 100) {
+        if (cleanDesc.length > 100)
           cleanDesc = "${cleanDesc.substring(0, 100)}...";
-        }
         buffer.writeln("📝 Details: $cleanDesc");
       }
     }
     buffer.writeln("━━━━━━━━━━━━━━━━");
-
-    if (_addTrustBadge) {
+    if (_addTrustBadge)
       buffer.writeln(
         _isHinglish
             ? "\n⭐ *Best Quality* | ⭐ *Easy Returns*"
             : "\n⭐ *Quality Verified* | ⭐ *Easy Returns*",
       );
-    }
-
     buffer.writeln(
       _isHinglish ? "🚚 *Free Home Delivery*" : "🚚 *Free Shipping*",
     );
     buffer.writeln("");
-
-    if (_isHinglish) {
-      buffer.writeln("👇 *Order karne ke liye photo reply karein!*");
-    } else {
-      buffer.writeln("👇 *Reply with photo to place order!*");
-    }
-
+    buffer.writeln(
+      _isHinglish
+          ? "👇 *Order karne ke liye photo reply karein!*"
+          : "👇 *Reply with photo to place order!*",
+    );
     buffer.writeln(
       "\n#Fashion #Sale #Trending #${_isHinglish ? 'DilSeDesi' : 'Style'}",
     );
 
-    setState(() {
-      _generatedCaption = buffer.toString();
-    });
+    setState(() => _generatedCaption = buffer.toString());
   }
-
-  // ─── ACTIONS ──────────────────────────────────────────────────────────────
 
   Future<void> _shareCampaign() async {
     if (selectedProducts.isEmpty) {
@@ -327,18 +296,15 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
           filesToShare.add(file);
         }
       }
-
       await Clipboard.setData(ClipboardData(text: _generatedCaption));
-
-      if (filesToShare.isEmpty) {
+      if (filesToShare.isEmpty)
         await Share.share(_generatedCaption);
-      } else {
+      else
         await Share.shareXFiles(
           filesToShare,
           text: _generatedCaption,
           subject: 'New Collection',
         );
-      }
     } catch (e) {
       _showSnack("Error: $e", isError: true);
     } finally {
@@ -353,17 +319,16 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     }
     final contact = await _contactPicker.selectPhoneNumber();
     if (contact?.selectedPhoneNumber == null) return;
-
-    String phone = contact!.selectedPhoneNumber!;
-    String cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    String phone = contact!.selectedPhoneNumber!.replaceAll(
+      RegExp(r'[^\d]'),
+      '',
+    );
     final message = Uri.encodeComponent(_generatedCaption);
-    final url = Uri.parse("whatsapp://send?phone=$cleanPhone&text=$message");
-
-    if (await canLaunchUrl(url)) {
+    final url = Uri.parse("whatsapp://send?phone=$phone&text=$message");
+    if (await canLaunchUrl(url))
       await launchUrl(url);
-    } else {
+    else
       _showSnack("Could not launch WhatsApp");
-    }
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -397,7 +362,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     }
   }
 
-  // ─── MAIN UI BUILD ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -424,21 +388,17 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // 5. INFO BUTTON to Restart Tour
           IconButton(
             key: _infoKey,
-            tooltip: "Guide",
             icon: const Icon(Iconsax.info_circle, color: kAccentBlue),
             onPressed: _startTour,
           ),
           if (selectedProducts.isNotEmpty)
             IconButton(
-              onPressed: () {
-                setState(() {
-                  selectedProducts.clear();
-                  _updateCaption();
-                });
-              },
+              onPressed: () => setState(() {
+                selectedProducts.clear();
+                _updateCaption();
+              }),
               icon: const Icon(Iconsax.trash, color: Colors.red),
             ),
         ],
@@ -452,121 +412,43 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
               child: Column(
                 children: [
                   _buildSectionTitle("1. Select Products"),
-
-                  // TOUR STEP 1
                   Showcase(
                     key: _productKey,
                     title: "Select Products",
-                    description:
-                        "Tap here to choose products from your inventory.",
-                    overlayColor: Colors.black.withOpacity(0.7),
-                    titleTextStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: kAccentBlue,
-                      fontSize: 16,
-                    ),
-                    descTextStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                      fontSize: 12,
-                    ),
-                    targetBorderRadius: BorderRadius.circular(20),
+                    description: "Choose products from your catalogues.",
                     child: _buildProductShowcase(),
                   ),
-
                   _buildSectionTitle("2. Profit & Pricing"),
-
-                  // TOUR STEP 2
                   Showcase(
                     key: _pricingKey,
-                    title: "Smart Pricing",
+                    title: "Smart Margin",
                     description:
-                        "Set your margin. We auto-calculate the selling price.",
-                    overlayColor: Colors.black.withOpacity(0.7),
-                    titleTextStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: kAccentBlue,
-                      fontSize: 16,
-                    ),
-                    descTextStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                      fontSize: 12,
-                    ),
-                    targetBorderRadius: BorderRadius.circular(20),
+                        "Set your percentage margin for all selected products.",
                     child: _buildPricingEngine(),
                   ),
-
                   _buildSectionTitle("3. Content & Marketing"),
-
-                  // TOUR STEP 3
                   Showcase(
                     key: _marketingKey,
                     title: "Customize Content",
-                    description:
-                        "Add your business name and choose the message tone.",
-                    overlayColor: Colors.black.withOpacity(0.7),
-                    titleTextStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: kAccentBlue,
-                      fontSize: 16,
-                    ),
-                    descTextStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                      fontSize: 12,
-                    ),
-                    targetBorderRadius: BorderRadius.circular(20),
+                    description: "Add business name and choose tone.",
                     child: _buildMarketingTools(),
                   ),
-
                   _buildSectionTitle("4. Live Preview"),
-
-                  // TOUR STEP 4
                   Showcase(
                     key: _previewKey,
                     title: "Live Preview",
-                    description:
-                        "See exactly how your WhatsApp message will look.",
-                    overlayColor: Colors.black.withOpacity(0.7),
-                    titleTextStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: kAccentBlue,
-                      fontSize: 16,
-                    ),
-                    descTextStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                      fontSize: 12,
-                    ),
-                    targetBorderRadius: BorderRadius.circular(12),
+                    description: "See the final WhatsApp message.",
                     child: _buildRealWhatsAppPreview(),
                   ),
-
-                  // 🌟 FIX: Extra padding to allow scrolling the last item to the center
                   const SizedBox(height: 200),
                 ],
               ),
             ),
           ),
-
-          // TOUR STEP 5 (Fixed)
           Showcase(
             key: _shareKey,
             title: "Broadcast",
-            description:
-                "Tap here to share images and text to WhatsApp instantly!",
-            overlayColor: Colors.black.withOpacity(0.7),
-            titleTextStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: kAccentBlue,
-              fontSize: 16,
-            ),
-            descTextStyle: const TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-              fontSize: 12,
-            ),
+            description: "Share to WhatsApp instantly!",
             child: _buildBottomDock(),
           ),
         ],
@@ -590,7 +472,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     );
   }
 
-  // ─── 1. PRODUCT SHOWCASE ──────────────────────────────────────────────────
   Widget _buildProductShowcase() {
     if (selectedProducts.isEmpty) {
       return GestureDetector(
@@ -616,7 +497,7 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
               ),
               const SizedBox(height: 10),
               const Text(
-                "Tap to Create Catalog",
+                "Tap to Add Catalogue Products",
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 15,
@@ -647,9 +528,9 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
-                child: Column(
+                child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(Iconsax.add_circle, color: Colors.grey, size: 28),
                     SizedBox(height: 8),
                     Text(
@@ -711,12 +592,10 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                 top: 4,
                 right: 16,
                 child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedProducts.removeAt(index);
-                      _updateCaption();
-                    });
-                  },
+                  onTap: () => setState(() {
+                    selectedProducts.removeAt(index);
+                    _updateCaption();
+                  }),
                   child: const CircleAvatar(
                     radius: 12,
                     backgroundColor: Colors.white,
@@ -731,7 +610,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     );
   }
 
-  // ─── 2. PROFIT ENGINE ─────────────────────────────────────────────────────
   Widget _buildPricingEngine() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -756,7 +634,7 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Your Profit",
+                    "Total Profit",
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   Text(
@@ -769,9 +647,8 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                   ),
                 ],
               ),
-              // Manual Input Field
               SizedBox(
-                width: 90,
+                width: 100,
                 child: TextField(
                   controller: marginInputController,
                   keyboardType: TextInputType.number,
@@ -782,13 +659,12 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     isDense: true,
-                    prefixText: _marginType == MarginType.fixed ? '₹ ' : '',
-                    suffixText: _marginType == MarginType.fixed ? '' : '%',
+                    labelText: "Margin %",
+                    suffixText: '%',
                   ),
                   onChanged: (val) {
-                    double v = double.tryParse(val) ?? 0;
                     setState(() {
-                      _marginValue = v;
+                      _marginValue = double.tryParse(val) ?? 0;
                       _updateCaption();
                     });
                   },
@@ -796,49 +672,22 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // Slider
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: kWhatsAppTeal,
-              thumbColor: kWhatsAppTeal,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-            ),
-            child: Slider(
-              value: _marginValue.clamp(
-                0.0,
-                _marginType == MarginType.fixed ? 1000.0 : 100.0,
-              ),
-              min: 0,
-              max: _marginType == MarginType.fixed ? 1000.0 : 100.0,
-              onChanged: (val) {
-                setState(() {
-                  _marginValue = val;
-                  marginInputController.text = val.toStringAsFixed(0);
-                  _updateCaption();
-                });
-              },
-            ),
+          Slider(
+            value: _marginValue.clamp(0.0, 100.0),
+            min: 0,
+            max: 100,
+            divisions: 20,
+            label: "${_marginValue.round()}%",
+            activeColor: kWhatsAppTeal,
+            onChanged: (val) {
+              setState(() {
+                _marginValue = val;
+                marginInputController.text = val.toStringAsFixed(0);
+                _updateCaption();
+              });
+            },
           ),
-
-          // Quick Tags
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildMarginTag(50),
-                const SizedBox(width: 8),
-                _buildMarginTag(100),
-                const SizedBox(width: 8),
-                _buildMarginTag(200),
-                const SizedBox(width: 8),
-                _buildMarginTag(500),
-              ],
-            ),
-          ),
-
           const Divider(height: 20),
           _buildSwitchTile(
             title: "Magic '99' Pricing",
@@ -867,32 +716,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     );
   }
 
-  Widget _buildMarginTag(double val) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _marginType = MarginType.fixed;
-          _marginValue = val;
-          marginInputController.text = val.toStringAsFixed(0);
-          _updateCaption();
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: kBgColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Text(
-          "+ ₹${val.toStringAsFixed(0)}",
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-        ),
-      ),
-    );
-  }
-
-  // ─── 3. MARKETING ─────────────────────────────────────────────────────────
   Widget _buildMarketingTools() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -910,7 +733,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
       ),
       child: Column(
         children: [
-          // Content Toggles
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -961,10 +783,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 8),
-
-          // Business Name
           TextField(
             controller: businessNameController,
             decoration: InputDecoration(
@@ -981,8 +799,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
             },
           ),
           const SizedBox(height: 12),
-
-          // Vibe Selector
           Row(
             children: [
               _buildVibeBtn("Urgency 🚨", "Urgency", Colors.red),
@@ -992,8 +808,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
               _buildVibeBtn("Friendly 😊", "Friendly", Colors.orange),
             ],
           ),
-          const SizedBox(height: 12),
-
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
@@ -1001,7 +815,7 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             subtitle: const Text(
-              "Use mix of Hindi-English (Increases trust)",
+              "Use mix of Hindi-English",
               style: TextStyle(fontSize: 11),
             ),
             activeColor: Colors.orange,
@@ -1072,7 +886,6 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     );
   }
 
-  // ─── 4. PREVIEW ───────────────────────────────────────────────────────────
   Widget _buildRealWhatsAppPreview() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1194,17 +1007,16 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
     );
   }
 
-  // ─── BOTTOM DOCK ──────────────────────────────────────────────────────────
   Widget _buildBottomDock() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: kSurface,
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 10,
-            offset: const Offset(0, -4),
+            offset: Offset(0, -4),
           ),
         ],
       ),
@@ -1238,9 +1050,9 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                     ),
                   ),
                   child: _isDownloading
-                      ? Row(
+                      ? const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             SizedBox(
                               width: 20,
                               height: 20,
@@ -1256,9 +1068,9 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
                             ),
                           ],
                         )
-                      : Row(
+                      : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(Iconsax.share, color: Colors.white),
                             SizedBox(width: 8),
                             Text(
@@ -1281,7 +1093,7 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
   }
 }
 
-// ─── PRODUCT PICKER SHEET ──────────────────────────────────────────────────
+// ─── UPDATED PRODUCT PICKER SHEET ──────────────────────────────────────────
 class _MultiProductPickerSheet extends StatefulWidget {
   const _MultiProductPickerSheet();
   @override
@@ -1291,30 +1103,44 @@ class _MultiProductPickerSheet extends StatefulWidget {
 
 class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
-  List<ProductModel> _products = [];
+  final CatalogueController catalogueController =
+      Get.find<CatalogueController>();
+
+  List<ProductModel> _allCatalogueProducts = [];
+  List<ProductModel> _filteredProducts = [];
   final Set<ProductModel> _selected = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetch();
+    _loadFromCatalogues();
   }
 
-  Future<void> _fetch({String query = ''}) async {
+  void _loadFromCatalogues() {
     setState(() => _isLoading = true);
-    try {
-      final items = query.isEmpty
-          ? await ApiService.fetchProducts(page: 1, perPage: 40)
-          : await ApiService.searchProducts(query);
-      if (mounted)
-        setState(() {
-          _products = items;
-          _isLoading = false;
-        });
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    final products = catalogueController.myCatalogues
+        .expand((cat) => cat.products)
+        .toSet()
+        .toList();
+
+    setState(() {
+      _allCatalogueProducts = products;
+      _filteredProducts = products;
+      _isLoading = false;
+    });
+  }
+
+  void _runSearch(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredProducts = _allCatalogueProducts;
+      } else {
+        _filteredProducts = _allCatalogueProducts
+            .where((p) => p.name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
   }
 
   void _toggleSelection(ProductModel p) {
@@ -1338,121 +1164,143 @@ class _MultiProductPickerSheetState extends State<_MultiProductPickerSheet> {
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Select Products",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      "${_selected.length} selected",
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                if (_selected.isNotEmpty)
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, _selected.toList()),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kWhatsAppTeal,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: const Text(
-                      "Done",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: const Icon(Iconsax.search_normal),
-                filled: true,
-                fillColor: kBgColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (v) => _fetch(query: v),
-            ),
-          ),
+          _buildHeader(),
+          _buildSearchBar(),
           const SizedBox(height: 10),
           Expanded(
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: kWhatsAppTeal),
                   )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 0.7,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                    itemCount: _products.length,
-                    itemBuilder: (ctx, i) {
-                      final p = _products[i];
-                      final isSelected = _selected.contains(p);
-                      return GestureDetector(
-                        onTap: () => _toggleSelection(p),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? kWhatsAppTeal
-                                  : Colors.grey.shade200,
-                              width: isSelected ? 3 : 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(9),
-                                  ),
-                                  child: Image.network(
-                                    p.image,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Text(
-                                  "₹${p.price}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                : _filteredProducts.isEmpty
+                ? _buildEmptyCatalogueState()
+                : _buildProductGrid(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Catalogue Products",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                "${_selected.length} selected (max 10)",
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          if (_selected.isNotEmpty)
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, _selected.toList()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kWhatsAppTeal,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: const Text(
+                "Add to Studio",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search in your catalogues...',
+          prefixIcon: const Icon(Iconsax.search_normal),
+          filled: true,
+          fillColor: kBgColor,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        onChanged: _runSearch,
+      ),
+    );
+  }
+
+  Widget _buildProductGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.7,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (ctx, i) {
+        final p = _filteredProducts[i];
+        final isSelected = _selected.contains(p);
+        return GestureDetector(
+          onTap: () => _toggleSelection(p),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? kWhatsAppTeal : Colors.grey.shade200,
+                width: isSelected ? 3 : 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(9),
+                    ),
+                    child: Image.network(p.image, fit: BoxFit.cover),
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Text(
+                    "₹${p.price}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyCatalogueState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Iconsax.box, size: 40, color: Colors.grey),
+          SizedBox(height: 10),
+          Text("No products found in your catalogues."),
+          Text(
+            "Add products to a catalogue first.",
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
