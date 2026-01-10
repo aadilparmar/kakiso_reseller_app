@@ -1,3 +1,5 @@
+// lib/screens/dashboard/catalogue/widgets/catalogue_card.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -19,6 +21,8 @@ class CatalogueCard extends StatelessWidget {
   final Function(CatalogueModel) onCsv;
   final Function(CatalogueModel) onDownload;
   final Function(CatalogueModel) onCollage;
+  // 隼 ADDED: Inventory Callback
+  final Function(CatalogueModel) onInventory;
   final CatalogueController catalogueController;
 
   const CatalogueCard({
@@ -33,6 +37,8 @@ class CatalogueCard extends StatelessWidget {
     required this.onCsv,
     required this.onDownload,
     required this.onCollage,
+    // 隼 ADDED
+    required this.onInventory,
     required this.catalogueController,
   }) : super(key: key);
 
@@ -78,6 +84,9 @@ class CatalogueCard extends StatelessWidget {
     );
   }
 
+  // ... [Keep _buildHeader, _buildContent, _buildBadge, _buildDeleteButton, _showDeleteConfirmation, _buildToolsSection unchanged] ...
+
+  // PASTED FOR CONTEXT - NO CHANGES IN THESE METHODS
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -344,6 +353,15 @@ class CatalogueCard extends StatelessWidget {
       spacing: 6,
       runSpacing: 8,
       children: [
+        // 隼 ADDED: Inventory Button
+        _buildActionButton(
+          icon: Iconsax.box,
+          label: "Inventory",
+          onTap: () => onInventory(catalogue),
+          bgColor: const Color(0xFFFFF7ED),
+          color: const Color(0xFFF97316),
+          targetTool: 'inventory_manager',
+        ),
         _buildActionButton(
           icon: Iconsax.magicpen,
           label: "Collage",

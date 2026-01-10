@@ -35,15 +35,13 @@ class ProductModel {
   final List<String> images;
   final int? discountPercentage;
   final List<ProductAttribute> attributes;
-
-  // 🔹 CHANGED: Store ALL category IDs, not just one
   final List<int> categoryIds;
 
   // BRAND
   final String? brandName;
   final String? brandLogoUrl;
 
-  // 🔹 TECHNICAL / META DATA
+  // META DATA
   final String? userSku;
   final String? uniqueCode;
   final String? hsnCode;
@@ -80,10 +78,11 @@ class ProductModel {
   final String? eanBarcode;
   final String? userProductName;
   final List<String> keywords;
-  // 🔹 NEW INVENTORY FIELDS
-  final bool manageStock; // Maps to 'manage_stock'
-  final int stockQuantity; // Maps to 'stock_quantity'
-  final String stockStatus; // Maps to 'stock_status' (e.g., "instock")
+
+  // INVENTORY FIELDS
+  final bool manageStock;
+  final int stockQuantity;
+  final String stockStatus;
 
   ProductModel({
     required this.id,
@@ -97,11 +96,9 @@ class ProductModel {
     this.discountPercentage,
     required this.attributes,
     this.categoryIds = const [],
-    // 🔹 Initialize New Fields
     required this.manageStock,
     required this.stockQuantity,
     required this.stockStatus,
-    // <--- Default to empty list
     this.brandName,
     this.brandLogoUrl,
     this.userSku,
@@ -134,6 +131,7 @@ class ProductModel {
     this.keywords = const [],
   });
 
+  // ... [Keep existing factory ProductModel.fromJson] ...
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     // --- IMAGES ---
     List<String> gallery = [];
@@ -151,8 +149,7 @@ class ProductModel {
           .toList();
     }
 
-    // --- 🔹 CATEGORY PARSING (ROBUST) ---
-    // Extract ALL category IDs associated with this product
+    // --- CATEGORY PARSING ---
     List<int> catIds = [];
     if (json['categories'] != null && json['categories'] is List) {
       for (var c in json['categories']) {
@@ -230,7 +227,7 @@ class ProductModel {
       images: gallery,
       discountPercentage: discount,
       attributes: attrs,
-      categoryIds: catIds, // <--- Assign List
+      categoryIds: catIds,
       brandName: bName,
       brandLogoUrl: bLogo,
       userSku: finalSku,
@@ -251,9 +248,9 @@ class ProductModel {
       packageGrossWeight: getMeta(['product_package_weight']),
       itemLength: getMeta(['product_item_length']),
       itemWidth: getMeta(['product_item_width']),
-      manageStock: json['manage_stock'] == true, //
+      manageStock: json['manage_stock'] == true,
       stockQuantity:
-          int.tryParse(json['stock_quantity']?.toString() ?? '0') ?? 0, //
+          int.tryParse(json['stock_quantity']?.toString() ?? '0') ?? 0,
       stockStatus: json['stock_status']?.toString() ?? 'outofstock',
       itemHeight: getMeta(['product_item_height']),
       itemWeight: getMeta(['product_item_weight']),
@@ -268,6 +265,7 @@ class ProductModel {
     );
   }
 
+  // ... [Keep existing toJson] ...
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -280,7 +278,6 @@ class ProductModel {
       'images': images.map((src) => {'src': src}).toList(),
       'attributes': attributes.map((a) => a.toJson()).toList(),
       'discount_percentage': discountPercentage,
-      // Map all IDs back to objects
       'categories': categoryIds.map((id) => {'id': id}).toList(),
       'brands': brandName == null
           ? null
@@ -290,7 +287,6 @@ class ProductModel {
       'tags': keywords.map((k) => {'name': k}).toList(),
       'meta_data': [
         {'key': 'product_code', 'value': userSku},
-        // ... (truncated meta data for brevity, same as before)
       ],
       'dimensions': {'length': length, 'width': width, 'height': height},
       'weight': weight,
@@ -302,5 +298,59 @@ class ProductModel {
 
   String get watermarkCode {
     return uniqueCode ?? '';
+  }
+
+  // 隼 NEW: copyWith for inventory updates
+  ProductModel copyWith({
+    bool? manageStock,
+    int? stockQuantity,
+    String? stockStatus,
+  }) {
+    return ProductModel(
+      id: id,
+      name: name,
+      price: price,
+      regularPrice: regularPrice,
+      description: description,
+      shortDescription: shortDescription,
+      image: image,
+      images: images,
+      discountPercentage: discountPercentage,
+      attributes: attributes,
+      categoryIds: categoryIds,
+      manageStock: manageStock ?? this.manageStock,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      stockStatus: stockStatus ?? this.stockStatus,
+      brandName: brandName,
+      brandLogoUrl: brandLogoUrl,
+      userSku: userSku,
+      uniqueCode: uniqueCode,
+      hsnCode: hsnCode,
+      gst: gst,
+      shippingFee: shippingFee,
+      manufacturedBy: manufacturedBy,
+      importedBy: importedBy,
+      marketedBy: marketedBy,
+      countryOfOrigin: countryOfOrigin,
+      packageIncludes: packageIncludes,
+      dispatchTime: dispatchTime,
+      length: length,
+      width: width,
+      height: height,
+      weight: weight,
+      packageGrossWeight: packageGrossWeight,
+      itemLength: itemLength,
+      itemWidth: itemWidth,
+      itemHeight: itemHeight,
+      itemWeight: itemWeight,
+      netContents: netContents,
+      highlights: highlights,
+      careInstruction: careInstruction,
+      disclaimer: disclaimer,
+      warranty: warranty,
+      eanBarcode: eanBarcode,
+      userProductName: userProductName,
+      keywords: keywords,
+    );
   }
 }

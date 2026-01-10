@@ -48,6 +48,25 @@ class CatalogueModel {
       'products': products.map((p) => p.toJson()).toList(),
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // 隼 ADDED: copyWith method to fix the error
+  // ---------------------------------------------------------------------------
+  CatalogueModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    DateTime? createdAt,
+    List<ProductModel>? products,
+  }) {
+    return CatalogueModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      products: products ?? this.products,
+    );
+  }
 }
 
 class CatalogueController extends GetxController {

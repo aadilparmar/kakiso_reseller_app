@@ -13,6 +13,8 @@ import 'package:kakiso_reseller_app/screens/dashboard/catalogue/dailogs/csv_expo
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/dailogs/pdf_margin_dialog.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/dailogs/share_margin_dialog.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/sheets/collage_studio_sheet.dart';
+// 隼 ADDED: New Inventory Manager Sheet Import
+import 'package:kakiso_reseller_app/screens/dashboard/catalogue/sheets/inventory_manager_sheet.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/utils/catalogue_utils.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/catalogue_card.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/catalogue/widgets/guide_overlay.dart';
@@ -301,12 +303,21 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
   // DIALOG & SHEET HANDLERS
   // ═══════════════════════════════════════════════════════════
 
+  // 隼 ADDED: Inventory Manager Logic
+  void _openInventoryManager(CatalogueModel cat) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => InventoryManagerSheet(catalogue: cat),
+    );
+  }
+
   void _openCreateCatalogueDialog() {
     CreateCatalogueDialog.show(catalogueController);
   }
 
   void _openCsvExportDialog(CatalogueModel cat) {
-    // Updated to handle named parameter
     CsvExportDialog.show(
       cat,
       (catalogue, margin, {bool includePrice = true}) =>
@@ -359,7 +370,6 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
     CatalogueModel cat,
     List<ProductModel> productsToPrint,
   ) {
-    // Updated to handle named parameter
     PdfMarginDialog.show(
       catalogue: cat,
       productsToPrint: productsToPrint,
@@ -992,6 +1002,8 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
             onCsv: _openCsvExportDialog,
             onDownload: _handleBulkDownload,
             onCollage: _openCollageStudio,
+            // 隼 ADDED: Pass the new inventory function
+            onInventory: _openInventoryManager,
             catalogueController: catalogueController,
           );
 
