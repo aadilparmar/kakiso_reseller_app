@@ -1,9 +1,11 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/watermarked_image.dart';
 import 'fullscreen_image_viewer.dart';
 
@@ -102,16 +104,32 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                       // 🔹 STRICT LOGIC:
                       // Only use WatermarkedImage if we have a Unique Code.
                       // Otherwise, show clean image.
+                      // Inside PageView.builder -> itemBuilder -> GestureDetector -> Hero
                       child: hasUniqueCode
                           ? WatermarkedImage(
-                              imageUrl: imageList[index],
+                              // Optimize the source image before watermarking
+                              imageUrl: ApiService.getOptimizedImageUrl(
+                                imageList[index],
+                                width: 600, // Requesting HD mobile quality
+                              ),
                               code: widget.product.watermarkCode,
                               fit: BoxFit.cover,
                             )
-                          : Image.network(
-                              imageList[index],
+                          : CachedNetworkImage(
+                              imageUrl: ApiService.getOptimizedImageUrl(
+                                imageList[index],
+                                width: 600,
+                              ),
                               fit: BoxFit.cover,
-                              errorBuilder: (c, o, s) => Container(
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[50],
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey[50],
                                 child: const Icon(Icons.image_not_supported),
                               ),
@@ -311,13 +329,23 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
-                                child: Image.network(
-                                  imageList[index],
+                                // Inside ListView.separated -> itemBuilder -> Obx -> GestureDetector -> AnimatedContainer -> ClipRRect
+                                child: CachedNetworkImage(
+                                  // Requesting very small image (150px) for thumbnails = Instant Load
+                                  imageUrl: ApiService.getOptimizedImageUrl(
+                                    imageList[index],
+                                    width: 150,
+                                  ),
                                   fit: BoxFit.cover,
+                                  // Keeping your existing dimming logic for unselected items
                                   color: isSelected
                                       ? null
                                       : Colors.black.withValues(alpha: 0.4),
                                   colorBlendMode: BlendMode.darken,
+                                  placeholder: (context, url) =>
+                                      Container(color: Colors.grey[200]),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error, size: 16),
                                 ),
                               ),
                             ),

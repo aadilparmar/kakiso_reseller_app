@@ -19,7 +19,7 @@ class HomeProductsController extends GetxController {
       errorMessage.value = '';
 
       // You can tune perPage / maxPages based on your needs.
-      final products = await ApiService.fetchAllProductsPaginated(
+      final products = await ApiService().fetchAllProductsPaginated(
         orderBy: 'date',
         order: 'desc',
         perPage: 40,

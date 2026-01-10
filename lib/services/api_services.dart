@@ -1,62 +1,197 @@
 // lib/services/api_services.dart
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
-import 'package:http/http.dart' as http;
+import 'dart:async'; // Added for Completer
+import 'dart:convert';
+import 'dart:io'; // Added for SocketException
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:dio/dio.dart';
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
+import 'package:dio_cache_interceptor_hive_store/dio_cache_interceptor_hive_store.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+// Import your models
 import 'package:kakiso_reseller_app/models/brand.dart';
 import 'package:kakiso_reseller_app/models/categories.dart';
 import 'package:kakiso_reseller_app/models/order.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+
+// --- CUSTOM EXCEPTION CLASS ---
+class KakisoApiException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  KakisoApiException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
+}
+
+// --- TOP LEVEL PARSER FUNCTIONS ---
+// Wrapped in try-catch to prevent Isolate crashes on bad JSON
+List<CategoryModel> _parseCategories(dynamic data) {
+  try {
+    return (data as List).map((json) => CategoryModel.fromJson(json)).toList();
+  } catch (e) {
+    debugPrint("Parse Error (Categories): $e");
+    return [];
+  }
+}
+
+List<ProductModel> _parseProducts(dynamic data) {
+  try {
+    return (data as List).map((json) => ProductModel.fromJson(json)).toList();
+  } catch (e) {
+    debugPrint("Parse Error (Products): $e");
+    return [];
+  }
+}
+
+List<BrandModel> _parseBrands(dynamic data) {
+  try {
+    return (data as List).map((json) => BrandModel.fromJson(json)).toList();
+  } catch (e) {
+    debugPrint("Parse Error (Brands): $e");
+    return [];
+  }
+}
+
+List<Order> _parseOrders(dynamic data) {
+  try {
+    return (data as List).map((json) => Order.fromWooJson(json)).toList();
+  } catch (e) {
+    debugPrint("Parse Error (Orders): $e");
+    return [];
+  }
+}
 
 class ApiService {
-  static const String baseUrl = 'https://stage.kakiso.com';
-  static const String consumerKey =
-      'ck_a821068196cf8a1153635a362fdec04d4e881051';
-  static const String consumerSecret =
-      'cs_389ffd5342045eb06ac641085e7885fc3f0db010';
-  static const String appApiKey = '';
+  // --- 1. SINGLETON PATTERN ---
+  static final ApiService _instance = ApiService._internal();
 
-  static final http.Client _client = http.Client();
-  static List<CategoryModel>? _cachedCategories;
-  static List<BrandModel>? _cachedBrands;
+  factory ApiService() => _instance;
 
-  static String get _basicAuth =>
-      'Basic ${base64Encode(utf8.encode('$consumerKey:$consumerSecret'))}';
+  late final Dio _dio;
+  // Completer prevents multiple inits running at the same time
+  Completer<void>? _initCompleter;
 
-  static Map<String, String> get _headers => {
-    "Authorization": _basicAuth,
-    "Content-Type": "application/json",
-    "User-Agent": "KakisoResellerApp/1.0",
-    "Connection": "keep-alive",
-  };
+  ApiService._internal();
 
-  // --- CATEGORIES ---
-  static Future<List<CategoryModel>> fetchCategories() async {
-    if (_cachedCategories != null) return _cachedCategories!;
+  // --- 2. INITIALIZATION ---
+  Future<void> init() async {
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
 
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products/categories?per_page=50&hide_empty=true',
-    );
+    _initCompleter = Completer<void>();
+
     try {
-      final response = await _client.get(url, headers: _headers);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        _cachedCategories = data
-            .map((json) => CategoryModel.fromJson(json))
-            .toList();
-        return _cachedCategories!;
+      // Load environment variables
+      await dotenv.load(fileName: "assets/.env");
+
+      final String baseUrl =
+          dotenv.env['BASE_URL'] ?? 'https://stage.kakiso.com';
+      final String consumerKey = dotenv.env['CONSUMER_KEY'] ?? '';
+      final String consumerSecret = dotenv.env['CONSUMER_SECRET'] ?? '';
+
+      final dir = await getTemporaryDirectory();
+      final cacheStore = HiveCacheStore(
+        dir.path,
+        hiveBoxName: "kakiso_api_cache_v4_opt", // Bumped version for new logic
+      );
+
+      final cacheOptions = CacheOptions(
+        store: cacheStore,
+        policy: CachePolicy.forceCache,
+        hitCacheOnErrorExcept: [401, 403, 500],
+        maxStale: const Duration(days: 7), // Increased for offline support
+        priority: CachePriority.normal,
+      );
+
+      _dio = Dio(
+        BaseOptions(
+          baseUrl: baseUrl,
+          // Increased timeouts for slow networks
+          connectTimeout: const Duration(seconds: 45),
+          receiveTimeout: const Duration(seconds: 45),
+          headers: {
+            "Authorization":
+                'Basic ${base64Encode(utf8.encode('$consumerKey:$consumerSecret'))}',
+            "Content-Type": "application/json",
+            "User-Agent": "KakisoResellerApp/2.2",
+          },
+        ),
+      );
+
+      _dio.interceptors.add(DioCacheInterceptor(options: cacheOptions));
+
+      if (kDebugMode) {
+        _dio.interceptors.add(LogInterceptor(responseBody: false));
       }
-      throw Exception('Category Error: ${response.statusCode}');
+
+      _initCompleter!.complete();
     } catch (e) {
-      throw Exception('Error fetching categories: $e');
+      _initCompleter!.completeError(e);
+      _initCompleter = null; // Reset on failure so we can try again
+      rethrow;
     }
   }
 
-  // --- PRODUCTS ---
-  static Future<List<ProductModel>> fetchProducts({
+  Future<Dio> get _client async {
+    if (_initCompleter == null) await init();
+    await _initCompleter!.future;
+    return _dio;
+  }
+
+  // Helper for error handling
+  KakisoApiException _handleError(dynamic error) {
+    if (error is DioException) {
+      if (error.error is SocketException ||
+          error.type == DioExceptionType.connectionTimeout) {
+        return KakisoApiException('Slow or No Internet Connection');
+      }
+      if (error.response?.statusCode == 401) {
+        return KakisoApiException(
+          'Unauthorized. Please login again.',
+          statusCode: 401,
+        );
+      }
+      return KakisoApiException(
+        error.message ?? 'Server Error: ${error.response?.statusCode}',
+        statusCode: error.response?.statusCode,
+      );
+    }
+    return KakisoApiException(error.toString());
+  }
+
+  // --- 3. IMAGE OPTIMIZATION (NEW) ---
+  /// Converts heavy WordPress images to lightweight WebP on the fly.
+  /// Use this in your UI: CachedNetworkImage(imageUrl: ApiService.getOptimizedImageUrl(url))
+  static String getOptimizedImageUrl(String originalUrl, {int width = 400}) {
+    if (originalUrl.isEmpty) return "";
+    // Using 'wsrv.nl' (free global CDN) to resize and compress.
+    // This is safe to use and very fast for mobile apps.
+    final encoded = Uri.encodeComponent(originalUrl);
+    return "https://wsrv.nl/?url=$encoded&w=$width&q=75&output=webp";
+  }
+
+  // --- 4. CATEGORIES ---
+  Future<List<CategoryModel>> fetchCategories() async {
+    final dio = await _client;
+    try {
+      final response = await dio.get(
+        '/wp-json/wc/v3/products/categories',
+        queryParameters: {'per_page': 50, 'hide_empty': true},
+      );
+      return compute(_parseCategories, response.data);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // --- 5. PRODUCTS ---
+  Future<List<ProductModel>> fetchProducts({
     int page = 1,
     int perPage = 20,
     String orderBy = 'date',
@@ -65,309 +200,339 @@ class ApiService {
     double? maxPrice,
     List<int>? brandIds,
   }) async {
-    final buffer = StringBuffer(
-      '$baseUrl/wp-json/wc/v3/products?status=publish',
-    );
-    buffer.write('&per_page=$perPage&page=$page&orderby=$orderBy&order=$order');
-    if (minPrice != null) buffer.write('&min_price=${minPrice.toInt()}');
-    if (maxPrice != null) buffer.write('&max_price=${maxPrice.toInt()}');
+    final dio = await _client;
+    final Map<String, dynamic> params = {
+      'status': 'publish',
+      'per_page': perPage,
+      'page': page,
+      'orderby': orderBy,
+      'order': order,
+    };
+
+    if (minPrice != null) params['min_price'] = minPrice.toInt();
+    if (maxPrice != null) params['max_price'] = maxPrice.toInt();
     if (brandIds != null && brandIds.isNotEmpty) {
-      buffer.write('&brand=${brandIds.join(',')}');
+      params['brand'] = brandIds.join(',');
     }
+
     try {
-      final response = await _client.get(
-        Uri.parse(buffer.toString()),
-        headers: _headers,
+      final options = page == 1
+          ? Options(extra: {'cache_policy': CachePolicy.refresh})
+          : null;
+
+      final response = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: params,
+        options: options,
       );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProductModel.fromJson(json)).toList();
-      }
-      throw Exception('Product Error: ${response.statusCode}');
+
+      return compute(_parseProducts, response.data);
     } catch (e) {
-      throw Exception('Error fetching products: $e');
+      throw _handleError(e);
     }
   }
 
-  static Future<List<ProductModel>> fetchAllProductsPaginated({
+  // FIXED: Safer pagination logic with delay to prevent choking
+  Future<List<ProductModel>> fetchAllProductsPaginated({
     String orderBy = 'date',
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
     int perPage = 50,
-    int maxPages = 20,
+    int maxPages = 10,
   }) async {
     final List<ProductModel> all = [];
     int page = 1;
-    while (true) {
-      final List<ProductModel> pageItems = await fetchProducts(
-        page: page,
-        perPage: perPage,
-        orderBy: orderBy,
-        order: order,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
-      );
-      if (pageItems.isEmpty) break;
-      all.addAll(pageItems);
-      if (pageItems.length < perPage || page >= maxPages) break;
-      page++;
+
+    try {
+      while (page <= maxPages) {
+        final pageItems = await fetchProducts(
+          page: page,
+          perPage: perPage,
+          orderBy: orderBy,
+          order: order,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+        );
+
+        if (pageItems.isEmpty) break;
+        all.addAll(pageItems);
+
+        if (pageItems.length < perPage) break;
+
+        page++;
+        // Small delay to be kind to the server
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+      return all;
+    } catch (e) {
+      return all;
     }
-    return all;
   }
 
-  static Future<List<ProductModel>> fetchProductsByCategory(
+  // Find the fetchProductsByCategory method and update it to this:
+
+  Future<List<ProductModel>> fetchProductsByCategory(
     int categoryId, {
+    int page = 1, // <--- 1. ADD THIS PARAMETER
     String orderBy = 'popularity',
     String order = 'desc',
     double? minPrice,
     double? maxPrice,
     List<int>? brandIds,
   }) async {
-    final buffer = StringBuffer(
-      '$baseUrl/wp-json/wc/v3/products?category=$categoryId&status=publish&per_page=20',
-    );
-    buffer.write('&orderby=$orderBy&order=$order');
-    if (minPrice != null) buffer.write('&min_price=${minPrice.toInt()}');
-    if (maxPrice != null) buffer.write('&max_price=${maxPrice.toInt()}');
+    final dio = await _client;
+    final Map<String, dynamic> params = {
+      'category': categoryId,
+      'status': 'publish',
+      'per_page': 20,
+      'page': page, // <--- 2. PASS IT TO WORDPRESS HERE
+      'orderby': orderBy,
+      'order': order,
+    };
+    if (minPrice != null) params['min_price'] = minPrice.toInt();
+    if (maxPrice != null) params['max_price'] = maxPrice.toInt();
     if (brandIds != null && brandIds.isNotEmpty) {
-      buffer.write('&brand=${brandIds.join(',')}');
+      params['brand'] = brandIds.join(',');
     }
+
     try {
-      final response = await _client.get(
-        Uri.parse(buffer.toString()),
-        headers: _headers,
+      final response = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: params,
       );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProductModel.fromJson(json)).toList();
-      }
-      throw Exception('Category Products Error');
+      return compute(_parseProducts, response.data);
     } catch (e) {
-      throw Exception('Error fetching products by category: $e');
+      throw _handleError(e);
     }
   }
 
-  static Future<ProductModel> fetchProductById(int id) async {
+  Future<ProductModel> fetchProductById(int id) async {
+    final dio = await _client;
     try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/wp-json/wc/v3/products/$id'),
-        headers: _headers,
-      );
-      if (response.statusCode == 200) {
-        return ProductModel.fromJson(json.decode(response.body));
-      }
-      throw Exception('Product Detail Error: ${response.statusCode}');
+      final response = await dio.get('/wp-json/wc/v3/products/$id');
+      return ProductModel.fromJson(response.data);
     } catch (e) {
-      throw Exception('Error fetching product: $e');
+      throw _handleError(e);
     }
   }
 
-  static Future<ProductModel?> fetchProductByIdSafe(String id) async {
+  Future<ProductModel?> fetchProductByIdSafe(String id) async {
     final int? pid = int.tryParse(id);
     if (pid == null) return null;
+    final dio = await _client;
     try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/wp-json/wc/v3/products/$pid'),
-        headers: _headers,
-      );
-      return response.statusCode == 200
-          ? ProductModel.fromJson(json.decode(response.body))
-          : null;
+      final response = await dio.get('/wp-json/wc/v3/products/$pid');
+      return ProductModel.fromJson(response.data);
     } catch (e) {
       return null;
     }
   }
 
-  static Future<List<ProductModel>> fetchProductsBySku(String sku) async {
-    try {
-      final response = await _client.get(
-        Uri.parse(
-          '$baseUrl/wp-json/wc/v3/products?sku=${Uri.encodeQueryComponent(sku)}',
-        ),
-        headers: _headers,
-      );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProductModel.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // 🔥 UPDATED: Advanced Unique Code Search
-  static Future<List<ProductModel>> fetchProductsByUniqueCode(
-    String code,
-  ) async {
+  // --- 6. OPTIMIZED SEARCH (SEQUENTIAL) ---
+  Future<List<ProductModel>> fetchProductsByUniqueCode(String code) async {
     final String cleanCode = code.trim();
     if (cleanCode.isEmpty) return [];
 
-    // Strategy 1: Standard Search (Works if backend plugin indexes meta)
-    final Uri searchUrl = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?search=${Uri.encodeQueryComponent(cleanCode)}&status=publish',
-    );
-
-    // Strategy 2: Legacy Meta Filter (Works on some WC setups without plugins)
-    // NOTE: This tries to find exact matches for the specific key
-    final Uri metaUrl = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?filter[meta_key]=_unique_product_code&filter[meta_value]=${Uri.encodeQueryComponent(cleanCode)}&status=publish',
-    );
-
-    // Strategy 3: Check SKU just in case (Many systems mirror unique code to SKU)
-    final Uri skuUrl = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?sku=${Uri.encodeQueryComponent(cleanCode)}',
-    );
+    final dio = await _client;
 
     try {
-      // Run all checks in parallel to be robust
-      final results = await Future.wait([
-        _client.get(searchUrl, headers: _headers),
-        _client.get(metaUrl, headers: _headers),
-        _client.get(skuUrl, headers: _headers),
-      ]);
-
-      final Map<int, ProductModel> uniqueMap = {};
-
-      for (var response in results) {
-        if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body);
-          for (var item in data) {
-            final p = ProductModel.fromJson(item);
-            uniqueMap[p.id] = p;
-          }
-        }
+      // 1. Try SKU first (Fastest/Most Exact)
+      final skuResponse = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: {'sku': cleanCode},
+      );
+      if ((skuResponse.data as List).isNotEmpty) {
+        return compute(_parseProducts, skuResponse.data);
       }
 
-      return uniqueMap.values.toList();
+      // 2. Try Meta Key (Unique Code)
+      final metaResponse = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: {
+          'filter[meta_key]': '_unique_product_code',
+          'filter[meta_value]': cleanCode,
+          'status': 'publish',
+        },
+      );
+      if ((metaResponse.data as List).isNotEmpty) {
+        return compute(_parseProducts, metaResponse.data);
+      }
+
+      // 3. Fallback to broad search (Slowest)
+      final searchResponse = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: {'search': cleanCode, 'status': 'publish'},
+      );
+      return compute(_parseProducts, searchResponse.data);
     } catch (e) {
-      print("Unique Code Search Error: $e");
       return [];
     }
   }
 
-  static Future<List<ProductModel>> fetchTopSellingProducts() async {
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?per_page=10&status=publish&orderby=popularity',
-    );
+  Future<List<ProductModel>> searchProducts(String query) async {
+    final dio = await _client;
     try {
-      final response = await _client.get(url, headers: _headers);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProductModel.fromJson(json)).toList();
-      }
-      throw Exception('Top Products Error');
+      final response = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: {'search': query, 'status': 'publish', 'per_page': 20},
+      );
+      return compute(_parseProducts, response.data);
     } catch (e) {
-      throw Exception('Error: $e');
+      throw _handleError(e);
     }
   }
 
-  static Future<List<ProductModel>> fetchNewestProducts() async {
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?per_page=10&status=publish&orderby=date',
-    );
+  // --- 7. RANKING & LISTS ---
+  Future<List<ProductModel>> fetchTopSellingProducts() async {
+    final dio = await _client;
     try {
-      final response = await _client.get(url, headers: _headers);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProductModel.fromJson(json)).toList();
-      }
-      throw Exception('Newest Products Error');
+      final response = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: {
+          'per_page': 10,
+          'status': 'publish',
+          'orderby': 'popularity',
+        },
+      );
+      return compute(_parseProducts, response.data);
     } catch (e) {
-      throw Exception('Error: $e');
+      throw _handleError(e);
     }
   }
 
-  static Future<List<ProductModel>> fetchTrendingProducts() =>
+  Future<List<ProductModel>> fetchNewestProducts() async {
+    final dio = await _client;
+    try {
+      final response = await dio.get(
+        '/wp-json/wc/v3/products',
+        queryParameters: {
+          'per_page': 10,
+          'status': 'publish',
+          'orderby': 'date',
+        },
+      );
+      return compute(_parseProducts, response.data);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<ProductModel>> fetchTrendingProducts() =>
       fetchTopSellingProducts();
 
-  static Future<List<BrandModel>> fetchBrands() async {
-    if (_cachedBrands != null) return _cachedBrands!;
+  static const int topRankingCategoryId = 513;
+  static const int hotRankingCategoryId = 512;
+
+  Future<List<ProductModel>> fetchTopRankingProducts() async {
+    final products = await fetchProductsByCategory(
+      topRankingCategoryId,
+      orderBy: 'menu_order',
+      order: 'asc',
+    );
+    return products.isEmpty ? fetchTopSellingProducts() : products;
+  }
+
+  Future<List<ProductModel>> fetchHotRankingProducts() async {
+    final products = await fetchProductsByCategory(
+      hotRankingCategoryId,
+      orderBy: 'menu_order',
+      order: 'asc',
+    );
+    return products.isEmpty ? fetchTopSellingProducts() : products;
+  }
+
+  // --- 8. BRANDS & MISC ---
+  Future<List<BrandModel>> fetchBrands() async {
+    final dio = await _client;
     try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/wp-json/wc/v3/products/brands?per_page=100'),
-        headers: _headers,
+      final response = await dio.get(
+        '/wp-json/wc/v3/products/brands',
+        queryParameters: {'per_page': 100},
       );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        _cachedBrands = data.map((json) => BrandModel.fromJson(json)).toList();
-        return _cachedBrands!;
-      }
-      throw Exception('Brands Error');
+      return compute(_parseBrands, response.data);
     } catch (e) {
-      throw Exception('Error fetching brands: $e');
+      throw _handleError(e);
     }
   }
 
-  static Future<List<ProductModel>> searchProducts(String query) async {
-    final Uri url = Uri.parse(
-      '$baseUrl/wp-json/wc/v3/products?search=${Uri.encodeQueryComponent(query)}&status=publish&per_page=20',
-    );
-    try {
-      final response = await _client.get(url, headers: _headers);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => ProductModel.fromJson(json)).toList();
+  // UPDATED: Robust download with retries for slow networks
+  Future<XFile> downloadImageAsFile(String imageUrl) async {
+    final dio = await _client;
+    int retries = 3;
+
+    while (retries > 0) {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final savePath =
+            "${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg";
+
+        await dio.download(
+          imageUrl,
+          savePath,
+          options: Options(
+            // Extra long timeout for downloads
+            receiveTimeout: const Duration(minutes: 2),
+          ),
+        );
+        return XFile(savePath);
+      } catch (e) {
+        retries--;
+        if (retries == 0) {
+          throw KakisoApiException(
+            'Failed to download image after 3 attempts. Check internet.',
+          );
+        }
+        // Wait 2 seconds before retrying
+        await Future.delayed(const Duration(seconds: 2));
       }
-      throw Exception('Search Error');
-    } catch (e) {
-      throw Exception('Error: $e');
     }
+    throw KakisoApiException('Download failed');
   }
 
-  static Future<XFile> downloadImageAsFile(String imageUrl) async {
-    final response = await _client.get(Uri.parse(imageUrl));
-    if (response.statusCode != 200) throw Exception('Image download failed');
-    final tempDir = await getTemporaryDirectory();
-    final file = File(
-      "${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg",
-    );
-    await file.writeAsBytes(response.bodyBytes);
-    return XFile(file.path);
-  }
-
-  static Future<String?> ensureWooCustomer({
+  // --- 9. USER & BUSINESS ---
+  Future<String?> ensureWooCustomer({
     required String email,
     required String name,
   }) async {
     final String trimmedEmail = email.trim();
     if (trimmedEmail.isEmpty) return null;
+    final dio = await _client;
+
     try {
-      final findResp = await _client.get(
-        Uri.parse(
-          '$baseUrl/wp-json/wc/v3/customers?email=${Uri.encodeQueryComponent(trimmedEmail)}',
-        ),
-        headers: _headers,
+      final findResp = await dio.get(
+        '/wp-json/wc/v3/customers',
+        queryParameters: {'email': trimmedEmail},
+        options: Options(extra: {'cache_policy': CachePolicy.noCache}),
       );
-      if (findResp.statusCode == 200) {
-        final List list = json.decode(findResp.body);
-        if (list.isNotEmpty) return list.first['id'].toString();
+
+      if ((findResp.data as List).isNotEmpty) {
+        return findResp.data[0]['id'].toString();
       }
-      final createResp = await _client.post(
-        Uri.parse('$baseUrl/wp-json/wc/v3/customers'),
-        headers: _headers,
-        body: jsonEncode({
+
+      final createResp = await dio.post(
+        '/wp-json/wc/v3/customers',
+        data: {
           'email': trimmedEmail,
           'first_name': name.trim().isNotEmpty
               ? name.trim()
               : trimmedEmail.split('@').first,
           'username': trimmedEmail,
-        }),
+        },
       );
-      if (createResp.statusCode == 201 || createResp.statusCode == 200) {
-        return json.decode(createResp.body)['id'].toString();
-      }
-    } catch (e) {}
-    return null;
+      return createResp.data['id'].toString();
+    } catch (e) {
+      return null;
+    }
   }
 
-  static Future<void> updateBusinessDetails({
+  Future<void> updateBusinessDetails({
     String? userId,
     required Map<String, dynamic> data,
   }) async {
     final int? customerId = int.tryParse((userId ?? '').trim());
     if (customerId == null || customerId <= 0) return;
+    final dio = await _client;
 
     final String fullName = (data["ownerName"] ?? "").toString().trim();
     final parts = fullName.split(" ");
@@ -399,37 +564,23 @@ class ApiService {
         },
       ],
     };
-    await _client.put(
-      Uri.parse('$baseUrl/wp-json/wc/v3/customers/$customerId'),
-      headers: _headers,
-      body: jsonEncode(payload),
-    );
+
+    await dio.put('/wp-json/wc/v3/customers/$customerId', data: payload);
   }
 
-  static Future<void> requestPasswordReset(String email) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/wp-json/kakiso/v1/password-reset'),
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "KakisoResellerApp/1.0",
-      },
-      body: jsonEncode({'email': email.trim()}),
-    );
-    if (response.statusCode != 200) throw Exception('Reset failed');
-  }
-
-  static Future<Map<String, dynamic>?> fetchBusinessDetails({
+  Future<Map<String, dynamic>?> fetchBusinessDetails({
     required String userId,
   }) async {
     final int? customerId = int.tryParse(userId.trim());
     if (customerId == null || customerId <= 0) return null;
+    final dio = await _client;
+
     try {
-      final response = await _client.get(
-        Uri.parse('$baseUrl/wp-json/wc/v3/customers/$customerId'),
-        headers: _headers,
+      final response = await dio.get(
+        '/wp-json/wc/v3/customers/$customerId',
+        options: Options(extra: {'cache_policy': CachePolicy.noCache}),
       );
-      if (response.statusCode != 200) return null;
-      final Map<String, dynamic> data = json.decode(response.body);
+      final data = response.data;
       final billing = data['billing'] ?? {};
       return {
         "businessName": billing['company'] ?? '',
@@ -447,35 +598,20 @@ class ApiService {
     }
   }
 
-  static Future<void> updateResellerBusinessMeta({
-    String? userId,
-    required Map<String, dynamic> data,
-  }) async {
-    return;
+  Future<void> requestPasswordReset(String email) async {
+    final dio = await _client;
+    try {
+      await dio.post(
+        '/wp-json/kakiso/v1/password-reset',
+        data: {'email': email.trim()},
+      );
+    } catch (e) {
+      throw KakisoApiException('Reset failed');
+    }
   }
 
-  static const int topRankingCategoryId = 513;
-  static const int hotRankingCategoryId = 512;
-
-  static Future<List<ProductModel>> fetchTopRankingProducts() async {
-    final products = await fetchProductsByCategory(
-      topRankingCategoryId,
-      orderBy: 'menu_order',
-      order: 'asc',
-    );
-    return products.isEmpty ? fetchTopSellingProducts() : products;
-  }
-
-  static Future<List<ProductModel>> fetchHotRankingProducts() async {
-    final products = await fetchProductsByCategory(
-      hotRankingCategoryId,
-      orderBy: 'menu_order',
-      order: 'asc',
-    );
-    return products.isEmpty ? fetchTopSellingProducts() : products;
-  }
-
-  static Future<Map<String, dynamic>> createWooOrder({
+  // --- 10. ORDERS ---
+  Future<Map<String, dynamic>> createWooOrder({
     String? userId,
     required List<Map<String, dynamic>> lineItems,
     required Map<String, dynamic> billing,
@@ -486,6 +622,7 @@ class ApiService {
     List<Map<String, dynamic>>? shippingLines,
     List<Map<String, dynamic>>? feeLines,
   }) async {
+    final dio = await _client;
     final payload = {
       'payment_method': paymentMethod,
       'payment_method_title': paymentMethodTitle,
@@ -500,89 +637,101 @@ class ApiService {
       if (shippingLines != null) 'shipping_lines': shippingLines,
       if (feeLines != null) 'fee_lines': feeLines,
     };
-    final response = await _client.post(
-      Uri.parse('$baseUrl/wp-json/wc/v3/orders'),
-      headers: _headers,
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode == 201 || response.statusCode == 200)
-      return json.decode(response.body);
-    throw Exception('Order Creation Failed');
+
+    try {
+      final response = await dio.post('/wp-json/wc/v3/orders', data: payload);
+      return response.data;
+    } catch (e) {
+      throw KakisoApiException('Order Creation Failed: ${e.toString()}');
+    }
   }
 
-  static Future<List<Order>> fetchWooOrdersForCustomer({
+  Future<List<Order>> fetchWooOrdersForCustomer({
     String? userId,
     String? userEmail,
   }) async {
-    final List<Order> result = [];
-    final Set<String> seenIds = {};
-    final futures = <Future<http.Response>>[];
+    final dio = await _client;
+    final futures = <Future<Response>>[];
 
     if (userId != null && userId.trim().isNotEmpty) {
       futures.add(
-        _client.get(
-          Uri.parse(
-            '$baseUrl/wp-json/wc/v3/orders?customer=${userId.trim()}&per_page=50',
-          ),
-          headers: _headers,
+        dio.get(
+          '/wp-json/wc/v3/orders',
+          queryParameters: {'customer': userId.trim(), 'per_page': 50},
         ),
       );
     }
     if (userEmail != null && userEmail.trim().isNotEmpty) {
       futures.add(
-        _client.get(
-          Uri.parse(
-            '$baseUrl/wp-json/wc/v3/orders?search=${Uri.encodeQueryComponent(userEmail.trim())}&per_page=50',
-          ),
-          headers: _headers,
+        dio.get(
+          '/wp-json/wc/v3/orders',
+          queryParameters: {'search': userEmail.trim(), 'per_page': 50},
         ),
       );
     }
 
-    final responses = await Future.wait(futures);
-    for (var resp in responses) {
-      if (resp.statusCode == 200) {
-        for (var raw in json.decode(resp.body)) {
-          final order = Order.fromWooJson(raw);
-          if (!seenIds.contains(order.id)) {
-            seenIds.add(order.id);
-            result.add(order);
-          }
-        }
+    try {
+      final responses = await Future.wait(futures);
+      final List<dynamic> combinedData = [];
+
+      for (var resp in responses) {
+        combinedData.addAll(resp.data);
       }
+
+      List<Order> allOrders = await compute(_parseOrders, combinedData);
+
+      // Cleaned up Deduplication:
+      final Map<String, Order> uniqueMap = {
+        for (var order in allOrders) order.id: order,
+      };
+
+      final result = uniqueMap.values.toList();
+      result.sort((a, b) => b.id.compareTo(a.id));
+
+      return result;
+    } catch (e) {
+      return [];
     }
-    return result..sort((a, b) => b.id.compareTo(a.id));
   }
 
-  static Future<Order> fetchWooOrderById({required String orderId}) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/wp-json/wc/v3/orders/$orderId'),
-      headers: _headers,
-    );
-    if (response.statusCode == 200) {
-      return Order.fromWooJson(json.decode(response.body));
+  Future<Order> fetchWooOrderById({required String orderId}) async {
+    final dio = await _client;
+    try {
+      final response = await dio.get('/wp-json/wc/v3/orders/$orderId');
+      return Order.fromWooJson(response.data);
+    } catch (e) {
+      throw KakisoApiException('Order Fetch Error');
     }
-    throw Exception('Order Fetch Error');
   }
 
-  static Future<void> trackProductView({
+  // --- 11. TRACKING ---
+  Future<void> trackProductView({
     required String userId,
     required int productId,
   }) async {
     try {
-      final Uri url = Uri.parse('$baseUrl/wp-json/kakiso/v1/track-view');
-      await _client.post(
-        url,
-        headers: _headers,
-        body: jsonEncode({
-          'user_id': userId,
-          'product_id': productId,
-          'timestamp': DateTime.now().toIso8601String(),
-        }),
-      );
+      final dio = await _client;
+      dio
+          .post(
+            '/wp-json/kakiso/v1/track-view',
+            data: {
+              'user_id': userId,
+              'product_id': productId,
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+          )
+          .catchError((e) {
+            // Silently catch errors so tracking never crashes app
+          });
     } catch (e) {
-      // Silently fail so it doesn't interrupt the user experience
-      print("Tracking error: $e");
+      // Ignore
     }
+  }
+
+  static Future<void> updateResellerBusinessMeta({
+    String? userId,
+    required Map<String, dynamic> data,
+  }) async {
+    return;
   }
 }

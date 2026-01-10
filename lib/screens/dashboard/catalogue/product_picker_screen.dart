@@ -64,7 +64,7 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
 
   Future<void> _fetchCategories() async {
     try {
-      final cats = await ApiService.fetchCategories();
+      final cats = await ApiService().fetchCategories();
       if (mounted) {
         setState(() {
           _categories = cats;
@@ -91,13 +91,13 @@ class _ProductPickerScreenState extends State<ProductPickerScreen> {
     try {
       List<ProductModel> newProducts = [];
       if (_activeCategoryId == 0) {
-        newProducts = await ApiService.fetchAllProductsPaginated(
+        newProducts = await ApiService().fetchAllProductsPaginated(
           perPage: 20,
           orderBy: 'date',
           order: 'desc',
         );
       } else {
-        newProducts = await ApiService.fetchProductsByCategory(
+        newProducts = await ApiService().fetchProductsByCategory(
           _activeCategoryId,
         );
       }

@@ -24,7 +24,7 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
 
   Future<void> _fetchData() async {
     try {
-      final data = await ApiService.fetchCategories();
+      final data = await ApiService().fetchCategories();
       // We need at least 3 categories for the mosaic
       if (data.length >= 3 && mounted) {
         setState(() {

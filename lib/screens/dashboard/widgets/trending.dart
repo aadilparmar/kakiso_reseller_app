@@ -297,7 +297,7 @@ class _TrendingProductsState extends State<TrendingProducts>
 
   Future<void> _fetchTrendingProducts() async {
     try {
-      final products = await ApiService.fetchTrendingProducts();
+      final products = await ApiService().fetchTrendingProducts();
       if (mounted) {
         setState(() {
           _products = products;

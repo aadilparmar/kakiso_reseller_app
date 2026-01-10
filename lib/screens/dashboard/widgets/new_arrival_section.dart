@@ -34,7 +34,7 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
 
   Future<void> _fetchNewestProducts() async {
     try {
-      final products = await ApiService.fetchNewestProducts();
+      final products = await ApiService().fetchNewestProducts();
       if (mounted) {
         setState(() {
           _products = products;

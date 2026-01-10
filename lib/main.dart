@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:kakiso_reseller_app/app.dart';
 import 'package:kakiso_reseller_app/controllers/shared_products_controller.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/services/notification_services.dart';
 
 // 1. IMPORT THE PACKAGE
@@ -33,5 +34,6 @@ void main() async {
   // Call init() on the instance (not statically)
   await translationService.init();
   await NotificationService().initialize();
+  await ApiService().init();
   runApp(const App());
 }

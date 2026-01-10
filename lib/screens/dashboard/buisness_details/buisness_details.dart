@@ -824,7 +824,9 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     setState(() => _isRemoteLoading = true);
 
     try {
-      final remoteData = await ApiService.fetchBusinessDetails(userId: userId);
+      final remoteData = await ApiService().fetchBusinessDetails(
+        userId: userId,
+      );
       if (remoteData == null || !mounted) return;
 
       final String remoteState = (remoteData['state'] as String?)?.trim() ?? '';
@@ -958,7 +960,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     try {
       await _storage.write(key: _storageKey, value: jsonEncode(payload));
       if (_currentUser?.userId != null) {
-        await ApiService.updateBusinessDetails(
+        await ApiService().updateBusinessDetails(
           userId: _currentUser!.userId,
           data: payload,
         );

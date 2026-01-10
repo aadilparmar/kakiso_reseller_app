@@ -39,7 +39,7 @@ class _BrandDetailsPageState extends State<BrandDetailsPage> {
 
   Future<List<ProductModel>> _loadBrandProducts() async {
     // 1. Get all products (server side pagination)
-    final all = await ApiService.fetchAllProductsPaginated(
+    final all = await ApiService().fetchAllProductsPaginated(
       perPage: 50,
       maxPages: 10,
       orderBy: 'date',

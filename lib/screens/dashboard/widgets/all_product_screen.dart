@@ -82,7 +82,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
 
       // 2. Fetch from API
       if (effectiveCatId != null) {
-        products = await ApiService.fetchProductsByCategory(
+        products = await ApiService().fetchProductsByCategory(
           effectiveCatId,
           orderBy: _orderBy,
           order: _order,
@@ -91,7 +91,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
           brandIds: _activeFilter.selectedBrandIds, // <--- ADD THIS
         );
       } else {
-        products = await ApiService.fetchProducts(
+        products = await ApiService().fetchProducts(
           orderBy: _orderBy,
           order: _order,
           minPrice: _activeFilter.minPrice,

@@ -765,7 +765,7 @@ class _PaymentPageState extends State<PaymentPage> {
           ];
 
           // ---------- 5. Push order to WooCommerce ----------
-          final wooOrder = await ApiService.createWooOrder(
+          final wooOrder = await ApiService().createWooOrder(
             userId: effectiveUserIdForWoo,
             lineItems: lineItems,
             billing: billing,

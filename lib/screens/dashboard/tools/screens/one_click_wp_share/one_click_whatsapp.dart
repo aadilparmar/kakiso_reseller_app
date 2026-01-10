@@ -292,7 +292,7 @@ class _OneClickWhatsAppContentState extends State<_OneClickWhatsAppContent> {
       List<XFile> filesToShare = [];
       for (var product in selectedProducts) {
         if (product.image.isNotEmpty) {
-          final file = await ApiService.downloadImageAsFile(product.image);
+          final file = await ApiService().downloadImageAsFile(product.image);
           filesToShare.add(file);
         }
       }

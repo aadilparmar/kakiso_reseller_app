@@ -28,10 +28,10 @@ class _SimilarProductsSectionState extends State<SimilarProductsSection> {
   Future<void> _fetchSimilarProducts() async {
     try {
       // In a real app, you would pass widget.categoryId to the API
-      // final products = await ApiService.fetchProductsByCategory(widget.categoryId);
+      // final products = await ApiService().fetchProductsByCategory(widget.categoryId);
 
       // For now, we reuse fetchProducts() to simulate recommendations
-      final products = await ApiService.fetchProducts();
+      final products = await ApiService().fetchProducts();
 
       if (mounted) {
         setState(() {

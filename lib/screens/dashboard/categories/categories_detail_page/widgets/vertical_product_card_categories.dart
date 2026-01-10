@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -9,6 +10,7 @@ import 'package:kakiso_reseller_app/controllers/cart_controller.dart';
 import 'package:kakiso_reseller_app/controllers/wishlist_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
 class VerticalProductCard extends StatefulWidget {
   final ProductModel product;
@@ -234,22 +236,23 @@ class _VerticalProductCardState extends State<VerticalProductCard> {
                     // Main Image
                     Hero(
                       tag: 'product_${widget.product.id}',
-                      child: Image.network(
-                        widget.product.image,
+                      child: CachedNetworkImage(
+                        // Requesting a slightly larger image (width: 500) because vertical cards are bigger
+                        imageUrl: ApiService.getOptimizedImageUrl(
+                          widget.product.image,
+                          width: 500,
+                        ),
                         fit: BoxFit.cover,
-                        loadingBuilder: (_, child, loading) {
-                          if (loading == null) return child;
-                          return Container(
-                            color: Colors.grey.shade50,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFFE5E7EB),
-                              ),
+                        placeholder: (_, __) => Container(
+                          color: Colors.grey.shade50,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFE5E7EB),
                             ),
-                          );
-                        },
-                        errorBuilder: (_, __, ___) => Container(
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
                           color: Colors.grey.shade50,
                           child: const Icon(Iconsax.image, color: Colors.grey),
                         ),

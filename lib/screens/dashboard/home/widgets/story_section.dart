@@ -38,7 +38,7 @@ class _StorySectionState extends State<StorySection>
 
   Future<void> _fetchStories() async {
     try {
-      final categories = await ApiService.fetchCategories();
+      final categories = await ApiService().fetchCategories();
       if (!mounted) return;
       setState(() {
         _stories = categories;

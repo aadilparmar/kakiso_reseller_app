@@ -219,7 +219,7 @@ class _PriceMarginToolContentState extends State<_PriceMarginToolContent> {
       List<XFile> files = [];
       for (var p in _selectedProducts) {
         if (p.image.isNotEmpty)
-          files.add(await ApiService.downloadImageAsFile(p.image));
+          files.add(await ApiService().downloadImageAsFile(p.image));
       }
       await Share.shareXFiles(files, text: buffer.toString());
     } finally {

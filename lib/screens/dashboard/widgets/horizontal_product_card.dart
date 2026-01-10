@@ -1,6 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+// ---------------------------------------------------------
+// IMPORTANT: These two imports are required for the fix
+// ---------------------------------------------------------
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 
 class HorizontalProductCard extends StatefulWidget {
   final String imageUrl;
@@ -78,19 +83,40 @@ class _HorizontalProductCardState extends State<HorizontalProductCard> {
               child: Row(
                 children: [
                   // --------------------------------------------------------------
-                  // LEFT: EDGE-TO-EDGE IMAGE
+                  // LEFT: EDGE-TO-EDGE IMAGE (OPTIMIZED)
                   // --------------------------------------------------------------
                   Stack(
                     children: [
                       SizedBox(
                         width: 118,
                         height: double.infinity,
-                        child: Image.network(
-                          widget.imageUrl,
+                        // FIXED: Replaced Image.network with CachedNetworkImage
+                        // and added ApiService.getOptimizedImageUrl
+                        child: CachedNetworkImage(
+                          imageUrl: ApiService.getOptimizedImageUrl(
+                            widget.imageUrl,
+                            width: 300, // Small width for faster loading
+                          ),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          placeholder: (context, url) => Container(
                             color: const Color(0xFFF1F5F9),
-                            child: const Icon(Iconsax.image, size: 28),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: const Color(0xFFF1F5F9),
+                            child: const Icon(
+                              Iconsax.image,
+                              size: 28,
+                              color: Colors.grey,
+                            ),
                           ),
                         ),
                       ),

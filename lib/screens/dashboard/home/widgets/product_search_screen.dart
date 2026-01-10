@@ -42,7 +42,7 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
 
   Future<void> _preloadCategories() async {
     try {
-      final cats = await ApiService.fetchCategories();
+      final cats = await ApiService().fetchCategories();
       if (mounted) setState(() => _allCategoriesCache = cats);
     } catch (_) {}
   }
@@ -85,7 +85,7 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
     // 1. Ensure Cache is Populated
     if (_allCategoriesCache.isEmpty) {
       try {
-        _allCategoriesCache = await ApiService.fetchCategories();
+        _allCategoriesCache = await ApiService().fetchCategories();
       } catch (_) {}
     }
 
@@ -93,17 +93,17 @@ class _UniversalSearchPageState extends State<UniversalSearchPage> {
       // 2. Prepare Parallel Search Tasks
       List<Future<List<ProductModel>>> tasks = [
         // A. Standard Search (Name, Description)
-        ApiService.searchProducts(query),
+        ApiService().searchProducts(query),
 
         // B. Unique Code Search (Replaces SKU Search)
-        ApiService.fetchProductsByUniqueCode(query),
+        ApiService().fetchProductsByUniqueCode(query),
       ];
 
       // C. ID Search (Only if query is strictly numeric)
       // Keeps the ID logic as requested
       if (int.tryParse(cleanQuery) != null) {
         tasks.add(
-          ApiService.fetchProductByIdSafe(cleanQuery).then((product) {
+          ApiService().fetchProductByIdSafe(cleanQuery).then((product) {
             return product != null ? [product] : [];
           }),
         );

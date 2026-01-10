@@ -68,7 +68,7 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
 
   Future<void> _fetchFlashProduct() async {
     try {
-      final products = await ApiService.fetchProducts();
+      final products = await ApiService().fetchProducts();
       if (products.isNotEmpty && mounted) {
         setState(() {
           _flashProduct = products.length > 3 ? products[3] : products[0];

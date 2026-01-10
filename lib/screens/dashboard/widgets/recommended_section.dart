@@ -48,7 +48,7 @@ class _RecommendedSectionState extends State<RecommendedSection>
 
   Future<void> _fetchProducts() async {
     try {
-      final products = await ApiService.fetchProducts(
+      final products = await ApiService().fetchProducts(
         perPage: 15,
         orderBy: 'popularity',
         order: 'desc',

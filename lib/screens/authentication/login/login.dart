@@ -128,7 +128,7 @@ class _LoginPageState extends State<LoginPage>
           ? ('$firstName $lastName').trim()
           : wpEmail.split('@').first;
 
-      final String? wooCustomerId = await ApiService.ensureWooCustomer(
+      final String? wooCustomerId = await ApiService().ensureWooCustomer(
         email: wpEmail,
         name: fullName,
       );

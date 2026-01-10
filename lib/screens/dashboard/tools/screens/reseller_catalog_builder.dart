@@ -71,7 +71,7 @@ class _ResellerCatalogContentState extends State<_ResellerCatalogContent> {
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
     try {
-      final data = await ApiService.fetchCategories();
+      final data = await ApiService().fetchCategories();
 
       if (mounted) {
         setState(() {
@@ -144,7 +144,10 @@ class _ResellerCatalogContentState extends State<_ResellerCatalogContent> {
           });
         }
 
-        final fetched = await ApiService.fetchProducts(page: page, perPage: 50);
+        final fetched = await ApiService().fetchProducts(
+          page: page,
+          perPage: 50,
+        );
 
         if (fetched.isEmpty) {
           hasMore = false;

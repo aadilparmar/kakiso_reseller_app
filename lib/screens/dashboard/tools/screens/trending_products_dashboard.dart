@@ -55,11 +55,11 @@ class _TrendingProductsDashboardPageState
 
       // Responsive Logic: Change data based on the active tab
       if (_currentTab == "New Items") {
-        data = await ApiService.fetchNewestProducts();
+        data = await ApiService().fetchNewestProducts();
       } else if (_currentTab == "High Profit") {
-        data = await ApiService.fetchHotRankingProducts();
+        data = await ApiService().fetchHotRankingProducts();
       } else {
-        data = await ApiService.fetchTrendingProducts();
+        data = await ApiService().fetchTrendingProducts();
       }
 
       if (mounted) {
@@ -530,7 +530,7 @@ class _ProfitSheetState extends State<_ProfitSheet> {
     final text =
         "Check out this deal!\n\n${widget.product.name}\nSelling Price: ₹${price.toStringAsFixed(0)}\n\nReply to order!";
     try {
-      final file = await ApiService.downloadImageAsFile(widget.product.image);
+      final file = await ApiService().downloadImageAsFile(widget.product.image);
       await Share.shareXFiles([file], text: text);
     } catch (e) {
       Get.snackbar("Error", "Could not share at this moment.");

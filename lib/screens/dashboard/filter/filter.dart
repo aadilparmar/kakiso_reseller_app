@@ -158,7 +158,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     });
 
     try {
-      final cats = await ApiService.fetchCategories();
+      final cats = await ApiService().fetchCategories();
       final tree = CategoryModel.buildTree(cats);
 
       if (mounted) {
@@ -185,7 +185,7 @@ class _SplitFilterContentState extends State<_SplitFilterContent> {
     });
 
     try {
-      final brands = await ApiService.fetchBrands();
+      final brands = await ApiService().fetchBrands();
 
       if (mounted) {
         setState(() {

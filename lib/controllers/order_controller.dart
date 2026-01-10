@@ -104,9 +104,9 @@ class OrderController extends GetxController {
     // );
 
     try {
-      // Call ApiService. We pass null for empty strings so the API can choose strategy
-      final List<Order> remoteOrders =
-          await ApiService.fetchWooOrdersForCustomer(
+      // Call ApiService(). We pass null for empty strings so the API can choose strategy
+      final List<Order> remoteOrders = await ApiService()
+          .fetchWooOrdersForCustomer(
             userId: rawUserId.isNotEmpty ? rawUserId : null,
             userEmail: rawEmail.isNotEmpty ? rawEmail : null,
           );
@@ -150,7 +150,7 @@ class OrderController extends GetxController {
     if (orderId.trim().isEmpty) return;
 
     try {
-      final remote = await ApiService.fetchWooOrderById(orderId: orderId);
+      final remote = await ApiService().fetchWooOrderById(orderId: orderId);
 
       final index = _orders.indexWhere((o) => o.id == remote.id);
       if (index >= 0) {

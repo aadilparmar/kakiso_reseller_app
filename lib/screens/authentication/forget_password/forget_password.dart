@@ -68,7 +68,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     setState(() => _isLoading = true);
 
     try {
-      await ApiService.requestPasswordReset(email);
+      await ApiService().requestPasswordReset(email);
 
       if (!mounted) return;
 

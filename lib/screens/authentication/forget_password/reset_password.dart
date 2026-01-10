@@ -24,7 +24,7 @@ class _PasswordResetConfirmationPageState
 
     try {
       // Reuse the same API service logic using the passed email
-      await ApiService.requestPasswordReset(widget.email);
+      await ApiService().requestPasswordReset(widget.email);
 
       if (!mounted) return;
 

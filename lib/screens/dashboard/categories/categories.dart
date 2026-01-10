@@ -86,7 +86,7 @@ class _CategoriesPageState extends State<_CategoriesSectionContent> {
     });
 
     try {
-      final cats = await ApiService.fetchCategories();
+      final cats = await ApiService().fetchCategories();
       if (mounted) {
         setState(() {
           _allCategoriesFlat = cats;

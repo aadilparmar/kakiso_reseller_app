@@ -67,7 +67,7 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
     final String code = widget.product.watermarkCode;
 
     if (code.trim().isEmpty) {
-      return await ApiService.downloadImageAsFile(imageUrl);
+      return await ApiService().downloadImageAsFile(imageUrl);
     }
 
     try {
@@ -147,7 +147,7 @@ class _ResellerToolsBoxState extends State<ResellerToolsBox> {
       return XFile(file.path);
     } catch (e) {
       print("Watermark failed: $e");
-      return await ApiService.downloadImageAsFile(imageUrl);
+      return await ApiService().downloadImageAsFile(imageUrl);
     }
   }
 

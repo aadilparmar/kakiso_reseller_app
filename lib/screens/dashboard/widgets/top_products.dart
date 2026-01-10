@@ -63,9 +63,9 @@ class _TopRankingSectionState extends State<TopRankingSection>
     try {
       List<ProductModel> products;
       if (tabName == 'Top') {
-        products = await ApiService.fetchTopRankingProducts();
+        products = await ApiService().fetchTopRankingProducts();
       } else {
-        products = await ApiService.fetchHotRankingProducts();
+        products = await ApiService().fetchHotRankingProducts();
       }
 
       if (!mounted) return;
