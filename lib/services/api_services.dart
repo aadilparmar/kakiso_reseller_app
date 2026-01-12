@@ -720,6 +720,7 @@ class ApiService {
               'timestamp': DateTime.now().toIso8601String(),
             },
           )
+          // ignore: body_might_complete_normally_catch_error
           .catchError((e) {
             // Silently catch errors so tracking never crashes app
           });
