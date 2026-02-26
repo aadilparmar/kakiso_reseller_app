@@ -9,12 +9,14 @@ import 'package:kakiso_reseller_app/screens/dashboard/home/home_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/categories/categories.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/profile_page/profile_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/tools/tools.dart';
-import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 
 // --- CONSTANTS ---
 const Color _activeIconColor = Color(0xFFE91E63);
 final Color _inactiveColor = const Color.fromARGB(255, 0, 0, 0);
+// Brand colors for loader
+const Color kPrimaryDeep = Color(0xFF4B3DAF);
+const Color kAccentColor = Color(0xFFE91E63);
 
 class NavigationController extends GetxController {
   final UserData userData;
@@ -100,6 +102,9 @@ class _NavigationMenuState extends State<NavigationMenu>
       _controller = Get.put(NavigationController(userData: navUser));
       _controller!.selectedIndex.value = widget.initialIndex;
 
+      // Small delay to let the beautiful loader show for a split second (optional)
+      await Future.delayed(const Duration(milliseconds: 800));
+
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -108,24 +113,22 @@ class _NavigationMenuState extends State<NavigationMenu>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ REPLACED: Generic Spinner -> Premium Brand Loader
     if (_isLoading || _controller == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: GalaxyLoader(),
+      );
     }
 
     final controller = _controller!;
 
     // --- RESPONSIVE CALCULATION ---
     final double screenWidth = MediaQuery.of(context).size.width;
-    // Divide screen width by 5 items.
-    // We subtract a small buffer (4px) to prevent edge touching.
     final double itemWidth = (screenWidth / 5) - 4;
 
-    // Calculate height based on scale factor, but cap it to prevent it being too huge.
     final double textScale = MediaQuery.textScalerOf(context).scale(1);
-    final double scaleFactor = math.max(
-      1.0,
-      math.min(textScale, 1.2),
-    ); // Capped at 1.2
+    final double scaleFactor = math.max(1.0, math.min(textScale, 1.2));
     final double navBarHeight = 65 * scaleFactor;
 
     return Scaffold(
@@ -230,12 +233,11 @@ class _NavigationMenuState extends State<NavigationMenu>
     bool isActive = index == currentIndex;
 
     return SizedBox(
-      width: maxWidth, // Enforce strict width
+      width: maxWidth,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Dot Indicator
           AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
@@ -247,20 +249,16 @@ class _NavigationMenuState extends State<NavigationMenu>
               shape: BoxShape.circle,
             ),
           ),
-
           Icon(
             isActive ? activeIcon : inactiveIcon,
             color: isActive ? _activeIconColor : _inactiveColor,
             size: 24,
           ),
-
           const SizedBox(height: 4),
-
-          // Responsive Text Container
           SizedBox(
             width: maxWidth,
             child: FittedBox(
-              fit: BoxFit.scaleDown, // SHRINK text if too big, never wrap
+              fit: BoxFit.scaleDown,
               child: Text(
                 label,
                 maxLines: 1,
@@ -277,7 +275,7 @@ class _NavigationMenuState extends State<NavigationMenu>
     );
   }
 
-  // --- CATALOG ICON (BLINKIT STYLE) ---
+  // --- CATALOG ICON ---
   Widget _buildCatalogIcon(
     IconData inactiveIcon,
     IconData activeIcon,
@@ -289,7 +287,7 @@ class _NavigationMenuState extends State<NavigationMenu>
     bool isActive = index == currentIndex;
 
     return SizedBox(
-      width: maxWidth, // Enforce strict width
+      width: maxWidth,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
@@ -298,7 +296,6 @@ class _NavigationMenuState extends State<NavigationMenu>
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Bouncy Scale Animation for Icon
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOutBack,
@@ -309,20 +306,17 @@ class _NavigationMenuState extends State<NavigationMenu>
                   size: 24,
                 ),
               ),
-
               const SizedBox(height: 4),
-
-              // Responsive Text Container
               SizedBox(
                 width: maxWidth,
                 child: FittedBox(
-                  fit: BoxFit.scaleDown, // SHRINK text if too big
+                  fit: BoxFit.scaleDown,
                   child: Text(
                     label,
                     maxLines: 1,
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.bold, // Bold for emphasis
+                      fontWeight: FontWeight.bold,
                       color: isActive ? _activeIconColor : _inactiveColor,
                     ),
                   ),
@@ -330,19 +324,14 @@ class _NavigationMenuState extends State<NavigationMenu>
               ),
             ],
           ),
-
-          // THE "HOT" BADGE
           Positioned(
             top: -10,
-            right: 12, // Align to right edge of the container
+            right: 12,
             child: AnimatedBuilder(
               animation: _badgeAnimation,
               builder: (context, child) {
                 return Transform.translate(
-                  offset: Offset(
-                    0,
-                    -_badgeAnimation.value,
-                  ), // Bobbing animation
+                  offset: Offset(0, -_badgeAnimation.value),
                   child: child,
                 );
               },
@@ -359,7 +348,6 @@ class _NavigationMenuState extends State<NavigationMenu>
                     ),
                   ],
                 ),
-                // FittedBox ensures "HOT" never overflows the badge itself
                 child: const FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
@@ -377,6 +365,199 @@ class _NavigationMenuState extends State<NavigationMenu>
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------
+// 🪐 PREMIUM "COMMERCE GALAXY" LOADER
+// ---------------------------------------------
+class GalaxyLoader extends StatefulWidget {
+  const GalaxyLoader({super.key});
+
+  @override
+  State<GalaxyLoader> createState() => _GalaxyLoaderState();
+}
+
+class _GalaxyLoaderState extends State<GalaxyLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  // Brand Colors
+  final Color kPrimaryDeep = const Color(0xFF4B3DAF);
+  final Color kAccentColor = const Color(0xFFE91E63);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4), // Slow, majestic rotation
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 180, // Height of the orbital field
+            width: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. CENTER: Pulsing Brand Logo
+                // We create a "Breathing" effect using a simple Sine wave from the controller
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    final scale =
+                        1.0 + (0.1 * math.sin(_controller.value * 2 * math.pi));
+                    return Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: kPrimaryDeep.withOpacity(0.15),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/logos/login-logo.png',
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // 2. ORBITING PLANETS (Icons)
+                // We place 3 icons at 0, 120, and 240 degrees
+                _buildOrbitingIcon(
+                  icon: Iconsax.bag_2,
+                  color: kPrimaryDeep,
+                  startAngle: 0,
+                  label: "Orders",
+                ),
+                _buildOrbitingIcon(
+                  icon: Iconsax.heart,
+                  color: kAccentColor,
+                  startAngle: (2 * math.pi) / 3, // 120 degrees
+                  label: "Wishlist",
+                ),
+                _buildOrbitingIcon(
+                  icon: Iconsax.tag,
+                  color: Colors.amber[700]!,
+                  startAngle: (4 * math.pi) / 3, // 240 degrees
+                  label: "Offers",
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 3. ELEGANT TEXT
+          Column(
+            children: [
+              Text(
+                "KaKiSo",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: kPrimaryDeep,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Curating your catalog...",
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrbitingIcon({
+    required IconData icon,
+    required Color color,
+    required double startAngle,
+    required String label,
+  }) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        // Current angle based on time + start position
+        final double angle = (_controller.value * 2 * math.pi) + startAngle;
+
+        // Orbital Math:
+        // Radius = 65
+        // We use Cos for X and Sin for Y to make a circle.
+        // We multiply Y by 0.3 to "squash" the circle into an oval (3D perspective).
+        final double radius = 75;
+        final double x = radius * math.cos(angle);
+        final double y = (radius * 0.3) * math.sin(angle);
+
+        // Scale calculation:
+        // Icons in "front" (y > 0) should be bigger. Icons in "back" should be smaller.
+        // Sin(angle) gives us -1 to 1.
+        final double scale = 1.0 + (0.3 * math.sin(angle));
+
+        // Opacity:
+        // Icons in back are slightly transparent
+        final double opacity = 0.6 + (0.4 * ((math.sin(angle) + 1) / 2));
+
+        return Transform.translate(
+          offset: Offset(x, y),
+          child: Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: opacity,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

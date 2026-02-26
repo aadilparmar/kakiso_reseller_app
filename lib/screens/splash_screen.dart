@@ -18,7 +18,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   // ✅ FIX 1: Match the URL used in Login (Stage vs Prod mismatch caused the 500 error)
-  final String _graphqlUrl = "https://stage.kakiso.com/graphql";
+  final String _graphqlUrl = "https://kiranelectro.com/kakiso/graphql";
 
   @override
   void initState() {

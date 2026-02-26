@@ -37,7 +37,7 @@ class _LoginPageState extends State<LoginPage>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  final String _graphqlUrl = "https://stage.kakiso.com/graphql";
+  final String _graphqlUrl = "https://kiranelectro.com/kakiso/graphql";
   late GraphQLClient _client;
 
   late AnimationController _bgController;

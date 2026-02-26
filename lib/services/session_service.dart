@@ -81,8 +81,10 @@ class SessionService {
       'name': user.name,
       'email': user.email,
       'userId': user.userId,
+      'wooCustomerId': user.wooCustomerId,
       'joined': user.joined.toIso8601String(),
       'profilePicUrl': user.profilePicUrl,
+      'phone': user.phone,
     };
   }
 
@@ -91,8 +93,10 @@ class SessionService {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       userId: json['userId'] ?? '',
+      wooCustomerId: json['wooCustomerId'] ?? '',
       joined: DateTime.tryParse(json['joined'] ?? '') ?? DateTime.now(),
       profilePicUrl: json['profilePicUrl'] ?? '',
+      phone: json['phone'] ?? '',
     );
   }
 }

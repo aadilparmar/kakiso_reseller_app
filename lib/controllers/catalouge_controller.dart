@@ -1,12 +1,19 @@
 // lib/controllers/catalouge_controller.dart
+//
+// UPDATED: Now syncs catalogs with WordPress database via REST API
+// Local SharedPreferences is kept as offline cache/fallback.
+// Web dashboard and app now share the SAME catalog data.
 
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
+import 'package:kakiso_reseller_app/services/session_service.dart';
 
 /// Model for a single catalogue.
 class CatalogueModel {
@@ -49,9 +56,17 @@ class CatalogueModel {
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // 隼 ADDED: copyWith method to fix the error
-  // ---------------------------------------------------------------------------
+  /// Convert to server format (product IDs only, not full objects)
+  Map<String, dynamic> toServerJson() {
+    return {
+      'id': id,
+      'name': name,
+      'desc': description,
+      'created': createdAt.toIso8601String(),
+      'product_ids': products.map((p) => p.id).toList(),
+    };
+  }
+
   CatalogueModel copyWith({
     String? id,
     String? name,
@@ -70,10 +85,16 @@ class CatalogueModel {
 }
 
 class CatalogueController extends GetxController {
-  /// All catalogues for this device / user.
+  /// All catalogues for this user.
   final RxList<CatalogueModel> myCatalogues = <CatalogueModel>[].obs;
 
+  /// Sync status observable (UI can show sync indicator)
+  final RxBool isSyncing = false.obs;
+
   static const _prefsKey = 'kakiso_catalogues_v1';
+
+  // Cache of product models we've already fetched (avoids re-fetching)
+  final Map<int, ProductModel> _productCache = {};
 
   // ---------------------------------------------------------------------------
   // LIFECYCLE
@@ -82,11 +103,12 @@ class CatalogueController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadFromStorage();
+    _loadFromStorage(); // Load local first (instant UI)
+    _syncFromServer(); // Then sync from server in background
   }
 
   // ---------------------------------------------------------------------------
-  // PUBLIC API – used by your UI
+  // PUBLIC API – used by your UI (unchanged method signatures!)
   // ---------------------------------------------------------------------------
 
   CatalogueModel? getById(String id) {
@@ -97,7 +119,6 @@ class CatalogueController extends GetxController {
     }
   }
 
-  /// Handy getter for just the catalogue names (used in bottom sheets / dropdowns).
   List<String> get catalogueNames => myCatalogues
       .map((c) => (c.name.isEmpty ? 'Untitled Catalogue' : c.name))
       .toList();
@@ -116,11 +137,12 @@ class CatalogueController extends GetxController {
     myCatalogues.add(catalogue);
     myCatalogues.refresh();
     _saveToStorage();
+
+    // Push to server in background
+    _createOnServer(catalogue);
   }
 
-  /// Create a new catalogue *and* add the given product to it.
-  ///
-  /// Used when user taps "Create New Catalogue" from product card.
+  /// Create a new catalogue AND add a product to it
   void createCatalogueAndAddProduct(
     String name,
     ProductModel product, {
@@ -138,6 +160,9 @@ class CatalogueController extends GetxController {
     myCatalogues.add(catalogue);
     myCatalogues.refresh();
     _saveToStorage();
+
+    // Push to server with product
+    _createOnServer(catalogue);
   }
 
   /// Delete an entire catalogue
@@ -145,22 +170,21 @@ class CatalogueController extends GetxController {
     myCatalogues.removeWhere((c) => c.id == id);
     myCatalogues.refresh();
     _saveToStorage();
+
+    // Delete on server in background
+    _deleteOnServer(id);
   }
 
-  /// Add a product to a specific catalogue (if not already present)
+  /// Add a product to a specific catalogue
   void addProductToCatalogue(String catalogueId, ProductModel product) {
     final index = myCatalogues.indexWhere((c) => c.id == catalogueId);
     if (index == -1) return;
 
     final cat = myCatalogues[index];
-
     final alreadyExists = cat.products.any(
       (p) => p.id.toString() == product.id.toString(),
     );
-    if (alreadyExists) {
-      // Optional: Show a snackbar in UI if you like
-      return;
-    }
+    if (alreadyExists) return;
 
     cat.products.add(product);
     myCatalogues[index] = CatalogueModel(
@@ -173,11 +197,14 @@ class CatalogueController extends GetxController {
 
     myCatalogues.refresh();
     _saveToStorage();
+
+    // Cache the product for future server syncs
+    _productCache[product.id] = product;
+
+    // Push to server
+    _addProductOnServer(catalogueId, product.id);
   }
 
-  /// Convenience: Add product to an *existing* catalogue by its name.
-  ///
-  /// This is useful when your UI is only dealing with catalogue names.
   void addProductToExistingCatalogueByName(
     String catalogueName,
     ProductModel product,
@@ -185,13 +212,9 @@ class CatalogueController extends GetxController {
     try {
       final cat = myCatalogues.firstWhere((c) => c.name == catalogueName);
       addProductToCatalogue(cat.id, product);
-    } catch (_) {
-      // No catalogue with that name – do nothing (or you could create one).
-    }
+    } catch (_) {}
   }
 
-  /// Backwards-compatible wrapper so you can call:
-  ///   addProductToExistingCatalogue(catalogueName, product)
   void addProductToExistingCatalogue(
     String catalogueName,
     ProductModel product,
@@ -199,13 +222,12 @@ class CatalogueController extends GetxController {
     addProductToExistingCatalogueByName(catalogueName, product);
   }
 
-  /// Remove a product from a catalogue by productId
+  /// Remove a product from a catalogue
   void removeProductFromCatalogue(String catalogueId, String productId) {
     final index = myCatalogues.indexWhere((c) => c.id == catalogueId);
     if (index == -1) return;
 
     final cat = myCatalogues[index];
-
     cat.products.removeWhere((p) => p.id.toString() == productId.toString());
 
     myCatalogues[index] = CatalogueModel(
@@ -218,10 +240,234 @@ class CatalogueController extends GetxController {
 
     myCatalogues.refresh();
     _saveToStorage();
+
+    // Push to server
+    _removeProductOnServer(catalogueId, int.tryParse(productId) ?? 0);
+  }
+
+  /// Force sync from server (can be called from UI pull-to-refresh)
+  Future<void> refreshFromServer() async {
+    await _syncFromServer();
   }
 
   // ---------------------------------------------------------------------------
-  // PERSISTENCE
+  // SERVER SYNC — Background operations (never block UI)
+  // ---------------------------------------------------------------------------
+
+  Future<String?> _getUserId() async {
+    final user = await SessionService.getUser();
+    return user?.wooCustomerId.isNotEmpty == true
+        ? user!.wooCustomerId
+        : user?.userId;
+  }
+
+  /// Fetch catalogs from server and merge with local
+  Future<void> _syncFromServer() async {
+    try {
+      isSyncing.value = true;
+      final userId = await _getUserId();
+      if (userId == null || userId.isEmpty) return;
+
+      final serverCatalogs = await ApiService().fetchCatalogsFromServer(
+        userId: userId,
+      );
+
+      if (serverCatalogs == null) return; // Network error, keep local
+
+      if (serverCatalogs.isEmpty && myCatalogues.isNotEmpty) {
+        // Server is empty but we have local catalogs → push them up
+        await _pushAllToServer(userId);
+        return;
+      }
+
+      // Convert server catalogs (product IDs) to local format (full ProductModels)
+      final List<CatalogueModel> converted = [];
+      for (final serverCat in serverCatalogs) {
+        final catalogModel = await _convertServerCatalog(serverCat);
+        if (catalogModel != null) {
+          converted.add(catalogModel);
+        }
+      }
+
+      // Merge: server catalogs + any local-only catalogs
+      final Map<String, CatalogueModel> merged = {};
+
+      // Server catalogs take priority
+      for (final cat in converted) {
+        merged[cat.id] = cat;
+      }
+
+      // Add local-only catalogs that don't exist on server
+      for (final local in myCatalogues) {
+        if (!merged.containsKey(local.id)) {
+          merged[local.id] = local;
+          // Push this local-only catalog to server
+          _createOnServer(local);
+        }
+      }
+
+      myCatalogues.assignAll(merged.values.toList());
+      myCatalogues.refresh();
+      _saveToStorage();
+    } catch (e) {
+      debugPrint('CatalogSync: Error syncing from server: $e');
+    } finally {
+      isSyncing.value = false;
+    }
+  }
+
+  /// Convert server catalog format {products: [IDs]} to app format {products: [ProductModels]}
+  Future<CatalogueModel?> _convertServerCatalog(
+    Map<String, dynamic> serverCat,
+  ) async {
+    try {
+      final String id = serverCat['id'] ?? '';
+      final String name = serverCat['name'] ?? 'Untitled';
+      final String desc = serverCat['desc'] ?? '';
+      final String created = serverCat['created'] ?? '';
+      final List<dynamic> productIds = serverCat['products'] ?? [];
+
+      // Fetch product details for each ID
+      final List<ProductModel> products = [];
+      for (final pid in productIds) {
+        final int productId = (pid is int)
+            ? pid
+            : (int.tryParse(pid.toString()) ?? 0);
+        if (productId <= 0) continue;
+
+        // Check cache first
+        if (_productCache.containsKey(productId)) {
+          products.add(_productCache[productId]!);
+          continue;
+        }
+
+        // Check if we already have this product in any local catalog
+        ProductModel? existing;
+        for (final cat in myCatalogues) {
+          try {
+            existing = cat.products.firstWhere((p) => p.id == productId);
+            break;
+          } catch (_) {}
+        }
+
+        if (existing != null) {
+          products.add(existing);
+          _productCache[productId] = existing;
+          continue;
+        }
+
+        // Fetch from WooCommerce API (last resort)
+        try {
+          final product = await ApiService().fetchProductByIdSafe(
+            productId.toString(),
+          );
+          if (product != null) {
+            products.add(product);
+            _productCache[productId] = product;
+          }
+        } catch (e) {
+          debugPrint('CatalogSync: Could not fetch product $productId: $e');
+        }
+      }
+
+      return CatalogueModel(
+        id: id,
+        name: name,
+        description: desc,
+        createdAt: DateTime.tryParse(created) ?? DateTime.now(),
+        products: products,
+      );
+    } catch (e) {
+      debugPrint('CatalogSync: Error converting server catalog: $e');
+      return null;
+    }
+  }
+
+  /// Push all local catalogs to server (used when server is empty)
+  Future<void> _pushAllToServer(String userId) async {
+    try {
+      final List<Map<String, dynamic>> catalogsForServer = myCatalogues
+          .map((c) => c.toServerJson())
+          .toList();
+
+      await ApiService().syncCatalogsToServer(
+        userId: userId,
+        catalogs: catalogsForServer,
+      );
+    } catch (e) {
+      debugPrint('CatalogSync: Error pushing all to server: $e');
+    }
+  }
+
+  /// Create a single catalog on the server
+  Future<void> _createOnServer(CatalogueModel catalogue) async {
+    try {
+      final userId = await _getUserId();
+      if (userId == null || userId.isEmpty) return;
+
+      await ApiService().createCatalogOnServer(
+        userId: userId,
+        catalogId: catalogue.id,
+        name: catalogue.name,
+        desc: catalogue.description,
+        productIds: catalogue.products.map((p) => p.id).toList(),
+      );
+    } catch (e) {
+      debugPrint('CatalogSync: Error creating on server: $e');
+    }
+  }
+
+  /// Delete a catalog on the server
+  Future<void> _deleteOnServer(String catalogId) async {
+    try {
+      final userId = await _getUserId();
+      if (userId == null || userId.isEmpty) return;
+
+      await ApiService().deleteCatalogOnServer(
+        userId: userId,
+        catalogId: catalogId,
+      );
+    } catch (e) {
+      debugPrint('CatalogSync: Error deleting on server: $e');
+    }
+  }
+
+  /// Add a product to a catalog on the server
+  Future<void> _addProductOnServer(String catalogId, int productId) async {
+    try {
+      final userId = await _getUserId();
+      if (userId == null || userId.isEmpty) return;
+
+      await ApiService().updateCatalogOnServer(
+        userId: userId,
+        catalogId: catalogId,
+        action: 'add_product',
+        productId: productId,
+      );
+    } catch (e) {
+      debugPrint('CatalogSync: Error adding product on server: $e');
+    }
+  }
+
+  /// Remove a product from a catalog on the server
+  Future<void> _removeProductOnServer(String catalogId, int productId) async {
+    try {
+      final userId = await _getUserId();
+      if (userId == null || userId.isEmpty) return;
+
+      await ApiService().updateCatalogOnServer(
+        userId: userId,
+        catalogId: catalogId,
+        action: 'remove_product',
+        productId: productId,
+      );
+    } catch (e) {
+      debugPrint('CatalogSync: Error removing product on server: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // LOCAL PERSISTENCE (unchanged — acts as offline cache)
   // ---------------------------------------------------------------------------
 
   Future<void> _loadFromStorage() async {
@@ -251,7 +497,7 @@ class CatalogueController extends GetxController {
       final jsonString = jsonEncode(list);
       await prefs.setString(_prefsKey, jsonString);
     } catch (e) {
-      // ignore for now or log
+      // ignore
     }
   }
 

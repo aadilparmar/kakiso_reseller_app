@@ -1,6 +1,7 @@
 // lib/screens/dashboard/categories/categories_detail_page/category_details_page.dart
 
 import 'dart:ui';
+import 'dart:math' as math; // <--- ADDED for Loader
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -30,7 +31,7 @@ class CategoryDetailsPage extends StatefulWidget {
 class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
   late int _activeCategoryId;
   List<ProductModel> _products = [];
-  int _currentPage = 1; // <--- ADD THIS TRACKER
+  int _currentPage = 1;
   bool _isLoadingProducts = true;
   bool _isLoadingMore = false;
 
@@ -107,35 +108,27 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
       setState(() {
         _isLoadingProducts = true;
         _hasMore = true;
-        _currentPage = 1; // <--- Reset page on refresh
+        _currentPage = 1;
         _products.clear();
       });
     } else {
-      if (!_hasMore) return; // Prevent unnecessary calls
+      if (!_hasMore) return;
       setState(() {
         _isLoadingMore = true;
       });
     }
 
     try {
-      // 1. Fetch from API with current page
       List<ProductModel> newProducts = await ApiService()
           .fetchProductsByCategory(
             _activeCategoryId,
-            page: _currentPage, // <--- Pass the current page
+            page: _currentPage,
             orderBy: _orderBy,
             order: _order,
             minPrice: _activeFilter.minPrice ?? _currentPriceRange.start,
             maxPrice: _activeFilter.maxPrice ?? _currentPriceRange.end,
             brandIds: _activeFilter.selectedBrandIds,
           );
-
-      // ... (Your existing Client-Side Filtering logic remains here) ...
-
-      // Explicit Price Filter (Client Side fallback)
-      if (_activeFilter.minPrice != null) {
-        // ... existing filtering logic ...
-      }
 
       if (mounted) {
         setState(() {
@@ -148,10 +141,8 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
               _products.addAll(newProducts);
             }
 
-            // Increment page for next time
             _currentPage++;
 
-            // If we received fewer items than the page size (20), we reached the end
             if (newProducts.length < 20) {
               _hasMore = false;
             }
@@ -159,8 +150,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
           _isLoadingProducts = false;
           _isLoadingMore = false;
-
-          // ... existing selection cleanup logic ...
         });
       }
     } catch (e) {
@@ -867,9 +856,8 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
 
                 Expanded(
                   child: _isLoadingProducts
-                      ? const Center(
-                          child: CircularProgressIndicator(color: accentColor),
-                        )
+                      // ✅ UPDATED: Used GalaxyLoader() instead of Spinner
+                      ? const Center(child: GalaxyLoader())
                       : _products.isEmpty
                       ? _buildEmptyState()
                       : Column(
@@ -1046,7 +1034,6 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             "No products found.",
             style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
           ),
-          // Added button to clear filters easily if list is empty due to filtering
           if (_activeFilter.hasActiveFilters)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
@@ -1065,6 +1052,167 @@ class _CategoryDetailsPageState extends State<CategoryDetailsPage> {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------
+// 🪐 GALAXY LOADER (Added for local use)
+// ---------------------------------------------
+class GalaxyLoader extends StatefulWidget {
+  const GalaxyLoader({super.key});
+
+  @override
+  State<GalaxyLoader> createState() => _GalaxyLoaderState();
+}
+
+class _GalaxyLoaderState extends State<GalaxyLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  // Brand Colors (Matching your app)
+  final Color kPrimaryDeep = const Color(0xFF4B3DAF);
+  final Color kAccentColor = const Color(0xFFE91E63);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 180,
+            width: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. CENTER: Pulsing Brand Logo
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    final scale =
+                        1.0 + (0.1 * math.sin(_controller.value * 2 * math.pi));
+                    return Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: kPrimaryDeep.withOpacity(0.15),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/logos/login-logo.png',
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // 2. ORBITING PLANETS
+                _buildOrbitingIcon(
+                  icon: Iconsax.bag_2,
+                  color: kPrimaryDeep,
+                  startAngle: 0,
+                ),
+                _buildOrbitingIcon(
+                  icon: Iconsax.heart,
+                  color: kAccentColor,
+                  startAngle: (2 * math.pi) / 3,
+                ),
+                _buildOrbitingIcon(
+                  icon: Iconsax.tag,
+                  color: Colors.amber[700]!,
+                  startAngle: (4 * math.pi) / 3,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          Text(
+            "Fetching products...",
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrbitingIcon({
+    required IconData icon,
+    required Color color,
+    required double startAngle,
+  }) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final double angle = (_controller.value * 2 * math.pi) + startAngle;
+
+        final double radius = 75;
+        final double x = radius * math.cos(angle);
+        final double y = (radius * 0.3) * math.sin(angle);
+
+        final double scale = 1.0 + (0.3 * math.sin(angle));
+        final double opacity = 0.6 + (0.4 * ((math.sin(angle) + 1) / 2));
+
+        return Transform.translate(
+          offset: Offset(x, y),
+          child: Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: opacity,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -421,8 +421,8 @@ class ApiService {
   Future<List<ProductModel>> fetchTrendingProducts() =>
       fetchTopSellingProducts();
 
-  static const int topRankingCategoryId = 513;
-  static const int hotRankingCategoryId = 512;
+  static const int topRankingCategoryId = 90;
+  static const int hotRankingCategoryId = 91;
 
   Future<List<ProductModel>> fetchTopRankingProducts() async {
     final products = await fetchProductsByCategory(
@@ -558,10 +558,7 @@ class ApiService {
       "meta_data": [
         {"key": "kakiso_whatsapp", "value": data["whatsapp"]},
         {"key": "kakiso_gstin", "value": data["gstin"]},
-        {
-          "key": "reseller_store_store_name",
-          "value": data["businessName"] ?? "",
-        },
+        {"key": "reseller_store_name", "value": data["businessName"] ?? ""},
       ],
     };
 
@@ -734,5 +731,135 @@ class ApiService {
     required Map<String, dynamic> data,
   }) async {
     return;
+  }
+  // ===========================================================================
+  // --- 12. CATALOG SYNC ---
+  // ===========================================================================
+
+  /// Fetch all catalogs for a user from the server
+  Future<List<Map<String, dynamic>>?> fetchCatalogsFromServer({
+    required String userId,
+  }) async {
+    final dio = await _client;
+    try {
+      final response = await dio.get(
+        '/wp-json/kakiso/v1/catalogs',
+        queryParameters: {'user_id': userId},
+        options: Options(extra: {'cache_policy': CachePolicy.noCache}),
+      );
+
+      final data = response.data;
+      if (data['success'] == true && data['catalogs'] is List) {
+        return List<Map<String, dynamic>>.from(
+          (data['catalogs'] as List).map((c) => Map<String, dynamic>.from(c)),
+        );
+      }
+      return [];
+    } catch (e) {
+      debugPrint('CatalogAPI: fetchCatalogs error: $e');
+      return null;
+    }
+  }
+
+  /// Create a new catalog on the server
+  Future<bool> createCatalogOnServer({
+    required String userId,
+    required String catalogId,
+    required String name,
+    String desc = '',
+    List<int> productIds = const [],
+  }) async {
+    final dio = await _client;
+    try {
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/catalogs',
+        data: {
+          'user_id': userId,
+          'catalog_id': catalogId,
+          'name': name,
+          'desc': desc,
+          'product_ids': productIds,
+        },
+      );
+      return response.data['success'] == true;
+    } catch (e) {
+      debugPrint('CatalogAPI: createCatalog error: $e');
+      return false;
+    }
+  }
+
+  /// Update a catalog on the server
+  Future<bool> updateCatalogOnServer({
+    required String userId,
+    required String catalogId,
+    required String action,
+    int? productId,
+    List<int>? productIds,
+    String? name,
+    String? desc,
+  }) async {
+    final dio = await _client;
+    try {
+      final Map<String, dynamic> payload = {
+        'user_id': userId,
+        'catalog_id': catalogId,
+        'action': action,
+      };
+      if (productId != null) payload['product_id'] = productId;
+      if (productIds != null) payload['product_ids'] = productIds;
+      if (name != null) payload['name'] = name;
+      if (desc != null) payload['desc'] = desc;
+
+      final response = await dio.put(
+        '/wp-json/kakiso/v1/catalogs',
+        data: payload,
+      );
+      return response.data['success'] == true;
+    } catch (e) {
+      debugPrint('CatalogAPI: updateCatalog error: $e');
+      return false;
+    }
+  }
+
+  /// Delete a catalog on the server
+  Future<bool> deleteCatalogOnServer({
+    required String userId,
+    required String catalogId,
+  }) async {
+    final dio = await _client;
+    try {
+      final response = await dio.delete(
+        '/wp-json/kakiso/v1/catalogs',
+        queryParameters: {'user_id': userId, 'catalog_id': catalogId},
+      );
+      return response.data['success'] == true;
+    } catch (e) {
+      debugPrint('CatalogAPI: deleteCatalog error: $e');
+      return false;
+    }
+  }
+
+  /// Full sync — push all app catalogs to server
+  Future<List<Map<String, dynamic>>?> syncCatalogsToServer({
+    required String userId,
+    required List<Map<String, dynamic>> catalogs,
+  }) async {
+    final dio = await _client;
+    try {
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/catalogs/sync',
+        data: {'user_id': userId, 'catalogs': catalogs},
+      );
+      final data = response.data;
+      if (data['success'] == true && data['catalogs'] is List) {
+        return List<Map<String, dynamic>>.from(
+          (data['catalogs'] as List).map((c) => Map<String, dynamic>.from(c)),
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('CatalogAPI: syncCatalogs error: $e');
+      return null;
+    }
   }
 }

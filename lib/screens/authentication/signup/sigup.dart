@@ -86,7 +86,7 @@ class _RegisterPageState extends State<RegisterPage>
   late final AnimationController _bgController;
 
   // GraphQL Client
-  final String _graphqlUrl = "https://stage.kakiso.com/graphql";
+  final String _graphqlUrl = "https://kiranelectro.com/kakiso/graphql";
   late GraphQLClient _client;
 
   @override
