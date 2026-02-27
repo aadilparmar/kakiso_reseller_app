@@ -1,4 +1,8 @@
 // lib/services/session_service.dart
+//
+// UPDATED: Now properly saves wooCustomerId and phone
+// which are needed for catalog sync and other features.
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';

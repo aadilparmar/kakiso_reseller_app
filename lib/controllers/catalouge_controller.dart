@@ -1,21 +1,28 @@
 // lib/controllers/catalouge_controller.dart
 //
-// UPDATED: Now syncs catalogs with WordPress database via REST API
-// Local SharedPreferences is kept as offline cache/fallback.
-// Web dashboard and app now share the SAME catalog data.
+// v6: FIXED — Polling pauses during server push to prevent overwriting
+//
+// The bug was: optimistic UI update → 5s poll fires → server hasn't
+// processed yet → poll overwrites optimistic update with stale data.
+//
+// Fix: _pushLock prevents polling from fetching while a push is active.
+// After push completes + small delay, a forced fetch confirms the state.
 
-import 'dart:convert';
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 
-/// Model for a single catalogue.
+// =============================================================================
+// MODEL
+// =============================================================================
+
 class CatalogueModel {
   final String id;
   String name;
@@ -31,7 +38,6 @@ class CatalogueModel {
     required this.products,
   });
 
-  /// JSON serialization – used for local persistence.
   factory CatalogueModel.fromJson(Map<String, dynamic> json) {
     return CatalogueModel(
       id: json['id'] as String,
@@ -56,7 +62,6 @@ class CatalogueModel {
     };
   }
 
-  /// Convert to server format (product IDs only, not full objects)
   Map<String, dynamic> toServerJson() {
     return {
       'id': id,
@@ -84,32 +89,94 @@ class CatalogueModel {
   }
 }
 
-class CatalogueController extends GetxController {
-  /// All catalogues for this user.
+// =============================================================================
+// CONTROLLER
+// =============================================================================
+
+class CatalogueController extends GetxController with WidgetsBindingObserver {
+  // ── Observables ──
   final RxList<CatalogueModel> myCatalogues = <CatalogueModel>[].obs;
-
-  /// Sync status observable (UI can show sync indicator)
   final RxBool isSyncing = false.obs;
+  final RxBool isLoaded = false.obs;
 
-  static const _prefsKey = 'kakiso_catalogues_v1';
-
-  // Cache of product models we've already fetched (avoids re-fetching)
+  // ── Internal state ──
   final Map<int, ProductModel> _productCache = {};
+  Timer? _pollTimer;
+  bool _isFetching = false;
+  String? _cachedUserId;
+  bool _tabActive = false;
 
-  // ---------------------------------------------------------------------------
+  // ── Push lock: prevents polling from overwriting optimistic updates ──
+  int _activePushes = 0;
+
+  // =========================================================================
   // LIFECYCLE
-  // ---------------------------------------------------------------------------
+  // =========================================================================
 
   @override
   void onInit() {
     super.onInit();
-    _loadFromStorage(); // Load local first (instant UI)
-    _syncFromServer(); // Then sync from server in background
+    WidgetsBinding.instance.addObserver(this);
+    _forceFetch();
+    _startPolling(fast: false);
   }
 
-  // ---------------------------------------------------------------------------
-  // PUBLIC API – used by your UI (unchanged method signatures!)
-  // ---------------------------------------------------------------------------
+  @override
+  void onClose() {
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _forceFetch();
+      _startPolling(fast: _tabActive);
+    } else if (state == AppLifecycleState.paused) {
+      _pollTimer?.cancel();
+    }
+  }
+
+  // =========================================================================
+  // POLLING
+  // =========================================================================
+
+  void _startPolling({required bool fast}) {
+    _pollTimer?.cancel();
+    final duration = fast
+        ? const Duration(seconds: 5)
+        : const Duration(seconds: 30);
+    _pollTimer = Timer.periodic(duration, (_) {
+      // CRITICAL: Skip poll if a push is in progress
+      if (_activePushes > 0) {
+        debugPrint('CatalogSync: Poll skipped — push in progress');
+        return;
+      }
+      _fetchFromServer();
+    });
+  }
+
+  // =========================================================================
+  // UI TRIGGERS
+  // =========================================================================
+
+  void onCatalogTabOpened() {
+    _tabActive = true;
+    if (_activePushes == 0) _forceFetch();
+    _startPolling(fast: true);
+  }
+
+  void onCatalogTabClosed() {
+    _tabActive = false;
+    _startPolling(fast: false);
+  }
+
+  Future<void> refreshFromServer() => _forceFetch();
+
+  // =========================================================================
+  // PUBLIC API — UNCHANGED SIGNATURES
+  // =========================================================================
 
   CatalogueModel? getById(String id) {
     try {
@@ -120,394 +187,302 @@ class CatalogueController extends GetxController {
   }
 
   List<String> get catalogueNames => myCatalogues
-      .map((c) => (c.name.isEmpty ? 'Untitled Catalogue' : c.name))
+      .map((c) => c.name.isEmpty ? 'Untitled Catalogue' : c.name)
       .toList();
 
-  /// Create a new empty catalogue
+  // ── CREATE ──
   void createCatalogue(String name, String description) {
-    final id = _generateId();
-    final catalogue = CatalogueModel(
+    final id = _genId();
+    final cat = CatalogueModel(
       id: id,
       name: name,
       description: description,
       createdAt: DateTime.now(),
       products: [],
     );
-
-    myCatalogues.add(catalogue);
+    myCatalogues.add(cat);
     myCatalogues.refresh();
-    _saveToStorage();
 
-    // Push to server in background
-    _createOnServer(catalogue);
+    _doPush(() async {
+      final uid = await _uid();
+      if (uid == null) return;
+      await ApiService().createCatalogOnServer(
+        userId: uid,
+        catalogId: id,
+        name: name,
+        desc: description,
+      );
+    });
   }
 
-  /// Create a new catalogue AND add a product to it
   void createCatalogueAndAddProduct(
     String name,
     ProductModel product, {
     String description = '',
   }) {
-    final id = _generateId();
-    final catalogue = CatalogueModel(
+    final id = _genId();
+    _productCache[product.id] = product;
+    final cat = CatalogueModel(
       id: id,
       name: name,
       description: description,
       createdAt: DateTime.now(),
       products: [product],
     );
-
-    myCatalogues.add(catalogue);
+    myCatalogues.add(cat);
     myCatalogues.refresh();
-    _saveToStorage();
 
-    // Push to server with product
-    _createOnServer(catalogue);
+    _doPush(() async {
+      final uid = await _uid();
+      if (uid == null) return;
+      await ApiService().createCatalogOnServer(
+        userId: uid,
+        catalogId: id,
+        name: name,
+        desc: description,
+        productIds: [product.id],
+      );
+    });
   }
 
-  /// Delete an entire catalogue
+  // ── DELETE ──
   void deleteCatalogue(String id) {
     myCatalogues.removeWhere((c) => c.id == id);
     myCatalogues.refresh();
-    _saveToStorage();
 
-    // Delete on server in background
-    _deleteOnServer(id);
+    _doPush(() async {
+      final uid = await _uid();
+      if (uid == null) return;
+      await ApiService().deleteCatalogOnServer(userId: uid, catalogId: id);
+    });
   }
 
-  /// Add a product to a specific catalogue
+  // ── ADD PRODUCT ──
   void addProductToCatalogue(String catalogueId, ProductModel product) {
-    final index = myCatalogues.indexWhere((c) => c.id == catalogueId);
-    if (index == -1) return;
-
-    final cat = myCatalogues[index];
-    final alreadyExists = cat.products.any(
-      (p) => p.id.toString() == product.id.toString(),
-    );
-    if (alreadyExists) return;
+    final idx = myCatalogues.indexWhere((c) => c.id == catalogueId);
+    if (idx == -1) return;
+    final cat = myCatalogues[idx];
+    if (cat.products.any((p) => p.id == product.id)) return;
 
     cat.products.add(product);
-    myCatalogues[index] = CatalogueModel(
-      id: cat.id,
-      name: cat.name,
-      description: cat.description,
-      createdAt: cat.createdAt,
+    myCatalogues[idx] = cat.copyWith(
       products: List<ProductModel>.from(cat.products),
     );
-
     myCatalogues.refresh();
-    _saveToStorage();
-
-    // Cache the product for future server syncs
     _productCache[product.id] = product;
 
-    // Push to server
-    _addProductOnServer(catalogueId, product.id);
+    _doPush(() async {
+      final uid = await _uid();
+      if (uid == null) return;
+      await ApiService().updateCatalogOnServer(
+        userId: uid,
+        catalogId: catalogueId,
+        action: 'add_product',
+        productId: product.id,
+      );
+    });
   }
 
-  void addProductToExistingCatalogueByName(
-    String catalogueName,
-    ProductModel product,
-  ) {
+  void addProductToExistingCatalogueByName(String name, ProductModel product) {
     try {
-      final cat = myCatalogues.firstWhere((c) => c.name == catalogueName);
+      final cat = myCatalogues.firstWhere((c) => c.name == name);
       addProductToCatalogue(cat.id, product);
     } catch (_) {}
   }
 
-  void addProductToExistingCatalogue(
-    String catalogueName,
-    ProductModel product,
-  ) {
-    addProductToExistingCatalogueByName(catalogueName, product);
+  void addProductToExistingCatalogue(String name, ProductModel product) {
+    addProductToExistingCatalogueByName(name, product);
   }
 
-  /// Remove a product from a catalogue
+  // ── REMOVE PRODUCT ──
   void removeProductFromCatalogue(String catalogueId, String productId) {
-    final index = myCatalogues.indexWhere((c) => c.id == catalogueId);
-    if (index == -1) return;
-
-    final cat = myCatalogues[index];
-    cat.products.removeWhere((p) => p.id.toString() == productId.toString());
-
-    myCatalogues[index] = CatalogueModel(
-      id: cat.id,
-      name: cat.name,
-      description: cat.description,
-      createdAt: cat.createdAt,
+    final idx = myCatalogues.indexWhere((c) => c.id == catalogueId);
+    if (idx == -1) return;
+    final cat = myCatalogues[idx];
+    cat.products.removeWhere((p) => p.id.toString() == productId);
+    myCatalogues[idx] = cat.copyWith(
       products: List<ProductModel>.from(cat.products),
     );
-
     myCatalogues.refresh();
-    _saveToStorage();
 
-    // Push to server
-    _removeProductOnServer(catalogueId, int.tryParse(productId) ?? 0);
-  }
-
-  /// Force sync from server (can be called from UI pull-to-refresh)
-  Future<void> refreshFromServer() async {
-    await _syncFromServer();
-  }
-
-  // ---------------------------------------------------------------------------
-  // SERVER SYNC — Background operations (never block UI)
-  // ---------------------------------------------------------------------------
-
-  Future<String?> _getUserId() async {
-    final user = await SessionService.getUser();
-    return user?.wooCustomerId.isNotEmpty == true
-        ? user!.wooCustomerId
-        : user?.userId;
-  }
-
-  /// Fetch catalogs from server and merge with local
-  Future<void> _syncFromServer() async {
-    try {
-      isSyncing.value = true;
-      final userId = await _getUserId();
-      if (userId == null || userId.isEmpty) return;
-
-      final serverCatalogs = await ApiService().fetchCatalogsFromServer(
-        userId: userId,
+    _doPush(() async {
+      final uid = await _uid();
+      if (uid == null) return;
+      await ApiService().updateCatalogOnServer(
+        userId: uid,
+        catalogId: catalogueId,
+        action: 'remove_product',
+        productId: int.tryParse(productId) ?? 0,
       );
+    });
+  }
 
-      if (serverCatalogs == null) return; // Network error, keep local
+  // =========================================================================
+  // PUSH WITH LOCK — Core fix for the race condition
+  //
+  // 1. Increment _activePushes (blocks polling)
+  // 2. Await the server push
+  // 3. Wait 500ms (give server time to write)
+  // 4. Force fetch from server (confirm state)
+  // 5. Decrement _activePushes (resume polling)
+  // =========================================================================
 
-      if (serverCatalogs.isEmpty && myCatalogues.isNotEmpty) {
-        // Server is empty but we have local catalogs → push them up
-        await _pushAllToServer(userId);
-        return;
-      }
+  Future<void> _doPush(Future<void> Function() serverAction) async {
+    _activePushes++;
+    debugPrint(
+      'CatalogSync: Push started (active=$_activePushes, polling paused)',
+    );
 
-      // Convert server catalogs (product IDs) to local format (full ProductModels)
-      final List<CatalogueModel> converted = [];
-      for (final serverCat in serverCatalogs) {
-        final catalogModel = await _convertServerCatalog(serverCat);
-        if (catalogModel != null) {
-          converted.add(catalogModel);
-        }
-      }
-
-      // Merge: server catalogs + any local-only catalogs
-      final Map<String, CatalogueModel> merged = {};
-
-      // Server catalogs take priority
-      for (final cat in converted) {
-        merged[cat.id] = cat;
-      }
-
-      // Add local-only catalogs that don't exist on server
-      for (final local in myCatalogues) {
-        if (!merged.containsKey(local.id)) {
-          merged[local.id] = local;
-          // Push this local-only catalog to server
-          _createOnServer(local);
-        }
-      }
-
-      myCatalogues.assignAll(merged.values.toList());
-      myCatalogues.refresh();
-      _saveToStorage();
+    try {
+      await serverAction();
+      // Give the server a moment to persist
+      await Future.delayed(const Duration(milliseconds: 500));
+      // Force fetch to confirm server state
+      await _forceFetch();
     } catch (e) {
-      debugPrint('CatalogSync: Error syncing from server: $e');
+      debugPrint('CatalogSync: Push error: $e');
+      // Still fetch to restore correct state
+      await _forceFetch();
     } finally {
+      _activePushes--;
+      debugPrint('CatalogSync: Push done (active=$_activePushes)');
+    }
+  }
+
+  // =========================================================================
+  // FETCH FROM SERVER — Two variants
+  // =========================================================================
+
+  /// Force fetch — ignores _isFetching guard, always runs
+  Future<void> _forceFetch() async {
+    _isFetching = true;
+    isSyncing.value = true;
+    try {
+      await _doFetch();
+    } finally {
+      _isFetching = false;
       isSyncing.value = false;
     }
   }
 
-  /// Convert server catalog format {products: [IDs]} to app format {products: [ProductModels]}
-  Future<CatalogueModel?> _convertServerCatalog(
-    Map<String, dynamic> serverCat,
-  ) async {
+  /// Poll fetch — respects _isFetching guard, skips if busy
+  Future<void> _fetchFromServer() async {
+    if (_isFetching) return;
+    _isFetching = true;
+    isSyncing.value = true;
     try {
-      final String id = serverCat['id'] ?? '';
-      final String name = serverCat['name'] ?? 'Untitled';
-      final String desc = serverCat['desc'] ?? '';
-      final String created = serverCat['created'] ?? '';
-      final List<dynamic> productIds = serverCat['products'] ?? [];
+      await _doFetch();
+    } finally {
+      _isFetching = false;
+      isSyncing.value = false;
+    }
+  }
 
-      // Fetch product details for each ID
-      final List<ProductModel> products = [];
-      for (final pid in productIds) {
-        final int productId = (pid is int)
-            ? pid
-            : (int.tryParse(pid.toString()) ?? 0);
-        if (productId <= 0) continue;
+  /// Actual fetch logic — shared by both force and poll
+  Future<void> _doFetch() async {
+    try {
+      final userId = await _uid();
+      if (userId == null) return;
 
-        // Check cache first
-        if (_productCache.containsKey(productId)) {
-          products.add(_productCache[productId]!);
-          continue;
-        }
+      final serverCatalogs = await ApiService().fetchCatalogsFromServer(
+        userId: userId,
+      );
+      if (serverCatalogs == null) return; // Network error, keep current
 
-        // Check if we already have this product in any local catalog
-        ProductModel? existing;
-        for (final cat in myCatalogues) {
-          try {
-            existing = cat.products.firstWhere((p) => p.id == productId);
-            break;
-          } catch (_) {}
-        }
-
-        if (existing != null) {
-          products.add(existing);
-          _productCache[productId] = existing;
-          continue;
-        }
-
-        // Fetch from WooCommerce API (last resort)
-        try {
-          final product = await ApiService().fetchProductByIdSafe(
-            productId.toString(),
-          );
-          if (product != null) {
-            products.add(product);
-            _productCache[productId] = product;
-          }
-        } catch (e) {
-          debugPrint('CatalogSync: Could not fetch product $productId: $e');
+      // Collect all product IDs
+      final Set<int> allPids = {};
+      for (final cat in serverCatalogs) {
+        for (final pid in (cat['products'] as List? ?? [])) {
+          final id = (pid is int) ? pid : (int.tryParse(pid.toString()) ?? 0);
+          if (id > 0) allPids.add(id);
         }
       }
 
-      return CatalogueModel(
-        id: id,
-        name: name,
-        description: desc,
-        createdAt: DateTime.tryParse(created) ?? DateTime.now(),
-        products: products,
-      );
-    } catch (e) {
-      debugPrint('CatalogSync: Error converting server catalog: $e');
-      return null;
-    }
-  }
-
-  /// Push all local catalogs to server (used when server is empty)
-  Future<void> _pushAllToServer(String userId) async {
-    try {
-      final List<Map<String, dynamic>> catalogsForServer = myCatalogues
-          .map((c) => c.toServerJson())
+      // Batch fetch missing products
+      final missing = allPids
+          .where((id) => !_productCache.containsKey(id))
           .toList();
+      if (missing.isNotEmpty) await _batchFetch(missing);
 
-      await ApiService().syncCatalogsToServer(
-        userId: userId,
-        catalogs: catalogsForServer,
-      );
-    } catch (e) {
-      debugPrint('CatalogSync: Error pushing all to server: $e');
-    }
-  }
+      // Build fresh catalog list
+      final List<CatalogueModel> fresh = [];
+      for (final cat in serverCatalogs) {
+        final String id = cat['id'] ?? '';
+        if (id.isEmpty) continue;
 
-  /// Create a single catalog on the server
-  Future<void> _createOnServer(CatalogueModel catalogue) async {
-    try {
-      final userId = await _getUserId();
-      if (userId == null || userId.isEmpty) return;
+        final List<ProductModel> products = [];
+        for (final pid in (cat['products'] as List? ?? [])) {
+          final int pId = (pid is int)
+              ? pid
+              : (int.tryParse(pid.toString()) ?? 0);
+          if (pId > 0 && _productCache.containsKey(pId)) {
+            products.add(_productCache[pId]!);
+          }
+        }
 
-      await ApiService().createCatalogOnServer(
-        userId: userId,
-        catalogId: catalogue.id,
-        name: catalogue.name,
-        desc: catalogue.description,
-        productIds: catalogue.products.map((p) => p.id).toList(),
-      );
-    } catch (e) {
-      debugPrint('CatalogSync: Error creating on server: $e');
-    }
-  }
+        fresh.add(
+          CatalogueModel(
+            id: id,
+            name: cat['name'] ?? '',
+            description: cat['desc'] ?? '',
+            createdAt:
+                DateTime.tryParse(cat['created'] ?? '') ?? DateTime.now(),
+            products: products,
+          ),
+        );
+      }
 
-  /// Delete a catalog on the server
-  Future<void> _deleteOnServer(String catalogId) async {
-    try {
-      final userId = await _getUserId();
-      if (userId == null || userId.isEmpty) return;
-
-      await ApiService().deleteCatalogOnServer(
-        userId: userId,
-        catalogId: catalogId,
-      );
-    } catch (e) {
-      debugPrint('CatalogSync: Error deleting on server: $e');
-    }
-  }
-
-  /// Add a product to a catalog on the server
-  Future<void> _addProductOnServer(String catalogId, int productId) async {
-    try {
-      final userId = await _getUserId();
-      if (userId == null || userId.isEmpty) return;
-
-      await ApiService().updateCatalogOnServer(
-        userId: userId,
-        catalogId: catalogId,
-        action: 'add_product',
-        productId: productId,
-      );
-    } catch (e) {
-      debugPrint('CatalogSync: Error adding product on server: $e');
-    }
-  }
-
-  /// Remove a product from a catalog on the server
-  Future<void> _removeProductOnServer(String catalogId, int productId) async {
-    try {
-      final userId = await _getUserId();
-      if (userId == null || userId.isEmpty) return;
-
-      await ApiService().updateCatalogOnServer(
-        userId: userId,
-        catalogId: catalogId,
-        action: 'remove_product',
-        productId: productId,
-      );
-    } catch (e) {
-      debugPrint('CatalogSync: Error removing product on server: $e');
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // LOCAL PERSISTENCE (unchanged — acts as offline cache)
-  // ---------------------------------------------------------------------------
-
-  Future<void> _loadFromStorage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_prefsKey);
-      if (jsonString == null || jsonString.isEmpty) return;
-
-      final List<dynamic> decoded = jsonDecode(jsonString) as List<dynamic>;
-      final loaded = decoded
-          .map((e) => CatalogueModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-
-      myCatalogues.assignAll(loaded);
+      // Replace the entire list — server is truth
+      myCatalogues.assignAll(fresh);
       myCatalogues.refresh();
+      isLoaded.value = true;
     } catch (e) {
-      // If anything goes wrong, don't crash – just start fresh
+      debugPrint('CatalogSync: fetch error: $e');
     }
   }
 
-  Future<void> _saveToStorage() async {
+  // =========================================================================
+  // BATCH PRODUCT FETCH
+  // =========================================================================
+
+  Future<void> _batchFetch(List<int> ids) async {
+    if (ids.isEmpty) return;
+
+    // Try batch endpoint first
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<Map<String, dynamic>> list = myCatalogues
-          .map((c) => c.toJson())
-          .toList();
-      final jsonString = jsonEncode(list);
-      await prefs.setString(_prefsKey, jsonString);
-    } catch (e) {
-      // ignore
+      final result = await ApiService().batchFetchProducts(productIds: ids);
+      if (result != null && result.isNotEmpty) {
+        for (final p in result) {
+          _productCache[p.id] = p;
+        }
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: individual fetch
+    for (final pid in ids) {
+      try {
+        final p = await ApiService().fetchProductByIdSafe(pid.toString());
+        if (p != null) _productCache[pid] = p;
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
-  // ---------------------------------------------------------------------------
+  // =========================================================================
   // HELPERS
-  // ---------------------------------------------------------------------------
+  // =========================================================================
 
-  String _generateId() {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final rand = Random().nextInt(999999);
-    return 'cat_${ts}_$rand';
+  Future<String?> _uid() async {
+    if (_cachedUserId != null) return _cachedUserId;
+    final user = await SessionService.getUser();
+    if (user == null) return null;
+    _cachedUserId = user.wooCustomerId.isNotEmpty
+        ? user.wooCustomerId
+        : (user.userId.isNotEmpty ? user.userId : null);
+    return _cachedUserId;
   }
+
+  String _genId() =>
+      'cat_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(999999)}';
 }

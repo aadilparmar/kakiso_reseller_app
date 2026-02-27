@@ -733,35 +733,39 @@ class ApiService {
     return;
   }
   // ===========================================================================
-  // --- 12. CATALOG SYNC ---
+  // 12. CATALOG SYNC API — ALL POST ROUTES
   // ===========================================================================
 
-  /// Fetch all catalogs for a user from the server
+  // ===========================================================================
+
+  /// Fetch all catalogs from server
   Future<List<Map<String, dynamic>>?> fetchCatalogsFromServer({
     required String userId,
   }) async {
     final dio = await _client;
     try {
+      debugPrint('CatalogAPI: GET /catalogs?user_id=$userId');
       final response = await dio.get(
         '/wp-json/kakiso/v1/catalogs',
         queryParameters: {'user_id': userId},
         options: Options(extra: {'cache_policy': CachePolicy.noCache}),
       );
-
       final data = response.data;
-      if (data['success'] == true && data['catalogs'] is List) {
-        return List<Map<String, dynamic>>.from(
+      if (data is Map && data['success'] == true && data['catalogs'] is List) {
+        final list = List<Map<String, dynamic>>.from(
           (data['catalogs'] as List).map((c) => Map<String, dynamic>.from(c)),
         );
+        debugPrint('CatalogAPI: Fetched ${list.length} catalogs');
+        return list;
       }
       return [];
     } catch (e) {
-      debugPrint('CatalogAPI: fetchCatalogs error: $e');
+      debugPrint('CatalogAPI: fetch error: $e');
       return null;
     }
   }
 
-  /// Create a new catalog on the server
+  /// Create a catalog on server
   Future<bool> createCatalogOnServer({
     required String userId,
     required String catalogId,
@@ -771,24 +775,28 @@ class ApiService {
   }) async {
     final dio = await _client;
     try {
+      debugPrint('CatalogAPI: POST /catalogs/create name=$name');
       final response = await dio.post(
-        '/wp-json/kakiso/v1/catalogs',
+        '/wp-json/kakiso/v1/catalogs/create',
         data: {
-          'user_id': userId,
+          'user_id': int.tryParse(userId) ?? userId,
           'catalog_id': catalogId,
           'name': name,
           'desc': desc,
           'product_ids': productIds,
+          'source': 'app',
         },
       );
-      return response.data['success'] == true;
+      final ok = response.data['success'] == true;
+      debugPrint('CatalogAPI: create result=$ok');
+      return ok;
     } catch (e) {
-      debugPrint('CatalogAPI: createCatalog error: $e');
+      debugPrint('CatalogAPI: create error: $e');
       return false;
     }
   }
 
-  /// Update a catalog on the server
+  /// Update a catalog on server
   Future<bool> updateCatalogOnServer({
     required String userId,
     required String catalogId,
@@ -801,7 +809,7 @@ class ApiService {
     final dio = await _client;
     try {
       final Map<String, dynamic> payload = {
-        'user_id': userId,
+        'user_id': int.tryParse(userId) ?? userId,
         'catalog_id': catalogId,
         'action': action,
       };
@@ -810,31 +818,42 @@ class ApiService {
       if (name != null) payload['name'] = name;
       if (desc != null) payload['desc'] = desc;
 
-      final response = await dio.put(
-        '/wp-json/kakiso/v1/catalogs',
+      debugPrint(
+        'CatalogAPI: POST /catalogs/update action=$action catalog=$catalogId',
+      );
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/catalogs/update',
         data: payload,
       );
-      return response.data['success'] == true;
+      final ok = response.data['success'] == true;
+      debugPrint('CatalogAPI: update result=$ok');
+      return ok;
     } catch (e) {
-      debugPrint('CatalogAPI: updateCatalog error: $e');
+      debugPrint('CatalogAPI: update error: $e');
       return false;
     }
   }
 
-  /// Delete a catalog on the server
+  /// Delete a catalog on server
   Future<bool> deleteCatalogOnServer({
     required String userId,
     required String catalogId,
   }) async {
     final dio = await _client;
     try {
-      final response = await dio.delete(
-        '/wp-json/kakiso/v1/catalogs',
-        queryParameters: {'user_id': userId, 'catalog_id': catalogId},
+      debugPrint('CatalogAPI: POST /catalogs/delete catalog=$catalogId');
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/catalogs/delete',
+        data: {
+          'user_id': int.tryParse(userId) ?? userId,
+          'catalog_id': catalogId,
+        },
       );
-      return response.data['success'] == true;
+      final ok = response.data['success'] == true;
+      debugPrint('CatalogAPI: delete result=$ok');
+      return ok;
     } catch (e) {
-      debugPrint('CatalogAPI: deleteCatalog error: $e');
+      debugPrint('CatalogAPI: delete error: $e');
       return false;
     }
   }
@@ -846,19 +865,49 @@ class ApiService {
   }) async {
     final dio = await _client;
     try {
+      debugPrint('CatalogAPI: POST /catalogs/sync count=${catalogs.length}');
       final response = await dio.post(
         '/wp-json/kakiso/v1/catalogs/sync',
-        data: {'user_id': userId, 'catalogs': catalogs},
+        data: {'user_id': int.tryParse(userId) ?? userId, 'catalogs': catalogs},
       );
       final data = response.data;
-      if (data['success'] == true && data['catalogs'] is List) {
+      if (data is Map && data['success'] == true && data['catalogs'] is List) {
         return List<Map<String, dynamic>>.from(
           (data['catalogs'] as List).map((c) => Map<String, dynamic>.from(c)),
         );
       }
       return null;
     } catch (e) {
-      debugPrint('CatalogAPI: syncCatalogs error: $e');
+      debugPrint('CatalogAPI: sync error: $e');
+      return null;
+    }
+  }
+
+  /// Batch fetch product details — single request for up to 200 products
+  Future<List<ProductModel>?> batchFetchProducts({
+    required List<int> productIds,
+  }) async {
+    if (productIds.isEmpty) return [];
+    final dio = await _client;
+    try {
+      debugPrint(
+        'CatalogAPI: POST /catalogs/products count=${productIds.length}',
+      );
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/catalogs/products',
+        data: {'product_ids': productIds},
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true && data['products'] is List) {
+        final list = (data['products'] as List)
+            .map((p) => ProductModel.fromJson(Map<String, dynamic>.from(p)))
+            .toList();
+        debugPrint('CatalogAPI: batch fetched ${list.length} products');
+        return list;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('CatalogAPI: batchFetch error: $e');
       return null;
     }
   }

@@ -1,4 +1,8 @@
-// lib/screens/splash/splash_screen.dart
+// lib/screens/splash_screen.dart
+//
+// UPDATED: Background refresh now preserves wooCustomerId
+// so catalog sync and other features work after app restart.
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -7,6 +11,7 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/navigation_menu.dart';
 import 'package:kakiso_reseller_app/screens/intro/intro_part2/kakiso_intro_screen.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/services/session_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -17,7 +22,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  // ✅ FIX 1: Match the URL used in Login (Stage vs Prod mismatch caused the 500 error)
   final String _graphqlUrl = "https://kiranelectro.com/kakiso/graphql";
 
   @override
@@ -45,19 +49,28 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     // 4. Logic: Logged in? -> Fire background refresh, wait for timer, then Home.
-    // We do NOT await this. It runs in the background to update storage.
-    _silentBackgroundRefresh(authToken);
+    _silentBackgroundRefresh(authToken, cachedUser);
 
-    // Ensure we show the logo for at least the full duration
     await minSplashTime;
-
-    // Navigate immediately with the cached user (Instant feel)
     Get.offAll(() => NavigationMenu(userData: cachedUser));
   }
 
-  // Moved the network call to a fire-and-forget method or handled inside Home
-  // But if you want to keep the validation here, this is the fixed fetcher:
-  Future<UserData> _fetchUserData(String token) async {
+  Future<void> _silentBackgroundRefresh(
+    String token,
+    UserData cachedUser,
+  ) async {
+    try {
+      final freshUser = await _fetchUserData(token, cachedUser);
+      await SessionService.saveSession(authToken: token, user: freshUser);
+      debugPrint("Background user refresh successful");
+    } catch (e) {
+      debugPrint("Background refresh failed (ignoring): $e");
+    }
+  }
+
+  /// Fetch fresh user data from GraphQL, but PRESERVE wooCustomerId
+  /// from the cached session (GraphQL doesn't return it).
+  Future<UserData> _fetchUserData(String token, UserData cachedUser) async {
     final HttpLink httpLink = HttpLink(_graphqlUrl);
     final AuthLink authLink = AuthLink(getToken: () async => 'Bearer $token');
     final Link link = authLink.concat(httpLink);
@@ -81,10 +94,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final QueryOptions options = QueryOptions(
       document: gql(getMeQuery),
-      fetchPolicy: FetchPolicy.networkOnly, // Don't read from cache here
+      fetchPolicy: FetchPolicy.networkOnly,
     );
 
-    // Reduced timeout to 5s so we don't hang if we decide to await it
     final QueryResult result = await client
         .query(options)
         .timeout(const Duration(seconds: 5));
@@ -95,29 +107,42 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (result.data != null && result.data!['viewer'] != null) {
       final userData = result.data!['viewer'];
+      final String wpEmail =
+          (userData['email'] as String?)?.trim() ?? cachedUser.email;
+      final String firstName = (userData['firstName'] as String?) ?? '';
+      final String lastName = (userData['lastName'] as String?) ?? '';
+      final String fullName = ('$firstName $lastName').trim().isNotEmpty
+          ? ('$firstName $lastName').trim()
+          : wpEmail.split('@').first;
+
+      // CRITICAL: Preserve wooCustomerId from cached session
+      // GraphQL viewer query doesn't return WooCommerce customer ID
+      String wooId = cachedUser.wooCustomerId;
+
+      // If wooCustomerId is missing (old session), try to fetch it
+      if (wooId.isEmpty) {
+        try {
+          final freshWooId = await ApiService().ensureWooCustomer(
+            email: wpEmail,
+            name: fullName,
+          );
+          wooId = freshWooId ?? '';
+        } catch (_) {}
+      }
+
       return UserData(
-        name: '${userData['firstName']} ${userData['lastName']}',
-        email: userData['email'],
+        name: fullName,
+        email: wpEmail,
         userId: userData['databaseId'].toString(),
+        wooCustomerId: wooId,
         joined:
             DateTime.tryParse(userData['registeredDate'] ?? '') ??
             DateTime.now(),
         profilePicUrl: userData['avatar']?['url'] ?? '',
+        phone: cachedUser.phone, // Preserve phone too
       );
     } else {
       throw Exception('Failed to get user data.');
-    }
-  }
-
-  Future<void> _silentBackgroundRefresh(String token) async {
-    try {
-      final freshUser = await _fetchUserData(token);
-      await SessionService.saveSession(authToken: token, user: freshUser);
-      // Note: This saves to storage, but won't update the UI immediately
-      // unless you use a State Management solution (like GetxController) for the User.
-      debugPrint("Background user refresh successful");
-    } catch (e) {
-      debugPrint("Background refresh failed (ignoring): $e");
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/src/scheduler/binding.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -95,7 +96,7 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
     super.initState();
     _initializePulseAnimation();
     _setupProductListener();
-    _schedulePostFrameCallbacks();
+    _schedulePostFrameCallbacks(); // ← THIS LINE MUST BE HERE
   }
 
   void _initializePulseAnimation() {
@@ -110,18 +111,11 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
   }
 
   void _setupProductListener() {
-    _productListener = ever(homeProductsController.allProducts, (products) {
-      if (products.isNotEmpty) {
-        _checkAndCreateDefaultCatalogues();
-      }
-    });
+    // Default catalog creation removed — catalogs come from server now
   }
-
   void _schedulePostFrameCallbacks() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (homeProductsController.allProducts.isNotEmpty) {
-        _checkAndCreateDefaultCatalogues();
-      }
+      catalogueController.onCatalogTabOpened();
       _checkForNavArguments();
       _checkAndStartTour();
     });
@@ -129,11 +123,11 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
 
   @override
   void dispose() {
+    catalogueController.onCatalogTabClosed();
     _pulseController.dispose();
     _productListener?.dispose();
     super.dispose();
   }
-
   // ═══════════════════════════════════════════════════════════
   // TOUR & GUIDE LOGIC
   // ═══════════════════════════════════════════════════════════
@@ -984,40 +978,49 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
       }
       if (items.isEmpty) return const CatalogueSearchEmptyState();
 
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final cat = items[index];
-          final bool isFirstItem = index == 0;
+      return RefreshIndicator(
+        onRefresh: () => catalogueController.refreshFromServer(),
+        color: accentColor,
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final cat = items[index];
+            final bool isFirstItem = index == 0;
 
-          Widget card = CatalogueCard(
-            catalogue: cat,
-            isGuideActive: _activeGuideTool != null,
-            isFirstItem: isFirstItem,
-            activeGuideTool: _activeGuideTool,
-            pulseAnimation: _pulseAnimation,
-            onShare: _openShareMarginDialog,
-            onPdf: _openPdfMarginDialog,
-            onCsv: _openCsvExportDialog,
-            onDownload: _handleBulkDownload,
-            onCollage: _openCollageStudio,
-            // 隼 ADDED: Pass the new inventory function
-            onInventory: _openInventoryManager,
-            catalogueController: catalogueController,
-          );
-
-          if (isFirstItem && _activeGuideTool == null) {
-            return Showcase(
-              key: index == 0 ? _shareKey : GlobalKey(),
-              title: "Easy Sharing",
-              description: "Share directly with margin added.",
-              child: card,
+            Widget card = CatalogueCard(
+              catalogue: cat,
+              isGuideActive: _activeGuideTool != null,
+              isFirstItem: isFirstItem,
+              activeGuideTool: _activeGuideTool,
+              pulseAnimation: _pulseAnimation,
+              onShare: _openShareMarginDialog,
+              onPdf: _openPdfMarginDialog,
+              onCsv: _openCsvExportDialog,
+              onDownload: _handleBulkDownload,
+              onCollage: _openCollageStudio,
+              onInventory: _openInventoryManager,
+              catalogueController: catalogueController,
             );
-          }
 
-          return card;
-        },
+            if (isFirstItem && _activeGuideTool == null) {
+              return Showcase(
+                key: _shareKey,
+                title: "Share & Export",
+                description:
+                    "Use these tools to share catalogs with customers via WhatsApp, PDF, or CSV.",
+                child: Showcase(
+                  key: _toolsKey,
+                  title: "More Tools",
+                  description:
+                      "Download images, create collages, and manage inventory.",
+                  child: card,
+                ),
+              );
+            }
+            return card;
+          },
+        ),
       );
     });
   }
