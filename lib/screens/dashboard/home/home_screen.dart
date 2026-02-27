@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/home_dynamic_builder.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/kite_celebration.dart';
 
 // --- WIDGET & SCREEN IMPORTS ---
@@ -60,10 +61,12 @@ class _HomePageState extends State<HomePage> {
   final NotificationController notificationController = Get.put(
     NotificationController(),
   );
+  late final HomeConfigController _homeConfig;
 
   @override
   void initState() {
     super.initState();
+
     _userData = widget.userData;
 
     // Trigger celebration every time user comes to home
@@ -71,6 +74,7 @@ class _HomePageState extends State<HomePage> {
       _isCelebrating = true;
     });
 
+    _homeConfig = Get.put(HomeConfigController());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowWelcome();
     });
@@ -275,6 +279,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Search always first (essential)
                   SearchHeader(
                     readOnly: true,
                     onTap: () => Get.to(
@@ -282,23 +287,27 @@ class _HomePageState extends State<HomePage> {
                       transition: Transition.fadeIn,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const VideoBannerCarousel(),
-                  const StorySection(),
-                  const SizedBox(height: 16),
-                  const RecommendedSection(),
-                  const SizedBox(height: 10),
-                  const FlashSaleBanner(),
-                  const SizedBox(height: 16),
-                  const TopRankingSection(),
-                  const SizedBox(height: 6),
-                  const NewArrivalSection(),
-                  const TrendingProducts(),
-                  const SizedBox(height: 16),
-                  const CuratedCollections(),
-                  const SizedBox(height: 16),
-                  _buildBudgetSection(),
-                  const SizedBox(height: 16),
+                  // Dynamic sections from admin config
+                  Obx(() {
+                    final secs = _homeConfig.sections;
+                    if (secs.isEmpty) {
+                      // No config loaded yet or empty → show defaults
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: HomeSectionBuilder.buildSections(
+                          sections: HomeConfigController.defaults,
+                          budgetSectionBuilder: _buildBudgetSection,
+                        ),
+                      );
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: HomeSectionBuilder.buildSections(
+                        sections: secs,
+                        budgetSectionBuilder: _buildBudgetSection,
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),

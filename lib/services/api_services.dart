@@ -915,12 +915,13 @@ class ApiService {
     }
   }
   // ===========================================================================
-  // 13. BUSINESS DETAILS API — Syncs with web dashboard's reseller_* meta keys
+  // 13. BUSINESS DETAILS API v2 — Syncs with web dashboard
+  // Supports: fetch, first-save, edit-request (admin approval)
   // ===========================================================================
   // ADD these methods inside ApiService class, BEFORE the final closing }
   // ===========================================================================
 
-  /// Fetch ALL business details from server (same data as web dashboard)
+  /// Fetch ALL business details + lock/pending status
   Future<Map<String, dynamic>?> fetchFullBusinessDetails({
     required String userId,
   }) async {
@@ -937,7 +938,9 @@ class ApiService {
       );
       final data = response.data;
       if (data is Map && data['success'] == true) {
-        debugPrint('BusinessAPI: Fetched business details');
+        debugPrint(
+          'BusinessAPI: Fetched (biz_locked=${data['business_locked']}, billing_locked=${data['billing_locked']})',
+        );
         return Map<String, dynamic>.from(data);
       }
       return null;
@@ -947,8 +950,8 @@ class ApiService {
     }
   }
 
-  /// Save ALL business details to server (syncs with web dashboard)
-  Future<bool> saveFullBusinessDetails({
+  /// Save business details (first-time only; locked fields are skipped server-side)
+  Future<Map<String, dynamic>> saveFullBusinessDetails({
     required String userId,
     required Map<String, dynamic> data,
   }) async {
@@ -956,18 +959,172 @@ class ApiService {
     try {
       final payload = Map<String, dynamic>.from(data);
       payload['user_id'] = int.tryParse(userId) ?? userId;
-
       debugPrint('BusinessAPI: POST /business/save');
       final response = await dio.post(
         '/wp-json/kakiso/v1/business/save',
         data: payload,
       );
-      final ok = response.data['success'] == true;
-      debugPrint('BusinessAPI: save result=$ok');
-      return ok;
+      final result = Map<String, dynamic>.from(response.data);
+      debugPrint(
+        'BusinessAPI: save result=${result['success']} msg=${result['message']}',
+      );
+      return result;
     } catch (e) {
       debugPrint('BusinessAPI: save error: $e');
-      return false;
+      return {'success': false, 'message': 'Network error'};
+    }
+  }
+
+  /// Submit edit request for locked fields (admin approval required)
+  /// editType: "business" or "billing"
+  Future<Map<String, dynamic>> requestBusinessEdit({
+    required String userId,
+    required String editType,
+    required Map<String, dynamic> data,
+  }) async {
+    final dio = await _client;
+    try {
+      final payload = Map<String, dynamic>.from(data);
+      payload['user_id'] = int.tryParse(userId) ?? userId;
+      payload['edit_type'] = editType;
+      debugPrint('BusinessAPI: POST /business/request-edit ($editType)');
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/business/request-edit',
+        data: payload,
+      );
+      final result = Map<String, dynamic>.from(response.data);
+      debugPrint('BusinessAPI: request-edit result=${result['success']}');
+      return result;
+    } catch (e) {
+      debugPrint('BusinessAPI: request-edit error: $e');
+      return {'success': false, 'message': 'Network error'};
+    }
+  }
+  // ===========================================================================
+  // 14. CUSTOMER ADDRESS API — Syncs with reseller_customer_addresses user_meta
+  // ===========================================================================
+  // ADD these methods inside ApiService class, BEFORE the final closing }
+  // ===========================================================================
+
+  /// Fetch all customer addresses from server
+  Future<List<Map<String, dynamic>>> fetchCustomerAddresses({
+    required String userId,
+  }) async {
+    final dio = await _client;
+    try {
+      debugPrint('AddressAPI: GET /addresses?user_id=$userId');
+      final response = await dio.get(
+        '/wp-json/kakiso/v1/addresses',
+        queryParameters: {
+          'user_id': userId,
+          '_t': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true && data['addresses'] is List) {
+        debugPrint('AddressAPI: Fetched ${data['count']} addresses');
+        return List<Map<String, dynamic>>.from(
+          (data['addresses'] as List).map((e) => Map<String, dynamic>.from(e)),
+        );
+      }
+      return [];
+    } catch (e) {
+      debugPrint('AddressAPI: fetch error: $e');
+      return [];
+    }
+  }
+
+  /// Add new customer address to server
+  Future<Map<String, dynamic>> addCustomerAddress({
+    required String userId,
+    required Map<String, dynamic> address,
+  }) async {
+    final dio = await _client;
+    try {
+      final payload = Map<String, dynamic>.from(address);
+      payload['user_id'] = int.tryParse(userId) ?? userId;
+      debugPrint('AddressAPI: POST /addresses/add');
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/addresses/add',
+        data: payload,
+      );
+      return Map<String, dynamic>.from(response.data);
+    } catch (e) {
+      debugPrint('AddressAPI: add error: $e');
+      return {'success': false, 'message': 'Network error'};
+    }
+  }
+
+  /// Delete customer address from server
+  Future<Map<String, dynamic>> deleteCustomerAddress({
+    required String userId,
+    required String addressId,
+  }) async {
+    final dio = await _client;
+    try {
+      debugPrint('AddressAPI: POST /addresses/delete ($addressId)');
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/addresses/delete',
+        data: {
+          'user_id': int.tryParse(userId) ?? userId,
+          'address_id': addressId,
+        },
+      );
+      return Map<String, dynamic>.from(response.data);
+    } catch (e) {
+      debugPrint('AddressAPI: delete error: $e');
+      return {'success': false, 'message': 'Network error'};
+    }
+  }
+
+  /// Update existing customer address on server
+  Future<Map<String, dynamic>> updateCustomerAddress({
+    required String userId,
+    required String addressId,
+    required Map<String, dynamic> address,
+  }) async {
+    final dio = await _client;
+    try {
+      final payload = Map<String, dynamic>.from(address);
+      payload['user_id'] = int.tryParse(userId) ?? userId;
+      payload['address_id'] = addressId;
+      debugPrint('AddressAPI: POST /addresses/update ($addressId)');
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/addresses/update',
+        data: payload,
+      );
+      return Map<String, dynamic>.from(response.data);
+    } catch (e) {
+      debugPrint('AddressAPI: update error: $e');
+      return {'success': false, 'message': 'Network error'};
+    }
+  }
+  // ===========================================================================
+  // 15. HOME SCREEN CONFIG API
+  // ===========================================================================
+  // ADD these methods inside ApiService class, BEFORE the final closing }
+  // ===========================================================================
+
+  /// Fetch home screen layout config from admin
+  Future<Map<String, dynamic>?> fetchHomeConfig() async {
+    final dio = await _client;
+    try {
+      debugPrint('HomeConfigAPI: GET /home-config');
+      final response = await dio.get(
+        '/wp-json/kakiso/v1/home-config',
+        queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        debugPrint(
+          'HomeConfigAPI: configured=${data['configured']}, sections=${(data['sections'] as List?)?.length}',
+        );
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('HomeConfigAPI: error: $e');
+      return null;
     }
   }
 }

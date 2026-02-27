@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/src/scheduler/binding.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -178,121 +176,121 @@ class _CatalogueSectionContentState extends State<CatalogueSectionContent>
   // DEFAULT CATALOGUES CREATION
   // ═══════════════════════════════════════════════════════════
 
-  Future<void> _checkAndCreateDefaultCatalogues() async {
-    bool hasCreated =
-        _localStorage.read(CatalogueStorageKeys.hasCreatedDefaultCatalogs) ??
-        false;
+  // Future<void> _checkAndCreateDefaultCatalogues() async {
+  //   bool hasCreated =
+  //       _localStorage.read(CatalogueStorageKeys.hasCreatedDefaultCatalogs) ??
+  //       false;
 
-    if (hasCreated && catalogueController.myCatalogues.isNotEmpty) return;
+  //   if (hasCreated && catalogueController.myCatalogues.isNotEmpty) return;
 
-    final allProducts = homeProductsController.allProducts;
-    if (allProducts.isEmpty) return;
+  //   final allProducts = homeProductsController.allProducts;
+  //   if (allProducts.isEmpty) return;
 
-    // High Margin Picks
-    await _createHighMarginCatalogue(allProducts);
+  //   // High Margin Picks
+  //   await _createHighMarginCatalogue(allProducts);
 
-    // Under ₹1000 Store
-    await _createBudgetCatalogue(allProducts);
+  //   // Under ₹1000 Store
+  //   await _createBudgetCatalogue(allProducts);
 
-    // Trending & Viral
-    await _createTrendingCatalogue(allProducts);
+  //   // Trending & Viral
+  //   await _createTrendingCatalogue(allProducts);
 
-    _localStorage.write(CatalogueStorageKeys.hasCreatedDefaultCatalogs, true);
-    if (mounted) setState(() {});
-  }
+  //   _localStorage.write(CatalogueStorageKeys.hasCreatedDefaultCatalogs, true);
+  //   if (mounted) setState(() {});
+  // }
 
-  Future<void> _createHighMarginCatalogue(
-    List<ProductModel> allProducts,
-  ) async {
-    final highMarginProducts = allProducts
-        .where(
-          (p) =>
-              (double.tryParse(p.price) ?? 0) >
-              DefaultCatalogueTemplates.highMarginThreshold,
-        )
-        .take(DefaultCatalogueTemplates.highMarginLimit)
-        .toList();
+  // Future<void> _createHighMarginCatalogue(
+  //   List<ProductModel> allProducts,
+  // ) async {
+  //   final highMarginProducts = allProducts
+  //       .where(
+  //         (p) =>
+  //             (double.tryParse(p.price) ?? 0) >
+  //             DefaultCatalogueTemplates.highMarginThreshold,
+  //       )
+  //       .take(DefaultCatalogueTemplates.highMarginLimit)
+  //       .toList();
 
-    if (highMarginProducts.isNotEmpty) {
-      if (!catalogueController.myCatalogues.any(
-        (c) => c.name == DefaultCatalogueTemplates.highMarginName,
-      )) {
-        catalogueController.createCatalogue(
-          DefaultCatalogueTemplates.highMarginName,
-          DefaultCatalogueTemplates.highMarginDesc,
-        );
-        await Future.delayed(const Duration(milliseconds: 50));
-        final cat = catalogueController.myCatalogues.firstWhereOrNull(
-          (c) => c.name == DefaultCatalogueTemplates.highMarginName,
-        );
-        if (cat != null) {
-          for (var p in highMarginProducts) {
-            catalogueController.addProductToCatalogue(cat.id, p);
-          }
-        }
-      }
-    }
-  }
+  //   if (highMarginProducts.isNotEmpty) {
+  //     if (!catalogueController.myCatalogues.any(
+  //       (c) => c.name == DefaultCatalogueTemplates.highMarginName,
+  //     )) {
+  //       catalogueController.createCatalogue(
+  //         DefaultCatalogueTemplates.highMarginName,
+  //         DefaultCatalogueTemplates.highMarginDesc,
+  //       );
+  //       await Future.delayed(const Duration(milliseconds: 50));
+  //       final cat = catalogueController.myCatalogues.firstWhereOrNull(
+  //         (c) => c.name == DefaultCatalogueTemplates.highMarginName,
+  //       );
+  //       if (cat != null) {
+  //         for (var p in highMarginProducts) {
+  //           catalogueController.addProductToCatalogue(cat.id, p);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
-  Future<void> _createBudgetCatalogue(List<ProductModel> allProducts) async {
-    final budgetProducts = allProducts
-        .where(
-          (p) =>
-              (double.tryParse(p.price) ?? 0) <
-                  DefaultCatalogueTemplates.budgetThreshold &&
-              (double.tryParse(p.price) ?? 0) > 0,
-        )
-        .take(DefaultCatalogueTemplates.budgetLimit)
-        .toList();
+  // Future<void> _createBudgetCatalogue(List<ProductModel> allProducts) async {
+  //   final budgetProducts = allProducts
+  //       .where(
+  //         (p) =>
+  //             (double.tryParse(p.price) ?? 0) <
+  //                 DefaultCatalogueTemplates.budgetThreshold &&
+  //             (double.tryParse(p.price) ?? 0) > 0,
+  //       )
+  //       .take(DefaultCatalogueTemplates.budgetLimit)
+  //       .toList();
 
-    if (budgetProducts.isNotEmpty) {
-      if (!catalogueController.myCatalogues.any(
-        (c) => c.name == DefaultCatalogueTemplates.budgetName,
-      )) {
-        catalogueController.createCatalogue(
-          DefaultCatalogueTemplates.budgetName,
-          DefaultCatalogueTemplates.budgetDesc,
-        );
-        await Future.delayed(const Duration(milliseconds: 50));
-        final cat = catalogueController.myCatalogues.firstWhereOrNull(
-          (c) => c.name == DefaultCatalogueTemplates.budgetName,
-        );
-        if (cat != null) {
-          for (var p in budgetProducts) {
-            catalogueController.addProductToCatalogue(cat.id, p);
-          }
-        }
-      }
-    }
-  }
+  //   if (budgetProducts.isNotEmpty) {
+  //     if (!catalogueController.myCatalogues.any(
+  //       (c) => c.name == DefaultCatalogueTemplates.budgetName,
+  //     )) {
+  //       catalogueController.createCatalogue(
+  //         DefaultCatalogueTemplates.budgetName,
+  //         DefaultCatalogueTemplates.budgetDesc,
+  //       );
+  //       await Future.delayed(const Duration(milliseconds: 50));
+  //       final cat = catalogueController.myCatalogues.firstWhereOrNull(
+  //         (c) => c.name == DefaultCatalogueTemplates.budgetName,
+  //       );
+  //       if (cat != null) {
+  //         for (var p in budgetProducts) {
+  //           catalogueController.addProductToCatalogue(cat.id, p);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
-  Future<void> _createTrendingCatalogue(List<ProductModel> allProducts) async {
-    final trendingProducts = List<ProductModel>.from(allProducts)
-      ..shuffle(Random());
-    final selectedTrending = trendingProducts
-        .take(DefaultCatalogueTemplates.trendingLimit)
-        .toList();
+  // Future<void> _createTrendingCatalogue(List<ProductModel> allProducts) async {
+  //   final trendingProducts = List<ProductModel>.from(allProducts)
+  //     ..shuffle(Random());
+  //   final selectedTrending = trendingProducts
+  //       .take(DefaultCatalogueTemplates.trendingLimit)
+  //       .toList();
 
-    if (selectedTrending.isNotEmpty) {
-      if (!catalogueController.myCatalogues.any(
-        (c) => c.name == DefaultCatalogueTemplates.trendingName,
-      )) {
-        catalogueController.createCatalogue(
-          DefaultCatalogueTemplates.trendingName,
-          DefaultCatalogueTemplates.trendingDesc,
-        );
-        await Future.delayed(const Duration(milliseconds: 50));
-        final cat = catalogueController.myCatalogues.firstWhereOrNull(
-          (c) => c.name == DefaultCatalogueTemplates.trendingName,
-        );
-        if (cat != null) {
-          for (var p in selectedTrending) {
-            catalogueController.addProductToCatalogue(cat.id, p);
-          }
-        }
-      }
-    }
-  }
+  //   if (selectedTrending.isNotEmpty) {
+  //     if (!catalogueController.myCatalogues.any(
+  //       (c) => c.name == DefaultCatalogueTemplates.trendingName,
+  //     )) {
+  //       catalogueController.createCatalogue(
+  //         DefaultCatalogueTemplates.trendingName,
+  //         DefaultCatalogueTemplates.trendingDesc,
+  //       );
+  //       await Future.delayed(const Duration(milliseconds: 50));
+  //       final cat = catalogueController.myCatalogues.firstWhereOrNull(
+  //         (c) => c.name == DefaultCatalogueTemplates.trendingName,
+  //       );
+  //       if (cat != null) {
+  //         for (var p in selectedTrending) {
+  //           catalogueController.addProductToCatalogue(cat.id, p);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
   // ═══════════════════════════════════════════════════════════
   // DIALOG & SHEET HANDLERS
   // ═══════════════════════════════════════════════════════════

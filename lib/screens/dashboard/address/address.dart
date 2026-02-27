@@ -1,79 +1,57 @@
 // lib/screens/dashboard/address/address.dart
-import 'dart:convert';
+// v2: Full DB sync via /kakiso/v1/addresses REST API
+// Addresses stored in reseller_customer_addresses user_meta (same as web)
+// Local cache in FlutterSecureStorage for offline/speed
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added for input formatters
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/checkout/checkout.dart';
+import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
-
-// 🔹 STEP: Customer Address (Step 3)
 
 class CustomerAddressPage extends StatefulWidget {
   final UserData? userData;
   final bool fromDrawer;
-
   const CustomerAddressPage({
     super.key,
     this.userData,
     this.fromDrawer = false,
   });
-
   @override
   State<CustomerAddressPage> createState() => _CustomerAddressPageState();
 }
 
 class _CustomerAddressPageState extends State<CustomerAddressPage> {
   final _formKey = GlobalKey<FormState>();
-
-  final TextEditingController _customerNameCtrl = TextEditingController();
-  final TextEditingController _customerPhoneCtrl = TextEditingController();
-
-  // Address split into three lines
-  final TextEditingController _addressLine1Ctrl = TextEditingController();
-  final TextEditingController _addressLine2Ctrl = TextEditingController();
-  final TextEditingController _addressLine3Ctrl = TextEditingController();
-
-  // City and State controllers (bound to Autocomplete)
-  final TextEditingController _cityCtrl = TextEditingController();
-  final TextEditingController _stateCtrl = TextEditingController();
-
-  final TextEditingController _countryCtrl = TextEditingController(
-    text: 'India',
-  );
-  final TextEditingController _pincodeCtrl = TextEditingController();
-
-  // Keys to force rebuild Autocomplete widgets when data changes programmatically
+  final _customerNameCtrl = TextEditingController();
+  final _customerPhoneCtrl = TextEditingController();
+  final _addressLine1Ctrl = TextEditingController();
+  final _addressLine2Ctrl = TextEditingController();
+  final _addressLine3Ctrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
+  final _countryCtrl = TextEditingController(text: 'India');
+  final _pincodeCtrl = TextEditingController();
   Key _stateFieldKey = UniqueKey();
   Key _cityFieldKey = UniqueKey();
+  String? _selectedState, _selectedCity;
+  bool _isSaving = false, _isLoading = false;
 
-  // State dropdown selection
-  String? _selectedState;
-  String? _selectedCity;
-
-  bool _isSaving = false;
-
-  // ---- STORAGE SETUP ----
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String _storageKey = 'customer_addresses';
   static const String _businessStorageKey = 'business_details';
 
-  // ---- IN-MEMORY LIST OF SAVED ADDRESSES ----
   List<CustomerAddress> _savedAddresses = [];
   int? _selectedIndex;
-
-  // ---- BUSINESS ADDRESS (for FinalCheckoutPage) ----
-  String? _businessAddressLabel;
-  String? _businessAddressText;
-
+  String? _businessAddressLabel, _businessAddressText;
   UserData? get _userData => widget.userData;
 
-  // 🔹 DATA: Comprehensive State & City Mapping
   final Map<String, List<String>> _stateCityMap = {
     'Andaman and Nicobar Islands': [
       'Port Blair',
@@ -199,48 +177,22 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       'South Delhi',
       'East Delhi',
       'West Delhi',
-      'Dwarka',
-      'Rohini',
-      'Saket',
-      'Vasant Kunj',
-      'Janakpuri',
-      'Laxmi Nagar',
-      'Karol Bagh',
-      'Connaught Place',
     ],
-    'Goa': [
-      'Mapusa',
-      'Margao',
-      'Mormugao',
-      'Panaji',
-      'Ponda',
-      'Vasco da Gama',
-      'Bicholim',
-      'Curchorem',
-    ],
+    'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
     'Gujarat': [
       'Ahmedabad',
       'Amreli',
       'Anand',
-      'Anjar',
-      'Bardoli',
       'Bharuch',
       'Bhavnagar',
       'Bhuj',
-      'Botad',
       'Dahod',
-      'Deesa',
-      'Gandhidham',
       'Gandhinagar',
+      'Gandhidham',
       'Godhra',
-      'Gondal',
-      'Himmatnagar',
       'Jamnagar',
-      'Jetpur',
       'Junagadh',
-      'Kalol',
-      'Mahesana',
-      'Modasa',
+      'Mehsana',
       'Morbi',
       'Nadiad',
       'Navsari',
@@ -257,44 +209,29 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     ],
     'Haryana': [
       'Ambala',
-      'Bahadurgarh',
       'Bhiwani',
-      'Charkhi Dadri',
       'Faridabad',
-      'Fatehabad',
       'Gurugram',
-      'Hansi',
       'Hisar',
-      'Jind',
-      'Kaithal',
       'Karnal',
-      'Kurukshetra',
-      'Narnaul',
-      'Narwana',
-      'Palwal',
-      'Panchkula',
       'Panipat',
-      'Rewari',
+      'Panchkula',
       'Rohtak',
       'Sirsa',
       'Sonipat',
-      'Thanesar',
-      'Tohana',
       'Yamunanagar',
     ],
     'Himachal Pradesh': [
       'Baddi',
       'Bilaspur',
-      'Chamba',
       'Dharamshala',
       'Hamirpur',
       'Kullu',
       'Mandi',
       'Nahan',
-      'Paonta Sahib',
+      'Palampur',
       'Shimla',
       'Solan',
-      'Sundarnagar',
       'Una',
     ],
     'Jammu and Kashmir': [
@@ -302,122 +239,72 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       'Baramulla',
       'Jammu',
       'Kathua',
-      'Pulwama',
       'Sopore',
       'Srinagar',
       'Udhampur',
     ],
     'Jharkhand': [
-      'Adityapur',
       'Bokaro',
-      'Chaibasa',
       'Deoghar',
       'Dhanbad',
       'Dumka',
       'Giridih',
-      'Hazaribagh',
+      'Hazaribag',
       'Jamshedpur',
-      'Jhumri Tilaiya',
-      'Mango',
-      'Medininagar',
-      'Phusro',
-      'Ramgarh',
       'Ranchi',
-      'Sahibganj',
     ],
     'Karnataka': [
       'Bagalkot',
-      'Belagavi',
       'Ballari',
+      'Belgaum',
       'Bengaluru',
       'Bidar',
-      'Chikkamagaluru',
-      'Chitradurga',
-      'Davangere',
+      'Davanagere',
       'Dharwad',
-      'Gadag',
-      'Gangavathi',
+      'Gulbarga',
       'Hassan',
-      'Hospet',
-      'Hubballi',
-      'Kalaburagi',
+      'Hubli',
       'Kolar',
       'Mandya',
       'Mangaluru',
       'Mysuru',
       'Raichur',
-      'Ranebennur',
-      'Robertson Pet',
-      'Shivamogga',
-      'Tumakuru',
+      'Shimoga',
+      'Tumkur',
       'Udupi',
-      'Vijayapura',
     ],
     'Kerala': [
       'Alappuzha',
-      'Changanassery',
-      'Cherthala',
-      'Guruvayur',
       'Kannur',
       'Kasaragod',
-      'Kayamkulam',
       'Kochi',
       'Kollam',
       'Kottayam',
       'Kozhikode',
-      'Kunnamkulam',
       'Malappuram',
-      'Manjeri',
-      'Nedumangad',
-      'Neyyattinkara',
       'Palakkad',
-      'Payyanur',
-      'Ponnani',
-      'Taliparamba',
-      'Thalassery',
+      'Pathanamthitta',
       'Thiruvananthapuram',
-      'Thrippunithura',
       'Thrissur',
-      'Tirur',
-      'Vadakara',
     ],
-    'Ladakh': ['Leh', 'Kargil'],
-    'Lakshadweep': ['Kavaratti', 'Minicoy', 'Andrott'],
+    'Ladakh': ['Kargil', 'Leh'],
+    'Lakshadweep': ['Kavaratti'],
     'Madhya Pradesh': [
-      'Ashoknagar',
-      'Balaghat',
-      'Betul',
-      'Bhind',
       'Bhopal',
       'Burhanpur',
-      'Chhatarpur',
       'Chhindwara',
-      'Damoh',
-      'Datia',
       'Dewas',
-      'Dhar',
-      'Guna',
       'Gwalior',
-      'Hoshangabad',
       'Indore',
-      'Itarsi',
       'Jabalpur',
+      'Katni',
       'Khandwa',
-      'Khargone',
-      'Mandsaur',
       'Morena',
-      'Murwara',
-      'Nagda',
-      'Neemuch',
-      'Pithampur',
       'Ratlam',
       'Rewa',
       'Sagar',
       'Satna',
       'Sehore',
-      'Seoni',
-      'Shahdol',
-      'Shivpuri',
       'Singrauli',
       'Ujjain',
       'Vidisha',
@@ -427,224 +314,124 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       'Akola',
       'Amravati',
       'Aurangabad',
-      'Badlapur',
-      'Barshi',
-      'Bhiwandi',
-      'Bhusawal',
       'Chandrapur',
       'Dhule',
-      'Gondia',
       'Ichalkaranji',
       'Jalgaon',
       'Jalna',
-      'Kalyan-Dombivli',
       'Kolhapur',
       'Latur',
       'Malegaon',
-      'Mira-Bhayandar',
       'Mumbai',
       'Nagpur',
       'Nanded',
       'Nashik',
       'Navi Mumbai',
-      'Osmanabad',
-      'Panvel',
       'Parbhani',
       'Pune',
       'Sangli',
       'Satara',
       'Solapur',
       'Thane',
-      'Ulhasnagar',
-      'Vasai-Virar',
-      'Wardha',
-      'Yavatmal',
     ],
-    'Manipur': ['Imphal', 'Thoubal', 'Kakching', 'Ukhrul'],
-    'Meghalaya': ['Shillong', 'Tura', 'Jowai', 'Nongstoin'],
-    'Mizoram': ['Aizawl', 'Lunglei', 'Saiha', 'Champhai'],
-    'Nagaland': [
-      'Dimapur',
-      'Kohima',
-      'Mokokchung',
-      'Tuensang',
-      'Wokha',
-      'Zunheboto',
-    ],
+    'Manipur': ['Bishnupur', 'Imphal', 'Thoubal'],
+    'Meghalaya': ['Jowai', 'Shillong', 'Tura'],
+    'Mizoram': ['Aizawl', 'Champhai', 'Lunglei'],
+    'Nagaland': ['Dimapur', 'Kohima', 'Mokokchung'],
     'Odisha': [
-      'Balangir',
       'Balasore',
       'Baripada',
-      'Bhadrak',
       'Berhampur',
       'Bhubaneswar',
-      'Brajrajnagar',
       'Cuttack',
       'Jharsuguda',
-      'Jeypore',
       'Puri',
       'Rourkela',
       'Sambalpur',
     ],
-    'Puducherry': ['Karaikal', 'Mahe', 'Puducherry', 'Yanam', 'Ozhukarai'],
+    'Puducherry': ['Karaikal', 'Mahe', 'Puducherry', 'Yanam'],
     'Punjab': [
-      'Abohar',
       'Amritsar',
-      'Barnala',
-      'Batala',
       'Bathinda',
-      'Firozpur',
       'Hoshiarpur',
       'Jalandhar',
-      'Kapurthala',
-      'Khanna',
       'Ludhiana',
-      'Malerkotla',
       'Moga',
       'Mohali',
-      'Muktsar',
       'Pathankot',
       'Patiala',
-      'Phagwara',
-      'Rajpura',
     ],
     'Rajasthan': [
       'Ajmer',
       'Alwar',
-      'Barmer',
-      'Beawar',
       'Bharatpur',
       'Bhilwara',
-      'Bhiwadi',
       'Bikaner',
-      'Bundi',
-      'Chittorgarh',
-      'Churu',
-      'Dausa',
-      'Dholpur',
-      'Ganganagar',
       'Hanumangarh',
-      'Hindaun',
       'Jaipur',
-      'Jaisalmer',
-      'Jhunjhunu',
       'Jodhpur',
-      'Kishangarh',
       'Kota',
-      'Nagaur',
       'Pali',
-      'Sawai Madhopur',
       'Sikar',
-      'Sirohi',
-      'Tonk',
+      'Sri Ganganagar',
       'Udaipur',
     ],
-    'Sikkim': ['Gangtok', 'Namchi', 'Gyalshing', 'Mangan'],
+    'Sikkim': ['Gangtok', 'Gyalshing', 'Namchi'],
     'Tamil Nadu': [
-      'Ambur',
-      'Avadi',
       'Chennai',
       'Coimbatore',
       'Cuddalore',
       'Dindigul',
       'Erode',
       'Hosur',
-      'Kanchipuram',
-      'Karaikudi',
       'Karur',
-      'Kumbakonam',
       'Madurai',
+      'Nagapattinam',
+      'Namakkal',
       'Nagercoil',
-      'Neyveli',
-      'Pallavaram',
-      'Pudukkottai',
-      'Rajapalayam',
       'Salem',
-      'Tambaram',
       'Thanjavur',
       'Thoothukudi',
       'Tiruchirappalli',
       'Tirunelveli',
       'Tiruppur',
-      'Tiruvannamalai',
       'Vellore',
     ],
     'Telangana': [
-      'Adilabad',
       'Hyderabad',
-      'Jagtial',
       'Karimnagar',
       'Khammam',
       'Mahbubnagar',
-      'Mancherial',
-      'Miryalaguda',
       'Nalgonda',
       'Nizamabad',
       'Ramagundam',
-      'Secunderabad',
       'Siddipet',
-      'Suryapet',
       'Warangal',
     ],
-    'Tripura': ['Agartala', 'Dharmanagar', 'Kailasahar', 'Udaipur', 'Ambassa'],
+    'Tripura': ['Agartala', 'Dharmanagar', 'Udaipur'],
     'Uttar Pradesh': [
       'Agra',
       'Aligarh',
       'Allahabad',
       'Amroha',
       'Ayodhya',
-      'Azamgarh',
-      'Bahraich',
-      'Ballia',
-      'Banda',
       'Bareilly',
-      'Basti',
-      'Budaun',
       'Bulandshahr',
-      'Chandausi',
-      'Deoria',
-      'Etah',
       'Etawah',
-      'Faizabad',
-      'Farrukhabad',
-      'Fatehpur',
       'Firozabad',
       'Ghaziabad',
-      'Ghazipur',
-      'Gonda',
       'Gorakhpur',
-      'Hapur',
-      'Hardoi',
-      'Hathras',
-      'Jaunpur',
       'Jhansi',
       'Kanpur',
-      'Kasganj',
-      'Khoshambi',
-      'Lakhimpur',
-      'Lalitpur',
+      'Lakhimpur Kheri',
       'Lucknow',
-      'Mainpuri',
       'Mathura',
-      'Maunath Bhanjan',
       'Meerut',
-      'Mirzapur',
-      'Modinagar',
       'Moradabad',
       'Muzaffarnagar',
       'Noida',
-      'Orai',
-      'Pilibhit',
-      'Prayagraj',
-      'Rae Bareli',
-      'Rampur',
       'Saharanpur',
-      'Sambhal',
       'Shahjahanpur',
-      'Shamli',
-      'Sitapur',
-      'Sultanpur',
-      'Unnao',
       'Varanasi',
     ],
     'Uttarakhand': [
@@ -652,65 +439,30 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       'Haldwani',
       'Haridwar',
       'Kashipur',
+      'Rishikesh',
       'Roorkee',
       'Rudrapur',
-      'Rishikesh',
-      'Nainital',
     ],
     'West Bengal': [
-      'Alipurduar',
       'Asansol',
       'Baharampur',
-      'Bally',
-      'Balurghat',
-      'Bankura',
-      'Baranagar',
-      'Barasat',
       'Bardhaman',
-      'Basirhat',
-      'Bhatpara',
-      'Bidhannagar',
-      'Bongaon',
-      'Chandannagar',
       'Darjeeling',
       'Durgapur',
-      'Haldia',
+      'Habra',
       'Howrah',
-      'Jalpaiguri',
-      'Kamarhati',
       'Kharagpur',
       'Kolkata',
-      'Krishnanagar',
-      'Madhyamgram',
-      'Maheshtala',
       'Malda',
-      'Medinipur',
-      'Naihati',
-      'North Dumdum',
-      'Panihati',
-      'Purulia',
-      'Raiganj',
-      'Rajarhat',
-      'Rajpur Sonarpur',
-      'Ranaghat',
-      'Serampore',
+      'Midnapore',
       'Siliguri',
-      'South Dumdum',
-      'Titagarh',
-      'Uluberia',
     ],
   };
-
-  List<String> get _indianStates => _stateCityMap.keys.toList()..sort();
-
-  List<String> get _availableCities {
-    if (_selectedState != null && _stateCityMap.containsKey(_selectedState)) {
-      final cities = List<String>.from(_stateCityMap[_selectedState]!);
-      cities.sort();
-      return cities;
-    }
-    return [];
-  }
+  List<String> get _states => _stateCityMap.keys.toList()..sort();
+  List<String> _getCitiesForState(String? s) =>
+      (s != null && _stateCityMap.containsKey(s))
+      ? (List<String>.from(_stateCityMap[s]!)..sort())
+      : [];
 
   @override
   void initState() {
@@ -718,127 +470,131 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     _countryCtrl.text = 'India';
     _loadSavedAddresses();
     _loadBusinessDetails();
+    _loadRemoteAddresses();
   }
 
   @override
   void dispose() {
-    _customerNameCtrl.dispose();
-    _customerPhoneCtrl.dispose();
-    _addressLine1Ctrl.dispose();
-    _addressLine2Ctrl.dispose();
-    _addressLine3Ctrl.dispose();
-    _cityCtrl.dispose();
-    _stateCtrl.dispose();
-    _countryCtrl.dispose();
-    _pincodeCtrl.dispose();
+    for (final c in [
+      _customerNameCtrl,
+      _customerPhoneCtrl,
+      _addressLine1Ctrl,
+      _addressLine2Ctrl,
+      _addressLine3Ctrl,
+      _cityCtrl,
+      _stateCtrl,
+      _countryCtrl,
+      _pincodeCtrl,
+    ])
+      c.dispose();
     super.dispose();
   }
 
-  // ----------------- MODEL -----------------
-  CustomerAddress _buildAddressFromForm() {
-    // Combine three address lines into a single stored address string
-    final fullAddress = [
-      _addressLine1Ctrl.text.trim(),
-      _addressLine2Ctrl.text.trim(),
-      _addressLine3Ctrl.text.trim(),
-    ].where((e) => e.isNotEmpty).join(", ");
+  // ═══ MODEL ═══
+  CustomerAddress _buildAddressFromForm() => CustomerAddress(
+    id: DateTime.now().millisecondsSinceEpoch.toString(),
+    name: _customerNameCtrl.text.trim(),
+    phone: _customerPhoneCtrl.text.trim(),
+    address1: _addressLine1Ctrl.text.trim(),
+    address2: _addressLine2Ctrl.text.trim(),
+    address3: _addressLine3Ctrl.text.trim(),
+    city: _selectedCity ?? '',
+    state: _selectedState ?? '',
+    country: 'India',
+    pincode: _pincodeCtrl.text.trim(),
+  );
 
-    return CustomerAddress(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _customerNameCtrl.text.trim(),
-      phone: _customerPhoneCtrl.text.trim(),
-      addressLine: fullAddress,
-      city: _selectedCity ?? '',
-      state: _selectedState ?? '',
-      country: 'India', // locked to India
-      pincode: _pincodeCtrl.text.trim(),
-    );
-  }
-
-  // ----------------- STORAGE : CUSTOMER ADDRESSES -----------------
+  // ═══ LOCAL STORAGE ═══
   Future<void> _loadSavedAddresses() async {
     try {
-      final String? jsonStr = await _storage.read(key: _storageKey);
-      if (jsonStr == null) return;
-
-      final List<dynamic> list = jsonDecode(jsonStr);
-      final addresses = list
-          .map((e) => CustomerAddress.fromJson(e as Map<String, dynamic>))
+      final js = await _storage.read(key: _storageKey);
+      if (js == null) return;
+      final list = (jsonDecode(js) as List)
+          .map((e) => CustomerAddress.fromJson(e))
           .toList();
-
       setState(() {
-        _savedAddresses = addresses;
-        if (_savedAddresses.isNotEmpty) {
-          _selectedIndex = 0;
-        }
+        _savedAddresses = list;
+        if (_savedAddresses.isNotEmpty) _selectedIndex = 0;
       });
     } catch (e) {
-      debugPrint('Failed to load customer addresses: $e');
+      debugPrint('Load local addresses error: $e');
     }
   }
 
   Future<void> _saveAddressesToStorage() async {
-    final jsonList = _savedAddresses.map((e) => e.toJson()).toList();
-    await _storage.write(key: _storageKey, value: jsonEncode(jsonList));
+    await _storage.write(
+      key: _storageKey,
+      value: jsonEncode(_savedAddresses.map((e) => e.toJson()).toList()),
+    );
   }
 
-  // ----------------- STORAGE : BUSINESS DETAILS -----------------
-  Future<void> _loadBusinessDetails() async {
+  // ═══ REMOTE SYNC ═══
+  Future<void> _loadRemoteAddresses() async {
+    final uid = _userData?.userId;
+    if (uid == null || uid.trim().isEmpty) return;
+    setState(() => _isLoading = true);
     try {
-      final String? jsonStr = await _storage.read(key: _businessStorageKey);
-      if (jsonStr == null) return;
-
-      final Map<String, dynamic> data = jsonDecode(jsonStr);
-
-      final String businessName =
-          (data['businessName'] as String?)?.trim() ?? '';
-      final String ownerName = (data['ownerName'] as String?)?.trim() ?? '';
-      final String street = (data['address'] as String?)?.trim() ?? '';
-      final String city = (data['city'] as String?)?.trim() ?? '';
-      final String state = (data['state'] as String?)?.trim() ?? '';
-      final String country = (data['country'] as String?)?.trim() ?? '';
-      final String pincode = (data['pincode'] as String?)?.trim() ?? '';
-      final String phone = (data['phone'] as String?)?.trim() ?? '';
-
-      final String label = businessName.isNotEmpty
-          ? businessName
-          : 'Your Business';
-
-      // Build nicer multi-line address
-      final List<String> line1Parts = [];
-      if (street.isNotEmpty) line1Parts.add(street);
-      if (city.isNotEmpty) line1Parts.add(city);
-      if (state.isNotEmpty) line1Parts.add(state);
-      if (country.isNotEmpty) line1Parts.add(country);
-
-      String line1 = line1Parts.join(', ');
-      if (pincode.isNotEmpty) {
-        line1 = line1.isEmpty ? pincode : '$line1 - $pincode';
+      final remoteList = await ApiService().fetchCustomerAddresses(userId: uid);
+      if (!mounted || remoteList.isEmpty) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
       }
-
-      final List<String> finalLines = [];
-      if (line1.trim().isNotEmpty) finalLines.add(line1);
-      if (phone.isNotEmpty) finalLines.add('Phone: $phone');
-      if (ownerName.isNotEmpty) finalLines.add('Owner: $ownerName');
-
-      final String addressText = finalLines.join('\n');
-
+      final addresses = remoteList
+          .map((e) => CustomerAddress.fromServerJson(e))
+          .toList();
       setState(() {
-        _businessAddressLabel = label;
-        _businessAddressText = addressText.isNotEmpty
-            ? addressText
-            : 'Business address not provided';
+        _savedAddresses = addresses;
+        if (_savedAddresses.isNotEmpty && _selectedIndex == null)
+          _selectedIndex = 0;
       });
+      await _saveAddressesToStorage(); // cache locally
     } catch (e) {
-      debugPrint('Failed to load business details for checkout: $e');
+      debugPrint('Remote address load error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ----------------- ACTIONS -----------------
+  // ═══ BUSINESS DETAILS (for checkout) ═══
+  Future<void> _loadBusinessDetails() async {
+    try {
+      final js = await _storage.read(key: _businessStorageKey);
+      if (js == null) return;
+      final d = jsonDecode(js) as Map<String, dynamic>;
+      final biz = (d['storeName'] ?? d['businessName'] ?? '').toString().trim();
+      final street = (d['addressLine1'] ?? d['address'] ?? '')
+          .toString()
+          .trim();
+      final city = (d['city'] ?? '').toString().trim();
+      final state = (d['state'] ?? '').toString().trim();
+      final pin = (d['pincode'] ?? '').toString().trim();
+      final phone = (d['phone'] ?? '').toString().trim();
+      final owner = (d['ownerName'] ?? '').toString().trim();
+      String addr = [
+        street,
+        city,
+        state,
+        'India',
+      ].where((s) => s.isNotEmpty).join(', ');
+      if (pin.isNotEmpty) addr += ' - $pin';
+      final lines = <String>[];
+      if (addr.isNotEmpty) lines.add(addr);
+      if (phone.isNotEmpty) lines.add('Phone: $phone');
+      if (owner.isNotEmpty) lines.add('Owner: $owner');
+      setState(() {
+        _businessAddressLabel = biz.isNotEmpty ? biz : 'Your Business';
+        _businessAddressText = lines.isNotEmpty
+            ? lines.join('\n')
+            : 'Business address not provided';
+      });
+    } catch (e) {
+      debugPrint('Load business error: $e');
+    }
+  }
+
+  // ═══ SAVE ADDRESS (local + server) ═══
   Future<void> _onSaveAddress() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Explicit check for dropdowns (in case Autocomplete field text is valid but no selection tracked)
     if (_selectedState == null || _selectedState!.isEmpty) {
       Get.snackbar(
         'State Required',
@@ -857,39 +613,45 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       );
       return;
     }
-
     setState(() => _isSaving = true);
-
     try {
-      final newAddress = _buildAddressFromForm();
-      _savedAddresses.insert(
-        0,
-        newAddress,
-      ); // latest on top, treated as default
+      final newAddr = _buildAddressFromForm();
+      // Optimistic UI
+      _savedAddresses.insert(0, newAddr);
       _selectedIndex = 0;
-
       await _saveAddressesToStorage();
-
-      // clear form
+      // Server sync
+      final uid = _userData?.userId;
+      if (uid != null && uid.trim().isNotEmpty) {
+        final result = await ApiService().addCustomerAddress(
+          userId: uid,
+          address: newAddr.toServerJson(),
+        );
+        if (result['success'] == true && result['address'] != null) {
+          // Update with server-generated ID if different
+          final serverId = result['address']['id'] ?? newAddr.id;
+          if (serverId != newAddr.id && _savedAddresses.isNotEmpty) {
+            _savedAddresses[0] = _savedAddresses[0].copyWith(id: serverId);
+            await _saveAddressesToStorage();
+          }
+        }
+      }
+      // Clear form
       _customerNameCtrl.clear();
       _customerPhoneCtrl.clear();
       _addressLine1Ctrl.clear();
       _addressLine2Ctrl.clear();
       _addressLine3Ctrl.clear();
-
-      // Reset State/City/Pin
       _selectedState = null;
       _stateCtrl.clear();
       _stateFieldKey = UniqueKey();
-
       _selectedCity = null;
       _cityCtrl.clear();
       _cityFieldKey = UniqueKey();
-
       _pincodeCtrl.clear();
       _countryCtrl.text = 'India';
-
       if (!mounted) return;
+      setState(() {});
       Get.snackbar(
         "Address saved",
         "Customer delivery address has been added.",
@@ -898,10 +660,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
         colorText: Colors.white,
       );
     } catch (e) {
-      if (!mounted) return;
       Get.snackbar(
         "Error",
-        "Failed to save address: $e",
+        "Failed: $e",
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -911,17 +672,17 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     }
   }
 
+  // ═══ DELETE ADDRESS (local + server) ═══
   void _onDeleteAddress(int index) async {
-    final removeItem = _savedAddresses[index];
-
-    final bool? confirm = await Get.dialog<bool>(
+    final item = _savedAddresses[index];
+    final confirm = await Get.dialog<bool>(
       AlertDialog(
         title: const Text(
           "Remove address",
           style: TextStyle(fontFamily: 'Poppins'),
         ),
         content: Text(
-          "Remove delivery address for \"${removeItem.name}\"?",
+          'Remove delivery address for "${item.name}"?',
           style: const TextStyle(fontFamily: 'Poppins'),
         ),
         actions: [
@@ -936,212 +697,92 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
         ],
       ),
     );
-
     if (confirm != true) return;
-
     setState(() {
       _savedAddresses.removeAt(index);
-
-      if (_savedAddresses.isEmpty) {
+      if (_savedAddresses.isEmpty)
         _selectedIndex = null;
-      } else if (_selectedIndex != null) {
-        if (_selectedIndex! >= _savedAddresses.length) {
-          _selectedIndex = _savedAddresses.length - 1;
-        }
-      }
+      else if (_selectedIndex != null &&
+          _selectedIndex! >= _savedAddresses.length)
+        _selectedIndex = _savedAddresses.length - 1;
     });
-
     await _saveAddressesToStorage();
+    // Server delete
+    final uid = _userData?.userId;
+    if (uid != null && uid.trim().isNotEmpty) {
+      await ApiService().deleteCustomerAddress(userId: uid, addressId: item.id);
+    }
   }
 
+  // ═══ CHECKOUT CONTINUE ═══
   void _onContinueCheckout() {
     if (_selectedIndex == null || _savedAddresses.isEmpty) {
       Get.snackbar(
         "Select address",
-        "Please select a delivery address to continue.",
+        "Please select a delivery address.",
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
       return;
     }
-
-    final selected = _savedAddresses[_selectedIndex!];
-
-    // Optional toast
+    final s = _savedAddresses[_selectedIndex!];
     Get.snackbar(
       "Address selected",
-      "Delivering to ${selected.name}, ${selected.city}.",
+      "Delivering to ${s.name}, ${s.city}.",
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.green,
       colorText: Colors.white,
       duration: const Duration(seconds: 2),
     );
-
-    // -------- Build Customer Address Text (nice formatting) --------
-    final List<String> lineParts = [];
-    if (selected.addressLine.trim().isNotEmpty) {
-      lineParts.add(selected.addressLine.trim());
-    }
-    if (selected.city.trim().isNotEmpty) {
-      lineParts.add(selected.city.trim());
-    }
-    if (selected.state.trim().isNotEmpty) {
-      lineParts.add(selected.state.trim());
-    }
-    if (selected.country.trim().isNotEmpty) {
-      lineParts.add(selected.country.trim());
-    }
-
-    String line1 = lineParts.join(', ');
-    if (selected.pincode.trim().isNotEmpty) {
-      line1 = '$line1 - ${selected.pincode.trim()}';
-    }
-
-    final String customerLabel = selected.name;
-    final String customerText = [
-      line1,
-      'Phone: ${selected.phone}',
-    ].where((e) => e.trim().isNotEmpty).join('\n');
-
-    // -------- Business Address (from secure storage) --------
-    final String businessLabel = _businessAddressLabel ?? "Your Business";
-    final String businessText =
-        _businessAddressText ?? "Business address not provided";
-
-    // -------- Navigate to Final Checkout Page --------
+    final addr =
+        [
+          s.fullAddress,
+          s.city,
+          s.state,
+          s.country,
+        ].where((e) => e.trim().isNotEmpty).join(', ') +
+        (s.pincode.isNotEmpty ? ' - ${s.pincode}' : '');
+    final custText = [
+      addr,
+      'Phone: ${s.phone}',
+    ].where((e) => e.isNotEmpty).join('\n');
     Get.to(
       () => FinalCheckoutPage(
         userData: _userData,
-        businessAddressLabel: businessLabel,
-        businessAddressText: businessText,
-        customerAddressLabel: customerLabel,
-        customerAddressText: customerText,
+        businessAddressLabel: _businessAddressLabel ?? 'Your Business',
+        businessAddressText: _businessAddressText ?? '',
+        customerAddressLabel: s.name,
+        customerAddressText: custText,
       ),
     );
   }
 
   Future<void> _onUpdateFromDrawer() async {
-    // When opened from drawer, just ensure addresses are saved and show snackbar
     if (_savedAddresses.isEmpty) {
       Get.snackbar(
-        "No address found",
-        "Add at least one customer address, then tap Update & Save.",
+        "No address",
+        "Add at least one address.",
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
       return;
     }
-
     await _saveAddressesToStorage();
-
     Get.snackbar(
-      "Addresses updated",
-      "Your customer address list has been updated.",
+      "Updated",
+      "Customer address list updated.",
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
   }
 
-  // ----------------- UI -----------------
-
-  // Helper widget to build Searchable Dropdowns (Autocomplete)
-  Widget _buildSearchableDropdown({
-    Key? key,
-    required String label,
-    required String? currentValue,
-    required List<String> options,
-    required Function(String) onSelected,
-    required String? Function(String?) validator,
-    required IconData icon,
-    bool enabled = true,
-  }) {
-    return RawAutocomplete<String>(
-      key: key,
-      initialValue: TextEditingValue(text: currentValue ?? ''),
-      optionsBuilder: (TextEditingValue textEditingValue) {
-        if (textEditingValue.text == '') {
-          return const Iterable<String>.empty();
-        }
-        return options.where((String option) {
-          return option.toLowerCase().contains(
-            textEditingValue.text.toLowerCase(),
-          );
-        });
-      },
-      onSelected: onSelected,
-      fieldViewBuilder:
-          (context, textEditingController, focusNode, onFieldSubmitted) {
-            // Important: Keep the main controller in sync so we can read from it later
-            if (currentValue != null &&
-                textEditingController.text.isEmpty &&
-                !focusNode.hasFocus) {
-              textEditingController.text = currentValue;
-            }
-            return TextFormField(
-              controller: textEditingController,
-              focusNode: focusNode,
-              enabled: enabled,
-              decoration: InputDecoration(
-                labelText: label,
-                prefixIcon: Icon(icon, size: 18),
-                suffixIcon: const Icon(
-                  Icons.arrow_drop_down,
-                  color: Colors.grey,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-                hintText: 'Search $label',
-                filled: !enabled,
-                fillColor: !enabled ? Colors.grey.withValues(alpha: 0.1) : null,
-              ),
-              validator: validator,
-            );
-          },
-      optionsViewBuilder: (context, onSelected, options) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4.0,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: MediaQuery.of(context).size.width - 64, // Matches padding
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final String option = options.elementAt(index);
-                  return ListTile(
-                    title: Text(
-                      option,
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                      ),
-                    ),
-                    onTap: () {
-                      onSelected(option);
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
+  // ═══ BUILD ═══
   @override
   Widget build(BuildContext context) {
-    final bool fromDrawer = widget.fromDrawer;
-
+    final fromDrawer = widget.fromDrawer;
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
@@ -1165,16 +806,37 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
         child: Column(
           children: [
             const SizedBox(height: 8),
-
-            // 🔹 STEP HEADER – Address step (only in checkout flow)
             if (!fromDrawer)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
                 child: CheckoutStepHeader(currentStep: 2),
               ),
-
             if (!fromDrawer) _buildInfoBanner(),
-
+            if (_isLoading)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: Row(
+                  children: const [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Syncing addresses\u2026',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'Poppins',
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -1195,265 +857,232 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     );
   }
 
-  Widget _buildInfoBanner() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: accentColor.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                ),
-              ],
-            ),
-            child: const Icon(Iconsax.location, color: accentColor, size: 18),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Add your customer’s delivery address. You can save multiple addresses and reuse them.',
-              style: TextStyle(
-                fontSize: 12,
-                fontFamily: 'Poppins',
-                color: Colors.black87,
+  Widget _buildInfoBanner() => Container(
+    margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: accentColor.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.15),
+                blurRadius: 8,
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  // --------- ADD NEW ADDRESS CARD ----------
-  Widget _buildAddNewAddressCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Add New Address",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _customerNameCtrl,
-              label: 'Customer Name',
-              icon: Iconsax.user,
-              hint: 'Eg. Aadil Parmar',
-              validator: (v) =>
-                  v!.trim().isEmpty ? 'Customer name required' : null,
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _customerPhoneCtrl,
-              label: 'Customer Phone Number',
-              keyboardType: TextInputType.phone,
-              icon: Iconsax.call,
-              hint: '10-digit mobile number',
-              inputFormatters: [
-                LengthLimitingTextInputFormatter(10),
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              validator: (v) {
-                if (v!.trim().isEmpty) return 'Phone number required';
-                if (v.trim().length < 10) return 'Invalid number';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // Address Lines
-            _buildTextField(
-              controller: _addressLine1Ctrl,
-              label: 'Address Line 1',
-              icon: Iconsax.location,
-              hint: 'House No. / Building / Street',
-              validator: (v) => v!.trim().isEmpty ? 'Address required' : null,
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _addressLine2Ctrl,
-              label: 'Address Line 2 (Optional)',
-              icon: Iconsax.location,
-              hint: 'Area / Landmark',
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _addressLine3Ctrl,
-              label: 'Address Line 3 (Optional)',
-              icon: Iconsax.location,
-              hint: 'Locality / Additional Info',
-            ),
-            const SizedBox(height: 12),
-
-            // State & City (Searchable Dropdowns)
-            // 1. STATE SEARCHABLE DROPDOWN
-            _buildSearchableDropdown(
-              key: _stateFieldKey,
-              label: 'State',
-              icon: Iconsax.map,
-              currentValue: _selectedState,
-              options: _indianStates,
-              onSelected: (String selection) {
-                setState(() {
-                  _selectedState = selection;
-                  _stateCtrl.text = selection;
-                  // Clear City when state changes
-                  _selectedCity = null;
-                  _cityCtrl.clear();
-                  _cityFieldKey = UniqueKey(); // Rebuild City widget
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'State required';
-                if (!_indianStates.contains(value)) return 'Select valid state';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // 2. CITY SEARCHABLE DROPDOWN
-            _buildSearchableDropdown(
-              key: _cityFieldKey,
-              label: 'City',
-              icon: Iconsax.location5,
-              currentValue: _selectedCity,
-              enabled: _selectedState != null,
-              options: _availableCities,
-              onSelected: (String selection) {
-                setState(() {
-                  _selectedCity = selection;
-                  _cityCtrl.text = selection;
-                });
-              },
-              validator: (value) {
-                if (_selectedState == null) {
-                  return null; // handled by state validator
-                }
-                if (value == null || value.isEmpty) return 'City required';
-                if (!_availableCities.contains(value)) {
-                  return 'Select valid city';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            // Country + Pincode
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _countryCtrl,
-                    enabled: false, // locked to India
-                    decoration: InputDecoration(
-                      labelText: 'Country',
-                      prefixIcon: const Icon(Iconsax.global, size: 18),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildTextField(
-                    controller: _pincodeCtrl,
-                    label: 'Pincode',
-                    keyboardType: TextInputType.number,
-                    icon: Iconsax.location_tick,
-                    hint: 'Eg. 360001',
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(6),
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Pincode required';
-                      }
-                      // STRICT REGEX: Exactly 6 digits, CANNOT start with 0
-                      final regex = RegExp(r'^[1-9][0-9]{5}$');
-                      if (!regex.hasMatch(v.trim())) {
-                        return 'Invalid Pincode';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _onSaveAddress,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Iconsax.add, size: 18, color: Colors.white),
-                label: Text(
-                  _isSaving ? "Saving..." : "Save Address",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Poppins',
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          child: const Icon(Iconsax.location, color: accentColor, size: 18),
         ),
-      ),
-    );
-  }
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            "Add your customer\u2019s delivery address. You can save multiple addresses and reuse them.",
+            style: TextStyle(
+              fontSize: 12,
+              fontFamily: 'Poppins',
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
-  // --------- SAVED ADDRESSES ----------
+  Widget _buildAddNewAddressCard() => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.03),
+          blurRadius: 12,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Add New Address",
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _customerNameCtrl,
+            label: 'Customer Name',
+            icon: Iconsax.user,
+            hint: 'Eg. Aadil Parmar',
+            validator: (v) => v!.trim().isEmpty ? 'Name required' : null,
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _customerPhoneCtrl,
+            label: 'Phone',
+            keyboardType: TextInputType.phone,
+            icon: Iconsax.call,
+            hint: '10-digit',
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(10),
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            validator: (v) {
+              if (v!.trim().isEmpty) return 'Required';
+              if (v.trim().length < 10) return 'Invalid';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _addressLine1Ctrl,
+            label: 'Address Line 1',
+            icon: Iconsax.location,
+            hint: 'House No. / Building / Street',
+            validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _addressLine2Ctrl,
+            label: 'Address Line 2',
+            icon: Iconsax.location,
+            hint: 'Area / Locality (optional)',
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _addressLine3Ctrl,
+            label: 'Address Line 3',
+            icon: Iconsax.location,
+            hint: 'Landmark (optional)',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSearchableDropdown(
+                  key: _stateFieldKey,
+                  label: 'State',
+                  currentValue: _selectedState,
+                  options: _states,
+                  onSelected: (v) {
+                    setState(() {
+                      _selectedState = v;
+                      _stateCtrl.text = v;
+                      _selectedCity = null;
+                      _cityCtrl.clear();
+                      _cityFieldKey = UniqueKey();
+                    });
+                  },
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Required' : null,
+                  icon: Iconsax.map_1,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSearchableDropdown(
+                  key: _cityFieldKey,
+                  label: 'City',
+                  currentValue: _selectedCity,
+                  options: _getCitiesForState(_selectedState),
+                  onSelected: (v) {
+                    setState(() {
+                      _selectedCity = v;
+                      _cityCtrl.text = v;
+                    });
+                  },
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Required' : null,
+                  icon: Iconsax.buildings_2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: _pincodeCtrl,
+                  label: 'Pincode',
+                  icon: Iconsax.location_tick,
+                  hint: '6-digit',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(6),
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  validator: (v) {
+                    if (v!.trim().isEmpty) return 'Required';
+                    if (!RegExp(r'^[1-9][0-9]{5}$').hasMatch(v.trim()))
+                      return 'Invalid';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildTextField(
+                  controller: _countryCtrl,
+                  label: 'Country',
+                  icon: Iconsax.global,
+                  hint: 'India',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: _isSaving ? null : _onSaveAddress,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Iconsax.add, size: 18, color: Colors.white),
+              label: Text(
+                _isSaving ? "Saving..." : "Save Address",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
   Widget _buildSavedAddressesSection() {
     if (_savedAddresses.isEmpty) {
       return Column(
@@ -1481,7 +1110,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    "No saved addresses yet. Add one above to reuse it quickly.",
+                    "No saved addresses yet. Add one above.",
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade700,
@@ -1495,13 +1124,12 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
         ],
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Saved Addresses",
-          style: TextStyle(
+        Text(
+          "Saved Addresses (${_savedAddresses.length})",
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             fontFamily: 'Poppins',
@@ -1513,160 +1141,131 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _savedAddresses.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            final address = _savedAddresses[index];
-            final bool isSelected = _selectedIndex == index;
-            final bool isDefault = index == 0;
-
-            // Combine address lines nicely
-            final partsLine1 = <String>[];
-            if (address.addressLine.trim().isNotEmpty) {
-              partsLine1.add(address.addressLine.trim());
-            }
-            final partsLine2 = <String>[];
-            if (address.city.trim().isNotEmpty) {
-              partsLine2.add(address.city.trim());
-            }
-            if (address.state.trim().isNotEmpty) {
-              partsLine2.add(address.state.trim());
-            }
-            final partsLine3 = <String>[];
-            if (address.country.trim().isNotEmpty) {
-              partsLine3.add(address.country.trim());
-            }
-            if (address.pincode.trim().isNotEmpty) {
-              partsLine3.add(address.pincode.trim());
-            }
-
-            final line1 = partsLine1.join(', ');
-            final line2 = partsLine2.join(', ');
-            final line3 = partsLine3.join(' • ');
-
+          itemBuilder: (_, i) {
+            final a = _savedAddresses[i];
+            final sel = _selectedIndex == i;
+            final def = i == 0;
+            final l1 = a.fullAddress;
+            final l2 = [a.city, a.state].where((s) => s.isNotEmpty).join(', ');
+            final l3 = [
+              a.country,
+              a.pincode,
+            ].where((s) => s.isNotEmpty).join(' \u2022 ');
             return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
+              onTap: () => setState(() => _selectedIndex = i),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected
+                  color: sel
                       ? accentColor.withValues(alpha: 0.06)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: isSelected ? accentColor : Colors.grey.shade300,
-                    width: isSelected ? 1.3 : 1,
+                    color: sel ? accentColor : Colors.grey.shade300,
+                    width: sel ? 1.5 : 1,
                   ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Radio Indicator
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      child: Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        size: 20,
-                        color: isSelected ? accentColor : Colors.grey,
-                      ),
+                    Radio<int>(
+                      value: i,
+                      groupValue: _selectedIndex,
+                      onChanged: (v) => setState(() => _selectedIndex = v),
+                      activeColor: accentColor,
+                      visualDensity: VisualDensity.compact,
                     ),
-                    const SizedBox(width: 10),
-                    // Address Text
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Flexible(
+                              Expanded(
                                 child: Text(
-                                  address.name,
+                                  a.name,
                                   style: const TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     fontFamily: 'Poppins',
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                address.phone,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                  fontFamily: 'Poppins',
-                                ),
-                              ),
-                              if (isDefault) ...[
-                                const SizedBox(width: 6),
+                              if (def)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 6,
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(999),
+                                    color: accentColor.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text(
                                     'Default',
                                     style: TextStyle(
                                       fontSize: 9,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.green,
+                                      color: accentColor,
                                       fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
-                              ],
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          if (line1.isNotEmpty)
+                          const SizedBox(height: 2),
+                          Text(
+                            '\ud83d\udcde ${a.phone}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          if (l1.isNotEmpty) ...[
+                            const SizedBox(height: 4),
                             Text(
-                              line1,
+                              l1,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade800,
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
                                 fontFamily: 'Poppins',
                               ),
                             ),
-                          if (line2.isNotEmpty)
+                          ],
+                          if (l2.isNotEmpty)
                             Text(
-                              line2,
+                              l2,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade800,
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
                                 fontFamily: 'Poppins',
                               ),
                             ),
-                          if (line3.isNotEmpty)
+                          if (l3.isNotEmpty)
                             Text(
-                              line3,
+                              l3,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade800,
+                                fontSize: 10,
+                                color: Colors.grey.shade500,
                                 fontFamily: 'Poppins',
                               ),
                             ),
                         ],
                       ),
                     ),
-                    // Delete Icon
                     IconButton(
-                      onPressed: () => _onDeleteAddress(index),
-                      icon: const Icon(
+                      icon: Icon(
                         Iconsax.trash,
                         size: 18,
-                        color: Colors.redAccent,
+                        color: Colors.red.shade300,
                       ),
+                      onPressed: () => _onDeleteAddress(i),
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
@@ -1678,39 +1277,9 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
     );
   }
 
-  // --------- TEXT FIELD HELPER ----------
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    int maxLines = 1,
-    String? hint,
-    String? Function(String?)? validator,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      validator: validator,
-      inputFormatters: inputFormatters,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 18),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        isDense: true,
-      ),
-    );
-  }
-
-  // --------- BOTTOM CONTINUE / UPDATE BAR ----------
   Widget _buildBottomBar() {
-    final bool fromDrawer = widget.fromDrawer;
-    final bool hasSelection =
-        _selectedIndex != null && _savedAddresses.isNotEmpty;
-
+    final fromDrawer = widget.fromDrawer;
+    final hasSel = _selectedIndex != null && _savedAddresses.isNotEmpty;
     return SafeArea(
       top: false,
       child: Container(
@@ -1721,14 +1290,14 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
             Expanded(
               child: fromDrawer
                   ? Text(
-                      "Saved addresses: ${_savedAddresses.length}",
+                      "Saved: ${_savedAddresses.length}",
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
                         fontFamily: 'Poppins',
                       ),
                     )
-                  : hasSelection
+                  : hasSel
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1768,7 +1337,7 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
               child: ElevatedButton(
                 onPressed: fromDrawer
                     ? _onUpdateFromDrawer
-                    : (hasSelection ? _onContinueCheckout : null),
+                    : (hasSel ? _onContinueCheckout : null),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accentColor,
                   disabledBackgroundColor: Colors.grey.shade300,
@@ -1807,51 +1376,190 @@ class _CustomerAddressPageState extends State<CustomerAddressPage> {
       ),
     );
   }
+
+  // ═══ FIELD HELPERS ═══
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? hint,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
+  }) => TextFormField(
+    controller: controller,
+    keyboardType: keyboardType,
+    maxLines: maxLines,
+    validator: validator,
+    inputFormatters: inputFormatters,
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, size: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      isDense: true,
+    ),
+  );
+
+  Widget _buildSearchableDropdown({
+    Key? key,
+    required String label,
+    required String? currentValue,
+    required List<String> options,
+    required Function(String) onSelected,
+    required String? Function(String?) validator,
+    required IconData icon,
+    bool enabled = true,
+  }) => RawAutocomplete<String>(
+    key: key,
+    initialValue: TextEditingValue(text: currentValue ?? ''),
+    optionsBuilder: (v) => v.text.isEmpty
+        ? const Iterable.empty()
+        : options.where((o) => o.toLowerCase().contains(v.text.toLowerCase())),
+    onSelected: onSelected,
+    fieldViewBuilder: (ctx, ctrl, fn, os) {
+      if (currentValue != null && ctrl.text.isEmpty && !fn.hasFocus)
+        ctrl.text = currentValue;
+      return TextFormField(
+        controller: ctrl,
+        focusNode: fn,
+        enabled: enabled,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, size: 18),
+          suffixIcon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          isDense: true,
+          hintText: 'Search $label',
+          filled: !enabled,
+          fillColor: !enabled ? Colors.grey.shade100 : null,
+        ),
+      );
+    },
+    optionsViewBuilder: (ctx, onSel, opts) => Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: MediaQuery.of(ctx).size.width - 64,
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            itemCount: opts.length,
+            itemBuilder: (_, i) {
+              final o = opts.elementAt(i);
+              return ListTile(
+                title: Text(
+                  o,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                ),
+                onTap: () => onSel(o),
+              );
+            },
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
-// ============= SIMPLE MODEL CLASS =============
+// ═══ MODEL (matches web: address_1, address_2, address_3) ═══
 class CustomerAddress {
-  final String id;
-  final String name;
-  final String phone;
-  final String addressLine;
-  final String city;
-  final String state;
-  final String country;
-  final String pincode;
-
+  final String id,
+      name,
+      phone,
+      address1,
+      address2,
+      address3,
+      city,
+      state,
+      country,
+      pincode;
   CustomerAddress({
     required this.id,
     required this.name,
     required this.phone,
-    required this.addressLine,
+    this.address1 = '',
+    this.address2 = '',
+    this.address3 = '',
     required this.city,
     required this.state,
-    required this.country,
+    this.country = 'India',
     required this.pincode,
   });
 
-  Map<String, dynamic> toJson() => {
-    "id": id,
-    "name": name,
-    "phone": phone,
-    "addressLine": addressLine,
-    "city": city,
-    "state": state,
-    "country": country,
-    "pincode": pincode,
-  };
+  String get fullAddress => [
+    address1,
+    address2,
+    address3,
+  ].where((s) => s.trim().isNotEmpty).join(', ');
 
-  factory CustomerAddress.fromJson(Map<String, dynamic> json) {
-    return CustomerAddress(
-      id: json["id"] ?? "",
-      name: json["name"] ?? "",
-      phone: json["phone"] ?? "",
-      addressLine: json["addressLine"] ?? "",
-      city: json["city"] ?? "",
-      state: json["state"] ?? "",
-      country: json["country"] ?? "",
-      pincode: json["pincode"] ?? "",
-    );
-  }
+  CustomerAddress copyWith({String? id}) => CustomerAddress(
+    id: id ?? this.id,
+    name: name,
+    phone: phone,
+    address1: address1,
+    address2: address2,
+    address3: address3,
+    city: city,
+    state: state,
+    country: country,
+    pincode: pincode,
+  );
+
+  // Local storage format
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'address1': address1,
+    'address2': address2,
+    'address3': address3,
+    'city': city,
+    'state': state,
+    'country': country,
+    'pincode': pincode,
+  };
+  factory CustomerAddress.fromJson(Map<String, dynamic> j) => CustomerAddress(
+    id: j['id'] ?? '',
+    name: j['name'] ?? '',
+    phone: j['phone'] ?? '',
+    address1: j['address1'] ?? j['addressLine'] ?? '',
+    address2: j['address2'] ?? '',
+    address3: j['address3'] ?? '',
+    city: j['city'] ?? '',
+    state: j['state'] ?? '',
+    country: j['country'] ?? 'India',
+    pincode: j['pincode'] ?? '',
+  );
+
+  // Server format (matches web: address_1, address_2, address_3)
+  Map<String, dynamic> toServerJson() => {
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'address_1': address1,
+    'address_2': address2,
+    'address_3': address3,
+    'city': city,
+    'state': state,
+    'pincode': pincode,
+  };
+  factory CustomerAddress.fromServerJson(Map<String, dynamic> j) =>
+      CustomerAddress(
+        id: j['id'] ?? '',
+        name: j['name'] ?? '',
+        phone: j['phone'] ?? '',
+        address1: j['address_1'] ?? '',
+        address2: j['address_2'] ?? '',
+        address3: j['address_3'] ?? '',
+        city: j['city'] ?? '',
+        state: j['state'] ?? '',
+        country: 'India',
+        pincode: j['pincode'] ?? '',
+      );
 }

@@ -1,10 +1,10 @@
 // lib/screens/dashboard/buisness_details/buisness_details.dart
-// v2: Old UI preserved + web-synced fields (Store, PAN, Bank, Signature)
-// Uses /kakiso/v1/business REST API (same user_meta as web dashboard)
+// v3: Lock + Edit Request flow matching web dashboard
+// First save = direct. After that = locked → admin approval to edit.
+// Bank, Signature, WhatsApp = always editable.
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,14 +17,12 @@ import 'package:path/path.dart' as path;
 import 'package:kakiso_reseller_app/models/user.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/address/address.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/check_out_header/check_out_header.dart';
-import 'package:kakiso_reseller_app/screens/dashboard/checkout/checkout.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 // ═══════════════════════════════════════════════════════════════════
-// SIGNATURE PAD (built-in, no package needed)
+// SIGNATURE PAD
 // ═══════════════════════════════════════════════════════════════════
-
 class SignaturePad extends StatefulWidget {
   final double height;
   final String? existingSignatureBase64;
@@ -43,13 +41,11 @@ class SignaturePadState extends State<SignaturePad> {
   bool _hasDrawn = false, _showCanvas = false;
   bool get hasSignature =>
       _hasDrawn || (widget.existingSignatureBase64?.isNotEmpty ?? false);
-
   void clear() => setState(() {
     _strokes.clear();
     _cur = [];
     _hasDrawn = false;
   });
-
   Future<String?> toBase64() async {
     if (!_hasDrawn) return widget.existingSignatureBase64;
     try {
@@ -257,7 +253,6 @@ class _SigPainter extends CustomPainter {
 // ═══════════════════════════════════════════════════════════════════
 // BUSINESS DETAILS PAGE
 // ═══════════════════════════════════════════════════════════════════
-
 class BusinessDetailsPage extends StatefulWidget {
   final UserData? userData;
   final bool fromDrawer;
@@ -278,7 +273,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   File? _logoFile;
   final ImagePicker _picker = ImagePicker();
 
-  // Controllers (old + new)
+  // Controllers
   final _storeNameCtrl = TextEditingController();
   final _businessNameCtrl = TextEditingController();
   final _ownerNameCtrl = TextEditingController();
@@ -299,16 +294,33 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   final _cityCtrl = TextEditingController();
   final _countryCtrl = TextEditingController(text: 'India');
 
-  bool _isWhatsAppSame = true,
-      _isSaving = false,
-      _hasSavedDetails = false,
-      _isRemoteLoading = false,
-      _shipToBusinessAddress = false;
+  // Edit request controllers (for locked fields)
+  final _editStoreNameCtrl = TextEditingController();
+  final _editBizNameCtrl = TextEditingController();
+  final _editGstinCtrl = TextEditingController();
+  final _editPanCtrl = TextEditingController();
+  final _editOwnerCtrl = TextEditingController();
+  final _editPhoneCtrl = TextEditingController();
+  final _editAddr1Ctrl = TextEditingController();
+  final _editAddr2Ctrl = TextEditingController();
+  final _editAddr3Ctrl = TextEditingController();
+  final _editCityCtrl = TextEditingController();
+  final _editStateCtrl = TextEditingController();
+  final _editPinCtrl = TextEditingController();
+
+  bool _isWhatsAppSame = true, _isSaving = false, _hasSavedDetails = false;
+  bool _isRemoteLoading = false, _shipToBusinessAddress = false;
   String? _selectedState, _selectedCity, _resellerId, _existingSignature;
   Key _stateFieldKey = UniqueKey(), _cityFieldKey = UniqueKey();
   final GlobalKey<SignaturePadState> _sigKey = GlobalKey<SignaturePadState>();
 
-  // State-City map (keep your existing one — this is a subset)
+  // ── LOCK & PENDING STATE ──
+  bool _bizLocked = false;
+  bool _billingLocked = false;
+  bool _hasPendingBizEdit = false;
+  bool _hasPendingBillingEdit = false;
+  bool _isSubmittingEdit = false;
+
   final Map<String, List<String>> _stateCityMap = {
     'Gujarat': [
       'Ahmedabad',
@@ -631,6 +643,18 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       _stateCtrl,
       _cityCtrl,
       _countryCtrl,
+      _editStoreNameCtrl,
+      _editBizNameCtrl,
+      _editGstinCtrl,
+      _editPanCtrl,
+      _editOwnerCtrl,
+      _editPhoneCtrl,
+      _editAddr1Ctrl,
+      _editAddr2Ctrl,
+      _editAddr3Ctrl,
+      _editCityCtrl,
+      _editStateCtrl,
+      _editPinCtrl,
     ])
       c.dispose();
     super.dispose();
@@ -638,12 +662,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
   Future<void> _pickLogo() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image == null) return;
-      final dir = await getApplicationDocumentsDirectory();
-      final fn =
-          'business_logo_${DateTime.now().millisecondsSinceEpoch}${path.extension(image.path)}';
-      final saved = await File(image.path).copy(path.join(dir.path, fn));
+      final i = await _picker.pickImage(source: ImageSource.gallery);
+      if (i == null) return;
+      final d = await getApplicationDocumentsDirectory();
+      final saved = await File(i.path).copy(
+        path.join(
+          d.path,
+          'biz_logo_${DateTime.now().millisecondsSinceEpoch}${path.extension(i.path)}',
+        ),
+      );
       setState(() => _logoFile = saved);
     } catch (e) {
       Get.snackbar(
@@ -656,95 +683,92 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
 
   Future<void> _loadSavedDetails() async {
     try {
-      final jsonStr = await _storage.read(key: _storageKey);
-      if (jsonStr == null) return;
-      final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final js = await _storage.read(key: _storageKey);
+      if (js == null) return;
+      final d = jsonDecode(js) as Map<String, dynamic>;
       if (!mounted) return;
-      final savedState = (data['state'] as String?)?.trim() ?? '';
-      final savedCity = (data['city'] as String?)?.trim() ?? '';
-      final logoPath = data['logo_path'] as String?;
-      if (logoPath != null && logoPath.isNotEmpty) {
-        final f = File(logoPath);
+      final ss = (d['state'] as String?)?.trim() ?? '';
+      final sc = (d['city'] as String?)?.trim() ?? '';
+      final lp = d['logo_path'] as String?;
+      if (lp != null && lp.isNotEmpty) {
+        final f = File(lp);
         if (await f.exists()) setState(() => _logoFile = f);
       }
       setState(() {
-        _storeNameCtrl.text = data['storeName'] ?? _storeNameCtrl.text;
-        _businessNameCtrl.text = data['businessName'] ?? _businessNameCtrl.text;
-        _ownerNameCtrl.text = data['ownerName'] ?? _ownerNameCtrl.text;
-        _phoneCtrl.text = data['phone'] ?? '';
-        _whatsappCtrl.text = data['whatsapp'] ?? '';
-        _emailCtrl.text = data['email'] ?? _emailCtrl.text;
-        _addressLine1Ctrl.text =
-            (data['addressLine1'] as String?)?.trim() ?? '';
-        _addressLine2Ctrl.text =
-            (data['addressLine2'] as String?)?.trim() ?? '';
-        _addressLine3Ctrl.text =
-            (data['addressLine3'] as String?)?.trim() ?? '';
-        _gstinCtrl.text = data['gstin'] ?? '';
-        _panCtrl.text = data['pan'] ?? '';
-        _bankNameCtrl.text = data['bankName'] ?? '';
-        _acNumberCtrl.text = data['acNumber'] ?? '';
-        _ifscCtrl.text = data['ifsc'] ?? '';
-        _upiCtrl.text = data['upi'] ?? '';
-        if (savedState.isNotEmpty && _stateCityMap.containsKey(savedState))
-          _selectedState = savedState;
-        else
-          _selectedState = null;
-        _stateCtrl.text = _selectedState ?? savedState;
+        _storeNameCtrl.text = d['storeName'] ?? '';
+        _businessNameCtrl.text = d['businessName'] ?? '';
+        _ownerNameCtrl.text = d['ownerName'] ?? _ownerNameCtrl.text;
+        _phoneCtrl.text = d['phone'] ?? '';
+        _whatsappCtrl.text = d['whatsapp'] ?? '';
+        _emailCtrl.text = d['email'] ?? _emailCtrl.text;
+        _addressLine1Ctrl.text = (d['addressLine1'] as String?)?.trim() ?? '';
+        _addressLine2Ctrl.text = (d['addressLine2'] as String?)?.trim() ?? '';
+        _addressLine3Ctrl.text = (d['addressLine3'] as String?)?.trim() ?? '';
+        _gstinCtrl.text = d['gstin'] ?? '';
+        _panCtrl.text = d['pan'] ?? '';
+        _bankNameCtrl.text = d['bankName'] ?? '';
+        _acNumberCtrl.text = d['acNumber'] ?? '';
+        _ifscCtrl.text = d['ifsc'] ?? '';
+        _upiCtrl.text = d['upi'] ?? '';
+        if (ss.isNotEmpty && _stateCityMap.containsKey(ss)) _selectedState = ss;
+        _stateCtrl.text = _selectedState ?? ss;
         _stateFieldKey = UniqueKey();
         if (_selectedState != null &&
-            _stateCityMap[_selectedState]!.contains(savedCity))
-          _selectedCity = savedCity;
-        else
-          _selectedCity = null;
-        _cityCtrl.text = _selectedCity ?? savedCity;
+            _stateCityMap[_selectedState]!.contains(sc))
+          _selectedCity = sc;
+        _cityCtrl.text = _selectedCity ?? sc;
         _cityFieldKey = UniqueKey();
-        _pincodeCtrl.text = data['pincode'] ?? '';
+        _pincodeCtrl.text = d['pincode'] ?? '';
         _isWhatsAppSame =
             _whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text;
         _hasSavedDetails = true;
       });
     } catch (e) {
-      debugPrint('Load saved error: $e');
+      debugPrint('Load local error: $e');
     }
   }
 
   Future<void> _loadRemoteDetails() async {
-    final userId = _currentUser?.userId;
-    if (userId == null || userId.trim().isEmpty) return;
+    final uid = _currentUser?.userId;
+    if (uid == null || uid.trim().isEmpty) return;
     setState(() => _isRemoteLoading = true);
     try {
-      final data = await ApiService().fetchFullBusinessDetails(userId: userId);
-      if (data == null || !mounted) return;
-      final rs = (data['billing_state'] as String?)?.trim() ?? '';
-      final rc = (data['billing_city'] as String?)?.trim() ?? '';
+      final d = await ApiService().fetchFullBusinessDetails(userId: uid);
+      if (d == null || !mounted) return;
+      final rs = (d['billing_state'] as String?)?.trim() ?? '';
+      final rc = (d['billing_city'] as String?)?.trim() ?? '';
       setState(() {
-        _resellerId = data['reseller_id'] ?? '';
-        _existingSignature = data['digital_signature'] ?? '';
-        _storeNameCtrl.text = data['store_name'] ?? _storeNameCtrl.text;
-        _businessNameCtrl.text =
-            data['business_name'] ?? _businessNameCtrl.text;
-        _gstinCtrl.text = data['gstin'] ?? _gstinCtrl.text;
-        _panCtrl.text = data['pan'] ?? _panCtrl.text;
-        _bankNameCtrl.text = data['bank_name'] ?? _bankNameCtrl.text;
-        _acNumberCtrl.text = data['ac_number'] ?? _acNumberCtrl.text;
-        _ifscCtrl.text = data['ifsc'] ?? _ifscCtrl.text;
-        _upiCtrl.text = data['upi'] ?? _upiCtrl.text;
-        final fn = data['billing_first_name'] ?? data['first_name'] ?? '';
-        final ln = data['billing_last_name'] ?? data['last_name'] ?? '';
+        _resellerId = d['reseller_id'] ?? '';
+        _existingSignature = d['digital_signature'] ?? '';
+        // Lock & pending status
+        _bizLocked = d['business_locked'] == true;
+        _billingLocked = d['billing_locked'] == true;
+        _hasPendingBizEdit = d['has_pending_biz_edit'] == true;
+        _hasPendingBillingEdit = d['has_pending_billing_edit'] == true;
+        // Fields
+        _storeNameCtrl.text = d['store_name'] ?? _storeNameCtrl.text;
+        _businessNameCtrl.text = d['business_name'] ?? _businessNameCtrl.text;
+        _gstinCtrl.text = d['gstin'] ?? _gstinCtrl.text;
+        _panCtrl.text = d['pan'] ?? _panCtrl.text;
+        _bankNameCtrl.text = d['bank_name'] ?? _bankNameCtrl.text;
+        _acNumberCtrl.text = d['ac_number'] ?? _acNumberCtrl.text;
+        _ifscCtrl.text = d['ifsc'] ?? _ifscCtrl.text;
+        _upiCtrl.text = d['upi'] ?? _upiCtrl.text;
+        final fn = d['billing_first_name'] ?? d['first_name'] ?? '';
+        final ln = d['billing_last_name'] ?? d['last_name'] ?? '';
         if (fn.toString().isNotEmpty) _ownerNameCtrl.text = '$fn $ln'.trim();
-        if ((data['billing_phone'] ?? '').toString().isNotEmpty)
-          _phoneCtrl.text = data['billing_phone'];
-        _emailCtrl.text = data['email'] ?? _emailCtrl.text;
-        if ((data['whatsapp'] ?? '').toString().isNotEmpty)
-          _whatsappCtrl.text = data['whatsapp'];
+        if ((d['billing_phone'] ?? '').toString().isNotEmpty)
+          _phoneCtrl.text = d['billing_phone'];
+        _emailCtrl.text = d['email'] ?? _emailCtrl.text;
+        if ((d['whatsapp'] ?? '').toString().isNotEmpty)
+          _whatsappCtrl.text = d['whatsapp'];
         _addressLine1Ctrl.text =
-            data['billing_address_1'] ?? _addressLine1Ctrl.text;
+            d['billing_address_1'] ?? _addressLine1Ctrl.text;
         _addressLine2Ctrl.text =
-            data['billing_address_2'] ?? _addressLine2Ctrl.text;
+            d['billing_address_2'] ?? _addressLine2Ctrl.text;
         _addressLine3Ctrl.text =
-            data['billing_address_3'] ?? _addressLine3Ctrl.text;
-        _pincodeCtrl.text = data['billing_postcode'] ?? _pincodeCtrl.text;
+            d['billing_address_3'] ?? _addressLine3Ctrl.text;
+        _pincodeCtrl.text = d['billing_postcode'] ?? _pincodeCtrl.text;
         if (rs.isNotEmpty && _stateCityMap.containsKey(rs)) _selectedState = rs;
         _stateCtrl.text = _selectedState ?? rs;
         _stateFieldKey = UniqueKey();
@@ -798,39 +822,39 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     'logo_path': _logoFile?.path,
   };
 
-  // ═══ SAVE (uses new REST API) ═══
+  // ═══ SAVE (first-time or unlocked fields + bank/sig) ═══
   Future<void> _onSubmit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedState == null || _selectedState!.trim().isEmpty) {
-      Get.snackbar(
-        'State Required',
-        'Please select your state.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return;
+    if (!_bizLocked) {
+      if (_selectedState == null || _selectedState!.trim().isEmpty) {
+        Get.snackbar(
+          'State Required',
+          'Please select your state.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      if (_selectedCity == null || _selectedCity!.trim().isEmpty) {
+        Get.snackbar(
+          'City Required',
+          'Please select your city.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
     }
-    if (_selectedCity == null || _selectedCity!.trim().isEmpty) {
-      Get.snackbar(
-        'City Required',
-        'Please select your city.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    _stateCtrl.text = _selectedState!;
-    _cityCtrl.text = _selectedCity!;
     setState(() => _isSaving = true);
-    String? sigBase64 = _existingSignature;
+    String? sig = _existingSignature;
     if (_sigKey.currentState != null) {
       final ns = await _sigKey.currentState!.toBase64();
-      if (ns != null) sigBase64 = ns;
+      if (ns != null) sig = ns;
     }
     final fn = _ownerNameCtrl.text.trim().split(' ');
     final fName = fn.isNotEmpty ? fn[0] : '';
     final lName = fn.length > 1 ? fn.sublist(1).join(' ') : '';
-    final serverPayload = <String, dynamic>{
+    final p = <String, dynamic>{
       'store_name': _storeNameCtrl.text.trim(),
       'business_name': _businessNameCtrl.text.trim(),
       'gstin': _gstinCtrl.text.trim().toUpperCase(),
@@ -845,8 +869,8 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       'billing_address_1': _addressLine1Ctrl.text.trim(),
       'billing_address_2': _addressLine2Ctrl.text.trim(),
       'billing_address_3': _addressLine3Ctrl.text.trim(),
-      'billing_city': _selectedCity,
-      'billing_state': _selectedState,
+      'billing_city': _selectedCity ?? _cityCtrl.text.trim(),
+      'billing_state': _selectedState ?? _stateCtrl.text.trim(),
       'billing_postcode': _pincodeCtrl.text.trim(),
       'whatsapp': _isWhatsAppSame
           ? _phoneCtrl.text.trim()
@@ -854,35 +878,40 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       'first_name': fName,
       'last_name': lName,
     };
-    if (sigBase64 != null && sigBase64.isNotEmpty)
-      serverPayload['digital_signature'] = sigBase64;
+    if (sig != null && sig.isNotEmpty) p['digital_signature'] = sig;
     try {
       await _storage.write(
         key: _storageKey,
         value: jsonEncode(_buildLocalPayload()),
       );
-      if (_currentUser?.userId != null)
-        await ApiService().saveFullBusinessDetails(
+      if (_currentUser?.userId != null) {
+        final result = await ApiService().saveFullBusinessDetails(
           userId: _currentUser!.userId,
-          data: serverPayload,
+          data: p,
         );
-      if (!mounted) return;
-      setState(() => _hasSavedDetails = true);
-      if (widget.fromDrawer) {
-        Get.snackbar(
-          'Success',
-          'Business details updated.',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-      } else {
-        Get.snackbar(
-          'Saved',
-          'Details saved successfully.',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-        Get.to(() => CustomerAddressPage(userData: _currentUser));
+        if (!mounted) return;
+        if (result['success'] == true) {
+          setState(() {
+            _hasSavedDetails = true;
+            _bizLocked = result['business_locked'] == true;
+            _billingLocked = result['billing_locked'] == true;
+          });
+          Get.snackbar(
+            'Success',
+            result['message'] ?? 'Saved!',
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+          if (!widget.fromDrawer)
+            Get.to(() => CustomerAddressPage(userData: _currentUser));
+        } else {
+          Get.snackbar(
+            'Error',
+            result['message'] ?? 'Save failed',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
       }
     } catch (e) {
       debugPrint('Save error: $e');
@@ -891,10 +920,367 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     }
   }
 
-  // ═══ CHECKOUT FLOW CHECKS (same as old) ═══
+  // ═══ SUBMIT EDIT REQUEST (for locked fields) ═══
+  Future<void> _submitBizEditRequest() async {
+    if (_editStoreNameCtrl.text.trim().isEmpty) {
+      Get.snackbar(
+        'Required',
+        'Store name cannot be empty',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    setState(() => _isSubmittingEdit = true);
+    try {
+      final result = await ApiService().requestBusinessEdit(
+        userId: _currentUser!.userId,
+        editType: 'business',
+        data: {
+          'store_name': _editStoreNameCtrl.text.trim(),
+          'business_name': _editBizNameCtrl.text.trim(),
+          'gstin': _editGstinCtrl.text.trim().toUpperCase(),
+          'pan': _editPanCtrl.text.trim().toUpperCase(),
+        },
+      );
+      if (!mounted) return;
+      Get.back(); // close bottom sheet
+      if (result['success'] == true) {
+        setState(() => _hasPendingBizEdit = true);
+        Get.snackbar(
+          'Submitted',
+          result['message'] ?? 'Edit request sent!',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          'Error',
+          result['message'] ?? 'Failed',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      debugPrint('Biz edit request error: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmittingEdit = false);
+    }
+  }
+
+  Future<void> _submitBillingEditRequest() async {
+    if (_editAddr1Ctrl.text.trim().isEmpty ||
+        _editPhoneCtrl.text.trim().isEmpty) {
+      Get.snackbar(
+        'Required',
+        'Phone and Address are required',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    setState(() => _isSubmittingEdit = true);
+    final fn = _editOwnerCtrl.text.trim().split(' ');
+    try {
+      final result = await ApiService().requestBusinessEdit(
+        userId: _currentUser!.userId,
+        editType: 'billing',
+        data: {
+          'billing_first_name': fn.isNotEmpty ? fn[0] : '',
+          'billing_last_name': fn.length > 1 ? fn.sublist(1).join(' ') : '',
+          'billing_phone': _editPhoneCtrl.text.trim(),
+          'billing_address_1': _editAddr1Ctrl.text.trim(),
+          'billing_address_2': _editAddr2Ctrl.text.trim(),
+          'billing_address_3': _editAddr3Ctrl.text.trim(),
+          'billing_city': _editCityCtrl.text.trim(),
+          'billing_state': _editStateCtrl.text.trim(),
+          'billing_postcode': _editPinCtrl.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      Get.back();
+      if (result['success'] == true) {
+        setState(() => _hasPendingBillingEdit = true);
+        Get.snackbar(
+          'Submitted',
+          result['message'] ?? 'Edit request sent!',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          'Error',
+          result['message'] ?? 'Failed',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      debugPrint('Billing edit request error: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmittingEdit = false);
+    }
+  }
+
+  void _showBizEditSheet() {
+    _editStoreNameCtrl.text = _storeNameCtrl.text;
+    _editBizNameCtrl.text = _businessNameCtrl.text;
+    _editGstinCtrl.text = _gstinCtrl.text;
+    _editPanCtrl.text = _panCtrl.text;
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Request Business Edit',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Changes will take effect once admin approves.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.amber.shade700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 16),
+              _editField(_editStoreNameCtrl, 'Store Name', Iconsax.shop),
+              const SizedBox(height: 12),
+              _editField(
+                _editBizNameCtrl,
+                'Legal Business Name',
+                Iconsax.building,
+              ),
+              const SizedBox(height: 12),
+              _editField(
+                _editGstinCtrl,
+                'GSTIN',
+                Iconsax.document_text,
+                cap: TextCapitalization.characters,
+              ),
+              const SizedBox(height: 12),
+              _editField(
+                _editPanCtrl,
+                'PAN',
+                Iconsax.card,
+                cap: TextCapitalization.characters,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isSubmittingEdit ? null : _submitBizEditRequest,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0f172a),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSubmittingEdit
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'SUBMIT FOR APPROVAL',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                            letterSpacing: 1,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  void _showBillingEditSheet() {
+    _editOwnerCtrl.text = _ownerNameCtrl.text;
+    _editPhoneCtrl.text = _phoneCtrl.text;
+    _editAddr1Ctrl.text = _addressLine1Ctrl.text;
+    _editAddr2Ctrl.text = _addressLine2Ctrl.text;
+    _editAddr3Ctrl.text = _addressLine3Ctrl.text;
+    _editCityCtrl.text = _cityCtrl.text;
+    _editStateCtrl.text = _stateCtrl.text;
+    _editPinCtrl.text = _pincodeCtrl.text;
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Request Billing Edit',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Changes will take effect once admin approves.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.amber.shade700,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 16),
+              _editField(_editOwnerCtrl, 'Name', Iconsax.user),
+              const SizedBox(height: 12),
+              _editField(
+                _editPhoneCtrl,
+                'Phone',
+                Iconsax.call,
+                keyboard: TextInputType.phone,
+              ),
+              const SizedBox(height: 12),
+              _editField(_editAddr1Ctrl, 'Address Line 1', Iconsax.location),
+              const SizedBox(height: 12),
+              _editField(_editAddr2Ctrl, 'Address Line 2', Iconsax.location),
+              const SizedBox(height: 12),
+              _editField(_editAddr3Ctrl, 'Address Line 3', Iconsax.location),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _editField(
+                      _editCityCtrl,
+                      'City',
+                      Iconsax.buildings_2,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _editField(_editStateCtrl, 'State', Iconsax.map_1),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _editField(
+                _editPinCtrl,
+                'Pincode',
+                Iconsax.location_tick,
+                keyboard: TextInputType.number,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isSubmittingEdit
+                      ? null
+                      : _submitBillingEditRequest,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0f172a),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSubmittingEdit
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'SUBMIT FOR APPROVAL',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                            letterSpacing: 1,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Widget _editField(
+    TextEditingController c,
+    String label,
+    IconData icon, {
+    TextInputType? keyboard,
+    TextCapitalization cap = TextCapitalization.words,
+  }) => TextField(
+    controller: c,
+    keyboardType: keyboard,
+    textCapitalization: cap,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      isDense: true,
+    ),
+  );
+
+  // ═══ CHECKOUT CHECKS (same as old) ═══
   void _onContinueFromCheckout() {
     bool ok =
-        _storeNameCtrl.text.trim().isNotEmpty &&
+        (_storeNameCtrl.text.trim().isNotEmpty ||
+            _businessNameCtrl.text.trim().isNotEmpty) &&
         _ownerNameCtrl.text.trim().isNotEmpty &&
         _phoneCtrl.text.trim().isNotEmpty &&
         _addressLine1Ctrl.text.trim().isNotEmpty &&
@@ -905,40 +1291,19 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
       _showMissingDetailsDialog();
       return;
     }
-    final l1 = _addressLine1Ctrl.text.trim();
-    final l2 = _addressLine2Ctrl.text.trim();
-    final l3 = _addressLine3Ctrl.text.trim();
-    final city = _selectedCity!.trim();
-    final state = _selectedState!.trim();
-    final pin = _pincodeCtrl.text.trim();
-    final phone = _phoneCtrl.text.trim();
-    String addr = [
-      l1,
-      l2,
-      l3,
-      city,
-      state,
-      'India',
-    ].where((s) => s.isNotEmpty).join(', ');
-    if (pin.isNotEmpty) addr += ' - $pin';
-    final label =
-        '${_storeNameCtrl.text.trim().isNotEmpty ? _storeNameCtrl.text.trim() : _businessNameCtrl.text.trim()} \u2022 $phone';
-    if (_shipToBusinessAddress) {
-      Get.to(() => CustomerAddressPage(userData: _currentUser));
-    } else {
-      Get.to(() => CustomerAddressPage(userData: _currentUser));
-    }
+    Get.to(() => CustomerAddressPage(userData: _currentUser));
   }
 
   void _showMissingDetailsDialog() {
     final m = <String>[];
-    if (_storeNameCtrl.text.trim().isEmpty) m.add('Store Name');
+    if (_storeNameCtrl.text.trim().isEmpty &&
+        _businessNameCtrl.text.trim().isEmpty)
+      m.add('Store/Business Name');
     if (_ownerNameCtrl.text.trim().isEmpty) m.add('Owner Name');
     if (_phoneCtrl.text.trim().isEmpty) m.add('Phone');
-    if (_addressLine1Ctrl.text.trim().isEmpty) m.add('Address Line 1');
-    if (_selectedState == null || _selectedState!.trim().isEmpty)
-      m.add('State');
-    if (_selectedCity == null || _selectedCity!.trim().isEmpty) m.add('City');
+    if (_addressLine1Ctrl.text.trim().isEmpty) m.add('Address');
+    if (_selectedState == null) m.add('State');
+    if (_selectedCity == null) m.add('City');
     if (_pincodeCtrl.text.trim().isEmpty) m.add('Pincode');
     Get.dialog(
       AlertDialog(
@@ -958,7 +1323,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Please fill in the following:',
+              'Please fill in:',
               style: TextStyle(fontSize: 13, fontFamily: 'Poppins'),
             ),
             const SizedBox(height: 8),
@@ -989,7 +1354,98 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     );
   }
 
-  // ═══ BUILD (same layout as old) ═══
+  // ═══ LOCKED FIELD DISPLAY ═══
+  Widget _lockedField(String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'Poppins',
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value.isNotEmpty ? value : '-',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Icon(Iconsax.lock_1, size: 14, color: Colors.grey.shade400),
+      ],
+    ),
+  );
+
+  Widget _pendingBanner() => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Colors.amber.shade50,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.amber.shade200),
+    ),
+    child: Row(
+      children: [
+        Icon(Iconsax.clock, size: 16, color: Colors.amber.shade700),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Edit request pending admin approval.',
+            style: TextStyle(
+              fontSize: 11,
+              fontFamily: 'Poppins',
+              color: Colors.amber.shade800,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _requestEditButton(
+    String label,
+    VoidCallback onTap, {
+    bool disabled = false,
+  }) => SizedBox(
+    width: double.infinity,
+    child: OutlinedButton.icon(
+      onPressed: disabled ? null : onTap,
+      icon: Icon(disabled ? Iconsax.clock : Iconsax.edit_2, size: 16),
+      label: Text(
+        disabled ? 'EDIT REQUEST PENDING' : label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Poppins',
+          letterSpacing: 0.5,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: disabled ? Colors.grey : const Color(0xFF0f172a),
+        side: BorderSide(
+          color: disabled ? Colors.grey.shade300 : const Color(0xFF0f172a),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+    ),
+  );
+
+  // ═══ BUILD ═══
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1062,7 +1518,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                     ),
                     SizedBox(width: 8),
                     Text(
-                      'Syncing your saved business details\u2026',
+                      'Syncing\u2026',
                       style: TextStyle(
                         fontSize: 11,
                         fontFamily: 'Poppins',
@@ -1092,10 +1548,11 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     );
   }
 
-  // ═══ FORM BODY (fromDrawer = true) ═══
+  // ═══ FORM BODY (fromDrawer) ═══
   Widget _buildFormBody() {
     return Column(
       children: [
+        // Logo (always editable)
         _buildSectionCard(
           title: 'Business Logo',
           child: Column(
@@ -1143,219 +1600,276 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // ── STORE & IDENTITY (lockable) ──
         _buildSectionCard(
           title: 'Store & Identity',
-          child: Column(
-            children: [
-              _buildTextField(
-                controller: _storeNameCtrl,
-                label: 'Store Display Name',
-                hint: 'e.g. Kiran Electronics',
-                icon: Iconsax.shop,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Store name is required'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _businessNameCtrl,
-                label: 'Legal Business Name',
-                hint: 'Registered company name',
-                icon: Iconsax.building,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'Owner & Contact',
-          child: Column(
-            children: [
-              _buildTextField(
-                controller: _ownerNameCtrl,
-                label: 'Owner Name',
-                hint: 'Your full name',
-                icon: Iconsax.user,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _phoneCtrl,
-                label: 'Phone',
-                hint: '10-digit mobile',
-                icon: Iconsax.call,
-                keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(10),
-                ],
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  if (v.trim().length < 10) return 'Enter 10 digits';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _emailCtrl,
-                label: 'Email',
-                hint: 'your@email.com',
-                icon: Iconsax.sms,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _isWhatsAppSame,
-                    onChanged: (v) =>
-                        setState(() => _isWhatsAppSame = v ?? true),
-                    activeColor: accentColor,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  const Text(
-                    'WhatsApp same as phone',
-                    style: TextStyle(fontSize: 12, fontFamily: 'Poppins'),
-                  ),
-                ],
-              ),
-              if (!_isWhatsAppSame) ...[
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _whatsappCtrl,
-                  label: 'WhatsApp Number',
-                  hint: '10-digit number',
-                  icon: Iconsax.message,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
+          locked: _bizLocked,
+          child: _bizLocked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_hasPendingBizEdit) _pendingBanner(),
+                    _lockedField('Store Name', _storeNameCtrl.text),
+                    _lockedField('Legal Name', _businessNameCtrl.text),
+                    _lockedField('GSTIN', _gstinCtrl.text),
+                    _lockedField('PAN', _panCtrl.text),
+                    const SizedBox(height: 8),
+                    _requestEditButton(
+                      'REQUEST EDIT',
+                      _showBizEditSheet,
+                      disabled: _hasPendingBizEdit,
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _buildTextField(
+                      controller: _storeNameCtrl,
+                      label: 'Store Display Name',
+                      hint: 'e.g. Kiran Electronics',
+                      icon: Iconsax.shop,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Store name is required'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _businessNameCtrl,
+                      label: 'Legal Business Name',
+                      hint: 'Registered company name',
+                      icon: Iconsax.building,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _gstinCtrl,
+                      label: 'GSTIN',
+                      hint: '22AAAAA0000A1Z5',
+                      icon: Iconsax.document_text,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _panCtrl,
+                      label: 'PAN Number',
+                      hint: 'ABCDE1234F',
+                      icon: Iconsax.card,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
                   ],
                 ),
-              ],
-            ],
-          ),
         ),
         const SizedBox(height: 16),
+
+        // ── OWNER & CONTACT (billing lockable for name/phone) ──
+        _buildSectionCard(
+          title: 'Owner & Contact',
+          locked: _billingLocked,
+          child: _billingLocked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_hasPendingBillingEdit) _pendingBanner(),
+                    _lockedField('Owner', _ownerNameCtrl.text),
+                    _lockedField('Phone', _phoneCtrl.text),
+                    _lockedField('Email', _emailCtrl.text),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _buildTextField(
+                      controller: _ownerNameCtrl,
+                      label: 'Owner Name',
+                      hint: 'Your name',
+                      icon: Iconsax.user,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _phoneCtrl,
+                      label: 'Phone',
+                      hint: '10-digit',
+                      icon: Iconsax.call,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (v.trim().length < 10) return '10 digits';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _emailCtrl,
+                      label: 'Email',
+                      hint: 'your@email.com',
+                      icon: Iconsax.sms,
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _isWhatsAppSame,
+                          onChanged: (v) =>
+                              setState(() => _isWhatsAppSame = v ?? true),
+                          activeColor: accentColor,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        const Text(
+                          'WhatsApp same as phone',
+                          style: TextStyle(fontSize: 12, fontFamily: 'Poppins'),
+                        ),
+                      ],
+                    ),
+                    if (!_isWhatsAppSame) ...[
+                      const SizedBox(height: 8),
+                      _buildTextField(
+                        controller: _whatsappCtrl,
+                        label: 'WhatsApp',
+                        hint: '10-digit',
+                        icon: Iconsax.message,
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── BILLING ADDRESS (lockable) ──
         _buildSectionCard(
           title: 'Billing Address',
-          child: Column(
-            children: [
-              _buildTextField(
-                controller: _addressLine1Ctrl,
-                label: 'Address Line 1',
-                hint: 'Shop/Office, Building',
-                icon: Iconsax.location,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _addressLine2Ctrl,
-                label: 'Address Line 2',
-                hint: 'Street, Area',
-                icon: Iconsax.location,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _addressLine3Ctrl,
-                label: 'Address Line 3',
-                hint: 'Landmark (optional)',
-                icon: Iconsax.location,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildAutocompleteField(
-                      key: _stateFieldKey,
-                      controller: _stateCtrl,
-                      label: 'State',
-                      hint: 'Select',
-                      icon: Iconsax.map_1,
-                      options: _states,
-                      initialValue: _selectedState,
-                      onSelected: (v) {
-                        setState(() {
-                          _selectedState = v;
-                          _stateCtrl.text = v;
-                          _selectedCity = null;
-                          _cityCtrl.text = '';
-                          _cityFieldKey = UniqueKey();
-                        });
-                      },
+          locked: _billingLocked,
+          child: _billingLocked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_hasPendingBillingEdit) _pendingBanner(),
+                    _lockedField(
+                      'Address',
+                      [
+                        _addressLine1Ctrl.text,
+                        _addressLine2Ctrl.text,
+                        _addressLine3Ctrl.text,
+                      ].where((s) => s.trim().isNotEmpty).join(', '),
+                    ),
+                    _lockedField('City', _cityCtrl.text),
+                    _lockedField('State', _stateCtrl.text),
+                    _lockedField('Pincode', _pincodeCtrl.text),
+                    const SizedBox(height: 8),
+                    _requestEditButton(
+                      'REQUEST BILLING EDIT',
+                      _showBillingEditSheet,
+                      disabled: _hasPendingBillingEdit,
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _buildTextField(
+                      controller: _addressLine1Ctrl,
+                      label: 'Address Line 1',
+                      hint: 'Shop/Office',
+                      icon: Iconsax.location,
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Required' : null,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildAutocompleteField(
-                      key: _cityFieldKey,
-                      controller: _cityCtrl,
-                      label: 'City',
-                      hint: 'Select',
-                      icon: Iconsax.buildings_2,
-                      options: _getCitiesForState(_selectedState),
-                      initialValue: _selectedCity,
-                      onSelected: (v) {
-                        setState(() {
-                          _selectedCity = v;
-                          _cityCtrl.text = v;
-                        });
-                      },
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _addressLine2Ctrl,
+                      label: 'Address Line 2',
+                      hint: 'Street, Area',
+                      icon: Iconsax.location,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _pincodeCtrl,
-                label: 'Pincode',
-                hint: '360001',
-                icon: Iconsax.location_tick,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(6),
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  if (!RegExp(r'^[1-9][0-9]{5}$').hasMatch(v.trim()))
-                    return 'Invalid';
-                  return null;
-                },
-              ),
-            ],
-          ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _addressLine3Ctrl,
+                      label: 'Address Line 3',
+                      hint: 'Landmark',
+                      icon: Iconsax.location,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildAutocompleteField(
+                            key: _stateFieldKey,
+                            controller: _stateCtrl,
+                            label: 'State',
+                            hint: 'Select',
+                            icon: Iconsax.map_1,
+                            options: _states,
+                            initialValue: _selectedState,
+                            onSelected: (v) {
+                              setState(() {
+                                _selectedState = v;
+                                _stateCtrl.text = v;
+                                _selectedCity = null;
+                                _cityCtrl.text = '';
+                                _cityFieldKey = UniqueKey();
+                              });
+                            },
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildAutocompleteField(
+                            key: _cityFieldKey,
+                            controller: _cityCtrl,
+                            label: 'City',
+                            hint: 'Select',
+                            icon: Iconsax.buildings_2,
+                            options: _getCitiesForState(_selectedState),
+                            initialValue: _selectedCity,
+                            onSelected: (v) {
+                              setState(() {
+                                _selectedCity = v;
+                                _cityCtrl.text = v;
+                              });
+                            },
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Required'
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _pincodeCtrl,
+                      label: 'Pincode',
+                      hint: '360001',
+                      icon: Iconsax.location_tick,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(6),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Required';
+                        if (!RegExp(r'^[1-9][0-9]{5}$').hasMatch(v.trim()))
+                          return 'Invalid';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
         ),
         const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'GST & Compliance',
-          child: Column(
-            children: [
-              _buildTextField(
-                controller: _gstinCtrl,
-                label: 'GSTIN',
-                hint: '22AAAAA0000A1Z5',
-                icon: Iconsax.document_text,
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _panCtrl,
-                label: 'PAN Number',
-                hint: 'ABCDE1234F',
-                icon: Iconsax.card,
-                textCapitalization: TextCapitalization.characters,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
+
+        // ── BANK (always editable) ──
         _buildSectionCard(
           title: 'Bank Account',
           child: Column(
@@ -1372,14 +1886,14 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
               _buildTextField(
                 controller: _bankNameCtrl,
                 label: 'Bank Name',
-                hint: 'e.g. State Bank of India',
+                hint: 'e.g. SBI',
                 icon: Iconsax.bank,
               ),
               const SizedBox(height: 12),
               _buildTextField(
                 controller: _acNumberCtrl,
                 label: 'Account Number',
-                hint: 'Your bank A/C',
+                hint: 'A/C No',
                 icon: Iconsax.card,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -1411,13 +1925,15 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // ── SIGNATURE (always editable) ──
         _buildSectionCard(
           title: 'Digital Signature',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Required for invoices. Draw your signature below.',
+                'Required for invoices.',
                 style: TextStyle(
                   fontSize: 11,
                   color: Colors.grey.shade500,
@@ -1437,8 +1953,12 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     );
   }
 
-  // ═══ REUSABLE WIDGETS (same style as old) ═══
-  Widget _buildSectionCard({required String title, required Widget child}) {
+  // ═══ REUSABLE WIDGETS ═══
+  Widget _buildSectionCard({
+    required String title,
+    required Widget child,
+    bool locked = false,
+  }) {
     final isOpt =
         title == 'GST & Compliance' ||
         title == 'Business Logo' ||
@@ -1472,7 +1992,38 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
                 ),
               ),
               const SizedBox(width: 6),
-              if (!isOpt)
+              if (locked)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Iconsax.lock_1,
+                        size: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Locked',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey.shade600,
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (!isOpt)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
@@ -1511,23 +2062,21 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     int maxLines = 1,
     TextCapitalization textCapitalization = TextCapitalization.none,
     List<TextInputFormatter>? inputFormatters,
-  }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      textCapitalization: textCapitalization,
-      inputFormatters: inputFormatters,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 18),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        isDense: true,
-      ),
-    );
-  }
+  }) => TextFormField(
+    controller: controller,
+    validator: validator,
+    keyboardType: keyboardType,
+    maxLines: maxLines,
+    textCapitalization: textCapitalization,
+    inputFormatters: inputFormatters,
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, size: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      isDense: true,
+    ),
+  );
 
   Widget _buildAutocompleteField({
     required Key key,
@@ -1539,62 +2088,58 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
     required String? initialValue,
     required void Function(String) onSelected,
     String? Function(String?)? validator,
-  }) {
-    return Autocomplete<String>(
-      key: key,
-      initialValue: TextEditingValue(text: initialValue ?? ''),
-      optionsBuilder: (v) => v.text.isEmpty
-          ? options
-          : options.where(
-              (o) => o.toLowerCase().contains(v.text.toLowerCase()),
-            ),
-      onSelected: onSelected,
-      fieldViewBuilder: (ctx, ctrl, fn, os) {
-        if (ctrl.text.isEmpty && initialValue != null) ctrl.text = initialValue;
-        return TextFormField(
-          controller: ctrl,
-          focusNode: fn,
-          validator: validator,
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: hint,
-            prefixIcon: Icon(icon, size: 18),
-            suffixIcon: const Icon(Icons.arrow_drop_down),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            isDense: true,
-            filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.1),
-          ),
-        );
-      },
-      optionsViewBuilder: (ctx, onSel, opts) => Align(
-        alignment: Alignment.topLeft,
-        child: Material(
-          elevation: 4,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: MediaQuery.of(ctx).size.width - 64,
-            constraints: const BoxConstraints(maxHeight: 200),
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              itemCount: opts.length,
-              itemBuilder: (_, i) {
-                final o = opts.elementAt(i);
-                return ListTile(
-                  title: Text(
-                    o,
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-                  ),
-                  onTap: () => onSel(o),
-                );
-              },
-            ),
+  }) => Autocomplete<String>(
+    key: key,
+    initialValue: TextEditingValue(text: initialValue ?? ''),
+    optionsBuilder: (v) => v.text.isEmpty
+        ? options
+        : options.where((o) => o.toLowerCase().contains(v.text.toLowerCase())),
+    onSelected: onSelected,
+    fieldViewBuilder: (ctx, c, fn, os) {
+      if (c.text.isEmpty && initialValue != null) c.text = initialValue;
+      return TextFormField(
+        controller: c,
+        focusNode: fn,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixIcon: Icon(icon, size: 18),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.grey.withValues(alpha: 0.1),
+        ),
+      );
+    },
+    optionsViewBuilder: (ctx, onSel, opts) => Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: MediaQuery.of(ctx).size.width - 64,
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: ListView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            itemCount: opts.length,
+            itemBuilder: (_, i) {
+              final o = opts.elementAt(i);
+              return ListTile(
+                title: Text(
+                  o,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                ),
+                onTap: () => onSel(o),
+              );
+            },
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 
   Widget _buildInfoBanner() => Container(
     margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -1623,7 +2168,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         const SizedBox(width: 12),
         const Expanded(
           child: Text(
-            'Review your shop details. These will be shown to your customers on catalogues & orders.',
+            'Review your shop details. These will be shown to customers.',
             style: TextStyle(
               fontSize: 12,
               fontFamily: 'Poppins',
@@ -1636,19 +2181,17 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   );
 
   Widget _buildSavedSummaryCard() {
-    final l1 = _addressLine1Ctrl.text.trim();
-    final l2 = _addressLine2Ctrl.text.trim();
-    final city = _cityCtrl.text.trim();
-    final state = _selectedState ?? _stateCtrl.text.trim();
-    final pin = _pincodeCtrl.text.trim();
-    String addr = [
-      l1,
-      l2,
-      city,
-      state,
-      'India',
-    ].where((s) => s.isNotEmpty).join(', ');
-    if (pin.isNotEmpty) addr += ' - $pin';
+    final addr =
+        [
+          _addressLine1Ctrl.text.trim(),
+          _addressLine2Ctrl.text.trim(),
+          _cityCtrl.text.trim(),
+          _selectedState ?? _stateCtrl.text.trim(),
+          'India',
+        ].where((s) => s.isNotEmpty).join(', ') +
+        (_pincodeCtrl.text.trim().isNotEmpty
+            ? ' - ${_pincodeCtrl.text.trim()}'
+            : '');
     final name = _storeNameCtrl.text.trim().isNotEmpty
         ? _storeNameCtrl.text.trim()
         : (_businessNameCtrl.text.isEmpty
@@ -1792,7 +2335,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
         ),
       ),
       subtitle: const Text(
-        "The order will be delivered to you instead of a customer.",
+        "Deliver to you instead of customer.",
         style: TextStyle(
           fontSize: 11,
           fontFamily: 'Poppins',
@@ -1817,13 +2360,13 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
   );
 
   Widget _buildReadOnlyBody() {
-    if (_hasSavedDetails)
+    if (_hasSavedDetails) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
           SizedBox(height: 8),
           Text(
-            'To update your business details, open the menu/drawer and go to "Business Details".',
+            'To update, go to menu \u2192 "Business Details".',
             style: TextStyle(
               fontSize: 12,
               fontFamily: 'Poppins',
@@ -1832,6 +2375,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           ),
         ],
       );
+    }
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 20),
@@ -1867,7 +2411,7 @@ class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'To proceed with your order, you must first add your business details.\n\nPlease navigate to the Profile Page manually to add them.',
+            'Add your business details from the Profile page.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
