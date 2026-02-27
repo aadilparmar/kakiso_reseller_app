@@ -15,7 +15,17 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 const Color _kPrimary = Color(0xFF4A317E);
 
 class RecommendedSection extends StatefulWidget {
-  const RecommendedSection({super.key});
+  final int? configProductCount;
+  final String? configOrderBy;
+  final int? configCategoryId;
+  final String? configTitle;
+  const RecommendedSection({
+    super.key,
+    this.configProductCount,
+    this.configOrderBy,
+    this.configCategoryId,
+    this.configTitle,
+  });
 
   @override
   State<RecommendedSection> createState() => _RecommendedSectionState();
@@ -48,11 +58,24 @@ class _RecommendedSectionState extends State<RecommendedSection>
 
   Future<void> _fetchProducts() async {
     try {
-      final products = await ApiService().fetchProducts(
-        perPage: 15,
-        orderBy: 'popularity',
-        order: 'desc',
-      );
+      final count = widget.configProductCount ?? 15;
+      final orderBy = widget.configOrderBy ?? 'popularity';
+      final catId = widget.configCategoryId;
+      List<ProductModel> products;
+      if (catId != null && catId > 0) {
+        products = await ApiService().fetchProductsByCategory(
+          catId,
+          orderBy: orderBy,
+          order: orderBy == 'price' ? 'asc' : 'desc',
+        );
+        if (products.length > count) products = products.sublist(0, count);
+      } else {
+        products = await ApiService().fetchProducts(
+          perPage: count,
+          orderBy: orderBy,
+          order: orderBy == 'price' ? 'asc' : 'desc',
+        );
+      }
       if (mounted) {
         setState(() {
           _products = products;
@@ -179,8 +202,8 @@ class _RecommendedSectionState extends State<RecommendedSection>
                       end: Alignment.centerRight,
                     ).createShader(rect);
                   },
-                  child: const Text(
-                    'Featured Products',
+                  child: Text(
+                    widget.configTitle ?? 'Featured Products',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -194,8 +217,8 @@ class _RecommendedSectionState extends State<RecommendedSection>
               GestureDetector(
                 onTap: () {
                   Get.to(
-                    () => const AllProductsScreen(
-                      title: "Featured Products",
+                    () => AllProductsScreen(
+                      title: widget.configTitle ?? "Featured Products",
                       initialOrderBy: 'popularity',
                       initialOrder: 'desc',
                     ),

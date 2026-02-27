@@ -268,7 +268,13 @@ class TrendingCard extends StatelessWidget {
 
 // --- 2. MAIN SECTION ---
 class TrendingProducts extends StatefulWidget {
-  const TrendingProducts({super.key});
+  final int? configProductCount;
+  final String? configTitle;
+  const TrendingProducts({
+    super.key,
+    this.configProductCount,
+    this.configTitle,
+  });
 
   @override
   State<TrendingProducts> createState() => _TrendingProductsState();
@@ -297,7 +303,9 @@ class _TrendingProductsState extends State<TrendingProducts>
 
   Future<void> _fetchTrendingProducts() async {
     try {
-      final products = await ApiService().fetchTrendingProducts();
+      List<ProductModel> products = await ApiService().fetchTrendingProducts();
+      final maxCount = widget.configProductCount ?? 20;
+      if (products.length > maxCount) products = products.sublist(0, maxCount);
       if (mounted) {
         setState(() {
           _products = products;

@@ -11,7 +11,15 @@ const Color _kPrimary = Color(0xFF4A317E);
 const Color _kAccent = Color(0xFFEB2A7E);
 
 class TopRankingSection extends StatefulWidget {
-  const TopRankingSection({super.key});
+  final int? configTopCatId;
+  final int? configHotCatId;
+  final int? configProductCount;
+  const TopRankingSection({
+    super.key,
+    this.configTopCatId,
+    this.configHotCatId,
+    this.configProductCount,
+  });
 
   @override
   State<TopRankingSection> createState() => _TopRankingSectionState();
@@ -63,10 +71,30 @@ class _TopRankingSectionState extends State<TopRankingSection>
     try {
       List<ProductModel> products;
       if (tabName == 'Top') {
-        products = await ApiService().fetchTopRankingProducts();
+        final catId = widget.configTopCatId;
+        if (catId != null && catId > 0) {
+          products = await ApiService().fetchProductsByCategory(
+            catId,
+            orderBy: 'menu_order',
+            order: 'asc',
+          );
+        } else {
+          products = await ApiService().fetchTopRankingProducts();
+        }
       } else {
-        products = await ApiService().fetchHotRankingProducts();
+        final catId = widget.configHotCatId;
+        if (catId != null && catId > 0) {
+          products = await ApiService().fetchProductsByCategory(
+            catId,
+            orderBy: 'menu_order',
+            order: 'asc',
+          );
+        } else {
+          products = await ApiService().fetchHotRankingProducts();
+        }
       }
+      final maxCount = widget.configProductCount ?? 20;
+      if (products.length > maxCount) products = products.sublist(0, maxCount);
 
       if (!mounted) return;
 

@@ -15,7 +15,15 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/my_cart/my_cart.dart';
 
 class NewArrivalSection extends StatefulWidget {
-  const NewArrivalSection({super.key});
+  final int? configProductCount;
+  final int? configCategoryId;
+  final String? configTitle;
+  const NewArrivalSection({
+    super.key,
+    this.configProductCount,
+    this.configCategoryId,
+    this.configTitle,
+  });
 
   @override
   State<NewArrivalSection> createState() => _NewArrivalSectionState();
@@ -34,7 +42,23 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
 
   Future<void> _fetchNewestProducts() async {
     try {
-      final products = await ApiService().fetchNewestProducts();
+      final catId = widget.configCategoryId;
+      final count = widget.configProductCount ?? 10;
+      List<ProductModel> products;
+      if (catId != null && catId > 0) {
+        products = await ApiService().fetchProductsByCategory(
+          catId,
+          orderBy: 'date',
+          order: 'desc',
+        );
+        if (products.length > count) products = products.sublist(0, count);
+      } else {
+        products = await ApiService().fetchProducts(
+          perPage: count,
+          orderBy: 'date',
+          order: 'desc',
+        );
+      }
       if (mounted) {
         setState(() {
           _products = products;
@@ -171,8 +195,8 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
                             end: Alignment.centerRight,
                           ).createShader(rect);
                         },
-                        child: const Text(
-                          'Fresh Drops 🔥',
+                        child: Text(
+                          '${widget.configTitle ?? 'Fresh Drops'} 🔥',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -190,8 +214,8 @@ class _NewArrivalSectionState extends State<NewArrivalSection> {
                 onTap: () {
                   // --- NAVIGATION LOGIC ---
                   Get.to(
-                    () => const AllProductsScreen(
-                      title: "Fresh Drops",
+                    () => AllProductsScreen(
+                      title: widget.configTitle ?? "Fresh Drops",
                       initialOrderBy: 'date',
                       initialOrder: 'desc',
                     ),

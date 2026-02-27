@@ -6,7 +6,13 @@ import 'package:kakiso_reseller_app/services/api_services.dart';
 
 // --- IMPORT CATEGORY DETAILS PAGE ---
 class CuratedCollections extends StatefulWidget {
-  const CuratedCollections({super.key});
+  final int? configMaxCount;
+  final List<int>? configCategoryIds;
+  const CuratedCollections({
+    super.key,
+    this.configMaxCount,
+    this.configCategoryIds,
+  });
 
   @override
   State<CuratedCollections> createState() => _CuratedCollectionsState();
@@ -24,11 +30,23 @@ class _CuratedCollectionsState extends State<CuratedCollections> {
 
   Future<void> _fetchData() async {
     try {
-      final data = await ApiService().fetchCategories();
-      // We need at least 3 categories for the mosaic
-      if (data.length >= 3 && mounted) {
+      final allCats = await ApiService().fetchCategories();
+      final maxCount = widget.configMaxCount ?? 3;
+      List<CategoryModel> filtered;
+      if (widget.configCategoryIds != null &&
+          widget.configCategoryIds!.isNotEmpty) {
+        // Use admin-specified categories in order
+        filtered = widget.configCategoryIds!
+            .map((id) => allCats.firstWhereOrNull((c) => c.id == id))
+            .whereType<CategoryModel>()
+            .toList();
+        if (filtered.length < 3) filtered = allCats.take(maxCount).toList();
+      } else {
+        filtered = allCats.take(maxCount).toList();
+      }
+      if (filtered.length >= 3 && mounted) {
         setState(() {
-          _categories = data.take(3).toList(); // Take top 3
+          _categories = filtered;
           _isLoading = false;
         });
       }

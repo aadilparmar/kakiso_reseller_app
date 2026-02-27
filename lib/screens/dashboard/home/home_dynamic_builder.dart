@@ -1,6 +1,6 @@
 // lib/screens/dashboard/home/home_dynamic_builder.dart
-// Dynamic home screen section builder — driven by admin config from WP
-// Falls back to built-in widgets if no config or section disabled
+// v3: Passes admin config directly to ORIGINAL widgets via optional params.
+// Zero design changes. All original widget designs preserved exactly.
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -9,6 +9,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:kakiso_reseller_app/models/product.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_page.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/home_video_banner.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/story_section.dart';
@@ -18,6 +19,7 @@ import 'package:kakiso_reseller_app/screens/dashboard/widgets/top_products.dart'
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/new_arrival_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/trending.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/widgets/curated_collections.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/home/widgets/budget_store_section.dart';
 import 'package:kakiso_reseller_app/services/api_services.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
@@ -36,7 +38,8 @@ class HomeSection {
   final String imageUrl;
   final String linkType;
   final String linkValue;
-  final List<Map<String, dynamic>> products; // pre-fetched by API
+  final List<Map<String, dynamic>> products;
+  final Map<String, String> settings;
 
   HomeSection({
     required this.type,
@@ -51,6 +54,7 @@ class HomeSection {
     this.linkType = 'none',
     this.linkValue = '',
     this.products = const [],
+    this.settings = const {},
   });
 
   factory HomeSection.fromJson(Map<String, dynamic> j) => HomeSection(
@@ -72,22 +76,26 @@ class HomeSection {
             j['products'].map((e) => Map<String, dynamic>.from(e)),
           )
         : [],
+    settings: (j['settings'] is Map)
+        ? Map<String, String>.from(
+            (j['settings'] as Map).map((k, v) => MapEntry('$k', '$v')),
+          )
+        : {},
   );
 
-  Map<String, dynamic> toJson() => {
-    'type': type,
-    'enabled': enabled,
-    'order': order,
-    'title': title,
-    'subtitle': subtitle,
-    'product_ids': productIds,
-    'category_id': categoryId,
-    'limit': limit,
-    'image_url': imageUrl,
-    'link_type': linkType,
-    'link_value': linkValue,
-    'products': products,
-  };
+  String setting(String key, [String fallback = '']) =>
+      settings[key]?.isNotEmpty == true ? settings[key]! : fallback;
+  int settingInt(String key, [int fallback = 0]) =>
+      int.tryParse(settings[key] ?? '') ?? fallback;
+  List<int> settingIntList(String key) {
+    final raw = settings[key] ?? '';
+    if (raw.isEmpty) return [];
+    return raw
+        .split(',')
+        .map((s) => int.tryParse(s.trim()) ?? 0)
+        .where((v) => v > 0)
+        .toList();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -96,7 +104,6 @@ class HomeSection {
 class HomeConfigController extends GetxController {
   static const String _cacheKey = 'home_config_cache';
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-
   final RxList<HomeSection> sections = <HomeSection>[].obs;
   final RxBool isConfigured = false.obs;
   final RxBool isLoading = true.obs;
@@ -109,30 +116,19 @@ class HomeConfigController extends GetxController {
 
   Future<void> _loadConfig() async {
     isLoading.value = true;
-
-    // 1. Load from local cache first (instant UI)
+    // Load cache first for instant UI
     try {
-      final cached = await _storage.read(key: _cacheKey);
-      if (cached != null) {
-        final data = jsonDecode(cached);
-        _parseConfig(data);
-      }
-    } catch (e) {
-      debugPrint('HomeConfig: cache load error: $e');
-    }
-
-    // 2. Fetch fresh from server
+      final c = await _storage.read(key: _cacheKey);
+      if (c != null) _parseConfig(jsonDecode(c));
+    } catch (_) {}
+    // Fetch fresh from server
     try {
-      final data = await ApiService().fetchHomeConfig();
-      if (data != null) {
-        _parseConfig(data);
-        // Cache it
-        await _storage.write(key: _cacheKey, value: jsonEncode(data));
+      final d = await ApiService().fetchHomeConfig();
+      if (d != null) {
+        _parseConfig(d);
+        await _storage.write(key: _cacheKey, value: jsonEncode(d));
       }
-    } catch (e) {
-      debugPrint('HomeConfig: fetch error: $e');
-    }
-
+    } catch (_) {}
     isLoading.value = false;
   }
 
@@ -147,161 +143,274 @@ class HomeConfigController extends GetxController {
     sections.assignAll(list);
   }
 
-  /// Force refresh (pull-to-refresh)
   Future<void> refresh() async => _loadConfig();
 
-  // ── DEFAULT SECTIONS (matches current hardcoded home screen) ──
   static List<HomeSection> get defaults => [
-    HomeSection(
-      type: 'video_banner',
-      enabled: true,
-      order: 1,
-      title: 'Video Banner',
-    ),
-    HomeSection(type: 'stories', enabled: true, order: 2, title: 'Categories'),
-    HomeSection(
-      type: 'recommended',
-      enabled: true,
-      order: 3,
-      title: 'Recommended',
-    ),
-    HomeSection(
-      type: 'flash_sale',
-      enabled: true,
-      order: 4,
-      title: 'Flash Sale',
-    ),
-    HomeSection(
-      type: 'top_ranking',
-      enabled: true,
-      order: 5,
-      title: 'Top Ranking',
-    ),
-    HomeSection(
-      type: 'new_arrivals',
-      enabled: true,
-      order: 6,
-      title: 'New Arrivals',
-    ),
-    HomeSection(type: 'trending', enabled: true, order: 7, title: 'Trending'),
-    HomeSection(type: 'curated', enabled: true, order: 8, title: 'Curated'),
-    HomeSection(type: 'budget', enabled: true, order: 9, title: 'Budget Store'),
+    HomeSection(type: 'video_banner', enabled: true, order: 1),
+    HomeSection(type: 'stories', enabled: true, order: 2),
+    HomeSection(type: 'recommended', enabled: true, order: 3),
+    HomeSection(type: 'flash_sale', enabled: true, order: 4),
+    HomeSection(type: 'top_ranking', enabled: true, order: 5),
+    HomeSection(type: 'new_arrivals', enabled: true, order: 6),
+    HomeSection(type: 'trending', enabled: true, order: 7),
+    HomeSection(type: 'curated', enabled: true, order: 8),
+    HomeSection(type: 'budget', enabled: true, order: 9),
   ];
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DYNAMIC SECTION BUILDER
+// SECTION BUILDER — passes config to ORIGINAL widgets
 // ═══════════════════════════════════════════════════════════════
 class HomeSectionBuilder {
-  /// Build widget list from config sections.
-  /// [budgetSectionBuilder] should be the existing _buildBudgetSection() from HomePage.
   static List<Widget> buildSections({
     required List<HomeSection> sections,
     required Widget Function() budgetSectionBuilder,
   }) {
+    final active = sections.where((s) => s.enabled).toList();
+    if (active.isEmpty) return _buildDefaults(budgetSectionBuilder);
     final widgets = <Widget>[];
-    final activeSections = sections.where((s) => s.enabled).toList();
-
-    if (activeSections.isEmpty) {
-      // No config → return defaults (same as current hardcoded)
-      return _buildDefaults(budgetSectionBuilder);
-    }
-
-    for (final sec in activeSections) {
-      final w = _buildSection(sec, budgetSectionBuilder);
+    for (final sec in active) {
+      final w = _build(sec, budgetSectionBuilder);
       if (w != null) {
         widgets.add(w);
         widgets.add(const SizedBox(height: 10));
       }
     }
-
-    if (widgets.isNotEmpty && widgets.last is SizedBox) {
-      widgets.removeLast(); // remove trailing spacer
-    }
-    widgets.add(const SizedBox(height: 16)); // bottom padding
-
+    if (widgets.isNotEmpty && widgets.last is SizedBox) widgets.removeLast();
+    widgets.add(const SizedBox(height: 16));
     return widgets;
   }
 
-  static Widget? _buildSection(
-    HomeSection sec,
-    Widget Function() budgetBuilder,
-  ) {
+  /// Build each section using the ORIGINAL widget with optional config params.
+  /// If admin hasn't set any config → widget gets null params → uses its own defaults.
+  /// Design stays 100% identical.
+  static Widget? _build(HomeSection sec, Widget Function() budgetBuilder) {
     switch (sec.type) {
       case 'video_banner':
+        final images = sec.setting('banner_images');
+        if (images.isNotEmpty) return _ConfigImageBanner(section: sec);
         return const VideoBannerCarousel();
+
       case 'stories':
         return const StorySection();
+
       case 'recommended':
-        return const RecommendedSection();
+        final catId = sec.settingInt('category_id');
+        final count = sec.settingInt('product_count');
+        final orderBy = sec.setting('order_by');
+        final title = sec.title;
+        return RecommendedSection(
+          configProductCount: count > 0 ? count : null,
+          configOrderBy: orderBy.isNotEmpty ? orderBy : null,
+          configCategoryId: catId > 0 ? catId : null,
+          configTitle: title.isNotEmpty ? title : null,
+        );
+
       case 'flash_sale':
-        return const FlashSaleBanner();
+        final productId = sec.settingInt('flash_product_id');
+        return FlashSaleBanner(
+          configProductId: productId > 0 ? productId : null,
+        );
+
       case 'top_ranking':
-        return const TopRankingSection();
+        final topCat = sec.settingInt('top_category_id');
+        final hotCat = sec.settingInt('hot_category_id');
+        final count = sec.settingInt('product_count');
+        return TopRankingSection(
+          configTopCatId: topCat > 0 ? topCat : null,
+          configHotCatId: hotCat > 0 ? hotCat : null,
+          configProductCount: count > 0 ? count : null,
+        );
+
       case 'new_arrivals':
-        return const NewArrivalSection();
+        final catId = sec.settingInt('category_id');
+        final count = sec.settingInt('product_count');
+        final title = sec.title;
+        return NewArrivalSection(
+          configProductCount: count > 0 ? count : null,
+          configCategoryId: catId > 0 ? catId : null,
+          configTitle: title.isNotEmpty ? title : null,
+        );
+
       case 'trending':
-        return const TrendingProducts();
+        final count = sec.settingInt('product_count');
+        final title = sec.title;
+        return TrendingProducts(
+          configProductCount: count > 0 ? count : null,
+          configTitle: title.isNotEmpty ? title : null,
+        );
+
       case 'curated':
-        return const CuratedCollections();
+        final maxCount = sec.settingInt('max_count');
+        final catIds = sec.settingIntList('category_ids');
+        return CuratedCollections(
+          configMaxCount: maxCount > 0 ? maxCount : null,
+          configCategoryIds: catIds.isNotEmpty ? catIds : null,
+        );
+
       case 'budget':
         return budgetBuilder();
+
+      // ── CUSTOM SECTIONS (admin-added, not built-in) ──
       case 'custom_products':
         return sec.products.isNotEmpty
-            ? CustomProductCarousel(section: sec)
+            ? _CustomProductCarousel(section: sec)
             : null;
       case 'category_products':
         return sec.products.isNotEmpty
-            ? CustomProductCarousel(section: sec)
+            ? _CustomProductCarousel(section: sec)
             : null;
       case 'custom_banner':
         return sec.imageUrl.isNotEmpty
-            ? CustomBannerWidget(section: sec)
+            ? _CustomBannerWidget(section: sec)
             : null;
       default:
         return null;
     }
   }
 
-  static List<Widget> _buildDefaults(Widget Function() budgetBuilder) {
-    return [
-      const SizedBox(height: 8),
-      const VideoBannerCarousel(),
-      const StorySection(),
-      const SizedBox(height: 16),
-      const RecommendedSection(),
-      const SizedBox(height: 10),
-      const FlashSaleBanner(),
-      const SizedBox(height: 16),
-      const TopRankingSection(),
-      const SizedBox(height: 6),
-      const NewArrivalSection(),
-      const TrendingProducts(),
-      const SizedBox(height: 16),
-      const CuratedCollections(),
-      const SizedBox(height: 16),
-      budgetBuilder(),
-      const SizedBox(height: 16),
-    ];
+  static List<Widget> _buildDefaults(Widget Function() budgetBuilder) => [
+    const SizedBox(height: 8),
+    const VideoBannerCarousel(),
+    const StorySection(),
+    const SizedBox(height: 16),
+    const RecommendedSection(),
+    const SizedBox(height: 10),
+    const FlashSaleBanner(),
+    const SizedBox(height: 16),
+    const TopRankingSection(),
+    const SizedBox(height: 6),
+    const NewArrivalSection(),
+    const TrendingProducts(),
+    const SizedBox(height: 16),
+    const CuratedCollections(),
+    const SizedBox(height: 16),
+    budgetBuilder(),
+    const SizedBox(height: 16),
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIGURABLE IMAGE BANNER (only when admin uploads banner images
+// to replace the video banner — otherwise VideoBannerCarousel is used)
+// ═══════════════════════════════════════════════════════════════
+class _ConfigImageBanner extends StatefulWidget {
+  final HomeSection section;
+  const _ConfigImageBanner({required this.section});
+  @override
+  State<_ConfigImageBanner> createState() => _ConfigImageBannerState();
+}
+
+class _ConfigImageBannerState extends State<_ConfigImageBanner> {
+  late PageController _pc;
+  int _current = 0;
+  late List<String> _urls;
+
+  @override
+  void initState() {
+    super.initState();
+    _urls = widget.section
+        .setting('banner_images')
+        .split('\n')
+        .where((u) => u.trim().isNotEmpty)
+        .toList();
+    _pc = PageController();
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    final interval = widget.section.settingInt('scroll_interval', 10);
+    Future.delayed(Duration(seconds: interval), () {
+      if (!mounted) return;
+      final next = (_current + 1) % _urls.length;
+      if (_pc.hasClients)
+        _pc.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      _startAutoScroll();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_urls.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 220,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          PageView.builder(
+            controller: _pc,
+            itemCount: _urls.length,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (_, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: _urls[i],
+                  width: double.infinity,
+                  height: 220,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: Colors.grey.shade100,
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: Colors.grey.shade200,
+                    child: const Center(child: Icon(Iconsax.image, size: 32)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 14,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _urls.length,
+                (i) => Container(
+                  width: i == _current ? 20 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    color: i == _current ? accentColor : Colors.grey.shade400,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CUSTOM PRODUCT CAROUSEL WIDGET
-// Shows admin-picked products in a horizontal carousel
+// CUSTOM PRODUCT CAROUSEL (for admin-picked products via IDs)
 // ═══════════════════════════════════════════════════════════════
-class CustomProductCarousel extends StatelessWidget {
+class _CustomProductCarousel extends StatelessWidget {
   final HomeSection section;
-  const CustomProductCarousel({super.key, required this.section});
-
+  const _CustomProductCarousel({required this.section});
   @override
   Widget build(BuildContext context) {
     if (section.products.isEmpty) return const SizedBox.shrink();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
@@ -346,47 +455,43 @@ class CustomProductCarousel extends StatelessWidget {
             ],
           ),
         ),
-
-        // Product List
         SizedBox(
           height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: section.products.length,
-            itemBuilder: (_, i) => _buildCard(section.products[i]),
+            itemBuilder: (_, i) => _CustomCard(data: section.products[i]),
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildCard(Map<String, dynamic> p) {
-    final name = p['name'] ?? '';
-    final price = '${p['price'] ?? ''}';
-    final regularPrice = '${p['regular_price'] ?? ''}';
-    final salePrice = '${p['sale_price'] ?? ''}';
-    final image = p['image'] ?? '';
-    final id = p['id'] ?? 0;
-
-    final hasDiscount =
-        salePrice.isNotEmpty && salePrice != price && regularPrice.isNotEmpty;
-    int discountPct = 0;
-    if (hasDiscount) {
-      final rp = double.tryParse(regularPrice) ?? 0;
-      final sp = double.tryParse(salePrice) ?? 0;
-      if (rp > 0) discountPct = ((1 - sp / rp) * 100).round();
+class _CustomCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _CustomCard({required this.data});
+  @override
+  Widget build(BuildContext context) {
+    final name = data['name'] ?? '';
+    final price = '${data['price'] ?? ''}';
+    final regPrice = '${data['regular_price'] ?? ''}';
+    final salePrice = '${data['sale_price'] ?? ''}';
+    final image = data['image'] ?? '';
+    final id = data['id'] ?? 0;
+    final hasDsc =
+        salePrice.isNotEmpty && salePrice != price && regPrice.isNotEmpty;
+    int disc = 0;
+    if (hasDsc) {
+      final r = double.tryParse(regPrice) ?? 0;
+      final s = double.tryParse(salePrice) ?? 0;
+      if (r > 0) disc = ((1 - s / r) * 100).round();
     }
-
     return GestureDetector(
       onTap: () async {
-        try {
-          final product = await ApiService().fetchProductByIdSafe('$id');
-          if (product != null)
-            Get.to(() => ProductDetailsPage(product: product));
-        } catch (e) {
-          debugPrint('Custom product tap error: $e');
-        }
+        final p = await ApiService().fetchProductByIdSafe('$id');
+        if (p != null) Get.to(() => ProductDetailsPage(product: p));
       },
       child: Container(
         width: 140,
@@ -406,7 +511,6 @@ class CustomProductCarousel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(14),
@@ -436,7 +540,7 @@ class CustomProductCarousel extends StatelessWidget {
                             ),
                           ),
                   ),
-                  if (discountPct > 0)
+                  if (disc > 0)
                     Positioned(
                       top: 6,
                       left: 6,
@@ -450,7 +554,7 @@ class CustomProductCarousel extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '-$discountPct%',
+                          '-$disc%',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -462,7 +566,6 @@ class CustomProductCarousel extends StatelessWidget {
                 ],
               ),
             ),
-            // Info
             Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
@@ -476,7 +579,6 @@ class CustomProductCarousel extends StatelessWidget {
                       fontSize: 11,
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
                       height: 1.2,
                     ),
                   ),
@@ -492,10 +594,10 @@ class CustomProductCarousel extends StatelessWidget {
                           color: Color(0xFF4A317E),
                         ),
                       ),
-                      if (hasDiscount) ...[
+                      if (hasDsc) ...[
                         const SizedBox(width: 4),
                         Text(
-                          '\u20B9$regularPrice',
+                          '\u20B9$regPrice',
                           style: TextStyle(
                             fontSize: 10,
                             fontFamily: 'Poppins',
@@ -517,17 +619,14 @@ class CustomProductCarousel extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CUSTOM BANNER WIDGET
-// Shows admin-uploaded banner image with optional link
+// CUSTOM BANNER WIDGET (admin-uploaded image banner)
 // ═══════════════════════════════════════════════════════════════
-class CustomBannerWidget extends StatelessWidget {
+class _CustomBannerWidget extends StatelessWidget {
   final HomeSection section;
-  const CustomBannerWidget({super.key, required this.section});
-
+  const _CustomBannerWidget({required this.section});
   @override
   Widget build(BuildContext context) {
     if (section.imageUrl.isEmpty) return const SizedBox.shrink();
-
     return GestureDetector(
       onTap: _handleTap,
       child: Container(
@@ -571,17 +670,12 @@ class CustomBannerWidget extends StatelessWidget {
 
   void _handleTap() {
     if (section.linkType == 'none' || section.linkValue.isEmpty) return;
-    // For category/product links, the app can handle navigation
-    // For URL links, you could use url_launcher
-    debugPrint('Banner tapped: ${section.linkType} → ${section.linkValue}');
     if (section.linkType == 'product') {
       final pid = int.tryParse(section.linkValue);
-      if (pid != null) {
-        ApiService().fetchProductByIdSafe('$pid').then((product) {
-          if (product != null)
-            Get.to(() => ProductDetailsPage(product: product));
+      if (pid != null)
+        ApiService().fetchProductByIdSafe('$pid').then((p) {
+          if (p != null) Get.to(() => ProductDetailsPage(product: p));
         });
-      }
     }
   }
 }

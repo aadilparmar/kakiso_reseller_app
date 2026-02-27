@@ -11,7 +11,8 @@ import 'package:kakiso_reseller_app/screens/dashboard/product/product_details_pa
 import 'package:kakiso_reseller_app/services/api_services.dart';
 
 class FlashSaleBanner extends StatefulWidget {
-  const FlashSaleBanner({super.key});
+  final int? configProductId;
+  const FlashSaleBanner({super.key, this.configProductId});
 
   @override
   State<FlashSaleBanner> createState() => _FlashSaleBannerState();
@@ -68,6 +69,20 @@ class _FlashSaleBannerState extends State<FlashSaleBanner>
 
   Future<void> _fetchFlashProduct() async {
     try {
+      // If admin set a specific product, use it
+      if (widget.configProductId != null && widget.configProductId! > 0) {
+        final p = await ApiService().fetchProductByIdSafe(
+          '${widget.configProductId}',
+        );
+        if (p != null && mounted) {
+          setState(() {
+            _flashProduct = p;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      // Default: pick from popular products
       final products = await ApiService().fetchProducts();
       if (products.isNotEmpty && mounted) {
         setState(() {
