@@ -747,7 +747,10 @@ class ApiService {
       debugPrint('CatalogAPI: GET /catalogs?user_id=$userId');
       final response = await dio.get(
         '/wp-json/kakiso/v1/catalogs',
-        queryParameters: {'user_id': userId},
+        queryParameters: {
+          'user_id': userId,
+          '_t': DateTime.now().millisecondsSinceEpoch, // ← ADD THIS LINE
+        },
         options: Options(extra: {'cache_policy': CachePolicy.noCache}),
       );
       final data = response.data;
@@ -909,6 +912,62 @@ class ApiService {
     } catch (e) {
       debugPrint('CatalogAPI: batchFetch error: $e');
       return null;
+    }
+  }
+  // ===========================================================================
+  // 13. BUSINESS DETAILS API — Syncs with web dashboard's reseller_* meta keys
+  // ===========================================================================
+  // ADD these methods inside ApiService class, BEFORE the final closing }
+  // ===========================================================================
+
+  /// Fetch ALL business details from server (same data as web dashboard)
+  Future<Map<String, dynamic>?> fetchFullBusinessDetails({
+    required String userId,
+  }) async {
+    final dio = await _client;
+    try {
+      debugPrint('BusinessAPI: GET /business?user_id=$userId');
+      final response = await dio.get(
+        '/wp-json/kakiso/v1/business',
+        queryParameters: {
+          'user_id': userId,
+          '_t': DateTime.now().millisecondsSinceEpoch,
+        },
+        options: Options(extra: {'cache_policy': CachePolicy.noCache}),
+      );
+      final data = response.data;
+      if (data is Map && data['success'] == true) {
+        debugPrint('BusinessAPI: Fetched business details');
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('BusinessAPI: fetch error: $e');
+      return null;
+    }
+  }
+
+  /// Save ALL business details to server (syncs with web dashboard)
+  Future<bool> saveFullBusinessDetails({
+    required String userId,
+    required Map<String, dynamic> data,
+  }) async {
+    final dio = await _client;
+    try {
+      final payload = Map<String, dynamic>.from(data);
+      payload['user_id'] = int.tryParse(userId) ?? userId;
+
+      debugPrint('BusinessAPI: POST /business/save');
+      final response = await dio.post(
+        '/wp-json/kakiso/v1/business/save',
+        data: payload,
+      );
+      final ok = response.data['success'] == true;
+      debugPrint('BusinessAPI: save result=$ok');
+      return ok;
+    } catch (e) {
+      debugPrint('BusinessAPI: save error: $e');
+      return false;
     }
   }
 }
