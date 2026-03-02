@@ -5,9 +5,11 @@ import 'package:iconsax/iconsax.dart';
 import 'package:kakiso_reseller_app/controllers/product_details_controller.dart';
 import 'package:kakiso_reseller_app/controllers/catalouge_controller.dart';
 import 'package:kakiso_reseller_app/models/product.dart';
+import 'package:kakiso_reseller_app/screens/dashboard/product/live_tryon_screen.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/widgets/price_calculator.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/product/widgets/similar_product_section.dart';
 import 'package:kakiso_reseller_app/screens/dashboard/wishlist/wishlist.dart';
+import 'package:kakiso_reseller_app/services/gemini_tryon_service.dart';
 import 'package:kakiso_reseller_app/utils/constants.dart';
 
 // --- WIDGET IMPORTS ---
@@ -84,7 +86,9 @@ class ProductDetailsPage extends StatelessWidget {
                     const SizedBox(height: 16),
                     const Divider(height: 1, color: Color(0xFFF3F4F6)),
                     const SizedBox(height: 24),
-
+                    // ✨ LIVE TRY-ON BUTTON
+                    if (product.images.isNotEmpty) _buildTryOnButton(product),
+                    if (product.images.isNotEmpty) const SizedBox(height: 16),
                     // Variant Selectors (Size/Color)
                     if (product.attributes.isNotEmpty)
                       ...product.attributes.map(
@@ -675,6 +679,108 @@ class ProductDetailsPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTryOnButton(ProductModel product) {
+    final RxBool isAnalyzing = false.obs;
+
+    return Obx(
+      () => GestureDetector(
+        onTap: isAnalyzing.value
+            ? null
+            : () async {
+                isAnalyzing.value = true;
+
+                try {
+                  final imageUrl = product.images.isNotEmpty
+                      ? product.images.first
+                      : product.image;
+
+                  final analysis = await GeminiTryOnService.analyzeProduct(
+                    imageUrl,
+                  );
+
+                  if (analysis.canTryOn) {
+                    Get.to(
+                      () => LiveTryOnScreen(
+                        productImageUrl: imageUrl,
+                        productName: product.name,
+                        category: analysis.category,
+                        placement: analysis.placement,
+                      ),
+                    );
+                  } else {
+                    Get.snackbar(
+                      'Try-On Not Available',
+                      analysis.reason,
+                      snackPosition: SnackPosition.BOTTOM,
+                      margin: const EdgeInsets.all(16),
+                      borderRadius: 12,
+                      backgroundColor: Colors.grey.shade800,
+                      colorText: Colors.white,
+                      icon: const Icon(Icons.info_outline, color: Colors.white),
+                      duration: const Duration(seconds: 3),
+                    );
+                  }
+                } catch (e) {
+                  Get.snackbar(
+                    'Error',
+                    'Could not start try-on. Please try again.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    margin: const EdgeInsets.all(16),
+                    borderRadius: 12,
+                    backgroundColor: Colors.red.shade700,
+                    colorText: Colors.white,
+                  );
+                } finally {
+                  isAnalyzing.value = false;
+                }
+              },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF43397), Color(0xFFAB47BC)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF43397).withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isAnalyzing.value)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              else
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                isAnalyzing.value ? 'Analyzing product...' : '✨ Try On Live',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

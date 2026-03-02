@@ -51,6 +51,8 @@ flutter {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
+    implementation ("androidx.concurrent:concurrent-futures:1.1.0")
+
     // Add other dependencies your app needs
 coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
