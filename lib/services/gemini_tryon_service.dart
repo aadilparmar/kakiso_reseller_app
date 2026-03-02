@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 // ═══════════════════════════════════════════════════════════════════
 
 /// ────── PASTE YOUR GEMINI API KEY HERE ──────
-const String geminiApiKey = 'AIzaSyBYAx4LG6JkKx8j1RsYRv_i7TiWPdHwLfA';
+const String geminiApiKey = '';
 
 enum TryOnCategory {
   earring,
