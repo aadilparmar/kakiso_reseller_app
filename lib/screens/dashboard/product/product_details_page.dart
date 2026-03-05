@@ -708,6 +708,7 @@ class ProductDetailsPage extends StatelessWidget {
                         productName: product.name,
                         category: analysis.category,
                         placement: analysis.placement,
+                        structure: analysis.structure, // ← NEW: pass structure
                       ),
                     );
                   } else {
